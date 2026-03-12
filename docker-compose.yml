@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: dig_stellar_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dig
+      POSTGRES_PASSWORD: dig
+      POSTGRES_DB: dig_stellar
+    ports:
+      - "5432:5432"
+    volumes:
+      - dig_stellar_pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: dig_stellar_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - dig_stellar_redisdata:/data
+
+volumes:
+  dig_stellar_pgdata:
+  dig_stellar_redisdata:
