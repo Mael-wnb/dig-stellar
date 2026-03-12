@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Protocol {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String
+  category  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  venues Venue[]
+}
+
+model Venue {
+  id         String   @id @default(cuid())
+  protocolId String
+  protocol   Protocol @relation(fields: [protocolId], references: [id])
+
+  key        String   @unique
+  type       String   // pool | market | vault | bridge
+  label      String?
+  meta       Json?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  snapshots Snapshot[]
+}
+
+model Snapshot {
+  id          String   @id @default(cuid())
+  venueId     String
+  venue       Venue    @relation(fields: [venueId], references: [id])
+  ts          DateTime @db.Timestamptz(6)
+
+  tvl         Float?
+  liquidity   Float?
+  volume      Float?
+  apy         Float?
+  utilization Float?
+
+  inflow      Float?
+  outflow     Float?
+  netflow     Float?
+
+  data        Json?
+
+  @@index([venueId, ts])
+}
