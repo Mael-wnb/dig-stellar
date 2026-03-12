@@ -73,23 +73,23 @@ flowchart TB
 This diagram zooms into the data path: sources feed a protocol-first adapter layer, data is normalized into unified entities, stored, and served to the dashboard.
 
 ```mermaid
-  flowchart LR
+flowchart LR
   subgraph Sources[Sources]
     H[Horizon API]
     S[Soroban RPC]
     P[Protocol APIs/SDKs]
-    B[Bridge data (e.g., Allbridge)]
+    B[Bridge data - Allbridge]
   end
 
   subgraph Indexing[Indexing and Normalization]
-    A[Adapter layer (protocol-first)]
-    N[Normalizer (unified entities)]
-    J[Jobs/Scheduler (run-once + periodic)]
+    A[Adapter layer - protocol-first]
+    N[Normalizer - unified entities]
+    J[Jobs/Scheduler - run-once + periodic]
   end
 
   subgraph Storage[Storage]
     DB[(Postgres - Prisma)]
-    Snap[Snapshots (time-windowed)]
+    Snap[Snapshots - time-windowed]
   end
 
   subgraph Serving[Serving]
@@ -104,3 +104,4 @@ This diagram zooms into the data path: sources feed a protocol-first adapter lay
   J --> A
   A --> N --> DB
   DB --> Snap --> API --> UI
+
