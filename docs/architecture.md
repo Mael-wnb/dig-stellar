@@ -66,3 +66,40 @@ flowchart TB
   Exec -->|Prepare action proposal| UI
   UI -->|User reviews and approves| WK
   UI -->|Submit to network| SorobanRPC
+
+## 2) System Architecture (High-level)
+
+This diagram shows the end-to-end system at a high level: wallet connectivity, API gateway, indexing layer, storage, portfolio monitoring, alerts, and optional actions.
+
+```mermaid
+  flowchart LR
+  subgraph Sources[Sources]
+    H[Horizon API]
+    S[Soroban RPC]
+    P[Protocol APIs/SDKs]
+    B[Bridge data (e.g., Allbridge)]
+  end
+
+  subgraph Indexing[Indexing and Normalization]
+    A[Adapter layer (protocol-first)]
+    N[Normalizer (unified entities)]
+    J[Jobs/Scheduler (run-once + periodic)]
+  end
+
+  subgraph Storage[Storage]
+    DB[(Postgres - Prisma)]
+    Snap[Snapshots (time-windowed)]
+  end
+
+  subgraph Serving[Serving]
+    API[REST API]
+    UI[Dashboard]
+  end
+
+  H --> A
+  S --> A
+  P --> A
+  B --> A
+  J --> A
+  A --> N --> DB
+  DB --> Snap --> API --> UI
