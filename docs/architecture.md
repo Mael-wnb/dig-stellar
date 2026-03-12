@@ -121,8 +121,8 @@ flowchart TB
   API --> DB[(Postgres)]
 
   subgraph Portfolio[Portfolio]
-    Port[Consolidation (multi-wallet overview)]
-    Pos[Position resolvers (protocol-level)]
+    Port[Consolidation - multi-wallet overview]
+    Pos[Position resolvers - protocol-level]
   end
 
   API --> Port
@@ -131,16 +131,16 @@ flowchart TB
   Pos --> DB
 
   subgraph Alerts[Alerts]
-    Rules[Rule engine (thresholds + anomalies)]
+    Rules[Rule engine - thresholds and anomalies]
     Feed[In-app alerts feed]
   end
 
   DB --> Rules --> Feed
   API --> Feed
 
-  subgraph Actions[Optional actions (non-custodial)]
-    Propose[Build action proposal (swap/deposit/withdraw where supported)]
-    Review[User review + approval]
+  subgraph Actions[Optional actions - non-custodial]
+    Propose[Build action proposal - swap, deposit, withdraw]
+    Review[User review and approval]
   end
 
   API --> Propose --> UI
