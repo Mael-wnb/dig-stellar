@@ -66,10 +66,11 @@ flowchart TB
   Exec -->|Prepare action proposal| UI
   UI -->|User reviews and approves| WK
   UI -->|Submit to network| SorobanRPC
+```
 
-## 2) System Architecture (High-level)
+## 2) Closer Look — Data Pipeline (Indexing → Snapshots → API)
 
-This diagram shows the end-to-end system at a high level: wallet connectivity, API gateway, indexing layer, storage, portfolio monitoring, alerts, and optional actions.
+This diagram zooms into the data path: sources feed a protocol-first adapter layer, data is normalized into unified entities, stored, and served to the dashboard.
 
 ```mermaid
   flowchart LR
