@@ -104,4 +104,44 @@ flowchart LR
   J --> A
   A --> N --> DB
   DB --> Snap --> API --> UI
+```
 
+## 3) Closer Look — Portfolio, Alerts, and Optional Actions
+
+This diagram focuses on the user-facing loop: multi-wallet portfolio consolidation, alerting derived from snapshots/events, and optional action proposals approved by the user.
+
+```mermaid
+flowchart TB
+  U[User] --> UI[Dashboard]
+
+  UI --> WK[Stellar Wallets Kit]
+  WK -->|Connected wallet addresses| UI
+
+  UI --> API[API Gateway]
+  API --> DB[(Postgres)]
+
+  subgraph Portfolio[Portfolio]
+    Port[Consolidation (multi-wallet overview)]
+    Pos[Position resolvers (protocol-level)]
+  end
+
+  API --> Port
+  Port --> DB
+  Port --> Pos
+  Pos --> DB
+
+  subgraph Alerts[Alerts]
+    Rules[Rule engine (thresholds + anomalies)]
+    Feed[In-app alerts feed]
+  end
+
+  DB --> Rules --> Feed
+  API --> Feed
+
+  subgraph Actions[Optional actions (non-custodial)]
+    Propose[Build action proposal (swap/deposit/withdraw where supported)]
+    Review[User review + approval]
+  end
+
+  API --> Propose --> UI
+  UI --> Review --> WK
