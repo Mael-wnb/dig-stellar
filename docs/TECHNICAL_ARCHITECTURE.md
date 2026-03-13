@@ -156,27 +156,42 @@ After submission, Dig:
 	•	can trigger follow-up alerts if post-execution metrics change (e.g., exposure or utilization shifts)
 
 ```mermaid
-sequenceDiagram
-  participant U as User
-  participant UI as Web App
-  participant API as API
-  participant WK as Wallets Kit
-  participant RPC as Network
+flowchart TB
+  U[User] --> UI[Dashboard]
 
-  U->>UI: Choose action and source address
-  UI->>API: Request action proposal
-  API-->>UI: Proposal summary and payload
+  UI --> WK[Stellar Wallets Kit]
+  WK -->|Connected wallet addresses| UI
 
-  alt Source address is active signer
-    UI->>WK: Approve and sign
-    WK-->>UI: Signed transaction
-  else Source address requires signer switch
-    UI->>WK: Switch signer and connect wallet
-    WK-->>UI: Active signer updated
-    UI->>WK: Approve and sign
-    WK-->>UI: Signed transaction
+  UI --> API[API Gateway]
+  API --> DB[(Postgres)]
+
+  subgraph Portfolio[Portfolio]
+    Port[Consolidation - multi-wallet overview]
+    Pos[Position resolvers - protocol-level]
   end
 
-  UI->>RPC: Submit signed transaction
-  RPC-->>UI: Transaction result
+  API --> Port
+  Port --> DB
+  Port --> Pos
+  Pos --> DB
+
+  subgraph Alerts[Alerts]
+    Rules[Rule engine - thresholds and anomalies]
+    Feed[In-app alerts feed]
+  end
+
+  DB --> Rules --> Feed
+  API --> Feed
+
+  subgraph Actions[Optional actions - non-custodial]
+    Propose[Build action proposal - swap, deposit, withdraw]
+    Review[User review and approval]
+    Sign[Wallet signs transaction]
+    Submit[App submits to network]
+  end
+
+  API --> Propose --> UI
+  UI --> Review --> WK
+  WK --> Sign --> UI
+  UI --> Submit --> Net[Stellar network]
 ```
