@@ -355,3 +355,55 @@ flowchart LR
 
   DB --> API --> Dash
   DB --> API --> Feed
+  ```
+
+## 9. Reference Implementation in this Repository
+
+This repository includes a minimal executable reference implementation that demonstrates the end-to-end flow from indexing to storage to API serving.
+
+### 9.1 Local stack
+- **Postgres** as the primary datastore for protocols, venues, and snapshots
+- **Prisma** schema and migrations in `packages/db`
+- **NestJS API** in `apps/api`
+- **Indexer job** in `apps/indexer` with a run-once command
+
+### 9.2 Quickstart
+1) Start services  
+- `docker compose up -d`
+
+2) Apply database schema  
+- `cd packages/db && pnpm prisma:migrate`
+
+3) Run the indexing job  
+- `pnpm -C apps/indexer run:once`
+
+4) Start the API  
+- `pnpm -C apps/api start:dev`
+
+### 9.3 Demo endpoints
+- `GET /health`  
+- `GET /protocols`  
+- `GET /venues/:key/snapshots?limit=...`
+
+### 9.4 How to add a new protocol integration
+To add a new integration:
+1) implement a protocol adapter that fetches protocol data from Horizon, Soroban RPC, and or protocol APIs
+2) map outputs into the unified entities: Protocol, Venue, Snapshot
+3) add a job to refresh snapshots on a cadence (e.g., 5–15 minutes)
+4) expose additional endpoints in the API if needed
+
+The reference implementation currently includes a seed indexing job to validate the full pipeline. Protocol adapters can progressively replace the seed with real data reads while keeping the same schema and endpoints.
+
+## 10. Scope and Assumptions
+
+The initial scope focuses on protocol analytics, multi-wallet portfolio monitoring with an active signer model, in-app alerting, and optional non-custodial action proposals on supported protocols. Bridge flow monitoring starts with Allbridge where attribution data is available. Additional cross-chain integrations such as Axelar or Near Intents are considered optional extensions depending on ecosystem alignment and data attribution feasibility.
+
+## 11. Security, Privacy, and Reliability
+
+Dig follows a strictly non-custodial design. Users always approve and sign transactions in their wallet via Stellar Wallets Kit. The backend stores only public addresses and user preferences, and never stores private keys or secrets.
+
+Reliability is ensured through predictable snapshot cadences, retries with backoff for indexing jobs, and freshness tracking per venue. Stale data is explicitly surfaced and can trigger protocol health alerts.
+
+## 12. Observability (optional)
+
+Indexing jobs emit structured logs and basic counters such as snapshots written per run, source latency, and RPC error rates. The API provides health endpoints to support basic monitoring during development and production rollout.
