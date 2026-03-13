@@ -1,29 +1,32 @@
-# Dig Stellar — DeFi Analytics & Portfolio Dashboard (Architecture + Demo)
+# Dig Stellar — DeFi Analytics and Multi-Wallet Dashboard
 
-This repository contains a **technical architecture** and a minimal **executable reference implementation** for Dig’s Stellar module. The goal is to increase Stellar ecosystem visibility through **protocol analytics**, **multi-wallet portfolio monitoring**, **alerting**, and **optional non-custodial actions** (guided interactions where supported).
+This repository contains the technical architecture and a minimal executable reference implementation for **Dig Stellar**: a Stellar-focused module designed to improve ecosystem visibility through **protocol analytics**, **multi-wallet portfolio monitoring**, **in-app alerting**, and **optional non-custodial action proposals**.
 
-Key integrations are **protocol-first** and modular (e.g., Blend, DeFindex, Aquarius, Soroswap; bridge flows via Allbridge with optional extensions). Data is collected from **Stellar Horizon** (classic ledger activity) and **Soroban RPC** (contract state and events), enriched with protocol APIs/SDKs where available, and normalized into time-windowed snapshots.
+Dig uses a protocol-first approach (e.g., Blend, DeFindex, Aquarius, Soroswap) with a modular adapter layer. Data is sourced from **Stellar Horizon** (classic ledger activity) and **Soroban RPC** (contract state and events), enriched with protocol APIs/SDKs where available, and normalized into time-windowed snapshots.
 
-## What’s included
-- Architecture diagrams (high-level + closer looks)
-- Unified data model (Protocol / Venue / Snapshot / Position / Alert)
-- Working local stack: **Postgres + Prisma + Nest API + Indexer**
-- Minimal endpoints to expose analytics data
+## Primary document
+- **Technical Architecture (single source of truth):** `docs/TECHNICAL_ARCHITECTURE.md`
+
+## What’s in this repo
+- **Postgres + Prisma** schema and migrations (`packages/db`)
+- **NestJS API** exposing demo endpoints (`apps/api`)
+- **Indexer** job proving end-to-end data flow (`apps/indexer`)
+- Architecture documentation and diagrams (`docs/`)
 
 ## Quickstart (local)
 Prereqs: Docker Desktop, Node 20+, pnpm
 
 ```bash
-# 1) Start Postgres/Redis
+# Start Postgres/Redis
 docker compose up -d
 
-# 2) Database migration
+# Apply DB schema
 cd packages/db
 pnpm prisma:migrate
 cd ../..
 
-# 3) Run a demo indexing job (writes protocol/venue/snapshot)
+# Seed demo data (protocol, venue, snapshot)
 pnpm -C apps/indexer run:once
 
-# 4) Start the API
+# Start API
 pnpm -C apps/api start:dev
