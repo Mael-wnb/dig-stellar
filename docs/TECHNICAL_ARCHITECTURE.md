@@ -124,36 +124,33 @@ The UI always shows the current signer and provides a one-step “Switch signer�
 ## 6. Signature and Execution Model
 
 ### 6.1 Action proposals
+Dig provides guided action proposals for supported protocols, such as swap, deposit, withdraw, and lending interactions where supported. Each proposal is scoped to:
+- a single source address (the signer)
+- a target protocol and venue
+- a clear user-facing summary of the expected effect
 
-Dig provides guided action proposals for supported protocols (e.g., swap, deposit, withdraw, supply/borrow where supported). Each proposal is always scoped to:
-	•	a single source address (the signer)
-	•	a target protocol and venue
-	•	a clear user-facing summary of the intended effect
-
-Proposals are built from the latest indexed state (snapshots + relevant on-chain reads). Where supported, Dig may run Soroban simulation to help validate expected behavior before presenting the proposal to the user.
+Proposals are built from the latest indexed state (snapshots plus relevant on-chain reads). Where supported, Dig may use Soroban simulation to preview expected outcomes and reduce execution errors before presenting the proposal to the user.
 
 ### 6.2 Signer selection and multi-wallet execution
-
 Dig supports execution from multiple wallets through an active signer model:
-	•	The user selects the source address for an action (from their tracked addresses).
-	•	If the source address matches the current active signer, the user can sign immediately via Stellar Wallets Kit.
-	•	If another source address is selected, the UI triggers a guided signer switch (connect the wallet that controls that address), then continues with the same proposal flow.
+- the user selects the source address for an action from their tracked addresses
+- if the source address matches the current active signer, the user can sign immediately via Stellar Wallets Kit
+- if another source address is selected, the UI guides the user through a signer switch by connecting the wallet that controls that address, then continues with the same proposal flow
 
 This design keeps execution fully non-custodial and user-controlled while enabling a smooth multi-wallet experience.
 
 ### 6.3 End-to-end execution flow
-	1.	User selects an action and a source address
-	2.	Dig API returns an action proposal (summary + transaction payload)
-	3.	UI requests approval and signature via Stellar Wallets Kit
-	4.	UI submits the signed transaction to the network
-	5.	UI displays the result and updates portfolio metrics as new events/snapshots arrive
+1. User selects an action and a source address  
+2. Dig API returns an action proposal (summary plus transaction proposal)  
+3. The UI requests approval and signature via Stellar Wallets Kit  
+4. The UI submits the signed transaction to the network  
+5. The UI displays the result and updates portfolio metrics as new events and snapshots are indexed  
 
 ### 6.4 Result handling and feedback in the dashboard
-
 After submission, Dig:
-	•	displays transaction status (submitted / confirmed / failed)
-	•	updates the relevant venue and portfolio views as new on-chain events are indexed
-	•	can trigger follow-up alerts if post-execution metrics change (e.g., exposure or utilization shifts)
+- displays transaction status (submitted, confirmed, failed)
+- updates the relevant venue and portfolio views as new on-chain events are indexed
+- can trigger follow-up alerts if post-execution metrics change, such as exposure or utilization shifts
 
 ```mermaid
 flowchart TB
