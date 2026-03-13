@@ -404,6 +404,6 @@ Dig follows a strictly non-custodial design. Users always approve and sign trans
 
 Reliability is ensured through predictable snapshot cadences, retries with backoff for indexing jobs, and freshness tracking per venue. Stale data is explicitly surfaced and can trigger protocol health alerts.
 
-## 12. Observability (optional)
+## 12. Observability
 
 Indexing jobs emit structured logs and basic counters such as snapshots written per run, source latency, and RPC error rates. The API provides health endpoints to support basic monitoring during development and production rollout.
