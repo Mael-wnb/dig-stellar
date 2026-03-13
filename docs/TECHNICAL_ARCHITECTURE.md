@@ -121,7 +121,7 @@ This approach keeps execution fully non-custodial and user-controlled while offe
 
 The UI always shows the current signer and provides a one-step “Switch signer” flow when required. Users can track multiple addresses in one dashboard and execute actions from any of them by connecting the relevant wallet for the action.
 
-## 6. Signature and Execution Model (version clean + bullish)
+## 6. Signature and Execution Model
 
 ### 6.1 Action proposals
 
