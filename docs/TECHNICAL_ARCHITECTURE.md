@@ -87,11 +87,11 @@ flowchart TB
 
 ## 4. Wallet Integration and User Connection Model
 
-# 4.1 Multi-provider wallet connectivity
+### 4.1 Multi-provider wallet connectivity
 
 Dig uses Stellar Wallets Kit as the frontend integration layer to connect Stellar wallet providers (e.g., Freighter, xBull, WalletConnect, Albedo) and request user approvals/signatures. Wallet access remains fully non-custodial: Dig never receives private keys and signatures are always performed in-wallet.
 
-# 4.2 User profile and stored configuration
+### 4.2 User profile and stored configuration
 
 Dig stores only non-sensitive configuration:
 	•	tracked wallet addresses selected by the user
