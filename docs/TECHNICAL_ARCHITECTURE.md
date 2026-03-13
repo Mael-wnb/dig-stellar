@@ -29,21 +29,25 @@ Dig Stellar aims to increase ecosystem visibility and user effectiveness across 
 
 ```mermaid
 flowchart TB
+  %% Users & Frontend
   U[User] --> UI[Dig Web App - Dashboard]
 
-  UI --> WK[Stellar Wallets Kit - multi provider]
-  WK -->|User approvals| UI
+  %% Multi-wallet connection
+  UI --> WK[Stellar Wallets Kit - Freighter / xBull / WalletConnect / others]
+  WK -->|Wallet session + user approvals| UI
 
-  UI --> API[Dig Stellar API - Gateway]
-  API --> Cache[Redis - hot data]
-  API --> DB[(Postgres - Prisma)]
+  %% Backend gateway
+  UI --> API[Dig Stellar API - Gateway / BFF]
+  API --> Cache[Redis Cache - hot data + rate limits]
+  API --> DB[(Postgres - Prisma data store)]
 
-  subgraph Data[Data and Indexing]
-    Horizon[Horizon API - ledger ops, balances, trustlines]
-    SorobanRPC[Soroban RPC - state and events]
-    Adapters[Protocol adapters - Blend, DeFindex, Aquarius, Soroswap]
-    Indexer[Indexer and normalizer]
-    Agg[Aggregator - snapshots and signals]
+  %% Data & Indexing
+  subgraph Data[Data and Indexing Layer]
+    Horizon[Horizon API - ledger activity, balances, trustlines, ops]
+    SorobanRPC[Soroban RPC - contract state and events]
+    Adapters[Protocol Adapters - Blend / DeFindex / Aquarius / Soroswap]
+    Indexer[Indexer and Normalizer - unified schema]
+    Agg[Metrics Aggregator - snapshots: TVL, flows, yields, risk]
   end
 
   Horizon --> Indexer
@@ -53,32 +57,30 @@ flowchart TB
   Agg --> DB
   DB --> API
 
-  subgraph Portfolio[Portfolio and positions]
-    Profile[User profile - wallets and prefs]
-    Pos[Position resolvers]
+  %% Portfolio
+  subgraph Portfolio[Portfolio and Position Monitoring]
+    PortSvc[Portfolio Service - multi-wallet]
+    PosSvc[Position Resolvers - protocol-level positions]
   end
 
-  API --> Profile
-  API --> Pos
-  Pos --> DB
-  Pos --> SorobanRPC
-  Pos --> Adapters
+  API --> PortSvc
+  PortSvc --> DB
+  PortSvc --> PosSvc
+  PosSvc --> SorobanRPC
+  PosSvc --> Adapters
 
-  subgraph Alerts[Alerting]
-    Rules[Rules engine]
-    Feed[In-app alerts feed]
+  %% Alerts & Optional Actions
+  subgraph Actions[Alerts and Optional Actions]
+    Rules[Rules Engine - thresholds + anomalies]
+    Notif[Notifications - in-app]
+    Exec[Action Builder - non-custodial action proposals]
   end
 
-  DB --> Rules --> Feed
-  API --> Feed
-
-  subgraph Actions[Optional actions]
-    Propose[Action proposals]
-  end
-
-  API --> Propose --> UI
-  UI -->|User signs| WK
-  UI -->|Submit| SorobanRPC
+  API --> Rules --> Notif
+  API --> Exec
+  Exec -->|Prepare action proposal| UI
+  UI -->|User reviews and approves| WK
+  UI -->|Submit to network| SorobanRPC
 ```
 
 ---
@@ -101,13 +103,13 @@ Dig stores only non-sensitive configuration:
 
 ## 5. Multi-Wallet Portfolio and Signing Experience
 
-# 5.1 Tracked addresses and active signer
+### 5.1 Tracked addresses and active signer
 
 To maximize accessibility and time savings, Dig provides a single portfolio view across multiple wallet addresses. Users can add multiple Stellar addresses to track balances, DeFi positions, rewards, and alerts in one place.
 
 At any time, one address is the active signer: the wallet currently connected through Stellar Wallets Kit in the session. Any tracked address can be used for execution by switching the active signer to that address when needed.
 
-# 5.2 Signing from different wallets
+### 5.2 Signing from different wallets
 
 Dig enables execution from multiple wallets through a simple, explicit signer model. Each action proposal is tied to a single source address. When a user initiates an action from the portfolio:
 	•	If the source address is already the active signer, Dig returns an action proposal and the user signs in their wallet via Stellar Wallets Kit.
@@ -115,13 +117,13 @@ Dig enables execution from multiple wallets through a simple, explicit signer mo
 
 This approach keeps execution fully non-custodial and user-controlled while offering a smooth multi-wallet experience.
 
-# 5.3 UX guidance for signer switching
+### 5.3 UX guidance for signer switching
 
 The UI always shows the current signer and provides a one-step “Switch signer” flow when required. Users can track multiple addresses in one dashboard and execute actions from any of them by connecting the relevant wallet for the action.
 
 ## 6. Signature and Execution Model (version clean + bullish)
 
-# 6.1 Action proposals
+### 6.1 Action proposals
 
 Dig provides guided action proposals for supported protocols (e.g., swap, deposit, withdraw, supply/borrow where supported). Each proposal is always scoped to:
 	•	a single source address (the signer)
@@ -130,7 +132,7 @@ Dig provides guided action proposals for supported protocols (e.g., swap, deposi
 
 Proposals are built from the latest indexed state (snapshots + relevant on-chain reads). Where supported, Dig may run Soroban simulation to help validate expected behavior before presenting the proposal to the user.
 
-# 6.2 Signer selection and multi-wallet execution
+### 6.2 Signer selection and multi-wallet execution
 
 Dig supports execution from multiple wallets through an active signer model:
 	•	The user selects the source address for an action (from their tracked addresses).
@@ -139,14 +141,14 @@ Dig supports execution from multiple wallets through an active signer model:
 
 This design keeps execution fully non-custodial and user-controlled while enabling a smooth multi-wallet experience.
 
-# 6.3 End-to-end execution flow
+### 6.3 End-to-end execution flow
 	1.	User selects an action and a source address
 	2.	Dig API returns an action proposal (summary + transaction payload)
 	3.	UI requests approval and signature via Stellar Wallets Kit
 	4.	UI submits the signed transaction to the network
 	5.	UI displays the result and updates portfolio metrics as new events/snapshots arrive
 
-# 6.4 Result handling and feedback in the dashboard
+### 6.4 Result handling and feedback in the dashboard
 
 After submission, Dig:
 	•	displays transaction status (submitted / confirmed / failed)
