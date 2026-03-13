@@ -251,3 +251,107 @@ Alerts are delivered directly in-app and can be extended with additional channel
 | Netflow spike | Inflow/outflow delta | netflow exceeds X over 1h window | Protocol / asset | Warning with flow breakdown |
 | Utilization spike | Lending market utilization | utilization exceeds X or jumps by X in 1h | Protocol / market | Warning with risk context |
 | Portfolio exposure change | Position delta for wallet | exposure changes by more than X percent | Wallet | Wallet-tagged alert with link to portfolio |
+
+## 8. Data Pipeline and Snapshots
+
+This module is built around a protocol-first indexing pipeline that normalizes heterogeneous sources into a unified schema and produces time-windowed snapshots for analytics, portfolio monitoring, and alerting.
+
+### 8.1 Data sources
+We ingest and enrich data from:
+- **Horizon**: ledger operations, balances, trustlines, and classic activity signals
+- **Soroban RPC**: contract events and state reads required for protocol-level metrics and positions
+- **Protocol APIs or SDKs**: protocol-native market metadata and rate data where available
+- **Bridge sources**: cross-chain flow attribution where available, starting with Allbridge
+
+### 8.2 Adapter layer and normalization
+Each integration is implemented as a protocol adapter that outputs normalized entities:
+- **Protocol**: protocol identity and metadata
+- **Venue**: a concrete object such as pool, market, vault, or bridge
+- **Snapshot**: time-windowed metrics for a venue at a given timestamp
+
+Adapters are responsible for mapping protocol-specific fields into the unified schema and providing consistent keys for venues to enable stable time-series tracking.
+
+### 8.3 Snapshot cadence and time windows
+Snapshots are produced on a predictable cadence (e.g., every 5–15 minutes) to balance freshness and cost. The system supports multiple analysis windows:
+- short window for rapid changes, such as 1 hour
+- medium window for daily trends, such as 24 hours
+- longer window for weekly context, such as 7 days
+
+### 8.4 Metrics computed in snapshots
+Typical snapshot fields include:
+- liquidity or TVL where applicable
+- volume and activity indicators
+- yield or rate indicators where available
+- utilization indicators for lending markets where applicable
+- inflow, outflow, and netflow metrics at the venue or asset level where attribution is available
+- a flexible data field for protocol-specific extensions
+
+### 8.5 Data freshness and reliability
+The pipeline tracks freshness per source and per venue. If a venue becomes stale, the system:
+- marks the venue metrics as stale in the UI
+- can generate protocol health alerts
+- retries indexing jobs with backoff to recover from temporary failures
+
+This ensures analytics remain transparent even when upstream sources are delayed.
+
+### 8.6 Flow computation - inflow, outflow, netflow
+
+Flow metrics are computed as time-windowed aggregates derived from on-chain activity:
+- **Asset-level flows** are computed from Horizon operations and transfers over a given window, producing inflow, outflow, and netflow per asset.
+- **Protocol-level flows** are derived from protocol activity (Soroban events and adapter data) by classifying movements such as deposits and withdrawals where supported.
+- **Bridge flows** are computed from bridge-related activity where attribution is available, producing cross-chain inflow and outflow snapshots for selected assets.
+
+Each flow snapshot is linked to a protocol and or venue key when possible, and stored alongside other metrics to support dashboards and alert triggers.
+
+### 8.7 Deeper view - indexing pipeline and storage
+
+The diagram below expands the data pipeline with the internal building blocks: collectors, protocol adapters, normalization, time-window aggregation, freshness tracking, and the main persisted entities used by analytics, portfolio, and alerting.
+
+```mermaid
+flowchart LR
+  subgraph Sources[Sources]
+    Horizon[Horizon API]
+    Soroban[Soroban RPC]
+    Prot[Protocol APIs or SDKs]
+    Bridge[Bridge data - Allbridge]
+  end
+
+  subgraph Indexing[Indexing]
+    Fetch[Collectors]
+    Adapt[Protocol adapters]
+    Normalize[Normalize to unified schema]
+    Window[Window aggregator - 1h 24h 7d]
+    Fresh[Freshness tracking]
+  end
+
+  subgraph Storage[Storage]
+    DB[(Postgres - Prisma)]
+    ProtoT[Protocols]
+    VenueT[Venues]
+    SnapT[Snapshots]
+    PosT[Positions]
+    AlertT[Alerts]
+  end
+
+  subgraph Serving[Serving]
+    API[REST API]
+    Dash[Dashboard]
+    Feed[Alerts feed]
+  end
+
+  Horizon --> Fetch
+  Soroban --> Fetch
+  Prot --> Fetch
+  Bridge --> Fetch
+
+  Fetch --> Adapt --> Normalize --> Window --> DB
+  Fresh --> DB
+
+  DB --> ProtoT
+  DB --> VenueT
+  DB --> SnapT
+  DB --> PosT
+  DB --> AlertT
+
+  DB --> API --> Dash
+  DB --> API --> Feed
