@@ -5,14 +5,17 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "run:once": "tsx src/run-once.ts"
+    "run:once": "tsx src/run-once.ts",
+    "run:blend": "tsx src/run-blend.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.32.1",
   "dependencies": {
+    "@blend-capital/blend-sdk": "^3.2.2",
     "@prisma/client": "^5.22.0",
+    "@stellar/stellar-sdk": "^14.6.1",
     "dotenv": "^17.3.1"
   },
   "devDependencies": {
