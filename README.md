@@ -63,6 +63,10 @@ pnpm -C apps/api start:dev
 ### 7) Test
 ```bash
 curl http://localhost:3000/health
+
 curl "http://localhost:3000/venues?protocol=blend"
 curl "http://localhost:3000/venues/blend:pool:CCCCIQSDILITHMM7PBSLVDT5MISSY7R26MNZXCX4H7J5JQ5FPIYOGYFS/snapshots?limit=1"
+
+curl "http://localhost:3000/venues?protocol=stellar"
+curl "http://localhost:3000/venues/horizon:network-activity/snapshots?limit=1"
 ```
