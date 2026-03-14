@@ -6,8 +6,12 @@ This module normalizes Stellar and protocol data into a small set of entities us
 - **Protocol**
   - `key`, `name`, `category`
 - **Venue**
-  - A protocol-specific object: `pool`, `market`, `vault`, or `bridge`
+  - A protocol-specific object such as `pool`, `market`, `vault`, `bridge` (and additional types as needed)
   - `key`, `type`, `label`, `meta`
+  - Example keys:
+    - `blend:pool:<poolId>`
+    - `blend:reserve:<poolId>:<assetId>`
+    - `horizon:network-activity`
 - **Snapshot**
   - Time-windowed metrics for a venue at timestamp `ts`
   - Typical fields: `tvl/liquidity`, `volume`, `apy`, `utilization`, `inflow/outflow/netflow`, plus `data` (JSON)
