@@ -5,6 +5,14 @@ allowBuilds:
   '@nestjs/core': true
   '@prisma/client': true
   '@prisma/engines': true
+  '@reown/appkit': true
+  blake-hash: true
+  bufferutil: true
   esbuild: true
   prisma: true
+  protobufjs: true
+  secp256k1: true
+  tiny-secp256k1: true
   unrs-resolver: true
+  usb: true
+  utf-8-validate: true
