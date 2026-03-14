@@ -36,11 +36,17 @@ STELLAR_RPC_URL="https://soroban-rpc.mainnet.stellar.gateway.fm"
 STELLAR_NETWORK_PASSPHRASE="Public Global Stellar Network ; September 2015"
 BLEND_POOL_ID="CCCCIQSDILITHMM7PBSLVDT5MISSY7R26MNZXCX4H7J5JQ5FPIYOGYFS"
 DATABASE_URL="postgresql://dig:dig@localhost:5432/dig_stellar?schema=public"
+HORIZON_URL="https://horizon.stellar.org"
 ```
 
 ### 4) Run the Blend indexing job
 ```bash
 pnpm -C apps/indexer run:blend
+```
+
+### 5) Run the Blend indexing job
+```bash
+pnpm -C apps/indexer run:horizon
 ```
 
 (Optional smoke test)
@@ -49,12 +55,12 @@ pnpm -C apps/indexer run:blend
 pnpm -C apps/indexer run:once
 ```
 
-### 5) Start the API
+### 6) Start the API
 ```bash
 pnpm -C apps/api start:dev
 ```
 
-### 6) Test
+### 7) Test
 ```bash
 curl http://localhost:3000/health
 curl "http://localhost:3000/venues?protocol=blend"
