@@ -5,22 +5,25 @@ This repository is organized as a small monorepo that combines documentation and
 ## apps/
 - **apps/api**: NestJS REST API serving protocols, venues, and snapshots from Postgres
 - **apps/indexer**: indexing jobs (run-once + scheduled) writing normalized data into Postgres
-- **apps/web**: lightweight demo UI for wallet connection and dashboard calls
+- **apps/web** (optional): lightweight demo UI for wallet connection and dashboard calls
 
 ## packages/
 - **packages/db**: Prisma schema and migrations for Postgres
-- **packages/core**: shared types and schemas for the unified model
-- **packages/adapters**: protocol adapters (Blend, DeFindex, Soroswap, Aquarius) and bridge adapters
+- **packages/core** (optional): shared types and schemas for the unified model
+- **packages/adapters** (optional): protocol adapters and bridge adapters
 
 ## Where to look
-- **Data model**: `packages/db/prisma/schema.prisma`
-- **Indexer entrypoint**: `apps/indexer/src/run-once.ts`
-- **API endpoints**: `apps/api/src/app.controller.ts`
 - **Primary architecture doc**: `docs/TECHNICAL_ARCHITECTURE.md`
+- **Data model**: `packages/db/prisma/schema.prisma`
+- **Blend job**: `apps/indexer/src/run-blend.ts`
+- **Horizon job**: `apps/indexer/src/run-horizon.ts`
+- **API endpoints**: `apps/api/src/app.controller.ts`
 
 ## Common commands
 - Apply DB schema: `cd packages/db && pnpm prisma:migrate`
-- Run indexer: `pnpm -C apps/indexer run:once`
+- Run Blend job: `pnpm -C apps/indexer run:blend`
+- Run Horizon job: `pnpm -C apps/indexer run:horizon`
+- Optional seed job: `pnpm -C apps/indexer run:once`
 - Start API: `pnpm -C apps/api start:dev`
 
 ## Extending the system
