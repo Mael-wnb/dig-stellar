@@ -16,17 +16,47 @@ Dig uses a protocol-first approach (e.g., Blend, DeFindex, Aquarius, Soroswap) w
 ## Quickstart (local)
 Prereqs: Docker Desktop, Node 20+, pnpm
 
+### 1) Start services
 ```bash
-# Start Postgres/Redis
 docker compose up -d
-
-# Apply DB schema
+```
+### 2) Apply DB 
+```bash
 cd packages/db
 pnpm prisma:migrate
 cd ../..
+```
 
-# Seed demo data (protocol, venue, snapshot)
+### 3) Configure the indexer
+
+Create apps/indexer/.env:
+
+```bash
+STELLAR_RPC_URL="https://soroban-rpc.mainnet.stellar.gateway.fm"
+STELLAR_NETWORK_PASSPHRASE="Public Global Stellar Network ; September 2015"
+BLEND_POOL_ID="CCCCIQSDILITHMM7PBSLVDT5MISSY7R26MNZXCX4H7J5JQ5FPIYOGYFS"
+DATABASE_URL="postgresql://dig:dig@localhost:5432/dig_stellar?schema=public"
+```
+
+### 4) Run the Blend indexing job
+```bash
+pnpm -C apps/indexer run:blend
+```
+
+(Optional smoke test)
+
+```bash
 pnpm -C apps/indexer run:once
+```
 
-# Start API
+### 5) Start the API
+```bash
 pnpm -C apps/api start:dev
+```
+
+### 6) Test
+```bash
+curl http://localhost:3000/health
+curl "http://localhost:3000/venues?protocol=blend"
+curl "http://localhost:3000/venues/blend:pool:CCCCIQSDILITHMM7PBSLVDT5MISSY7R26MNZXCX4H7J5JQ5FPIYOGYFS/snapshots?limit=1"
+```
