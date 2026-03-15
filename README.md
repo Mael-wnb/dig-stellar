@@ -49,7 +49,7 @@ HORIZON_URL="https://horizon.stellar.org"
 pnpm -C apps/indexer run:blend
 ```
 
-### 5) Run the Blend indexing job
+### 5) Run the Horizon indexing job
 ```bash
 pnpm -C apps/indexer run:horizon
 ```
