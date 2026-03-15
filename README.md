@@ -7,6 +7,11 @@ Dig uses a protocol-first approach (e.g., Blend, DeFindex, Aquarius, Soroswap) w
 ## Primary document
 - **Technical Architecture (single source of truth):** `docs/TECHNICAL_ARCHITECTURE.md`
 
+## Product visuals
+Complementary UI/UX mockups for the Dig Stellar module:
+- **Overview / Portfolio dashboard**: [Google Drive link](https://drive.google.com/drive/folders/1zZSWT-7J4m7BTOIQRtb3rg540xwW0TjO?usp=drive_link)
+- **Protocol analytics / detail page**: [Google Drive link](https://drive.google.com/drive/folders/1zZSWT-7J4m7BTOIQRtb3rg540xwW0TjO?usp=drive_link)
+
 ## What’s in this repo
 - **Postgres + Prisma** schema and migrations (`packages/db`)
 - **NestJS API** exposing demo endpoints (`apps/api`)
