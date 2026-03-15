@@ -9,8 +9,8 @@ Dig uses a protocol-first approach (e.g., Blend, DeFindex, Aquarius, Soroswap) w
 
 ## Product visuals
 Complementary UI/UX mockups for the Dig Stellar module:
-- **Overview / Portfolio dashboard**: [Google Drive link](https://drive.google.com/drive/folders/1zZSWT-7J4m7BTOIQRtb3rg540xwW0TjO?usp=drive_link)
-- **Protocol analytics / detail page**: [Google Drive link](https://drive.google.com/drive/folders/1zZSWT-7J4m7BTOIQRtb3rg540xwW0TjO?usp=drive_link)
+- **Overview / Portfolio dashboard**: [Google Drive link](https://drive.google.com/file/d/12oofXWmeZxFOT6-ZyDXC7IUUuTE86pe-/view?usp=sharing)
+- **Protocol analytics / detail page**: [Google Drive link](https://drive.google.com/file/d/1aNWgVppsrBu6yjX1cSCPUKFvNpnH2BFN/view?usp=sharing)
 
 ## What’s in this repo
 - **Postgres + Prisma** schema and migrations (`packages/db`)
