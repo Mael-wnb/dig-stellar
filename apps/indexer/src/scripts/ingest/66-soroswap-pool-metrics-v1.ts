@@ -36,23 +36,22 @@ async function main() {
       };
     });
 
-    const reserve0 = reserveMetrics[0] ?? null;
-    const reserve1 = reserveMetrics[1] ?? null;
-
     const tvlUsd = reserveMetrics.reduce((sum, r) => sum + (r.reserveUsd ?? 0), 0);
 
     const eventsRes = await client.query(
       `
       select
-        event_key,
-        token_amount_in_scaled,
-        token_amount_out_scaled,
-        occurred_at
+        ne.event_key,
+        ne.token_in_asset_id,
+        ne.token_out_asset_id,
+        ne.token_amount_in_scaled,
+        ne.token_amount_out_scaled,
+        ne.occurred_at
       from normalized_events ne
       join entities e on e.id = ne.entity_id
       where e.slug = 'soroswap-native-usdc-pair'
         and ne.occurred_at >= now() - interval '24 hours'
-      order by occurred_at desc
+      order by ne.occurred_at desc
       `
     );
 
@@ -64,16 +63,23 @@ async function main() {
 
       swaps24h += 1;
 
+      const tokenInPrice =
+        row.token_in_asset_id && prices.has(row.token_in_asset_id)
+          ? prices.get(row.token_in_asset_id) ?? 0
+          : 0;
+
+      const tokenOutPrice =
+        row.token_out_asset_id && prices.has(row.token_out_asset_id)
+          ? prices.get(row.token_out_asset_id) ?? 0
+          : 0;
+
       const amountIn = row.token_amount_in_scaled ? Number(row.token_amount_in_scaled) : 0;
       const amountOut = row.token_amount_out_scaled ? Number(row.token_amount_out_scaled) : 0;
 
-      const reserve0Price = reserve0?.priceUsd ?? 0;
-      const reserve1Price = reserve1?.priceUsd ?? 0;
+      const amountInUsd = amountIn * tokenInPrice;
+      const amountOutUsd = amountOut * tokenOutPrice;
 
-      const side0Usd = amountIn * reserve0Price;
-      const side1Usd = amountOut * reserve1Price;
-
-      volume24hUsd += Math.max(side0Usd, side1Usd);
+      volume24hUsd += Math.max(amountInUsd, amountOutUsd);
     }
 
     const feeRate = 0.003;

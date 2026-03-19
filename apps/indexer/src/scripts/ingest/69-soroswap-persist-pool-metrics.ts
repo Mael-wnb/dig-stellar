@@ -46,16 +46,47 @@ async function main() {
 
     const eventsRes = await client.query(
       `
-      select count(*)::int as swaps_24h
+      select
+        ne.event_key,
+        ne.token_in_asset_id,
+        ne.token_out_asset_id,
+        ne.token_amount_in_scaled,
+        ne.token_amount_out_scaled
       from normalized_events ne
       join entities e on e.id = ne.entity_id
       where e.slug = 'soroswap-native-usdc-pair'
-        and ne.event_key = 'SoroswapPair:swap'
         and ne.occurred_at >= now() - interval '24 hours'
       `
     );
 
-    const swaps24h = eventsRes.rows[0]?.swaps_24h ?? 0;
+    let swaps24h = 0;
+    let volume24hUsd = 0;
+
+    for (const row of eventsRes.rows as Array<any>) {
+      if (row.event_key !== 'SoroswapPair:swap') continue;
+
+      swaps24h += 1;
+
+      const tokenInPrice =
+        row.token_in_asset_id && priceMap.has(row.token_in_asset_id)
+          ? priceMap.get(row.token_in_asset_id) ?? 0
+          : 0;
+
+      const tokenOutPrice =
+        row.token_out_asset_id && priceMap.has(row.token_out_asset_id)
+          ? priceMap.get(row.token_out_asset_id) ?? 0
+          : 0;
+
+      const amountIn = row.token_amount_in_scaled ? Number(row.token_amount_in_scaled) : 0;
+      const amountOut = row.token_amount_out_scaled ? Number(row.token_amount_out_scaled) : 0;
+
+      const amountInUsd = amountIn * tokenInPrice;
+      const amountOutUsd = amountOut * tokenOutPrice;
+
+      volume24hUsd += Math.max(amountInUsd, amountOutUsd);
+    }
+
+    const fees24hUsd = volume24hUsd * 0.003;
     const asOf = nowIso();
 
     await client.query(
@@ -100,8 +131,8 @@ async function main() {
         asOf,
         'latest',
         tvlUsd,
-        0,
-        0,
+        volume24hUsd,
+        fees24hUsd,
         null,
         null,
         null,
@@ -111,7 +142,6 @@ async function main() {
         JSON.stringify({
           source: '69-soroswap-persist-pool-metrics',
           swaps24h,
-          note: 'volume_24h_usd and fees_24h_usd still placeholder until swap amounts are fully normalized',
         }),
       ]
     );
@@ -120,6 +150,8 @@ async function main() {
       completedAt: asOf,
       entitySlug: entity.slug,
       tvlUsd,
+      volume24hUsd,
+      fees24hUsd,
       swaps24h,
     });
   } finally {

@@ -1,16 +1,24 @@
 import { loadJson, saveJson, nowIso } from "./00-common";
+import { toScaled } from "../shared/scaling";
 
-function toScaled(raw: string | null, decimals: number | null): string | null {
-  if (!raw || decimals === null || !Number.isFinite(decimals)) return null;
+function toNumString(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "bigint") return value.toString();
+  return null;
+}
 
-  const s = String(raw);
-  const d = Number(decimals);
-  if (d === 0) return s;
+function getField(obj: Record<string, unknown>, candidates: string[]): string | null {
+  for (const key of candidates) {
+    const v = toNumString(obj[key]);
+    if (v !== null) return v;
+  }
+  return null;
+}
 
-  const padded = s.padStart(d + 1, "0");
-  const intPart = padded.slice(0, -d);
-  const fracPart = padded.slice(-d).replace(/0+$/, "");
-  return fracPart ? `${intPart}.${fracPart}` : intPart;
+function gtZero(raw: string | null): boolean {
+  return raw !== null && Number(raw) > 0;
 }
 
 async function main() {
@@ -38,12 +46,44 @@ async function main() {
         ? event.decodedTopics[1]
         : null;
 
-    const decodedValue = event.decodedValue ?? {};
+    const decodedValue = (event.decodedValue ?? {}) as Record<string, unknown>;
 
-    const reserve0Raw =
-      typeof decodedValue.new_reserve_0 === "string" ? decodedValue.new_reserve_0 : null;
-    const reserve1Raw =
-      typeof decodedValue.new_reserve_1 === "string" ? decodedValue.new_reserve_1 : null;
+    const reserve0Raw = getField(decodedValue, ["new_reserve_0", "newReserve0"]);
+    const reserve1Raw = getField(decodedValue, ["new_reserve_1", "newReserve1"]);
+
+    const amount0InRaw = getField(decodedValue, ["amount_0_in", "amount0In"]);
+    const amount1InRaw = getField(decodedValue, ["amount_1_in", "amount1In"]);
+    const amount0OutRaw = getField(decodedValue, ["amount_0_out", "amount0Out"]);
+    const amount1OutRaw = getField(decodedValue, ["amount_1_out", "amount1Out"]);
+
+    let tokenIn: string | null = null;
+    let tokenOut: string | null = null;
+    let tokenAmountInRaw: string | null = null;
+    let tokenAmountOutRaw: string | null = null;
+    let tokenAmountInScaled: string | null = null;
+    let tokenAmountOutScaled: string | null = null;
+
+    if (subEventName === "swap") {
+      if (gtZero(amount0InRaw)) {
+        tokenIn = token0;
+        tokenAmountInRaw = amount0InRaw;
+        tokenAmountInScaled = toScaled(amount0InRaw, token0Decimals);
+      } else if (gtZero(amount1InRaw)) {
+        tokenIn = token1;
+        tokenAmountInRaw = amount1InRaw;
+        tokenAmountInScaled = toScaled(amount1InRaw, token1Decimals);
+      }
+
+      if (gtZero(amount0OutRaw)) {
+        tokenOut = token0;
+        tokenAmountOutRaw = amount0OutRaw;
+        tokenAmountOutScaled = toScaled(amount0OutRaw, token0Decimals);
+      } else if (gtZero(amount1OutRaw)) {
+        tokenOut = token1;
+        tokenAmountOutRaw = amount1OutRaw;
+        tokenAmountOutScaled = toScaled(amount1OutRaw, token1Decimals);
+      }
+    }
 
     return {
       venueSlug: "soroswap",
@@ -58,6 +98,12 @@ async function main() {
       eventKey: `${event.eventName}:${subEventName ?? "unknown"}`,
       token0,
       token1,
+      tokenIn,
+      tokenOut,
+      tokenAmountInRaw,
+      tokenAmountOutRaw,
+      tokenAmountInScaled,
+      tokenAmountOutScaled,
       reserve0Raw,
       reserve1Raw,
       reserve0Scaled: toScaled(reserve0Raw, token0Decimals),
@@ -66,6 +112,8 @@ async function main() {
       decodedValue,
     };
   });
+
+  const firstSwapRow = rows.find((r: any) => r.subEventName === "swap") ?? null;
 
   const output = {
     generatedAt: nowIso(),
@@ -79,6 +127,7 @@ async function main() {
       pairId: output.pairId,
       count: output.count,
       firstRow: rows[0] ?? null,
+      firstSwapRow,
     },
     { depth: 8 }
   );

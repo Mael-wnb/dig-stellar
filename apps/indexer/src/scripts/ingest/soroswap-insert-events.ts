@@ -48,7 +48,23 @@ async function main() {
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
           $12,$13,$14,$15,$16,$17,$18,$19::jsonb
         )
-        on conflict (contract_address, event_id) do nothing
+        on conflict (contract_address, event_id)
+        do update set
+          tx_hash = excluded.tx_hash,
+          ledger = excluded.ledger,
+          occurred_at = excluded.occurred_at,
+          event_name = excluded.event_name,
+          sub_event_name = excluded.sub_event_name,
+          event_key = excluded.event_key,
+          caller_address = excluded.caller_address,
+          token_in_asset_id = excluded.token_in_asset_id,
+          token_out_asset_id = excluded.token_out_asset_id,
+          token_amount_in_raw = excluded.token_amount_in_raw,
+          token_amount_out_raw = excluded.token_amount_out_raw,
+          token_amount_in_scaled = excluded.token_amount_in_scaled,
+          token_amount_out_scaled = excluded.token_amount_out_scaled,
+          in_successful_contract_call = excluded.in_successful_contract_call,
+          metadata = excluded.metadata
         `,
         [
           venue.id,
@@ -62,15 +78,17 @@ async function main() {
           row.subEventName,
           row.eventKey,
           null,
-          row.token0 ? assetIdByContract.get(row.token0) ?? null : null,
-          row.token1 ? assetIdByContract.get(row.token1) ?? null : null,
-          row.reserve0Raw,
-          row.reserve1Raw,
-          row.reserve0Scaled,
-          row.reserve1Scaled,
+          row.tokenIn ? assetIdByContract.get(row.tokenIn) ?? null : null,
+          row.tokenOut ? assetIdByContract.get(row.tokenOut) ?? null : null,
+          row.tokenAmountInRaw ?? null,
+          row.tokenAmountOutRaw ?? null,
+          row.tokenAmountInScaled ?? null,
+          row.tokenAmountOutScaled ?? null,
           true,
           JSON.stringify({
             source: '58-soroswap-active-pair-events-normalized',
+            reserve0Raw: row.reserve0Raw ?? null,
+            reserve1Raw: row.reserve1Raw ?? null,
           }),
         ]
       );
