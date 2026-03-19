@@ -10,6 +10,11 @@ async function main() {
     throw new Error('Missing Soroswap snapshot JSON files');
   }
 
+  const entitySlug = poolSnapshot.entitySlug;
+  if (!entitySlug) {
+    throw new Error('Missing entitySlug in 60-soroswap-pool-snapshot-db-ready.json');
+  }
+
   const client = createPgClient();
   await client.connect();
 
@@ -17,7 +22,7 @@ async function main() {
     await client.query('begin');
 
     const venue = await getVenueBySlugOrThrow(client, 'soroswap');
-    const entity = await getEntityBySlugOrThrow(client, 'soroswap-native-usdc-pair');
+    const entity = await getEntityBySlugOrThrow(client, entitySlug);
     const assetIdByContract = await getAssetIdByContractMap(client, 'stellar-mainnet');
 
     const snapshotAt = poolSnapshot.generatedAt ?? nowIso();
@@ -67,7 +72,9 @@ async function main() {
       ]
     );
 
-    for (const row of reserveSnapshots.reserveRows ?? []) {
+    const reserveRows = reserveSnapshots.rows ?? [];
+
+    for (const row of reserveRows) {
       const assetId = assetIdByContract.get(row.assetId);
       if (!assetId) continue;
 
@@ -152,7 +159,8 @@ async function main() {
 
     console.log({
       completedAt: nowIso(),
-      reserveCount: reserveSnapshots.reserveRows?.length ?? 0,
+      entitySlug,
+      reserveCount: reserveRows.length,
     });
   } catch (err) {
     await client.query('rollback');

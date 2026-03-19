@@ -32,7 +32,7 @@ async function main() {
         registry.venue.chain,
         registry.venue.venueType,
         JSON.stringify({
-          source: 'soroswap_final_registry',
+          source: '59-soroswap-final-registry',
           generatedAt: registry.generatedAt,
         }),
       ]
@@ -64,7 +64,7 @@ async function main() {
           reserveCount: registry.pair.reserveCount,
           token0: registry.pair.token0,
           token1: registry.pair.token1,
-          source: 'soroswap_final_registry',
+          source: '59-soroswap-final-registry',
         }),
       ]
     );
@@ -97,7 +97,7 @@ async function main() {
           asset.name,
           asset.decimals,
           JSON.stringify({
-            source: 'soroswap_active_pair_assets',
+            source: '59-soroswap-final-registry',
             generatedAt: registry.generatedAt,
           }),
         ]
@@ -122,7 +122,7 @@ async function main() {
           assetId,
           role,
           JSON.stringify({
-            source: 'soroswap_final_registry',
+            source: '59-soroswap-final-registry',
           }),
         ]
       );
@@ -136,6 +136,7 @@ async function main() {
       completedAt: nowIso(),
       venueId,
       entityId,
+      entitySlug: registry.pair.entitySlug,
       assetCount,
     });
   } catch (err) {

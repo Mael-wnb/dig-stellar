@@ -1,44 +1,47 @@
-import { loadJson, saveJson, nowIso } from "./00-common";
+import { loadJson, nowIso, saveJson } from './00-common';
+
+function countBy<T extends string>(values: T[]): Record<string, number> {
+  return values.reduce<Record<string, number>>((acc, value) => {
+    acc[value] = (acc[value] ?? 0) + 1;
+    return acc;
+  }, {});
+}
 
 async function main() {
-  const pairShape = await loadJson<any>("57-soroswap-active-pair-db-shape.json");
-  const normalized = await loadJson<any>("58-soroswap-active-pair-events-normalized.json");
+  const shape = await loadJson<any>('57-soroswap-active-pair-db-shape.json');
+  const normalized = await loadJson<any>('58-soroswap-active-pair-events-normalized.json');
 
-  if (!pairShape || !normalized) {
-    throw new Error("Missing 57 or 58 Soroswap files");
-  }
+  if (!shape) throw new Error('Missing 57-soroswap-active-pair-db-shape.json');
+  if (!normalized) throw new Error('Missing 58-soroswap-active-pair-events-normalized.json');
 
-  const eventCounts: Record<string, number> = {};
-  for (const row of normalized.rows ?? []) {
-    eventCounts[row.eventKey] = (eventCounts[row.eventKey] ?? 0) + 1;
-  }
+  const subEventKeys = (normalized.rows ?? []).map((row: any) => row.eventKey).filter(Boolean);
 
   const output = {
     generatedAt: nowIso(),
     venue: {
-      slug: "soroswap",
-      name: "Soroswap",
-      chain: "stellar-mainnet",
-      venueType: "amm",
+      slug: 'soroswap',
+      name: 'Soroswap',
+      chain: 'stellar-mainnet',
+      venueType: 'amm',
     },
     pair: {
-      entitySlug: "soroswap-native-usdc-pair",
-      pairId: pairShape.pairId,
-      name: "native-USDC Soroswap LP Token",
-      reserveCount: 2,
-      token0: pairShape.token0,
-      token1: pairShape.token1,
-      reservesRaw: pairShape.reserves,
+      entitySlug: shape.entitySlug,
+      pairId: shape.pairId,
+      name: shape.pairName,
+      reserveCount: Array.isArray(shape.reserves) ? shape.reserves.length : 0,
+      token0: shape.token0,
+      token1: shape.token1,
+      reservesRaw: shape.reserves,
     },
-    assets: pairShape.assets ?? [],
+    assets: shape.assets,
     activity: {
-      recentEventCount: pairShape.recentEventCount ?? 0,
-      eventCounts,
+      recentEventCount: normalized.count ?? 0,
+      eventCounts: countBy(subEventKeys),
     },
   };
 
   console.dir(output, { depth: 8 });
-  await saveJson("59-soroswap-final-registry.json", output);
+  await saveJson('59-soroswap-final-registry.json', output);
 }
 
 main().catch((err) => {

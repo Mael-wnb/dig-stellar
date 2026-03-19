@@ -10,12 +10,17 @@ async function main() {
     throw new Error('Missing 58 or 59 Soroswap files');
   }
 
+  const entitySlug = registry.pair?.entitySlug;
+  if (!entitySlug) {
+    throw new Error('Missing entitySlug in 59-soroswap-final-registry.json');
+  }
+
   const client = createPgClient();
   await client.connect();
 
   try {
     const venue = await getVenueBySlugOrThrow(client, 'soroswap');
-    const entity = await getEntityBySlugOrThrow(client, 'soroswap-native-usdc-pair');
+    const entity = await getEntityBySlugOrThrow(client, entitySlug);
     const assetIdByContract = await getAssetIdByContractMap(client, 'stellar-mainnet');
 
     let processed = 0;
@@ -98,6 +103,7 @@ async function main() {
 
     console.log({
       completedAt: nowIso(),
+      entitySlug,
       processed,
     });
   } finally {

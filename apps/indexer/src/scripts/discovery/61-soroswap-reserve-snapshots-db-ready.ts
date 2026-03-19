@@ -1,46 +1,49 @@
-import { loadJson, saveJson, nowIso } from "./00-common";
+import { loadJson, nowIso, saveJson } from './00-common';
 
-function toScaled(raw: string | null, decimals: number | null): string | null {
-  if (!raw || decimals === null || !Number.isFinite(decimals)) return null;
+function scale(raw: string | null | undefined, decimals: number | null | undefined): string | null {
+  if (!raw || decimals === null || decimals === undefined) return null;
 
-  const s = String(raw);
-  const d = Number(decimals);
-  if (d === 0) return s;
+  const negative = raw.startsWith('-');
+  const digits = negative ? raw.slice(1) : raw;
 
-  const padded = s.padStart(d + 1, "0");
-  const intPart = padded.slice(0, -d);
-  const fracPart = padded.slice(-d).replace(/0+$/, "");
-  return fracPart ? `${intPart}.${fracPart}` : intPart;
+  if (decimals === 0) return raw;
+
+  const padded = digits.padStart(decimals + 1, '0');
+  const intPart = padded.slice(0, -decimals) || '0';
+  const fracPart = padded.slice(-decimals).replace(/0+$/, '');
+  const out = fracPart ? `${intPart}.${fracPart}` : intPart;
+
+  return negative ? `-${out}` : out;
 }
 
 async function main() {
-  const registry = await loadJson<any>("59-soroswap-final-registry.json");
-  if (!registry) throw new Error("Missing 59-soroswap-final-registry.json");
+  const shape = await loadJson<any>('57-soroswap-active-pair-db-shape.json');
 
-  const reservesRaw = registry.pair.reservesRaw ?? [];
-  const assets = registry.assets ?? [];
-
-  if (reservesRaw.length < 2 || assets.length < 2) {
-    throw new Error("Soroswap pair reserves/assets incomplete");
+  if (!shape) {
+    throw new Error('Missing 57-soroswap-active-pair-db-shape.json');
   }
 
-  const token0 = assets.find((a: any) => a.contractId === registry.pair.token0);
-  const token1 = assets.find((a: any) => a.contractId === registry.pair.token1);
+  const [reserve0Raw, reserve1Raw] = shape.reserves ?? [];
+  const [asset0, asset1] = shape.assets ?? [];
 
-  const reserveRows = [
+  if (!asset0 || !asset1) {
+    throw new Error('Missing assets in 57-soroswap-active-pair-db-shape.json');
+  }
+
+  const rows = [
     {
       generatedAt: nowIso(),
-      venueSlug: "soroswap",
-      entitySlug: registry.pair.entitySlug,
-      assetId: token0.contractId,
-      symbol: token0.symbol,
-      name: token0.name,
-      decimals: token0.decimals,
+      venueSlug: 'soroswap',
+      entitySlug: shape.entitySlug,
+      assetId: asset0.contractId,
+      symbol: asset0.symbol,
+      name: asset0.name,
+      decimals: asset0.decimals,
       enabled: true,
-      dSupplyRaw: reservesRaw[0],
+      dSupplyRaw: reserve0Raw ? String(reserve0Raw) : null,
       bSupplyRaw: null,
       backstopCreditRaw: null,
-      dSupplyScaled: toScaled(reservesRaw[0], token0.decimals),
+      dSupplyScaled: scale(reserve0Raw ? String(reserve0Raw) : null, asset0.decimals),
       bSupplyScaled: null,
       backstopCreditScaled: null,
       supplyCapRaw: null,
@@ -52,17 +55,17 @@ async function main() {
     },
     {
       generatedAt: nowIso(),
-      venueSlug: "soroswap",
-      entitySlug: registry.pair.entitySlug,
-      assetId: token1.contractId,
-      symbol: token1.symbol,
-      name: token1.name,
-      decimals: token1.decimals,
+      venueSlug: 'soroswap',
+      entitySlug: shape.entitySlug,
+      assetId: asset1.contractId,
+      symbol: asset1.symbol,
+      name: asset1.name,
+      decimals: asset1.decimals,
       enabled: true,
-      dSupplyRaw: reservesRaw[1],
+      dSupplyRaw: reserve1Raw ? String(reserve1Raw) : null,
       bSupplyRaw: null,
       backstopCreditRaw: null,
-      dSupplyScaled: toScaled(reservesRaw[1], token1.decimals),
+      dSupplyScaled: scale(reserve1Raw ? String(reserve1Raw) : null, asset1.decimals),
       bSupplyScaled: null,
       backstopCreditScaled: null,
       supplyCapRaw: null,
@@ -76,19 +79,22 @@ async function main() {
 
   const output = {
     generatedAt: nowIso(),
-    reserveCount: reserveRows.length,
-    reserveRows,
+    entitySlug: shape.entitySlug,
+    reserveCount: rows.length,
+    rows,
+    firstReserveRow: rows[0] ?? null,
   };
 
   console.dir(
     {
-      reserveCount: reserveRows.length,
-      firstReserveRow: reserveRows[0] ?? null,
+      reserveCount: output.reserveCount,
+      entitySlug: output.entitySlug,
+      firstReserveRow: output.firstReserveRow,
     },
     { depth: 8 }
   );
 
-  await saveJson("61-soroswap-reserve-snapshots-db-ready.json", output);
+  await saveJson('61-soroswap-reserve-snapshots-db-ready.json', output);
 }
 
 main().catch((err) => {

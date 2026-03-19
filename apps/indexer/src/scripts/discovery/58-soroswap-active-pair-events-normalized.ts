@@ -1,60 +1,60 @@
-import { loadJson, saveJson, nowIso } from "./00-common";
-import { toScaled } from "../shared/scaling";
+import { loadJson, nowIso, saveJson } from './00-common';
 
-function toNumString(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === "string") return value;
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  if (typeof value === "bigint") return value.toString();
-  return null;
+function scale(raw: string | null | undefined, decimals: number | null | undefined): string | null {
+  if (!raw || decimals === null || decimals === undefined) return null;
+
+  const negative = raw.startsWith('-');
+  const digits = negative ? raw.slice(1) : raw;
+
+  if (decimals === 0) return raw;
+
+  const padded = digits.padStart(decimals + 1, '0');
+  const intPart = padded.slice(0, -decimals) || '0';
+  const fracPart = padded.slice(-decimals).replace(/0+$/, '');
+  const out = fracPart ? `${intPart}.${fracPart}` : intPart;
+
+  return negative ? `-${out}` : out;
 }
 
-function getField(obj: Record<string, unknown>, candidates: string[]): string | null {
-  for (const key of candidates) {
-    const v = toNumString(obj[key]);
-    if (v !== null) return v;
-  }
-  return null;
-}
+function extractSwapAmounts(decodedValue: any) {
+  const amount0In = decodedValue?.amount_0_in ? String(decodedValue.amount_0_in) : '0';
+  const amount0Out = decodedValue?.amount_0_out ? String(decodedValue.amount_0_out) : '0';
+  const amount1In = decodedValue?.amount_1_in ? String(decodedValue.amount_1_in) : '0';
+  const amount1Out = decodedValue?.amount_1_out ? String(decodedValue.amount_1_out) : '0';
 
-function gtZero(raw: string | null): boolean {
-  return raw !== null && Number(raw) > 0;
+  return { amount0In, amount0Out, amount1In, amount1Out };
 }
 
 async function main() {
-  const pairShape = await loadJson<any>("57-soroswap-active-pair-db-shape.json");
-  const eventsFile = await loadJson<any>("50-soroswap-pair-events.json");
+  const shape = await loadJson<any>('57-soroswap-active-pair-db-shape.json');
+  const pairEvents = await loadJson<any>('50-soroswap-pair-events.json');
 
-  if (!pairShape || !eventsFile) {
-    throw new Error("Missing 57-soroswap-active-pair-db-shape.json or 50-soroswap-pair-events.json");
+  if (!shape) throw new Error('Missing 57-soroswap-active-pair-db-shape.json');
+  if (!pairEvents) throw new Error('Missing 50-soroswap-pair-events.json');
+
+  const asset0 = shape.assets.find((a: any) => a.contractId === shape.token0);
+  const asset1 = shape.assets.find((a: any) => a.contractId === shape.token1);
+
+  if (!asset0 || !asset1) {
+    throw new Error('Missing asset0/asset1 in 57 output');
   }
 
-  const token0 = pairShape.token0;
-  const token1 = pairShape.token1;
+  const decimals0 = asset0.decimals ?? 7;
+  const decimals1 = asset1.decimals ?? 7;
 
-  const assetMap = new Map<string, any>();
-  for (const asset of pairShape.assets ?? []) {
-    assetMap.set(asset.contractId, asset);
-  }
+  const sourceEvents = Array.isArray(pairEvents.decodedEvents)
+    ? pairEvents.decodedEvents
+    : Array.isArray(pairEvents.events)
+      ? pairEvents.events
+      : Array.isArray(pairEvents.results)
+        ? pairEvents.results
+        : Array.isArray(pairEvents.rows)
+          ? pairEvents.rows
+          : [];
 
-  const token0Decimals = assetMap.get(token0)?.decimals ?? null;
-  const token1Decimals = assetMap.get(token1)?.decimals ?? null;
-
-  const rows = (eventsFile.decodedEvents ?? []).map((event: any) => {
-    const subEventName =
-      Array.isArray(event.decodedTopics) && typeof event.decodedTopics[1] === "string"
-        ? event.decodedTopics[1]
-        : null;
-
-    const decodedValue = (event.decodedValue ?? {}) as Record<string, unknown>;
-
-    const reserve0Raw = getField(decodedValue, ["new_reserve_0", "newReserve0"]);
-    const reserve1Raw = getField(decodedValue, ["new_reserve_1", "newReserve1"]);
-
-    const amount0InRaw = getField(decodedValue, ["amount_0_in", "amount0In"]);
-    const amount1InRaw = getField(decodedValue, ["amount_1_in", "amount1In"]);
-    const amount0OutRaw = getField(decodedValue, ["amount_0_out", "amount0Out"]);
-    const amount1OutRaw = getField(decodedValue, ["amount_1_out", "amount1Out"]);
+  const rows = sourceEvents.map((event: any) => {
+    const subEventName = event.decodedTopics?.[1] ?? null;
+    const decodedValue = event.decodedValue ?? {};
 
     let tokenIn: string | null = null;
     let tokenOut: string | null = null;
@@ -62,42 +62,51 @@ async function main() {
     let tokenAmountOutRaw: string | null = null;
     let tokenAmountInScaled: string | null = null;
     let tokenAmountOutScaled: string | null = null;
+    let reserve0Raw: string | null = null;
+    let reserve1Raw: string | null = null;
+    let reserve0Scaled: string | null = null;
+    let reserve1Scaled: string | null = null;
 
-    if (subEventName === "swap") {
-      if (gtZero(amount0InRaw)) {
-        tokenIn = token0;
-        tokenAmountInRaw = amount0InRaw;
-        tokenAmountInScaled = toScaled(amount0InRaw, token0Decimals);
-      } else if (gtZero(amount1InRaw)) {
-        tokenIn = token1;
-        tokenAmountInRaw = amount1InRaw;
-        tokenAmountInScaled = toScaled(amount1InRaw, token1Decimals);
-      }
+    if (subEventName === 'swap') {
+      const { amount0In, amount0Out, amount1In, amount1Out } = extractSwapAmounts(decodedValue);
 
-      if (gtZero(amount0OutRaw)) {
-        tokenOut = token0;
-        tokenAmountOutRaw = amount0OutRaw;
-        tokenAmountOutScaled = toScaled(amount0OutRaw, token0Decimals);
-      } else if (gtZero(amount1OutRaw)) {
-        tokenOut = token1;
-        tokenAmountOutRaw = amount1OutRaw;
-        tokenAmountOutScaled = toScaled(amount1OutRaw, token1Decimals);
+      if (amount0In !== '0' && amount1Out !== '0') {
+        tokenIn = shape.token0;
+        tokenOut = shape.token1;
+        tokenAmountInRaw = amount0In;
+        tokenAmountOutRaw = amount1Out;
+        tokenAmountInScaled = scale(amount0In, decimals0);
+        tokenAmountOutScaled = scale(amount1Out, decimals1);
+      } else if (amount1In !== '0' && amount0Out !== '0') {
+        tokenIn = shape.token1;
+        tokenOut = shape.token0;
+        tokenAmountInRaw = amount1In;
+        tokenAmountOutRaw = amount0Out;
+        tokenAmountInScaled = scale(amount1In, decimals1);
+        tokenAmountOutScaled = scale(amount0Out, decimals0);
       }
     }
 
+    if (subEventName === 'sync') {
+      reserve0Raw = decodedValue?.new_reserve_0 ? String(decodedValue.new_reserve_0) : null;
+      reserve1Raw = decodedValue?.new_reserve_1 ? String(decodedValue.new_reserve_1) : null;
+      reserve0Scaled = scale(reserve0Raw, decimals0);
+      reserve1Scaled = scale(reserve1Raw, decimals1);
+    }
+
     return {
-      venueSlug: "soroswap",
-      entitySlug: "soroswap-native-usdc-pair",
-      pairId: pairShape.pairId,
+      venueSlug: 'soroswap',
+      entitySlug: shape.entitySlug,
+      pairId: shape.pairId,
       txHash: event.txHash,
       eventId: event.id,
       ledger: event.ledger,
       occurredAt: event.ledgerClosedAt,
       eventName: event.eventName,
       subEventName,
-      eventKey: `${event.eventName}:${subEventName ?? "unknown"}`,
-      token0,
-      token1,
+      eventKey: subEventName ? `${event.eventName}:${subEventName}` : event.eventName,
+      token0: shape.token0,
+      token1: shape.token1,
       tokenIn,
       tokenOut,
       tokenAmountInRaw,
@@ -106,33 +115,40 @@ async function main() {
       tokenAmountOutScaled,
       reserve0Raw,
       reserve1Raw,
-      reserve0Scaled: toScaled(reserve0Raw, token0Decimals),
-      reserve1Scaled: toScaled(reserve1Raw, token1Decimals),
+      reserve0Scaled,
+      reserve1Scaled,
       decodedTopics: event.decodedTopics,
-      decodedValue,
+      decodedValue: event.decodedValue,
     };
   });
 
-  const firstSwapRow = rows.find((r: any) => r.subEventName === "swap") ?? null;
+  const firstRow = rows[0] ?? null;
+  const firstSwapRow = rows.find((row: any) => row.subEventName === 'swap') ?? null;
 
   const output = {
     generatedAt: nowIso(),
-    pairId: pairShape.pairId,
+    pairId: shape.pairId,
+    entitySlug: shape.entitySlug,
+    sourceEventsCount: sourceEvents.length,
     count: rows.length,
     rows,
+    firstRow,
+    firstSwapRow,
   };
 
   console.dir(
     {
       pairId: output.pairId,
+      entitySlug: output.entitySlug,
+      sourceEventsCount: output.sourceEventsCount,
       count: output.count,
-      firstRow: rows[0] ?? null,
-      firstSwapRow,
+      firstRow: output.firstRow,
+      firstSwapRow: output.firstSwapRow,
     },
     { depth: 8 }
   );
 
-  await saveJson("58-soroswap-active-pair-events-normalized.json", output);
+  await saveJson('58-soroswap-active-pair-events-normalized.json', output);
 }
 
 main().catch((err) => {

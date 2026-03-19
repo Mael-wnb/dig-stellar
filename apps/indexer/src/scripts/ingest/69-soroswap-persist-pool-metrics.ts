@@ -1,14 +1,24 @@
 import { createPgClient } from '../shared/db';
-import { getVenueBySlugOrThrow, getEntityBySlugOrThrow } from '../shared/lookup';
-import { nowIso } from '../discovery/00-common';
+import { getEntityBySlugOrThrow, getVenueBySlugOrThrow } from '../shared/lookup';
+import { nowIso, loadJson } from '../discovery/00-common';
 
 async function main() {
+  const registry = await loadJson<any>('59-soroswap-final-registry.json');
+  if (!registry) {
+    throw new Error('Missing 59-soroswap-final-registry.json');
+  }
+
+  const entitySlug = registry.pair?.entitySlug;
+  if (!entitySlug) {
+    throw new Error('Missing entitySlug in 59-soroswap-final-registry.json');
+  }
+
   const client = createPgClient();
   await client.connect();
 
   try {
     const venue = await getVenueBySlugOrThrow(client, 'soroswap');
-    const entity = await getEntityBySlugOrThrow(client, 'soroswap-native-usdc-pair');
+    const entity = await getEntityBySlugOrThrow(client, entitySlug);
 
     const pricesRes = await client.query(`
       select distinct on (ap.asset_id)
@@ -27,13 +37,16 @@ async function main() {
 
     const reserveRes = await client.query(
       `
-      select
+      select distinct on (rs.asset_id)
         rs.asset_id,
-        rs.d_supply_scaled
+        rs.d_supply_scaled,
+        rs.snapshot_at
       from reserve_snapshots rs
       join entities e on e.id = rs.entity_id
-      where e.slug = 'soroswap-native-usdc-pair'
-      `
+      where e.slug = $1
+      order by rs.asset_id, rs.snapshot_at desc, rs.created_at desc
+      `,
+      [entitySlug]
     );
 
     let tvlUsd = 0;
@@ -54,9 +67,10 @@ async function main() {
         ne.token_amount_out_scaled
       from normalized_events ne
       join entities e on e.id = ne.entity_id
-      where e.slug = 'soroswap-native-usdc-pair'
+      where e.slug = $1
         and ne.occurred_at >= now() - interval '24 hours'
-      `
+      `,
+      [entitySlug]
     );
 
     let swaps24h = 0;
