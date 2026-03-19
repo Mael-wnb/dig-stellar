@@ -1,0 +1,10 @@
+{
+  "fetchedAt": "2026-03-19T11:43:04.878Z",
+  "rpcUrl": "https://mainnet.sorobanrpc.com",
+  "request": {
+    "pagination": {
+      "limit": 25
+    }
+  },
+  "count": 0
+}

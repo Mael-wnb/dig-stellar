@@ -1,0 +1,59 @@
+{
+  "fetchedAt": "2026-03-19T11:31:56.670Z",
+  "baseUrl": "https://backend.aqua.network",
+  "totalProbes": 10,
+  "successCount": 0,
+  "okEndpoints": [],
+  "results": [
+    {
+      "endpoint": "https://backend.aqua.network/",
+      "ok": false,
+      "error": "fetch failed"
+    },
+    {
+      "endpoint": "https://backend.aqua.network/api",
+      "ok": false,
+      "error": "fetch failed"
+    },
+    {
+      "endpoint": "https://backend.aqua.network/api/health",
+      "ok": false,
+      "error": "fetch failed"
+    },
+    {
+      "endpoint": "https://backend.aqua.network/api/pools",
+      "ok": false,
+      "error": "fetch failed"
+    },
+    {
+      "endpoint": "https://backend.aqua.network/api/pools?limit=10",
+      "ok": false,
+      "error": "fetch failed"
+    },
+    {
+      "endpoint": "https://backend.aqua.network/api/v1/pools",
+      "ok": false,
+      "error": "fetch failed"
+    },
+    {
+      "endpoint": "https://backend.aqua.network/api/v1/pools?limit=10",
+      "ok": false,
+      "error": "fetch failed"
+    },
+    {
+      "endpoint": "https://backend.aqua.network/api/marketkeys",
+      "ok": false,
+      "error": "fetch failed"
+    },
+    {
+      "endpoint": "https://backend.aqua.network/api/assets",
+      "ok": false,
+      "error": "fetch failed"
+    },
+    {
+      "endpoint": "https://backend.aqua.network/api/v1/assets",
+      "ok": false,
+      "error": "fetch failed"
+    }
+  ]
+}
