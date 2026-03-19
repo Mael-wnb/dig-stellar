@@ -1,36 +1,22 @@
-import { Client } from "pg";
-import { loadJson, nowIso } from "../discovery/00-common";
+import { loadJson, nowIso } from '../discovery/00-common';
+import { createPgClient } from '../shared/db';
+import { getAssetIdByContractMap, getEntityBySlugOrThrow, getVenueBySlugOrThrow } from '../shared/lookup';
 
 async function main() {
-  const databaseUrl =
-    process.env.DATABASE_URL?.replace("?schema=public", "") ??
-    "postgresql://dig:dig@localhost:5432/dig_stellar";
+  const eventsFile = await loadJson<any>('58-soroswap-active-pair-events-normalized.json');
+  const registry = await loadJson<any>('59-soroswap-final-registry.json');
 
-  const eventsFile = await loadJson<any>("58-soroswap-active-pair-events-normalized.json");
-  const registry = await loadJson<any>("59-soroswap-final-registry.json");
-  if (!eventsFile || !registry) throw new Error("Missing 58 or 59 Soroswap files");
+  if (!eventsFile || !registry) {
+    throw new Error('Missing 58 or 59 Soroswap files');
+  }
 
-  const client = new Client({ connectionString: databaseUrl });
+  const client = createPgClient();
   await client.connect();
 
   try {
-    const venueRes = await client.query(`select id from venues where slug = 'soroswap' limit 1`);
-    const entityRes = await client.query(
-      `select id from entities where slug = 'soroswap-native-usdc-pair' limit 1`
-    );
-
-    if (!venueRes.rowCount || !entityRes.rowCount) {
-      throw new Error("Missing soroswap venue or soroswap-native-usdc-pair entity");
-    }
-
-    const venueId = venueRes.rows[0].id;
-    const entityId = entityRes.rows[0].id;
-
-    const assetRes = await client.query(
-      `select id, contract_address from assets where chain = 'stellar-mainnet'`
-    );
-    const assetIdByContract = new Map<string, string>();
-    for (const row of assetRes.rows) assetIdByContract.set(row.contract_address, row.id);
+    const venue = await getVenueBySlugOrThrow(client, 'soroswap');
+    const entity = await getEntityBySlugOrThrow(client, 'soroswap-native-usdc-pair');
+    const assetIdByContract = await getAssetIdByContractMap(client, 'stellar-mainnet');
 
     let processed = 0;
 
@@ -65,8 +51,8 @@ async function main() {
         on conflict (contract_address, event_id) do nothing
         `,
         [
-          venueId,
-          entityId,
+          venue.id,
+          entity.id,
           row.pairId,
           row.eventId,
           row.txHash,
@@ -83,13 +69,19 @@ async function main() {
           row.reserve0Scaled,
           row.reserve1Scaled,
           true,
-          JSON.stringify({ source: "58-soroswap-active-pair-events-normalized" }),
+          JSON.stringify({
+            source: '58-soroswap-active-pair-events-normalized',
+          }),
         ]
       );
+
       processed += 1;
     }
 
-    console.log({ completedAt: nowIso(), processed });
+    console.log({
+      completedAt: nowIso(),
+      processed,
+    });
   } finally {
     await client.end();
   }

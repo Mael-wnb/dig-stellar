@@ -1,19 +1,17 @@
-import { Client } from "pg";
-import { loadJson, nowIso } from "../discovery/00-common";
+import { loadJson, nowIso } from '../discovery/00-common';
+import { createPgClient } from '../shared/db';
 
 async function main() {
-  const databaseUrl =
-    process.env.DATABASE_URL?.replace("?schema=public", "") ??
-    "postgresql://dig:dig@localhost:5432/dig_stellar";
+  const registry = await loadJson<any>('59-soroswap-final-registry.json');
+  if (!registry) {
+    throw new Error('Missing 59-soroswap-final-registry.json');
+  }
 
-  const registry = await loadJson<any>("59-soroswap-final-registry.json");
-  if (!registry) throw new Error("Missing 59-soroswap-final-registry.json");
-
-  const client = new Client({ connectionString: databaseUrl });
+  const client = createPgClient();
   await client.connect();
 
   try {
-    await client.query("begin");
+    await client.query('begin');
 
     const venueRes = await client.query(
       `
@@ -33,11 +31,14 @@ async function main() {
         registry.venue.name,
         registry.venue.chain,
         registry.venue.venueType,
-        JSON.stringify({ source: "soroswap_final_registry", generatedAt: registry.generatedAt }),
+        JSON.stringify({
+          source: 'soroswap_final_registry',
+          generatedAt: registry.generatedAt,
+        }),
       ]
     );
 
-    const venueId = venueRes.rows[0].id;
+    const venueId = venueRes.rows[0].id as string;
 
     const entityRes = await client.query(
       `
@@ -57,18 +58,20 @@ async function main() {
         venueId,
         registry.pair.entitySlug,
         registry.pair.name,
-        "amm_pool",
+        'amm_pool',
         registry.pair.pairId,
         JSON.stringify({
           reserveCount: registry.pair.reserveCount,
           token0: registry.pair.token0,
           token1: registry.pair.token1,
-          source: "soroswap_final_registry",
+          source: 'soroswap_final_registry',
         }),
       ]
     );
 
-    const entityId = entityRes.rows[0].id;
+    const entityId = entityRes.rows[0].id as string;
+
+    let assetCount = 0;
 
     for (const asset of registry.assets ?? []) {
       const assetRes = await client.query(
@@ -89,19 +92,22 @@ async function main() {
         [
           registry.venue.chain,
           asset.contractId,
-          "soroban_token",
+          'soroban_token',
           asset.symbol,
           asset.name,
           asset.decimals,
-          JSON.stringify({ source: "soroswap_active_pair_assets", generatedAt: registry.generatedAt }),
+          JSON.stringify({
+            source: 'soroswap_active_pair_assets',
+            generatedAt: registry.generatedAt,
+          }),
         ]
       );
 
-      const assetId = assetRes.rows[0].id;
+      const assetId = assetRes.rows[0].id as string;
 
-      let role = "reserve";
-      if (asset.contractId === registry.pair.token0) role = "token0";
-      if (asset.contractId === registry.pair.token1) role = "token1";
+      let role = 'reserve';
+      if (asset.contractId === registry.pair.token0) role = 'token0';
+      if (asset.contractId === registry.pair.token1) role = 'token1';
 
       await client.query(
         `
@@ -111,20 +117,29 @@ async function main() {
         do update set
           metadata = excluded.metadata
         `,
-        [entityId, assetId, role, JSON.stringify({ source: "soroswap_final_registry" })]
+        [
+          entityId,
+          assetId,
+          role,
+          JSON.stringify({
+            source: 'soroswap_final_registry',
+          }),
+        ]
       );
+
+      assetCount += 1;
     }
 
-    await client.query("commit");
+    await client.query('commit');
 
     console.log({
       completedAt: nowIso(),
       venueId,
       entityId,
-      assetCount: registry.assets?.length ?? 0,
+      assetCount,
     });
   } catch (err) {
-    await client.query("rollback");
+    await client.query('rollback');
     throw err;
   } finally {
     await client.end();

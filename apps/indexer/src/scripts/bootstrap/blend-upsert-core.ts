@@ -1,21 +1,17 @@
-import { Client } from "pg";
-import { loadJson, nowIso } from "../discovery/00-common";
+import { loadJson, nowIso } from '../discovery/00-common';
+import { createPgClient } from '../shared/db';
 
 async function main() {
-  const databaseUrl =
-    process.env.DATABASE_URL?.replace("?schema=public", "") ??
-    "postgresql://dig:dig@localhost:5432/dig_stellar";
-
-  const registry = await loadJson<any>("41-blend-final-registry.json");
+  const registry = await loadJson<any>('41-blend-final-registry.json');
   if (!registry) {
-    throw new Error("Missing 41-blend-final-registry.json");
+    throw new Error('Missing 41-blend-final-registry.json');
   }
 
-  const client = new Client({ connectionString: databaseUrl });
+  const client = createPgClient();
   await client.connect();
 
   try {
-    await client.query("begin");
+    await client.query('begin');
 
     const venueRes = await client.query(
       `
@@ -35,11 +31,14 @@ async function main() {
         registry.venue.name,
         registry.venue.chain,
         registry.venue.venueType,
-        JSON.stringify({ source: "blend_final_registry", generatedAt: registry.generatedAt }),
+        JSON.stringify({
+          source: 'blend_final_registry',
+          generatedAt: registry.generatedAt,
+        }),
       ]
     );
 
-    const venueId = venueRes.rows[0].id;
+    const venueId = venueRes.rows[0].id as string;
 
     const entityRes = await client.query(
       `
@@ -59,18 +58,18 @@ async function main() {
         venueId,
         registry.pool.entitySlug,
         registry.pool.name,
-        "lending_pool",
+        'lending_pool',
         registry.pool.poolId,
         JSON.stringify({
           reserveCount: registry.pool.reserveCount,
-          source: "blend_final_registry",
+          source: 'blend_final_registry',
         }),
       ]
     );
 
-    const entityId = entityRes.rows[0].id;
+    const entityId = entityRes.rows[0].id as string;
 
-    const assetIdsByContract = new Map<string, string>();
+    let assetCount = 0;
 
     for (const reserve of registry.reserves ?? []) {
       const assetRes = await client.query(
@@ -91,19 +90,18 @@ async function main() {
         [
           registry.venue.chain,
           reserve.assetId,
-          "soroban_token",
+          'soroban_token',
           reserve.symbol,
           reserve.name,
           reserve.decimals,
           JSON.stringify({
-            source: "blend_reserve_assets",
+            source: 'blend_reserve_assets',
             generatedAt: registry.generatedAt,
           }),
         ]
       );
 
-      const assetId = assetRes.rows[0].id;
-      assetIdsByContract.set(reserve.assetId, assetId);
+      const assetId = assetRes.rows[0].id as string;
 
       await client.query(
         `
@@ -116,24 +114,26 @@ async function main() {
         [
           entityId,
           assetId,
-          "reserve",
+          'reserve',
           JSON.stringify({
-            source: "blend_final_registry",
+            source: 'blend_final_registry',
           }),
         ]
       );
+
+      assetCount += 1;
     }
 
-    await client.query("commit");
+    await client.query('commit');
 
     console.log({
       completedAt: nowIso(),
       venueId,
       entityId,
-      assetCount: assetIdsByContract.size,
+      assetCount,
     });
   } catch (err) {
-    await client.query("rollback");
+    await client.query('rollback');
     throw err;
   } finally {
     await client.end();

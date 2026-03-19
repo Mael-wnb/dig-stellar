@@ -1,42 +1,22 @@
-import { Client } from "pg";
-import { loadJson, nowIso } from "../discovery/00-common";
+import { loadJson, nowIso } from '../discovery/00-common';
+import { createPgClient } from '../shared/db';
+import { getAssetIdByContractMap, getEntityBySlugOrThrow, getVenueBySlugOrThrow } from '../shared/lookup';
 
 async function main() {
-  const databaseUrl =
-    process.env.DATABASE_URL?.replace("?schema=public", "") ??
-    "postgresql://dig:dig@localhost:5432/dig_stellar";
-
-  const eventsFile = await loadJson<any>("28-blend-events-scaled.json");
+  const eventsFile = await loadJson<any>('28-blend-events-scaled.json');
   if (!eventsFile) {
-    throw new Error("Missing 28-blend-events-scaled.json");
+    throw new Error('Missing 28-blend-events-scaled.json');
   }
 
-  const client = new Client({ connectionString: databaseUrl });
+  const client = createPgClient();
   await client.connect();
 
   try {
-    const venueRes = await client.query(`select id from venues where slug = 'blend' limit 1`);
-    const entityRes = await client.query(
-      `select id from entities where slug = 'blend-fixed-pool' limit 1`
-    );
+    const venue = await getVenueBySlugOrThrow(client, 'blend');
+    const entity = await getEntityBySlugOrThrow(client, 'blend-fixed-pool');
+    const assetIdByContract = await getAssetIdByContractMap(client, 'stellar-mainnet');
 
-    if (!venueRes.rowCount || !entityRes.rowCount) {
-      throw new Error("Missing blend venue or blend-fixed-pool entity in DB");
-    }
-
-    const venueId = venueRes.rows[0].id;
-    const entityId = entityRes.rows[0].id;
-
-    const assetRes = await client.query(
-      `select id, contract_address from assets where chain = 'stellar-mainnet'`
-    );
-
-    const assetIdByContract = new Map<string, string>();
-    for (const row of assetRes.rows) {
-      assetIdByContract.set(row.contract_address, row.id);
-    }
-
-    let inserted = 0;
+    let processed = 0;
 
     for (const row of eventsFile.scaledRows ?? []) {
       await client.query(
@@ -69,8 +49,8 @@ async function main() {
         on conflict (contract_address, event_id) do nothing
         `,
         [
-          venueId,
-          entityId,
+          venue.id,
+          entity.id,
           row.contractAddress,
           row.eventId,
           row.txHash,
@@ -82,24 +62,24 @@ async function main() {
           row.callerAddress,
           row.tokenIn ? assetIdByContract.get(row.tokenIn) ?? null : null,
           row.tokenOut ? assetIdByContract.get(row.tokenOut) ?? null : null,
-          row.tokenAmountIn ? row.tokenAmountIn : null,
-          row.tokenAmountOut ? row.tokenAmountOut : null,
-          row.tokenAmountInScaled ? row.tokenAmountInScaled : null,
-          row.tokenAmountOutScaled ? row.tokenAmountOutScaled : null,
+          row.tokenAmountIn ?? null,
+          row.tokenAmountOut ?? null,
+          row.tokenAmountInScaled ?? null,
+          row.tokenAmountOutScaled ?? null,
           row.inSuccessfulContractCall,
           JSON.stringify({
-            source: "28-blend-events-scaled",
+            source: '28-blend-events-scaled',
             generatedAt: eventsFile.generatedAt,
           }),
         ]
       );
 
-      inserted += 1;
+      processed += 1;
     }
 
     console.log({
       completedAt: nowIso(),
-      processed: inserted,
+      processed,
     });
   } finally {
     await client.end();

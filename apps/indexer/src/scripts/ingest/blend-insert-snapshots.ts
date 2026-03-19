@@ -1,44 +1,24 @@
-import { Client } from "pg";
-import { loadJson, nowIso } from "../discovery/00-common";
+import { loadJson, nowIso } from '../discovery/00-common';
+import { createPgClient } from '../shared/db';
+import { getAssetIdByContractMap, getEntityBySlugOrThrow, getVenueBySlugOrThrow } from '../shared/lookup';
 
 async function main() {
-  const databaseUrl =
-    process.env.DATABASE_URL?.replace("?schema=public", "") ??
-    "postgresql://dig:dig@localhost:5432/dig_stellar";
-
-  const poolSnapshot = await loadJson<any>("42-blend-pool-snapshot-db-ready.json");
-  const reserveSnapshots = await loadJson<any>("43-blend-reserve-snapshots-db-ready.json");
+  const poolSnapshot = await loadJson<any>('42-blend-pool-snapshot-db-ready.json');
+  const reserveSnapshots = await loadJson<any>('43-blend-reserve-snapshots-db-ready.json');
 
   if (!poolSnapshot || !reserveSnapshots) {
-    throw new Error("Missing snapshot JSON files");
+    throw new Error('Missing snapshot JSON files');
   }
 
-  const client = new Client({ connectionString: databaseUrl });
+  const client = createPgClient();
   await client.connect();
 
   try {
-    await client.query("begin");
+    await client.query('begin');
 
-    const venueRes = await client.query(`select id from venues where slug = 'blend' limit 1`);
-    const entityRes = await client.query(
-      `select id from entities where slug = 'blend-fixed-pool' limit 1`
-    );
-
-    if (!venueRes.rowCount || !entityRes.rowCount) {
-      throw new Error("Missing blend venue or blend-fixed-pool entity");
-    }
-
-    const venueId = venueRes.rows[0].id;
-    const entityId = entityRes.rows[0].id;
-
-    const assetRes = await client.query(
-      `select id, contract_address from assets where chain = 'stellar-mainnet'`
-    );
-
-    const assetIdByContract = new Map<string, string>();
-    for (const row of assetRes.rows) {
-      assetIdByContract.set(row.contract_address, row.id);
-    }
+    const venue = await getVenueBySlugOrThrow(client, 'blend');
+    const entity = await getEntityBySlugOrThrow(client, 'blend-fixed-pool');
+    const assetIdByContract = await getAssetIdByContractMap(client, 'stellar-mainnet');
 
     const snapshotAt = poolSnapshot.generatedAt ?? nowIso();
 
@@ -72,8 +52,8 @@ async function main() {
         metadata = excluded.metadata
       `,
       [
-        venueId,
-        entityId,
+        venue.id,
+        entity.id,
         snapshotAt,
         poolSnapshot.poolId,
         poolSnapshot.poolName,
@@ -84,7 +64,7 @@ async function main() {
         poolSnapshot.totalExitPool,
         poolSnapshot.uniqueCallers,
         JSON.stringify({
-          source: "42-blend-pool-snapshot-db-ready",
+          source: '42-blend-pool-snapshot-db-ready',
         }),
       ]
     );
@@ -143,8 +123,8 @@ async function main() {
           metadata = excluded.metadata
         `,
         [
-          venueId,
-          entityId,
+          venue.id,
+          entity.id,
           assetId,
           row.generatedAt ?? snapshotAt,
           row.symbol,
@@ -164,20 +144,20 @@ async function main() {
           row.supplyApr,
           row.estSupplyApy,
           JSON.stringify({
-            source: "43-blend-reserve-snapshots-db-ready",
+            source: '43-blend-reserve-snapshots-db-ready',
           }),
         ]
       );
     }
 
-    await client.query("commit");
+    await client.query('commit');
 
     console.log({
       completedAt: nowIso(),
       reserveCount: reserveSnapshots.reserveRows?.length ?? 0,
     });
   } catch (err) {
-    await client.query("rollback");
+    await client.query('rollback');
     throw err;
   } finally {
     await client.end();
