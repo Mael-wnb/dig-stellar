@@ -1,8 +1,58 @@
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
-import { xdr, scValToNative } from "@stellar/stellar-sdk";
+import {
+    xdr,
+    scValToNative,
+    nativeToScVal,
+    Contract,
+    TransactionBuilder,
+    BASE_FEE,
+    Networks,
+    Account,
+    Address,
+  } from "@stellar/stellar-sdk";
+  import { Server as RpcServer } from "@stellar/stellar-sdk/rpc";
 
-export const TMP_DIR = path.resolve(process.cwd(), "tmp/discovery");
+  export const TMP_DIR = path.resolve(process.cwd(), "tmp/discovery");
+
+
+  export type ContractArg =
+  | { type: "address"; value: string }
+  | { type: "u32"; value: number }
+  | { type: "i128"; value: string | number | bigint }
+  | { type: "u128"; value: string | number | bigint }
+  | string
+  | number
+  | bigint
+  | boolean
+  | null;
+
+  function contractArgToScVal(arg: ContractArg): xdr.ScVal {
+    if (
+      arg &&
+      typeof arg === "object" &&
+      "type" in arg &&
+      "value" in arg
+    ) {
+      if (arg.type === "address") {
+        return new Address(arg.value).toScVal();
+      }
+  
+      if (arg.type === "u32") {
+        return xdr.ScVal.scvU32(arg.value);
+      }
+  
+      if (arg.type === "i128") {
+        return nativeToScVal(BigInt(arg.value), { type: "i128" });
+      }
+  
+      if (arg.type === "u128") {
+        return nativeToScVal(BigInt(arg.value), { type: "u128" });
+      }
+    }
+  
+    return nativeToScVal(arg as any);
+  }
 
 export function getEnv(name: string, fallback?: string): string {
   const value = process.env[name] ?? fallback;
@@ -95,18 +145,9 @@ export function sleep(ms: number): Promise<void> {
 }
 
 export function decodeScValBase64(input?: string | null): unknown {
-  if (!input) return null;
-
-  try {
-    const scVal = xdr.ScVal.fromXDR(input, "base64");
-    return scValToNative(scVal);
-  } catch (err) {
-    return {
-      __decodeError: err instanceof Error ? err.message : String(err),
-      raw: input,
-    };
+    if (!input) return null;
+    return decodeScValUnknown(input);
   }
-}
 
 export function decodeTopicList(topics?: string[] | null): unknown[] {
   if (!topics?.length) return [];
@@ -133,3 +174,187 @@ export function tryExtractEventName(decodedTopics: unknown[]): string | null {
 
   return null;
 }
+
+export async function getAccountSequence(
+    horizonUrl: string,
+    address: string
+  ): Promise<string> {
+    const url = new URL(`/accounts/${address}`, horizonUrl).toString();
+    const account = await fetchJson<any>(url);
+    return account.sequence;
+  }
+  
+  export async function simulateContractRead(params: {
+    rpcUrl: string;
+    horizonUrl: string;
+    contractId: string;
+    method: string;
+    args?: ContractArg[];
+    sourceAccount: string;
+  }): Promise<{
+    ok: boolean;
+    method: string;
+    decoded?: unknown;
+    raw?: unknown;
+    error?: string;
+  }> {
+    const {
+      rpcUrl,
+      horizonUrl,
+      contractId,
+      method,
+      args = [],
+      sourceAccount,
+    } = params;
+  
+    try {
+      const sequence = await getAccountSequence(horizonUrl, sourceAccount);
+  
+      const server = new RpcServer(rpcUrl);
+      const contract = new Contract(contractId);
+  
+      const account = new Account(sourceAccount, sequence);
+  
+      const tx = new TransactionBuilder(account, {
+        fee: BASE_FEE,
+        networkPassphrase: Networks.PUBLIC,
+      })
+        .addOperation(
+          contract.call(
+            method,
+            ...args.map((arg) => contractArgToScVal(arg as ContractArg))
+          )
+        )
+        .setTimeout(30)
+        .build();
+  
+      const sim = await server.simulateTransaction(tx);
+  
+      const retval = (sim as any)?.result?.retval;
+      let decoded: unknown = null;
+      
+      if (retval !== undefined && retval !== null) {
+        decoded = decodeScValUnknown(retval);
+      }
+  
+      const error =
+        (sim as any)?.error ??
+        (sim as any)?.result?.error ??
+        null;
+  
+      if (error) {
+        return {
+          ok: false,
+          method,
+          raw: sim,
+          error: typeof error === "string" ? error : JSON.stringify(error),
+        };
+      }
+  
+      return {
+        ok: true,
+        method,
+        decoded,
+        raw: sim,
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        method,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  function isLikelyScValInstance(value: unknown): boolean {
+    return !!value && typeof value === "object" && "_arm" in (value as Record<string, unknown>);
+  }
+  
+  function bufferLikeToString(value: unknown): unknown {
+    if (
+      value &&
+      typeof value === "object" &&
+      "type" in (value as Record<string, unknown>) &&
+      "data" in (value as Record<string, unknown>) &&
+      (value as { type?: string }).type === "Buffer" &&
+      Array.isArray((value as { data?: unknown[] }).data)
+    ) {
+      try {
+        return Buffer.from((value as { data: number[] }).data).toString("utf-8");
+      } catch {
+        return value;
+      }
+    }
+  
+    return value;
+  }
+  
+  export function deepNormalizeDecoded(value: unknown): unknown {
+    if (typeof value === "bigint") return value.toString();
+  
+    const maybeBufferString = bufferLikeToString(value);
+    if (maybeBufferString !== value) return maybeBufferString;
+  
+    if (Array.isArray(value)) {
+      return value.map(deepNormalizeDecoded);
+    }
+  
+    if (value && typeof value === "object") {
+      // Handle ChildUnion-like objects from Stellar SDK
+      const obj = value as Record<string, unknown>;
+  
+      if ("_arm" in obj && "_value" in obj) {
+        const arm = obj._arm;
+        const inner = obj._value;
+  
+        if (arm === "str" && inner) {
+          try {
+            if (Buffer.isBuffer(inner)) return inner.toString("utf-8");
+            if (
+              typeof inner === "object" &&
+              inner &&
+              "type" in (inner as Record<string, unknown>) &&
+              "data" in (inner as Record<string, unknown>) &&
+              (inner as { type?: string }).type === "Buffer"
+            ) {
+              return Buffer.from((inner as { data: number[] }).data).toString("utf-8");
+            }
+          } catch {
+            return inner;
+          }
+        }
+  
+        if (arm === "u32" || arm === "u64" || arm === "i32" || arm === "i64" || arm === "u128" || arm === "i128") {
+          return typeof inner === "bigint" ? inner.toString() : inner;
+        }
+  
+        return deepNormalizeDecoded(inner);
+      }
+  
+      return Object.fromEntries(
+        Object.entries(obj).map(([k, v]) => [k, deepNormalizeDecoded(v)])
+      );
+    }
+  
+    return value;
+  }
+  
+  export function decodeScValUnknown(input: unknown): unknown {
+    try {
+      if (typeof input === "string") {
+        const scVal = xdr.ScVal.fromXDR(input, "base64");
+        return deepNormalizeDecoded(scValToNative(scVal));
+      }
+  
+      if (isLikelyScValInstance(input)) {
+        return deepNormalizeDecoded(scValToNative(input as xdr.ScVal));
+      }
+  
+      return deepNormalizeDecoded(input);
+    } catch (err) {
+      return {
+        __decodeError: err instanceof Error ? err.message : String(err),
+        raw: deepNormalizeDecoded(input),
+      };
+    }
+  }
