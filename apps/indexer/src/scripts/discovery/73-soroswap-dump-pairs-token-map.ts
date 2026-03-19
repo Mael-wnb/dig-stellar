@@ -5,9 +5,11 @@ function asString(value: unknown): string | null {
 
   if (value && typeof value === 'object') {
     const obj = value as Record<string, unknown>;
+
     if (typeof obj.decoded === 'string') return obj.decoded;
     if (typeof obj.value === 'string') return obj.value;
     if (typeof obj.result === 'string') return obj.result;
+
     if (obj.ok === true && obj.value !== undefined) return asString(obj.value);
   }
 
@@ -46,25 +48,34 @@ async function readStringMethod(params: {
 async function main() {
   const rpcUrl = getEnv('SOROBAN_RPC_URL');
   const horizonUrl = getEnv('HORIZON_URL');
-  const sourceAccount = getEnv('STELLAR_SOURCE_ACCOUNT');
+  const sourceAccount =
+    process.env.STELLAR_SOURCE_ACCOUNT ??
+    process.env.SOURCE_ACCOUNT ??
+    'GDCRZPZYBZ24RHRO3WBPJGFDL7NDFKUQBS3ZDB6YGBJB3TGKMFYBQ3LD';
 
   const factoryScan = await loadJson<any>('53-soroswap-factory-pairs-scan.json');
   if (!factoryScan || !Array.isArray(factoryScan.results)) {
     throw new Error('Missing or invalid 53-soroswap-factory-pairs-scan.json');
   }
 
-  const maxPairs = Number(process.env.MAX_SCAN_PAIRS ?? 40);
-
-  const pairIds: string[] = factoryScan.results
+  const allPairIds: string[] = factoryScan.results
     .map((item: any) => item?.pairId)
-    .filter((value: unknown): value is string => typeof value === 'string' && value.startsWith('C'))
-    .slice(0, maxPairs);
+    .filter((value: unknown): value is string => typeof value === 'string' && value.startsWith('C'));
+
+  const envMaxScanPairs = process.env.MAX_SCAN_PAIRS ? Number(process.env.MAX_SCAN_PAIRS) : null;
+  const pairIds =
+    envMaxScanPairs && Number.isFinite(envMaxScanPairs)
+      ? allPairIds.slice(0, envMaxScanPairs)
+      : allPairIds;
 
   const rows: Array<{
     pairId: string;
     token0: string | null;
     token1: string | null;
   }> = [];
+
+  console.log(`Loaded ${allPairIds.length} pairIds from 53`);
+  console.log(`Scanning ${pairIds.length} pairIds in 73`);
 
   for (let i = 0; i < pairIds.length; i += 1) {
     const pairId = pairIds[i];
