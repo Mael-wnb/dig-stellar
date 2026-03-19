@@ -1,5 +1,6 @@
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
+import { DefindexSDK, SupportedNetworks } from '@defindex/sdk';
 
 const prisma = new PrismaClient();
 
@@ -9,83 +10,118 @@ function required(name: string): string {
   return v;
 }
 
-async function fetchVaults(api: string) {
-  // Endpoint typique (à adapter si besoin)
-  const res = await fetch(`${api}/vaults`);
+function toPrismaJson(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
 
-  if (!res.ok) {
-    throw new Error(`DeFindex API failed: ${res.status}`);
+function getVaultLabel(info: unknown): string {
+  if (
+    info &&
+    typeof info === 'object' &&
+    'name' in info &&
+    typeof (info as { name?: unknown }).name === 'string'
+  ) {
+    return (info as { name: string }).name;
   }
 
-  return res.json();
+  if (
+    info &&
+    typeof info === 'object' &&
+    'name_symbol' in info &&
+    typeof (info as { name_symbol?: unknown }).name_symbol === 'object' &&
+    (info as { name_symbol: { name?: unknown } }).name_symbol?.name &&
+    typeof (info as { name_symbol: { name?: unknown } }).name_symbol.name === 'string'
+  ) {
+    return (info as { name_symbol: { name: string } }).name_symbol.name;
+  }
+
+  return 'DeFindex Vault';
 }
 
 async function main() {
-  const api = required('DEFINDEX_API_URL');
+  const apiKey = required('DEFINDEX_API_KEY');
+  const baseUrl = process.env.DEFINDEX_API_URL || 'https://api.defindex.io';
 
-  // 1) Fetch raw data
-  const raw = await fetchVaults(api);
+  const sdk = new DefindexSDK({
+    apiKey,
+    baseUrl,
+    timeout: 30000,
+  });
 
-  console.log('DeFindex raw:', JSON.stringify(raw, null, 2));
+  const vaultAddresses = (process.env.DEFINDEX_VAULTS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
-  const vaults = raw?.data ?? raw ?? [];
+  if (vaultAddresses.length === 0) {
+    throw new Error(
+      'Missing DEFINDEX_VAULTS. Provide one or more real vault contract addresses separated by commas.',
+    );
+  }
 
-  // 2) Upsert protocol
   const protocol = await prisma.protocol.upsert({
     where: { key: 'defindex' },
     update: { name: 'DeFindex', category: 'yield' },
     create: { key: 'defindex', name: 'DeFindex', category: 'yield' },
   });
 
-  for (const v of vaults) {
-    const vaultId = v.id || v.address || v.vaultAddress;
+  let written = 0;
 
-    if (!vaultId) continue;
+  for (const vaultAddress of vaultAddresses) {
+    try {
+      const info = await sdk.getVaultInfo(vaultAddress, SupportedNetworks.MAINNET);
+      const apyInfo = await sdk.getVaultAPY(vaultAddress, SupportedNetworks.MAINNET);
 
-    const venueKey = `defindex:vault:${vaultId}`;
+      const apy = typeof apyInfo?.apy === 'number' ? apyInfo.apy : null;
 
-    // 3) Venue
-    const venue = await prisma.venue.upsert({
-      where: { key: venueKey },
-      update: {
-        protocolId: protocol.id,
-        type: 'vault',
-        label: v.name || 'DeFindex Vault',
-        meta: {
-          raw: v,
+      const venueKey = `defindex:vault:${vaultAddress}`;
+      const label = getVaultLabel(info);
+
+      const venue = await prisma.venue.upsert({
+        where: { key: venueKey },
+        update: {
+          protocolId: protocol.id,
+          type: 'vault',
+          label,
+          meta: {
+            vaultAddress,
+            network: 'mainnet',
+          },
         },
-      },
-      create: {
-        key: venueKey,
-        protocolId: protocol.id,
-        type: 'vault',
-        label: v.name || 'DeFindex Vault',
-        meta: {
-          raw: v,
+        create: {
+          key: venueKey,
+          protocolId: protocol.id,
+          type: 'vault',
+          label,
+          meta: {
+            vaultAddress,
+            network: 'mainnet',
+          },
         },
-      },
-    });
+      });
 
-    // 4) Snapshot
-    await prisma.snapshot.create({
-      data: {
-        venueId: venue.id,
-        ts: new Date(),
-
-        // Mapping minimal
-        apy: v.apy ?? v.yield ?? null,
-        tvl: v.tvl ?? v.totalValueLocked ?? null,
-
+      await prisma.snapshot.create({
         data: {
-          source: 'defindex',
-          vaultId,
-          raw: v,
+          venueId: venue.id,
+          ts: new Date(),
+          apy,
+          data: toPrismaJson({
+            source: 'defindex-sdk',
+            vaultAddress,
+            network: 'mainnet',
+            info,
+            apyInfo,
+          }),
         },
-      },
-    });
+      });
+
+      written += 1;
+    } catch (error) {
+      console.error(`Failed to process vault ${vaultAddress}:`, error);
+    }
   }
 
-  console.log(`DeFindex snapshots written: ${vaults.length}`);
+  console.log(`DeFindex snapshots written: ${written}`);
 }
 
 main()
@@ -93,4 +129,6 @@ main()
     console.error(e);
     process.exit(1);
   })
-  .finally(async () => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

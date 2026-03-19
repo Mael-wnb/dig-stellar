@@ -104,6 +104,9 @@ importers:
       '@blend-capital/blend-sdk':
         specifier: ^3.2.2
         version: 3.2.2
+      '@defindex/sdk':
+        specifier: ^0.1.2
+        version: 0.1.2
       '@prisma/client':
         specifier: ^5.22.0
         version: 5.22.0(prisma@5.22.0)
@@ -389,6 +392,10 @@ packages:
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
     engines: {node: '>=12'}
+
+  '@defindex/sdk@0.1.2':
+    resolution: {integrity: sha512-9yDrYpF0yZOm1Mt5xVtMXEEyenj6cStTOzUtfcV4Xq++ThXBmBFBSE+LbW9DfFAYSJ3UzkJRmmtfKSMEsQGj3w==}
+    engines: {node: '>=16.0.0'}
 
   '@emnapi/core@1.9.0':
     resolution: {integrity: sha512-0DQ98G9ZQZOxfUcQn1waV2yS8aWdZ6kJMbYCJB3oUBecjWYO1fqJ+a1DRfPF3O5JEkwqwP1A9QEN/9mYm2Yd0w==}
@@ -5726,6 +5733,12 @@ snapshots:
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
+
+  '@defindex/sdk@0.1.2':
+    dependencies:
+      axios: 1.13.6
+    transitivePeerDependencies:
+      - debug
 
   '@emnapi/core@1.9.0':
     dependencies:
