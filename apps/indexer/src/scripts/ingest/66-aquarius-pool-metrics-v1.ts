@@ -1,12 +1,22 @@
+import { loadJson } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
 import { getLatestAssetPricesMap } from '../shared/prices';
 
 async function main() {
+  const poolSnapshot = await loadJson<any>('60-aquarius-pool-snapshot-db-ready.json');
+  if (!poolSnapshot) {
+    throw new Error('Missing 60-aquarius-pool-snapshot-db-ready.json');
+  }
+
+  const entitySlug = poolSnapshot.entitySlug as string | undefined;
+  if (!entitySlug) {
+    throw new Error('Missing entitySlug in 60-aquarius-pool-snapshot-db-ready.json');
+  }
+
   const client = createPgClient();
   await client.connect();
 
   try {
-    const entitySlug = 'aquarius-native-usdc-pool';
     const prices = await getLatestAssetPricesMap(client);
 
     const reservesRes = await client.query(

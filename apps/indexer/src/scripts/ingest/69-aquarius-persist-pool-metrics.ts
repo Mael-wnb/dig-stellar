@@ -1,14 +1,22 @@
+import { loadJson, nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
 import { getVenueBySlugOrThrow, getEntityBySlugOrThrow } from '../shared/lookup';
-import { nowIso } from '../discovery/00-common';
 
 async function main() {
+  const poolSnapshot = await loadJson<any>('60-aquarius-pool-snapshot-db-ready.json');
+  if (!poolSnapshot) {
+    throw new Error('Missing 60-aquarius-pool-snapshot-db-ready.json');
+  }
+
+  const entitySlug = poolSnapshot.entitySlug as string | undefined;
+  if (!entitySlug) {
+    throw new Error('Missing entitySlug in 60-aquarius-pool-snapshot-db-ready.json');
+  }
+
   const client = createPgClient();
   await client.connect();
 
   try {
-    const entitySlug = 'aquarius-native-usdc-pool';
-
     const venue = await getVenueBySlugOrThrow(client, 'aquarius');
     const entity = await getEntityBySlugOrThrow(client, entitySlug);
 
@@ -103,6 +111,7 @@ async function main() {
         null,
         JSON.stringify({
           source: '69-aquarius-persist-pool-metrics',
+          entitySlug,
           swaps24h: 0,
         }),
       ]
