@@ -114,6 +114,7 @@ async function main() {
   try {
     await persistProtocol(client, 'blend');
     await persistProtocol(client, 'soroswap');
+    await persistProtocol(client, 'aquarius');
   } finally {
     await client.end();
   }
