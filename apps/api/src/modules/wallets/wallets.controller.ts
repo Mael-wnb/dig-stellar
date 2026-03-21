@@ -14,12 +14,15 @@ export class WalletsController {
   constructor(private readonly walletsService: WalletsService) {}
 
   @Post()
-  createWallet(@Body() body: CreateWalletBody) {
+  createWallet(
+    @Query('userId') queryUserId?: string,
+    @Body() body?: CreateWalletBody
+  ) {
     return this.walletsService.createWallet({
-      userId: body.userId,
-      chain: body.chain,
-      address: body.address,
-      label: body.label ?? null,
+      userId: queryUserId ?? body?.userId,
+      chain: body?.chain,
+      address: body?.address,
+      label: body?.label ?? null,
     });
   }
 
