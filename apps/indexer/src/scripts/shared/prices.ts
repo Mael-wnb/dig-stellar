@@ -18,3 +18,17 @@ export async function getLatestAssetPricesMap(client: Client): Promise<Map<strin
     ])
   );
 }
+
+export function safeDivide(a: number, b: number): number | null {
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) return null;
+  return a / b;
+}
+
+export function inferStablePrice(symbol: string): number | null {
+  const s = symbol.toUpperCase();
+
+  if (s === 'USDC') return 1;
+  if (s === 'PYUSD') return 1;
+
+  return null;
+}

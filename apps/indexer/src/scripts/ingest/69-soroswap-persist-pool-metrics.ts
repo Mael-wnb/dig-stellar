@@ -1,17 +1,31 @@
+import { loadJson, nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
 import { getEntityBySlugOrThrow, getVenueBySlugOrThrow } from '../shared/lookup';
-import { nowIso, loadJson } from '../discovery/00-common';
+
+function toNumber(value: unknown): number {
+  if (value === null || value === undefined) return 0;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+async function resolveEntitySlug(): Promise<string> {
+  const fromEnv = process.env.ENTITY_SLUG?.trim();
+  if (fromEnv) return fromEnv;
+
+  const registry = await loadJson<any>('59-soroswap-final-registry.json');
+  const fromRegistry = registry?.pair?.entitySlug;
+
+  if (typeof fromRegistry === 'string' && fromRegistry.length > 0) {
+    return fromRegistry;
+  }
+
+  throw new Error(
+    'Missing ENTITY_SLUG. Set ENTITY_SLUG in env or generate 59-soroswap-final-registry.json first.'
+  );
+}
 
 async function main() {
-  const registry = await loadJson<any>('59-soroswap-final-registry.json');
-  if (!registry) {
-    throw new Error('Missing 59-soroswap-final-registry.json');
-  }
-
-  const entitySlug = registry.pair?.entitySlug;
-  if (!entitySlug) {
-    throw new Error('Missing entitySlug in 59-soroswap-final-registry.json');
-  }
+  const entitySlug = await resolveEntitySlug();
 
   const client = createPgClient();
   await client.connect();
@@ -20,16 +34,18 @@ async function main() {
     const venue = await getVenueBySlugOrThrow(client, 'soroswap');
     const entity = await getEntityBySlugOrThrow(client, entitySlug);
 
-    const pricesRes = await client.query(`
+    const pricesRes = await client.query(
+      `
       select distinct on (ap.asset_id)
         ap.asset_id,
         ap.price_usd
       from asset_prices ap
       order by ap.asset_id, ap.observed_at desc
-    `);
+      `
+    );
 
     const priceMap = new Map<string, number>(
-      pricesRes.rows.map((row: { asset_id: string; price_usd: string }) => [
+      pricesRes.rows.map((row: { asset_id: string; price_usd: string | number }) => [
         row.asset_id,
         Number(row.price_usd),
       ])
@@ -39,6 +55,8 @@ async function main() {
       `
       select distinct on (rs.asset_id)
         rs.asset_id,
+        rs.symbol,
+        rs.name,
         rs.d_supply_scaled,
         rs.snapshot_at
       from reserve_snapshots rs
@@ -50,11 +68,37 @@ async function main() {
     );
 
     let tvlUsd = 0;
+    const reserveBreakdown: Array<{
+      assetId: string;
+      symbol: string | null;
+      name: string | null;
+      reserve: number;
+      priceUsd: number | null;
+      reserveUsd: number | null;
+    }> = [];
 
-    for (const row of reserveRes.rows as Array<any>) {
-      const price = priceMap.get(row.asset_id) ?? 0;
-      const reserve = row.d_supply_scaled ? Number(row.d_supply_scaled) : 0;
-      tvlUsd += reserve * price;
+    for (const row of reserveRes.rows as Array<{
+      asset_id: string;
+      symbol: string | null;
+      name: string | null;
+      d_supply_scaled: string | number | null;
+    }>) {
+      const reserve = toNumber(row.d_supply_scaled);
+      const priceUsd = priceMap.has(row.asset_id) ? priceMap.get(row.asset_id)! : null;
+      const reserveUsd = priceUsd !== null ? reserve * priceUsd : null;
+
+      if (reserveUsd !== null) {
+        tvlUsd += reserveUsd;
+      }
+
+      reserveBreakdown.push({
+        assetId: row.asset_id,
+        symbol: row.symbol,
+        name: row.name,
+        reserve,
+        priceUsd,
+        reserveUsd,
+      });
     }
 
     const eventsRes = await client.query(
@@ -76,7 +120,13 @@ async function main() {
     let swaps24h = 0;
     let volume24hUsd = 0;
 
-    for (const row of eventsRes.rows as Array<any>) {
+    for (const row of eventsRes.rows as Array<{
+      event_key: string | null;
+      token_in_asset_id: string | null;
+      token_out_asset_id: string | null;
+      token_amount_in_scaled: string | number | null;
+      token_amount_out_scaled: string | number | null;
+    }>) {
       if (row.event_key !== 'SoroswapPair:swap') continue;
 
       swaps24h += 1;
@@ -91,8 +141,8 @@ async function main() {
           ? priceMap.get(row.token_out_asset_id) ?? 0
           : 0;
 
-      const amountIn = row.token_amount_in_scaled ? Number(row.token_amount_in_scaled) : 0;
-      const amountOut = row.token_amount_out_scaled ? Number(row.token_amount_out_scaled) : 0;
+      const amountIn = toNumber(row.token_amount_in_scaled);
+      const amountOut = toNumber(row.token_amount_out_scaled);
 
       const amountInUsd = amountIn * tokenInPrice;
       const amountOutUsd = amountOut * tokenOutPrice;
@@ -155,7 +205,9 @@ async function main() {
         null,
         JSON.stringify({
           source: '69-soroswap-persist-pool-metrics',
+          entitySlug,
           swaps24h,
+          reserveBreakdown,
         }),
       ]
     );
