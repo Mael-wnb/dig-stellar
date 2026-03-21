@@ -1,3 +1,4 @@
+// src/scripts/discovery/50-aquarius-pool-events.ts
 import {
     getEnv,
     rpcCall,
@@ -16,29 +17,108 @@ import {
     error?: unknown;
   };
   
+  type RpcEvent = {
+    id: string;
+    ledger: number;
+    ledgerClosedAt: string;
+    txHash: string;
+    topic?: string[];
+    value?: string;
+  };
+  
+  type GetEventsResult = {
+    events?: RpcEvent[];
+    cursor?: string;
+    latestLedger?: number | string;
+    oldestLedger?: number | string;
+    latestLedgerCloseTime?: string;
+    oldestLedgerCloseTime?: string;
+  };
+  
   async function main() {
     const rpcUrl = process.env.SOROBAN_RPC_URL ?? getEnv('STELLAR_RPC_URL');
     const poolId = getEnv('AQUARIUS_POOL_ID');
   
-    const latestLedgerResp = await rpcCall<RpcEnvelope<any>>(rpcUrl, 'getLatestLedger');
+    const latestLedgerResp = await rpcCall<RpcEnvelope<{ sequence: number | string }>>(rpcUrl, 'getLatestLedger');
     const latestLedger = Number(latestLedgerResp.result?.sequence);
   
     if (!Number.isFinite(latestLedger)) {
       throw new Error('Could not retrieve latest ledger');
     }
   
-    const startLedger = Number(process.env.START_LEDGER ?? latestLedger - 5000);
+    const ledgerLookback = Number(process.env.LEDGER_LOOKBACK ?? 5000);
+    const startLedger = Number(process.env.START_LEDGER ?? latestLedger - ledgerLookback);
     const limit = Number(process.env.EVENTS_LIMIT ?? 200);
+    const maxPages = Number(process.env.MAX_EVENT_PAGES ?? 20);
   
-    const resp = await rpcCall<RpcEnvelope<any>>(rpcUrl, 'getEvents', {
-      startLedger,
-      filters: [{ contractIds: [poolId] }],
-      pagination: { limit },
-    });
+    const allEvents: RpcEvent[] = [];
+    let cursor: string | undefined;
+    let pagesFetched = 0;
   
-    const events = resp.result?.events ?? [];
+    let responseMeta: Partial<GetEventsResult> = {};
   
-    const decodedEvents = events.map((event: any) => {
+    while (pagesFetched < maxPages) {
+      const params =
+        pagesFetched === 0
+          ? {
+              startLedger,
+              filters: [{ contractIds: [poolId] }],
+              pagination: { limit },
+            }
+          : {
+              filters: [{ contractIds: [poolId] }],
+              pagination: { cursor, limit },
+            };
+  
+      const resp = await rpcCall<RpcEnvelope<GetEventsResult>>(rpcUrl, 'getEvents', params);
+  
+      if (resp.error) {
+        console.dir(resp.error, { depth: 8 });
+        throw new Error(`getEvents returned error on page ${pagesFetched + 1}`);
+      }
+  
+      const result = resp.result;
+      if (!result) {
+        throw new Error(`Missing result on getEvents page ${pagesFetched + 1}`);
+      }
+  
+      const pageEvents = Array.isArray(result.events) ? result.events : [];
+  
+      if (pagesFetched === 0) {
+        responseMeta = {
+          latestLedger: result.latestLedger,
+          oldestLedger: result.oldestLedger,
+          latestLedgerCloseTime: result.latestLedgerCloseTime,
+          oldestLedgerCloseTime: result.oldestLedgerCloseTime,
+        };
+      }
+  
+      allEvents.push(...pageEvents);
+      pagesFetched += 1;
+  
+      const nextCursor = typeof result.cursor === 'string' ? result.cursor : undefined;
+  
+      console.log({
+        page: pagesFetched,
+        pageEvents: pageEvents.length,
+        nextCursor,
+        firstEventId: pageEvents[0]?.id ?? null,
+        lastEventId: pageEvents[pageEvents.length - 1]?.id ?? null,
+      });
+  
+      if (!nextCursor || pageEvents.length === 0) {
+        break;
+      }
+  
+      if (nextCursor === cursor) {
+        console.log('Stopping pagination because cursor did not advance.');
+        break;
+      }
+  
+      cursor = nextCursor;
+    }
+  
+    const decodedEvents = allEvents.map((event) => {
       const decodedTopics = decodeTopicList(event.topic ?? []);
       const decodedValue = decodeScValBase64(event.value);
       const eventName = tryExtractEventName(decodedTopics);
@@ -71,14 +151,26 @@ import {
       .slice(0, 20)
       .map(([topicKey, count]) => ({ topicKey, count }));
   
+    const ledgers = decodedEvents
+      .map((event) => Number(event.ledger))
+      .filter((value) => Number.isFinite(value));
+  
     const output = {
       generatedAt: nowIso(),
       poolId,
       latestLedger,
       startLedger,
+      ledgerLookback,
+      pagesFetched,
+      cursor,
       count: decodedEvents.length,
-      decodedEvents,
+      oldestLedger: ledgers.length ? Math.min(...ledgers) : null,
+      newestLedger: ledgers.length ? Math.max(...ledgers) : null,
+      firstDecodedEvent: decodedEvents[0] ?? null,
+      lastDecodedEvent: decodedEvents[decodedEvents.length - 1] ?? null,
       topTopics,
+      decodedEvents,
+      rpcMeta: responseMeta,
     };
   
     console.dir(
@@ -86,8 +178,13 @@ import {
         poolId,
         latestLedger,
         startLedger,
+        ledgerLookback,
+        pagesFetched,
         count: decodedEvents.length,
-        firstDecodedEvent: decodedEvents[0] ?? null,
+        oldestLedger: output.oldestLedger,
+        newestLedger: output.newestLedger,
+        firstDecodedEvent: output.firstDecodedEvent,
+        lastDecodedEvent: output.lastDecodedEvent,
         topTopics,
       },
       { depth: 8 }

@@ -1,3 +1,4 @@
+//src/scripts/discovery/59-aquarius-final-registry.ts
 import { loadJson, nowIso, saveJson } from './00-common';
 
 async function main() {

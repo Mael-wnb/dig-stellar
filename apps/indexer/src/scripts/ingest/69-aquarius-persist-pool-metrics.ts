@@ -1,20 +1,84 @@
 // src/scripts/ingest/69-aquarius-persist-pool-metrics.ts
 import { loadJson, nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
-import { getVenueBySlugOrThrow, getEntityBySlugOrThrow } from '../shared/lookup';
+import { getEntityBySlugOrThrow, getVenueBySlugOrThrow } from '../shared/lookup';
+
+type LatestPriceRow = {
+  asset_id: string;
+  price_usd: string;
+};
+
+type ReserveSnapshotRow = {
+  asset_id: string;
+  d_supply_scaled: string | null;
+  snapshot_at: string;
+};
+
+type NormalizedEventRow = {
+  event_key: string | null;
+  token_in_asset_id: string | null;
+  token_out_asset_id: string | null;
+  token_amount_in_scaled: string | null;
+  token_amount_out_scaled: string | null;
+  occurred_at: string;
+  metadata: Record<string, unknown> | null;
+};
+
+function resolveEntitySlug(params: {
+  envEntitySlug: string | undefined;
+  registry: any;
+  poolSnapshot: any;
+}): string {
+  const entitySlug =
+    params.envEntitySlug ??
+    params.registry?.pool?.entitySlug ??
+    params.poolSnapshot?.entitySlug;
+
+  if (!entitySlug || typeof entitySlug !== 'string') {
+    throw new Error(
+      'Missing entitySlug. Checked ENTITY_SLUG env, 59-aquarius-final-registry.json, and 60-aquarius-pool-snapshot-db-ready.json'
+    );
+  }
+
+  return entitySlug;
+}
+
+function toFiniteNumber(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
 
 async function main() {
+  // src/scripts/discovery/59-aquarius-final-registry.ts
+  const registry = await loadJson<any>('59-aquarius-final-registry.json');
+
+  // src/scripts/discovery/60-aquarius-pool-snapshot-db-ready.ts
   const poolSnapshot = await loadJson<any>('60-aquarius-pool-snapshot-db-ready.json');
+
+  if (!registry) {
+    throw new Error('Missing 59-aquarius-final-registry.json');
+  }
+
   if (!poolSnapshot) {
     throw new Error('Missing 60-aquarius-pool-snapshot-db-ready.json');
   }
 
-  const entitySlug =
-    process.env.ENTITY_SLUG ??
-    (poolSnapshot.entitySlug as string | undefined);
+  const envEntitySlug = process.env.ENTITY_SLUG;
+  const envPoolId = process.env.AQUARIUS_POOL_ID;
 
-  if (!entitySlug) {
-    throw new Error('Missing entitySlug in 60-aquarius-pool-snapshot-db-ready.json');
+  const entitySlug = resolveEntitySlug({
+    envEntitySlug,
+    registry,
+    poolSnapshot,
+  });
+
+  const registryPoolId =
+    typeof registry?.pool?.poolId === 'string' ? registry.pool.poolId : null;
+
+  if (envPoolId && registryPoolId && envPoolId !== registryPoolId) {
+    throw new Error(
+      `Mismatch between AQUARIUS_POOL_ID and 59 poolId: ${envPoolId} !== ${registryPoolId}`
+    );
   }
 
   const client = createPgClient();
@@ -24,7 +88,7 @@ async function main() {
     const venue = await getVenueBySlugOrThrow(client, 'aquarius');
     const entity = await getEntityBySlugOrThrow(client, entitySlug);
 
-    const pricesRes = await client.query(`
+    const pricesRes = await client.query<LatestPriceRow>(`
       select distinct on (ap.asset_id)
         ap.asset_id,
         ap.price_usd
@@ -33,13 +97,10 @@ async function main() {
     `);
 
     const priceMap = new Map<string, number>(
-      pricesRes.rows.map((row: { asset_id: string; price_usd: string }) => [
-        row.asset_id,
-        Number(row.price_usd),
-      ])
+      pricesRes.rows.map((row) => [row.asset_id, Number(row.price_usd)])
     );
 
-    const reserveRes = await client.query(
+    const reserveRes = await client.query<ReserveSnapshotRow>(
       `
       select distinct on (rs.asset_id)
         rs.asset_id,
@@ -55,13 +116,13 @@ async function main() {
 
     let tvlUsd = 0;
 
-    for (const row of reserveRes.rows as Array<any>) {
+    for (const row of reserveRes.rows) {
       const price = priceMap.get(row.asset_id) ?? 0;
       const reserve = row.d_supply_scaled ? Number(row.d_supply_scaled) : 0;
       tvlUsd += reserve * price;
     }
 
-    const eventsRes = await client.query(
+    const eventsRes = await client.query<NormalizedEventRow>(
       `
       select
         ne.event_key,
@@ -72,18 +133,18 @@ async function main() {
         ne.occurred_at,
         ne.metadata
       from normalized_events ne
-      join entities e on e.id = ne.entity_id
-      where e.slug = $1
+      where ne.entity_id = $1
         and ne.occurred_at >= now() - interval '24 hours'
+      order by ne.occurred_at desc
       `,
-      [entitySlug]
+      [entity.id]
     );
 
     let swaps24h = 0;
     let volume24hUsd = 0;
     let fees24hUsd = 0;
 
-    for (const row of eventsRes.rows as Array<any>) {
+    for (const row of eventsRes.rows) {
       if (row.event_key !== 'AquariusPool:trade') continue;
 
       swaps24h += 1;
@@ -106,13 +167,14 @@ async function main() {
 
       volume24hUsd += Math.max(amountInUsd, amountOutUsd);
 
-      const metadata = row.metadata ?? {};
-      const feeAmountScaled =
-        metadata && typeof metadata === 'object' && metadata.feeAmountScaled !== undefined
-          ? Number(metadata.feeAmountScaled)
-          : 0;
+      const metadata =
+        row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
 
-      if (Number.isFinite(feeAmountScaled) && feeAmountScaled > 0) {
+      const feeAmountScaled = toFiniteNumber(
+        (metadata as Record<string, unknown>).feeAmountScaled
+      );
+
+      if (feeAmountScaled > 0) {
         fees24hUsd += feeAmountScaled * tokenInPrice;
       }
     }
@@ -172,6 +234,7 @@ async function main() {
         JSON.stringify({
           source: '69-aquarius-persist-pool-metrics',
           entitySlug,
+          poolId: registryPoolId,
           swaps24h,
         }),
       ]
