@@ -1,31 +1,21 @@
+// src/scripts/ingest/69-aquarius-persist-pool-metrics.ts
 import { loadJson, nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
-import { getEntityBySlugOrThrow, getVenueBySlugOrThrow } from '../shared/lookup';
-
-function toNumber(value: unknown): number {
-  if (value === null || value === undefined) return 0;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-}
-
-async function resolveEntitySlug(): Promise<string> {
-  const fromEnv = process.env.ENTITY_SLUG?.trim();
-  if (fromEnv) return fromEnv;
-
-  const poolSnapshot = await loadJson<any>('60-aquarius-pool-snapshot-db-ready.json');
-  const fromSnapshot = poolSnapshot?.entitySlug;
-
-  if (typeof fromSnapshot === 'string' && fromSnapshot.length > 0) {
-    return fromSnapshot;
-  }
-
-  throw new Error(
-    'Missing ENTITY_SLUG. Set ENTITY_SLUG in env or generate 60-aquarius-pool-snapshot-db-ready.json first.'
-  );
-}
+import { getVenueBySlugOrThrow, getEntityBySlugOrThrow } from '../shared/lookup';
 
 async function main() {
-  const entitySlug = await resolveEntitySlug();
+  const poolSnapshot = await loadJson<any>('60-aquarius-pool-snapshot-db-ready.json');
+  if (!poolSnapshot) {
+    throw new Error('Missing 60-aquarius-pool-snapshot-db-ready.json');
+  }
+
+  const entitySlug =
+    process.env.ENTITY_SLUG ??
+    (poolSnapshot.entitySlug as string | undefined);
+
+  if (!entitySlug) {
+    throw new Error('Missing entitySlug in 60-aquarius-pool-snapshot-db-ready.json');
+  }
 
   const client = createPgClient();
   await client.connect();
@@ -34,18 +24,16 @@ async function main() {
     const venue = await getVenueBySlugOrThrow(client, 'aquarius');
     const entity = await getEntityBySlugOrThrow(client, entitySlug);
 
-    const pricesRes = await client.query(
-      `
+    const pricesRes = await client.query(`
       select distinct on (ap.asset_id)
         ap.asset_id,
         ap.price_usd
       from asset_prices ap
       order by ap.asset_id, ap.observed_at desc
-      `
-    );
+    `);
 
     const priceMap = new Map<string, number>(
-      pricesRes.rows.map((row: { asset_id: string; price_usd: string | number }) => [
+      pricesRes.rows.map((row: { asset_id: string; price_usd: string }) => [
         row.asset_id,
         Number(row.price_usd),
       ])
@@ -55,50 +43,78 @@ async function main() {
       `
       select distinct on (rs.asset_id)
         rs.asset_id,
-        rs.symbol,
-        rs.name,
         rs.d_supply_scaled,
         rs.snapshot_at
       from reserve_snapshots rs
       join entities e on e.id = rs.entity_id
       where e.slug = $1
-      order by rs.asset_id, rs.snapshot_at desc, rs.created_at desc
+      order by rs.asset_id, rs.snapshot_at desc
       `,
       [entitySlug]
     );
 
     let tvlUsd = 0;
-    const reserveBreakdown: Array<{
-      assetId: string;
-      symbol: string | null;
-      name: string | null;
-      reserve: number;
-      priceUsd: number | null;
-      reserveUsd: number | null;
-    }> = [];
 
-    for (const row of reserveRes.rows as Array<{
-      asset_id: string;
-      symbol: string | null;
-      name: string | null;
-      d_supply_scaled: string | number | null;
-    }>) {
-      const reserve = toNumber(row.d_supply_scaled);
-      const priceUsd = priceMap.has(row.asset_id) ? priceMap.get(row.asset_id)! : null;
-      const reserveUsd = priceUsd !== null ? reserve * priceUsd : null;
+    for (const row of reserveRes.rows as Array<any>) {
+      const price = priceMap.get(row.asset_id) ?? 0;
+      const reserve = row.d_supply_scaled ? Number(row.d_supply_scaled) : 0;
+      tvlUsd += reserve * price;
+    }
 
-      if (reserveUsd !== null) {
-        tvlUsd += reserveUsd;
+    const eventsRes = await client.query(
+      `
+      select
+        ne.event_key,
+        ne.token_in_asset_id,
+        ne.token_out_asset_id,
+        ne.token_amount_in_scaled,
+        ne.token_amount_out_scaled,
+        ne.occurred_at,
+        ne.metadata
+      from normalized_events ne
+      join entities e on e.id = ne.entity_id
+      where e.slug = $1
+        and ne.occurred_at >= now() - interval '24 hours'
+      `,
+      [entitySlug]
+    );
+
+    let swaps24h = 0;
+    let volume24hUsd = 0;
+    let fees24hUsd = 0;
+
+    for (const row of eventsRes.rows as Array<any>) {
+      if (row.event_key !== 'AquariusPool:trade') continue;
+
+      swaps24h += 1;
+
+      const tokenInPrice =
+        row.token_in_asset_id && priceMap.has(row.token_in_asset_id)
+          ? priceMap.get(row.token_in_asset_id) ?? 0
+          : 0;
+
+      const tokenOutPrice =
+        row.token_out_asset_id && priceMap.has(row.token_out_asset_id)
+          ? priceMap.get(row.token_out_asset_id) ?? 0
+          : 0;
+
+      const amountIn = row.token_amount_in_scaled ? Number(row.token_amount_in_scaled) : 0;
+      const amountOut = row.token_amount_out_scaled ? Number(row.token_amount_out_scaled) : 0;
+
+      const amountInUsd = amountIn * tokenInPrice;
+      const amountOutUsd = amountOut * tokenOutPrice;
+
+      volume24hUsd += Math.max(amountInUsd, amountOutUsd);
+
+      const metadata = row.metadata ?? {};
+      const feeAmountScaled =
+        metadata && typeof metadata === 'object' && metadata.feeAmountScaled !== undefined
+          ? Number(metadata.feeAmountScaled)
+          : 0;
+
+      if (Number.isFinite(feeAmountScaled) && feeAmountScaled > 0) {
+        fees24hUsd += feeAmountScaled * tokenInPrice;
       }
-
-      reserveBreakdown.push({
-        assetId: row.asset_id,
-        symbol: row.symbol,
-        name: row.name,
-        reserve,
-        priceUsd,
-        reserveUsd,
-      });
     }
 
     const asOf = nowIso();
@@ -145,8 +161,8 @@ async function main() {
         asOf,
         'latest',
         tvlUsd,
-        0,
-        0,
+        volume24hUsd,
+        fees24hUsd,
         null,
         null,
         null,
@@ -156,8 +172,7 @@ async function main() {
         JSON.stringify({
           source: '69-aquarius-persist-pool-metrics',
           entitySlug,
-          swaps24h: 0,
-          reserveBreakdown,
+          swaps24h,
         }),
       ]
     );
@@ -166,9 +181,9 @@ async function main() {
       completedAt: asOf,
       entitySlug: entity.slug,
       tvlUsd,
-      volume24hUsd: 0,
-      fees24hUsd: 0,
-      swaps24h: 0,
+      volume24hUsd,
+      fees24hUsd,
+      swaps24h,
     });
   } finally {
     await client.end();

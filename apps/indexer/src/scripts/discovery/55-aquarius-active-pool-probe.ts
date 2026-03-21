@@ -1,4 +1,8 @@
+// src/scripts/discovery/55-aquarius-active-pool-probe.ts
 import { getEnv, nowIso, saveJson, simulateContractRead } from './00-common';
+import 'dotenv/config';
+
+type ContractArg = { type: string; value: string | number | boolean };
 
 async function safeRead(params: {
   rpcUrl: string;
@@ -6,7 +10,7 @@ async function safeRead(params: {
   sourceAccount: string;
   contractId: string;
   method: string;
-  args?: Array<{ type: string; value: string | number | boolean }>;
+  args?: ContractArg[];
 }) {
   try {
     const result = await simulateContractRead({
@@ -15,14 +19,15 @@ async function safeRead(params: {
       sourceAccount: params.sourceAccount,
       contractId: params.contractId,
       method: params.method,
-      args: params.args,
-    } as any);
+      args: params.args as any,
+    });
 
     return {
-      ok: true,
+      ok: result.ok,
       method: params.method,
-      decoded: result?.decoded ?? null,
-      raw: result,
+      decoded: result.decoded ?? null,
+      raw: result.raw ?? result,
+      error: result.ok ? undefined : result.error ?? 'Unknown contract read error',
     };
   } catch (error) {
     return {
@@ -34,7 +39,7 @@ async function safeRead(params: {
 }
 
 async function main() {
-  const rpcUrl = getEnv('SOROBAN_RPC_URL');
+  const rpcUrl = process.env.SOROBAN_RPC_URL ?? getEnv('STELLAR_RPC_URL');
   const horizonUrl = getEnv('HORIZON_URL');
   const sourceAccount = getEnv('STELLAR_SOURCE_ACCOUNT');
 
@@ -65,6 +70,7 @@ async function main() {
       contractId: poolId,
       method,
     });
+
     results.push(res);
 
     if (res.ok) {

@@ -1,3 +1,4 @@
+// src/scripts/discovery/57-aquarius-active-pool-db-shape.ts
 import { loadJson, nowIso, saveJson } from './00-common';
 
 function scale(raw: string | null | undefined, decimals: number | null | undefined): string | null {
@@ -32,6 +33,10 @@ async function main() {
 
   if (!probe) throw new Error('Missing 55-aquarius-active-pool-probe.json');
   if (!assetsFile) throw new Error('Missing 56-aquarius-active-pool-assets-resolve.json');
+
+  if (probe.poolId && assetsFile.poolId && probe.poolId !== assetsFile.poolId) {
+    throw new Error(`Mismatch between 55 and 56 poolId: ${probe.poolId} !== ${assetsFile.poolId}`);
+  }
 
   const token0 = assetsFile.token0 as string | undefined;
   const token1 = assetsFile.token1 as string | undefined;

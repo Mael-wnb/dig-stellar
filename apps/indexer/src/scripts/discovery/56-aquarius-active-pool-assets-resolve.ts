@@ -1,4 +1,6 @@
+// src/scripts/discovery/56-aquarius-active-pool-assets-resolve.ts
 import { getEnv, loadJson, nowIso, saveJson, simulateContractRead } from './00-common';
+import 'dotenv/config';
 
 type TokenMeta = {
   name: string | null;
@@ -64,7 +66,7 @@ async function fetchTokenMetadata(params: {
 }
 
 async function main() {
-  const rpcUrl = getEnv('SOROBAN_RPC_URL');
+  const rpcUrl = process.env.SOROBAN_RPC_URL ?? getEnv('STELLAR_RPC_URL');
   const horizonUrl = getEnv('HORIZON_URL');
   const sourceAccount = getEnv('STELLAR_SOURCE_ACCOUNT');
 
