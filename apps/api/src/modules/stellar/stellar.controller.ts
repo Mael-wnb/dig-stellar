@@ -1,3 +1,4 @@
+// apps/api/src/modules/stellar/stellar.controller.ts
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { StellarService } from './stellar.service';
 

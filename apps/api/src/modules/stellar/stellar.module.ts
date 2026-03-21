@@ -1,3 +1,4 @@
+// apps/api/src/modules/stellar/stellar.module.ts
 import { Module } from '@nestjs/common';
 import { DbModule } from '../../db/db.module';
 import { StellarController } from './stellar.controller';

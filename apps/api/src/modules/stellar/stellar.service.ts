@@ -1,3 +1,4 @@
+// apps/api/src/modules/stellar/stellar.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../db/prisma.service';
 
