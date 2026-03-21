@@ -29,11 +29,35 @@ async function main() {
   const shape = await loadJson<any>('57-soroswap-active-pair-db-shape.json');
   const pairEvents = await loadJson<any>('50-soroswap-pair-events.json');
 
-  if (!shape) throw new Error('Missing 57-soroswap-active-pair-db-shape.json');
-  if (!pairEvents) throw new Error('Missing 50-soroswap-pair-events.json');
+  if (!shape) {
+    throw new Error('Missing 57-soroswap-active-pair-db-shape.json');
+  }
 
-  const asset0 = shape.assets.find((a: any) => a.contractId === shape.token0);
-  const asset1 = shape.assets.find((a: any) => a.contractId === shape.token1);
+  if (!pairEvents) {
+    throw new Error('Missing 50-soroswap-pair-events.json');
+  }
+
+  if (!shape.pairId) {
+    throw new Error('Missing pairId in 57-soroswap-active-pair-db-shape.json');
+  }
+
+  if (!pairEvents.pairId) {
+    throw new Error('Missing pairId in 50-soroswap-pair-events.json');
+  }
+
+  if (pairEvents.pairId !== shape.pairId) {
+    throw new Error(
+      `Mismatch between 50 and 57 pairId: ${pairEvents.pairId} !== ${shape.pairId}`
+    );
+  }
+
+  const asset0 = Array.isArray(shape.assets)
+    ? shape.assets.find((a: any) => a.contractId === shape.token0)
+    : null;
+
+  const asset1 = Array.isArray(shape.assets)
+    ? shape.assets.find((a: any) => a.contractId === shape.token1)
+    : null;
 
   if (!asset0 || !asset1) {
     throw new Error('Missing asset0/asset1 in 57 output');

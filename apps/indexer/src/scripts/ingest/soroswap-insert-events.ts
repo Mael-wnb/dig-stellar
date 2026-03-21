@@ -1,7 +1,12 @@
+import 'dotenv/config';
+
 import { loadJson, nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
-import { getAssetIdByContractMap, getEntityBySlugOrThrow, getVenueBySlugOrThrow } from '../shared/lookup';
-import 'dotenv/config';
+import {
+  getAssetIdByContractMap,
+  getEntityBySlugOrThrow,
+  getVenueBySlugOrThrow,
+} from '../shared/lookup';
 
 async function main() {
   const eventsFile = await loadJson<any>('58-soroswap-active-pair-events-normalized.json');
@@ -11,10 +16,36 @@ async function main() {
     throw new Error('Missing 58 or 59 Soroswap files');
   }
 
-  const entitySlug = registry.pair?.entitySlug;
-  if (!entitySlug) {
+  const registryEntitySlug = registry.pair?.entitySlug;
+  const registryPairId = registry.pair?.pairId;
+
+  if (!registryEntitySlug) {
     throw new Error('Missing entitySlug in 59-soroswap-final-registry.json');
   }
+
+  if (!registryPairId) {
+    throw new Error('Missing pairId in 59-soroswap-final-registry.json');
+  }
+
+  if (!eventsFile.entitySlug) {
+    throw new Error('Missing entitySlug in 58-soroswap-active-pair-events-normalized.json');
+  }
+
+  if (!eventsFile.pairId) {
+    throw new Error('Missing pairId in 58-soroswap-active-pair-events-normalized.json');
+  }
+
+  if (eventsFile.entitySlug !== registryEntitySlug) {
+    throw new Error(
+      `Mismatch between 58 and 59 entitySlug: ${eventsFile.entitySlug} !== ${registryEntitySlug}`
+    );
+  }
+
+  if (eventsFile.pairId !== registryPairId) {
+    throw new Error(`Mismatch between 58 and 59 pairId: ${eventsFile.pairId} !== ${registryPairId}`);
+  }
+
+  const entitySlug = registryEntitySlug;
 
   const client = createPgClient();
   await client.connect();
@@ -27,6 +58,16 @@ async function main() {
     let processed = 0;
 
     for (const row of eventsFile.rows ?? []) {
+      if (row.entitySlug !== entitySlug) {
+        throw new Error(
+          `Row entitySlug mismatch inside 58 file: ${row.entitySlug} !== ${entitySlug}`
+        );
+      }
+
+      if (row.pairId !== registryPairId) {
+        throw new Error(`Row pairId mismatch inside 58 file: ${row.pairId} !== ${registryPairId}`);
+      }
+
       await client.query(
         `
         insert into normalized_events (

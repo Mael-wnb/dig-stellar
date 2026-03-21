@@ -1,7 +1,7 @@
 import { getEnv, saveJson, nowIso, simulateContractRead } from "./00-common";
 
 async function main() {
-  const rpcUrl = getEnv("STELLAR_RPC_URL");
+  const rpcUrl = process.env.SOROBAN_RPC_URL ?? getEnv('STELLAR_RPC_URL');
   const horizonUrl = getEnv("HORIZON_URL");
   const sourceAccount =
     process.env.SOURCE_ACCOUNT ??
