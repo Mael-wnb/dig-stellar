@@ -10,6 +10,8 @@ import {
   } from './00-common';
   import 'dotenv/config';
   
+  const VERBOSE = process.env.VERBOSE === '1';
+  
   type RpcEnvelope<T> = {
     jsonrpc: '2.0';
     id: string;
@@ -39,7 +41,10 @@ import {
     const rpcUrl = process.env.SOROBAN_RPC_URL ?? getEnv('STELLAR_RPC_URL');
     const poolId = getEnv('AQUARIUS_POOL_ID');
   
-    const latestLedgerResp = await rpcCall<RpcEnvelope<{ sequence: number | string }>>(rpcUrl, 'getLatestLedger');
+    const latestLedgerResp = await rpcCall<RpcEnvelope<{ sequence: number | string }>>(
+      rpcUrl,
+      'getLatestLedger'
+    );
     const latestLedger = Number(latestLedgerResp.result?.sequence);
   
     if (!Number.isFinite(latestLedger)) {
@@ -98,20 +103,24 @@ import {
   
       const nextCursor = typeof result.cursor === 'string' ? result.cursor : undefined;
   
-      console.log({
-        page: pagesFetched,
-        pageEvents: pageEvents.length,
-        nextCursor,
-        firstEventId: pageEvents[0]?.id ?? null,
-        lastEventId: pageEvents[pageEvents.length - 1]?.id ?? null,
-      });
+      if (VERBOSE) {
+        console.log({
+          page: pagesFetched,
+          pageEvents: pageEvents.length,
+          nextCursor,
+          firstEventId: pageEvents[0]?.id ?? null,
+          lastEventId: pageEvents[pageEvents.length - 1]?.id ?? null,
+        });
+      }
   
       if (!nextCursor || pageEvents.length === 0) {
         break;
       }
   
       if (nextCursor === cursor) {
-        console.log('Stopping pagination because cursor did not advance.');
+        if (VERBOSE) {
+          console.log('Stopping pagination because cursor did not advance.');
+        }
         break;
       }
   

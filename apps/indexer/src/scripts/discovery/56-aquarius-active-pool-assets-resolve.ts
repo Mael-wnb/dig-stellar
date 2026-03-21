@@ -92,7 +92,13 @@ async function main() {
     throw new Error(`Expected 2 Aquarius pool tokens, got ${tokenIds.length}`);
   }
 
-  const assets = [];
+  const assets: Array<{
+    contractId: string;
+    name: string | null;
+    symbol: string | null;
+    decimals: number | null;
+  }> = [];
+
   for (const contractId of tokenIds) {
     const meta = await fetchTokenMetadata({
       rpcUrl,

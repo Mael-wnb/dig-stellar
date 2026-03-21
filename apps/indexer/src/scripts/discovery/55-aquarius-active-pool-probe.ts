@@ -4,6 +4,14 @@ import 'dotenv/config';
 
 type ContractArg = { type: string; value: string | number | boolean };
 
+type ProbeResult = {
+  ok: boolean;
+  method: string;
+  decoded?: unknown;
+  raw?: unknown;
+  error?: string;
+};
+
 async function safeRead(params: {
   rpcUrl: string;
   horizonUrl: string;
@@ -11,7 +19,7 @@ async function safeRead(params: {
   contractId: string;
   method: string;
   args?: ContractArg[];
-}) {
+}): Promise<ProbeResult> {
   try {
     const result = await simulateContractRead({
       rpcUrl: params.rpcUrl,
@@ -23,7 +31,7 @@ async function safeRead(params: {
     });
 
     return {
-      ok: result.ok,
+      ok: Boolean(result.ok),
       method: params.method,
       decoded: result.decoded ?? null,
       raw: result.raw ?? result,
@@ -47,21 +55,11 @@ async function main() {
     process.env.AQUARIUS_POOL_ID ??
     'CA6PUJLBYKZKUEKLZJMKBZLEKP2OTHANDEOWSFF44FTSYLKQPIICCJBE';
 
-  const calls = [
-    'get_info',
-    'get_reserves',
-    'token_a',
-    'token_b',
-    'get_tokens',
-    'tokens',
-    'share_token',
-    'plane',
-    'name',
-    'symbol',
-    'decimals',
-  ];
+  // Aquarius pools: on garde uniquement les méthodes réellement utiles/supportées.
+  const calls = ['get_info', 'get_reserves', 'get_tokens'];
 
-  const results = [];
+  const results: ProbeResult[] = [];
+
   for (const method of calls) {
     const res = await safeRead({
       rpcUrl,
@@ -84,6 +82,7 @@ async function main() {
     generatedAt: nowIso(),
     protocol: 'aquarius',
     poolId,
+    supportedMethods: calls,
     results,
   };
 
