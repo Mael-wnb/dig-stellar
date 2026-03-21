@@ -1,6 +1,7 @@
 import { loadJson, nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
 import { getAssetIdByContractMap, getEntityBySlugOrThrow, getVenueBySlugOrThrow } from '../shared/lookup';
+import 'dotenv/config';
 
 async function main() {
   const eventsFile = await loadJson<any>('58-soroswap-active-pair-events-normalized.json');

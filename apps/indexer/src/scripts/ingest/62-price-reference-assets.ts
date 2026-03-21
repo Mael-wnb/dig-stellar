@@ -2,6 +2,12 @@ import { nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
 import { inferStablePrice } from '../shared/pricing';
 
+type PriceResolution = {
+  price: number;
+  source: string;
+  metadata: Record<string, unknown>;
+};
+
 async function fetchJson(url: string, headers?: Record<string, string>) {
   const res = await fetch(url, { headers });
 
@@ -63,7 +69,30 @@ async function fetchBtcUsdPrice(): Promise<number> {
   return price;
 }
 
-async function resolveNativeUsdPrice(): Promise<{ price: number; source: string; metadata: Record<string, unknown> }> {
+async function getLatestPriceBySource(
+  client: ReturnType<typeof createPgClient>,
+  source: string
+): Promise<number | null> {
+  const res = await client.query(
+    `
+    select ap.price_usd
+    from asset_prices ap
+    where ap.source = $1
+    order by ap.observed_at desc
+    limit 1
+    `,
+    [source]
+  );
+
+  if (!(res.rowCount ?? 0)) return null;
+
+  const value = Number(res.rows[0].price_usd);
+  return Number.isFinite(value) ? value : null;
+}
+
+async function resolveNativeUsdPrice(
+  client: ReturnType<typeof createPgClient>
+): Promise<PriceResolution> {
   try {
     const price = await fetchNativeUsdPrice();
     return {
@@ -75,13 +104,27 @@ async function resolveNativeUsdPrice(): Promise<{ price: number; source: string;
       },
     };
   } catch (error) {
-    const fallback =
+    const dbFallback = await getLatestPriceBySource(client, 'coingecko_xlm_usd');
+    if (dbFallback !== null) {
+      return {
+        price: dbFallback,
+        source: 'db_cached_xlm_usd',
+        metadata: {
+          confidence: 'medium',
+          method: 'latest_db_fallback_after_api_failure',
+          fallbackFrom: 'coingecko_xlm_usd',
+          error: error instanceof Error ? error.message : String(error),
+        },
+      };
+    }
+
+    const envFallback =
       getOptionalNumberEnv('MANUAL_XLM_USD') ??
       getOptionalNumberEnv('XLM_USD_FALLBACK') ??
       0.165416;
 
     return {
-      price: fallback,
+      price: envFallback,
       source: 'manual_xlm_fallback',
       metadata: {
         confidence: 'medium',
@@ -93,7 +136,9 @@ async function resolveNativeUsdPrice(): Promise<{ price: number; source: string;
   }
 }
 
-async function resolveBtcUsdPrice(): Promise<{ price: number; source: string; metadata: Record<string, unknown> }> {
+async function resolveBtcUsdPrice(
+  client: ReturnType<typeof createPgClient>
+): Promise<PriceResolution> {
   try {
     const price = await fetchBtcUsdPrice();
     return {
@@ -105,13 +150,27 @@ async function resolveBtcUsdPrice(): Promise<{ price: number; source: string; me
       },
     };
   } catch (error) {
-    const fallback =
+    const dbFallback = await getLatestPriceBySource(client, 'coingecko_btc_usd');
+    if (dbFallback !== null) {
+      return {
+        price: dbFallback,
+        source: 'db_cached_btc_usd',
+        metadata: {
+          confidence: 'medium',
+          method: 'latest_db_fallback_after_api_failure',
+          fallbackFrom: 'coingecko_btc_usd',
+          error: error instanceof Error ? error.message : String(error),
+        },
+      };
+    }
+
+    const envFallback =
       getOptionalNumberEnv('MANUAL_BTC_USD') ??
       getOptionalNumberEnv('BTC_USD_FALLBACK') ??
-      69801;
+      69846;
 
     return {
-      price: fallback,
+      price: envFallback,
       source: 'manual_btc_fallback',
       metadata: {
         confidence: 'medium',
@@ -188,8 +247,8 @@ async function main() {
       `
     );
 
-    const nativeResolved = await resolveNativeUsdPrice();
-    const btcResolved = await resolveBtcUsdPrice();
+    const nativeResolved = await resolveNativeUsdPrice(client);
+    const btcResolved = await resolveBtcUsdPrice(client);
 
     let inserted = 0;
 
