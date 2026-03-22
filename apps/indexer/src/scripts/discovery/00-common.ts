@@ -1,3 +1,4 @@
+// apps/indexer/src/scripts/discovery/00-common.ts
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
 import {

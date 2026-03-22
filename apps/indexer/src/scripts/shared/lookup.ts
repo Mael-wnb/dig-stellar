@@ -1,3 +1,4 @@
+// apps/indexer/src/scripts/shared/lookup.ts
 import type { Client } from 'pg';
 
 export async function getVenueBySlugOrThrow(client: Client, slug: string) {

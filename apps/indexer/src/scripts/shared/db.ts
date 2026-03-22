@@ -1,3 +1,4 @@
+// apps/indexer/src/scripts/shared/db.ts
 import { Client } from 'pg';
 
 export function getDatabaseUrl(): string {
