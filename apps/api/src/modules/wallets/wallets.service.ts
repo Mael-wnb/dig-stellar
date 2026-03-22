@@ -1,5 +1,5 @@
 // apps/api/src/modules/wallets/wallets.service.ts
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../db/prisma.service';
 
 function toNumber(value: unknown): number | null {
@@ -66,6 +66,20 @@ export class WalletsService {
     return value;
   }
 
+  private normalizeWalletId(walletId?: string): string {
+    const value = (walletId ?? '').trim();
+
+    if (!value) {
+      throw new BadRequestException('walletId is required');
+    }
+
+    if (!isUuid(value)) {
+      throw new BadRequestException('walletId must be a valid UUID');
+    }
+
+    return value;
+  }
+
   private normalizeChain(chain?: string): string {
     const value = (chain ?? 'stellar').trim().toLowerCase();
 
@@ -96,6 +110,52 @@ export class WalletsService {
 
     const value = label.trim();
     return value.length ? value : null;
+  }
+
+  private mapWallet(row: WalletRow) {
+    return {
+      id: row.id,
+      userId: row.user_id,
+      chain: row.chain,
+      address: row.address,
+      label: row.label,
+      isPrimary: row.is_primary,
+      isActive: row.is_active,
+      metadata: row.metadata,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  private async getWalletOrThrow(walletId: string, userId: string): Promise<WalletRow> {
+    const rows = await this.prisma.$queryRawUnsafe<WalletRow[]>(
+      `
+      select
+        id,
+        user_id,
+        chain,
+        address,
+        label,
+        is_primary,
+        is_active,
+        metadata,
+        created_at,
+        updated_at
+      from user_wallets
+      where id = $1::uuid
+        and user_id = $2::uuid
+      limit 1
+      `,
+      walletId,
+      userId
+    );
+
+    const wallet = rows[0];
+    if (!wallet) {
+      throw new NotFoundException(`Wallet not found: ${walletId}`);
+    }
+
+    return wallet;
   }
 
   async createWallet(params: {
@@ -160,18 +220,7 @@ export class WalletsService {
 
       return {
         created: false,
-        wallet: {
-          id: updated[0].id,
-          userId: updated[0].user_id,
-          chain: updated[0].chain,
-          address: updated[0].address,
-          label: updated[0].label,
-          isPrimary: updated[0].is_primary,
-          isActive: updated[0].is_active,
-          metadata: updated[0].metadata,
-          createdAt: updated[0].created_at,
-          updatedAt: updated[0].updated_at,
-        },
+        wallet: this.mapWallet(updated[0]),
       };
     }
 
@@ -219,18 +268,7 @@ export class WalletsService {
 
     return {
       created: true,
-      wallet: {
-        id: inserted[0].id,
-        userId: inserted[0].user_id,
-        chain: inserted[0].chain,
-        address: inserted[0].address,
-        label: inserted[0].label,
-        isPrimary: inserted[0].is_primary,
-        isActive: inserted[0].is_active,
-        metadata: inserted[0].metadata,
-        createdAt: inserted[0].created_at,
-        updatedAt: inserted[0].updated_at,
-      },
+      wallet: this.mapWallet(inserted[0]),
     };
   }
 
@@ -260,18 +298,7 @@ export class WalletsService {
     return {
       userId: normalizedUserId,
       count: rows.length,
-      wallets: rows.map((row) => ({
-        id: row.id,
-        userId: row.user_id,
-        chain: row.chain,
-        address: row.address,
-        label: row.label,
-        isPrimary: row.is_primary,
-        isActive: row.is_active,
-        metadata: row.metadata,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      })),
+      wallets: rows.map((row) => this.mapWallet(row)),
     };
   }
 
@@ -399,18 +426,138 @@ export class WalletsService {
         totalWallets: toNumber(row.total) ?? 0,
         activeWallets: toNumber(row.active) ?? 0,
       })),
-      wallets: walletRows.map((row) => ({
-        id: row.id,
-        userId: row.user_id,
-        chain: row.chain,
-        address: row.address,
-        label: row.label,
-        isPrimary: row.is_primary,
-        isActive: row.is_active,
-        metadata: row.metadata,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      })),
+      wallets: walletRows.map((row) => this.mapWallet(row)),
+    };
+  }
+
+  async setPrimaryWallet(params: { userId?: string; walletId?: string }) {
+    const userId = this.normalizeUserId(params.userId);
+    const walletId = this.normalizeWalletId(params.walletId);
+
+    await this.getWalletOrThrow(walletId, userId);
+
+    await this.prisma.$executeRawUnsafe(
+      `
+      update user_wallets
+      set
+        is_primary = false,
+        updated_at = now()
+      where user_id = $1::uuid
+        and is_primary = true
+      `,
+      userId
+    );
+
+    const updated = await this.prisma.$queryRawUnsafe<WalletRow[]>(
+      `
+      update user_wallets
+      set
+        is_primary = true,
+        is_active = true,
+        updated_at = now()
+      where id = $1::uuid
+        and user_id = $2::uuid
+      returning
+        id,
+        user_id,
+        chain,
+        address,
+        label,
+        is_primary,
+        is_active,
+        metadata,
+        created_at,
+        updated_at
+      `,
+      walletId,
+      userId
+    );
+
+    return {
+      updated: true,
+      wallet: this.mapWallet(updated[0]),
+    };
+  }
+
+  async setWalletActive(params: {
+    userId?: string;
+    walletId?: string;
+    isActive?: boolean;
+  }) {
+    const userId = this.normalizeUserId(params.userId);
+    const walletId = this.normalizeWalletId(params.walletId);
+
+    if (typeof params.isActive !== 'boolean') {
+      throw new BadRequestException('isActive must be provided as a boolean');
+    }
+
+    const current = await this.getWalletOrThrow(walletId, userId);
+
+    if (!params.isActive && current.is_primary) {
+      const otherActiveRows = await this.prisma.$queryRawUnsafe<Array<{ id: string }>>(
+        `
+        select id
+        from user_wallets
+        where user_id = $1::uuid
+          and id <> $2::uuid
+          and is_active = true
+        order by created_at asc
+        limit 1
+        `,
+        userId,
+        walletId
+      );
+
+      if (!otherActiveRows[0]) {
+        throw new BadRequestException(
+          'Cannot deactivate the only active primary wallet'
+        );
+      }
+
+      await this.prisma.$executeRawUnsafe(
+        `
+        update user_wallets
+        set
+          is_primary = true,
+          updated_at = now()
+        where id = $1::uuid
+        `,
+        otherActiveRows[0].id
+      );
+    }
+
+    const updated = await this.prisma.$queryRawUnsafe<WalletRow[]>(
+      `
+      update user_wallets
+      set
+        is_active = $3,
+        is_primary = case
+          when $3 = false then false
+          else is_primary
+        end,
+        updated_at = now()
+      where id = $1::uuid
+        and user_id = $2::uuid
+      returning
+        id,
+        user_id,
+        chain,
+        address,
+        label,
+        is_primary,
+        is_active,
+        metadata,
+        created_at,
+        updated_at
+      `,
+      walletId,
+      userId,
+      params.isActive
+    );
+
+    return {
+      updated: true,
+      wallet: this.mapWallet(updated[0]),
     };
   }
 }

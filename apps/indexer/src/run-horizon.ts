@@ -1,3 +1,4 @@
+// apps/indexer/src/run-horizon.ts
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 
