@@ -560,4 +560,61 @@ export class WalletsService {
       wallet: this.mapWallet(updated[0]),
     };
   }
+
+  async deleteWallet(params: { userId?: string; walletId?: string }) {
+    const userId = this.normalizeUserId(params.userId);
+    const walletId = this.normalizeWalletId(params.walletId);
+
+    const current = await this.getWalletOrThrow(walletId, userId);
+
+    if (current.is_primary) {
+      const otherActiveRows = await this.prisma.$queryRawUnsafe<Array<{ id: string }>>(
+        `
+        select id
+        from user_wallets
+        where user_id = $1::uuid
+          and id <> $2::uuid
+          and is_active = true
+        order by created_at asc
+        limit 1
+        `,
+        userId,
+        walletId
+      );
+
+      if (!otherActiveRows[0]) {
+        throw new BadRequestException(
+          'Cannot delete the only active primary wallet'
+        );
+      }
+
+      await this.prisma.$executeRawUnsafe(
+        `
+        update user_wallets
+        set
+          is_primary = true,
+          updated_at = now()
+        where id = $1::uuid
+        `,
+        otherActiveRows[0].id
+      );
+    }
+
+    await this.prisma.$executeRawUnsafe(
+      `
+      delete from user_wallets
+      where id = $1::uuid
+        and user_id = $2::uuid
+      `,
+      walletId,
+      userId
+    );
+
+    return {
+      deleted: true,
+      walletId,
+      userId,
+      address: current.address,
+    };
+  }
 }

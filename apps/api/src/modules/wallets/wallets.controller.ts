@@ -1,5 +1,5 @@
 // apps/api/src/modules/wallets/wallets.controller.ts
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { WalletsService } from './wallets.service';
 
 type CreateWalletBody = {
@@ -67,6 +67,18 @@ export class WalletsController {
       walletId,
       userId: queryUserId ?? body?.userId,
       isActive: body?.isActive,
+    });
+  }
+
+  @Delete(':walletId')
+  deleteWallet(
+    @Param('walletId') walletId: string,
+    @Query('userId') queryUserId?: string,
+    @Body() body?: { userId?: string }
+  ) {
+    return this.walletsService.deleteWallet({
+      walletId,
+      userId: queryUserId ?? body?.userId,
     });
   }
 }
