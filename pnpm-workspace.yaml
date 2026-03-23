@@ -1,6 +1,7 @@
 packages:
-  - "apps/*"
-  - "packages/*"
+  - apps/*
+  - packages/*
+
 allowBuilds:
   '@nestjs/core': true
   '@prisma/client': true
@@ -16,3 +17,19 @@ allowBuilds:
   unrs-resolver: true
   usb: true
   utf-8-validate: true
+
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - '@prisma/client'
+  - '@prisma/engines'
+  - '@reown/appkit'
+  - blake-hash
+  - bufferutil
+  - esbuild
+  - prisma
+  - protobufjs
+  - secp256k1
+  - tiny-secp256k1
+  - unrs-resolver
+  - usb
+  - utf-8-validate
