@@ -1,3 +1,13 @@
+@import "tailwindcss";
+
+
+html, body, #app {
+  background-color: #141414;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -157,11 +167,10 @@ code {
 }
 
 #app {
-  width: 1126px;
+  width: 100%;
   max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
+  margin: 0;
+  text-align: left;
   min-height: 100svh;
   display: flex;
   flex-direction: column;
@@ -294,3 +303,10 @@ code {
     border-right-color: var(--border);
   }
 }
+h1 {
+  color: #FFFFFF !important;
+  font-size: inherit;
+  letter-spacing: inherit;
+  margin: 0;
+}
+.pool-tvl-row { display: flex; align-items: center; gap: 4px; }

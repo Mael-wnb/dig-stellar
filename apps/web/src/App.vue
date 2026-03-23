@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue'
+import DigDashboard from './components/DigDashboard.vue'
 </script>
 
 <template>
-  <HelloWorld />
+  <DigDashboard />
 </template>
