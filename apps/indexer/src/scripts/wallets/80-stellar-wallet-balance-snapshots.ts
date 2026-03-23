@@ -1,127 +1,103 @@
+// apps/indexer/src/scripts/wallets/80-stellar-wallet-balance-snapshots.ts
 import 'dotenv/config';
 import { createPgClient } from '../shared/db';
-import { fetchJson, getEnv, nowIso } from '../discovery/00-common';
+import { fetchJson, nowIso } from '../discovery/00-common';
+
+type ActiveWalletRow = {
+  id: string;
+  user_id: string;
+  address: string;
+  chain: string;
+  label: string | null;
+};
+
+type AssetRow = {
+  id: string;
+  contract_address: string | null;
+  symbol: string | null;
+  name: string | null;
+  chain: string;
+};
+
+type PriceRow = {
+  asset_id: string;
+  price_usd: string | number | null;
+};
 
 type HorizonBalance = {
   balance: string;
   asset_type: string;
   asset_code?: string;
   asset_issuer?: string;
+  buying_liabilities?: string;
+  selling_liabilities?: string;
 };
 
 type HorizonAccountResponse = {
   id: string;
   account_id: string;
-  balances: HorizonBalance[];
+  balances?: HorizonBalance[];
 };
 
-type UserWalletRow = {
-  id: string;
-  user_id: string;
-  chain: string;
-  address: string;
-  label: string | null;
-  is_primary: boolean;
-  is_active: boolean;
-};
+const STELLAR_NATIVE_CONTRACT =
+  'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA';
 
-type AssetRow = {
-  id: string;
-  chain: string;
-  contract_address: string | null;
-  symbol: string | null;
-  name: string | null;
-};
-
-type AssetPriceRow = {
-  asset_id: string;
-  price_usd: string;
-};
-
-function normalizeHorizonAssetContract(balance: HorizonBalance): string | null {
-  if (balance.asset_type === 'native') {
-    return 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA';
+function toNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'string') {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
   }
-
-  if (
-    (balance.asset_type === 'credit_alphanum4' || balance.asset_type === 'credit_alphanum12') &&
-    balance.asset_code &&
-    balance.asset_issuer
-  ) {
-    return `${balance.asset_code}:${balance.asset_issuer}`;
-  }
-
   return null;
 }
 
-function normalizeHorizonAssetSymbol(balance: HorizonBalance): string | null {
-  if (balance.asset_type === 'native') return 'native';
-  if (balance.asset_code) return balance.asset_code;
-  return null;
+function normalizeSymbol(symbol?: string | null): string | null {
+  if (!symbol) return null;
+  const value = symbol.trim();
+  return value ? value.toUpperCase() : null;
 }
 
-function parseBalanceScaled(value: string | undefined | null): number {
-  if (!value) return 0;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function scaledToRawString(balanceScaled: number, decimals: number): string {
-  if (!Number.isFinite(balanceScaled)) return '0';
-  const factor = 10 ** decimals;
-  return Math.round(balanceScaled * factor).toString();
+function isKnownHorizonNotFound(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('HTTP 404');
 }
 
 async function main() {
-  const horizonUrl = getEnv('HORIZON_URL');
-  const chain = (process.env.WALLET_CHAIN ?? 'stellar').trim().toLowerCase();
-  const snapshotAt = nowIso();
-
+  const horizonUrl = process.env.HORIZON_URL ?? 'https://horizon.stellar.org';
   const client = createPgClient();
   await client.connect();
 
   try {
-    const walletsRes = await client.query<UserWalletRow>(
+    const walletsRes = await client.query<ActiveWalletRow>(
       `
       select
         id,
         user_id,
-        chain,
         address,
-        label,
-        is_primary,
-        is_active
+        chain,
+        label
       from user_wallets
-      where chain = $1
+      where chain = 'stellar'
         and is_active = true
-      order by is_primary desc, created_at asc
-      `,
-      [chain]
+      order by created_at asc
+      `
     );
-
-    const wallets = walletsRes.rows;
 
     const assetsRes = await client.query<AssetRow>(
       `
       select
         id,
-        chain,
         contract_address,
         symbol,
-        name
+        name,
+        chain
       from assets
       where chain = 'stellar-mainnet'
       `
     );
 
-    const assetByContract = new Map<string, AssetRow>();
-    for (const asset of assetsRes.rows) {
-      if (asset.contract_address) {
-        assetByContract.set(asset.contract_address, asset);
-      }
-    }
-
-    const pricesRes = await client.query<AssetPriceRow>(
+    const pricesRes = await client.query<PriceRow>(
       `
       select distinct on (asset_id)
         asset_id,
@@ -133,118 +109,147 @@ async function main() {
 
     const priceByAssetId = new Map<string, number>();
     for (const row of pricesRes.rows) {
-      const price = Number(row.price_usd);
-      if (Number.isFinite(price)) {
+      const price = toNumber(row.price_usd);
+      if (price !== null) {
         priceByAssetId.set(row.asset_id, price);
       }
     }
 
+    const nativeAsset =
+      assetsRes.rows.find((row) => row.contract_address === STELLAR_NATIVE_CONTRACT) ?? null;
+
+    const symbolToAssets = new Map<string, AssetRow[]>();
+    for (const row of assetsRes.rows) {
+      const key = normalizeSymbol(row.symbol);
+      if (!key) continue;
+      if (!symbolToAssets.has(key)) symbolToAssets.set(key, []);
+      symbolToAssets.get(key)!.push(row);
+    }
+
+    const snapshotAt = new Date();
     let processedWallets = 0;
     let insertedRows = 0;
 
-    for (const wallet of wallets) {
-      const url = `${horizonUrl.replace(/\/$/, '')}/accounts/${wallet.address}`;
-      let account: HorizonAccountResponse | null = null;
-
+    for (const wallet of walletsRes.rows) {
       try {
-        account = await fetchJson<HorizonAccountResponse>(url, {
-          headers: { accept: 'application/json' },
-        });
-      } catch (error) {
-        console.error(`[wallet-balance-snapshots] failed for ${wallet.address}`);
-        console.error(error);
-        continue;
-      }
-
-      const balances = Array.isArray(account.balances) ? account.balances : [];
-
-      for (const balance of balances) {
-        const assetContractId = normalizeHorizonAssetContract(balance);
-        const assetSymbol = normalizeHorizonAssetSymbol(balance);
-        const asset = assetContractId ? assetByContract.get(assetContractId) ?? null : null;
-
-        const decimals =
-          balance.asset_type === 'native'
-            ? 7
-            : assetSymbol === 'SolvBTC' || assetSymbol === 'xSolvBTC'
-              ? 8
-              : 7;
-
-        const balanceScaled = parseBalanceScaled(balance.balance);
-        const balanceRaw = scaledToRawString(balanceScaled, decimals);
-
-        const assetId = asset?.id ?? null;
-        const priceUsd = assetId ? priceByAssetId.get(assetId) ?? null : null;
-        const balanceUsd =
-          priceUsd !== null && Number.isFinite(balanceScaled)
-            ? balanceScaled * priceUsd
-            : null;
-
-        await client.query(
-          `
-          insert into wallet_balance_snapshots (
-            user_wallet_id,
-            asset_id,
-            asset_contract_id,
-            asset_symbol,
-            balance_raw,
-            balance_scaled,
-            price_usd,
-            balance_usd,
-            snapshot_at,
-            metadata
-          )
-          values (
-            $1::uuid,
-            $2::uuid,
-            $3,
-            $4,
-            $5::numeric,
-            $6::numeric,
-            $7::numeric,
-            $8::numeric,
-            $9::timestamptz,
-            $10::jsonb
-          )
-          on conflict (
-            user_wallet_id,
-            coalesce(asset_id, '00000000-0000-0000-0000-000000000000'::uuid),
-            coalesce(asset_contract_id, ''),
-            snapshot_at
-          )
-          do nothing
-          `,
-          [
-            wallet.id,
-            assetId,
-            assetContractId,
-            assetSymbol,
-            balanceRaw,
-            balanceScaled,
-            priceUsd,
-            balanceUsd,
-            snapshotAt,
-            JSON.stringify({
-              source: '80-stellar-wallet-balance-snapshots',
-              address: wallet.address,
-              horizonAssetType: balance.asset_type,
-              horizonAssetCode: balance.asset_code ?? null,
-              horizonAssetIssuer: balance.asset_issuer ?? null,
-            }),
-          ]
+        const account = await fetchJson<HorizonAccountResponse>(
+          `${horizonUrl.replace(/\/$/, '')}/accounts/${wallet.address}`
         );
 
-        insertedRows += 1;
-      }
+        const balances = Array.isArray(account.balances) ? account.balances : [];
 
-      processedWallets += 1;
+        for (const balance of balances) {
+          const balanceScaled = toNumber(balance.balance);
+          if (balanceScaled === null || balanceScaled <= 0) {
+            continue;
+          }
+
+          let matchedAsset: AssetRow | null = null;
+          let assetContractId: string | null = null;
+          let assetSymbol: string | null = null;
+
+          if (balance.asset_type === 'native') {
+            matchedAsset = nativeAsset;
+            assetContractId = nativeAsset?.contract_address ?? STELLAR_NATIVE_CONTRACT;
+            assetSymbol = nativeAsset?.symbol ?? 'XLM';
+          } else {
+            const symbol = normalizeSymbol(balance.asset_code);
+            assetSymbol = symbol;
+
+            const candidates = symbol ? symbolToAssets.get(symbol) ?? [] : [];
+            matchedAsset = candidates[0] ?? null;
+            assetContractId = matchedAsset?.contract_address ?? null;
+          }
+
+          const priceUsd =
+            matchedAsset && priceByAssetId.has(matchedAsset.id)
+              ? priceByAssetId.get(matchedAsset.id) ?? null
+              : null;
+
+          const balanceUsd = priceUsd !== null ? balanceScaled * priceUsd : null;
+
+          await client.query(
+            `
+            insert into wallet_balance_snapshots (
+              user_wallet_id,
+              asset_id,
+              asset_contract_id,
+              asset_symbol,
+              balance_raw,
+              balance_scaled,
+              price_usd,
+              balance_usd,
+              snapshot_at,
+              metadata
+            )
+            values (
+              $1::uuid,
+              $2::uuid,
+              $3,
+              $4,
+              $5,
+              $6,
+              $7,
+              $8,
+              $9::timestamptz,
+              $10::jsonb
+            )
+            on conflict (
+              user_wallet_id,
+              coalesce(asset_id, '00000000-0000-0000-0000-000000000000'::uuid),
+              coalesce(asset_contract_id, ''),
+              snapshot_at
+            )
+            do update set
+              asset_symbol = excluded.asset_symbol,
+              balance_raw = excluded.balance_raw,
+              balance_scaled = excluded.balance_scaled,
+              price_usd = excluded.price_usd,
+              balance_usd = excluded.balance_usd,
+              metadata = excluded.metadata
+            `,
+            [
+              wallet.id,
+              matchedAsset?.id ?? null,
+              assetContractId,
+              assetSymbol,
+              Math.round(balanceScaled * 10 ** 7).toString(), // fallback raw approximation
+              balanceScaled,
+              priceUsd,
+              balanceUsd,
+              snapshotAt.toISOString(),
+              JSON.stringify({
+                source: 'horizon',
+                address: wallet.address,
+                assetType: balance.asset_type,
+                assetCode: balance.asset_code ?? null,
+                assetIssuer: balance.asset_issuer ?? null,
+                buyingLiabilities: balance.buying_liabilities ?? null,
+                sellingLiabilities: balance.selling_liabilities ?? null,
+              }),
+            ]
+          );
+
+          insertedRows += 1;
+        }
+
+        processedWallets += 1;
+      } catch (error) {
+        console.error(`[wallet-balance-snapshots] failed for ${wallet.address}`);
+        if (isKnownHorizonNotFound(error)) {
+          console.error('Wallet not found on Horizon, skipping.');
+        } else {
+          console.error(error);
+        }
+      }
     }
 
     console.log({
-      completedAt: snapshotAt,
-      chain,
+      completedAt: nowIso(),
+      chain: 'stellar',
       processedWallets,
       insertedRows,
+      snapshotAt: snapshotAt.toISOString(),
     });
   } finally {
     await client.end();
