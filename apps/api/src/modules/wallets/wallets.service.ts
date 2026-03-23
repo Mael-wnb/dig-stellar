@@ -142,7 +142,7 @@ export class WalletsService {
   }
 
   private async getWalletOrThrow(walletId: string, userId: string): Promise<WalletRow> {
-    const rows = await this.prisma.$queryRawUnsafe<WalletRow[]>(
+    const rows = (await this.prisma.$queryRawUnsafe(
       `
       select
         id,
@@ -162,7 +162,7 @@ export class WalletsService {
       `,
       walletId,
       userId
-    );
+    )) as WalletRow[];
 
     const wallet = rows[0];
     if (!wallet) {
@@ -183,7 +183,7 @@ export class WalletsService {
     const address = this.normalizeAddress(params.address);
     const label = this.normalizeLabel(params.label);
 
-    const existing = await this.prisma.$queryRawUnsafe<WalletRow[]>(
+    const existing = (await this.prisma.$queryRawUnsafe(
       `
       select
         id,
@@ -205,10 +205,10 @@ export class WalletsService {
       userId,
       chain,
       address
-    );
+    )) as WalletRow[];
 
     if (existing[0]) {
-      const updated = await this.prisma.$queryRawUnsafe<WalletRow[]>(
+      const updated = (await this.prisma.$queryRawUnsafe(
         `
         update user_wallets
         set
@@ -230,7 +230,7 @@ export class WalletsService {
         `,
         existing[0].id,
         label
-      );
+      )) as WalletRow[];
 
       return {
         created: false,
@@ -238,18 +238,18 @@ export class WalletsService {
       };
     }
 
-    const primaryRows = await this.prisma.$queryRawUnsafe<Array<{ count: unknown }>>(
+    const primaryRows = (await this.prisma.$queryRawUnsafe(
       `
       select count(*) as count
       from user_wallets
       where user_id = $1::uuid
       `,
       userId
-    );
+    )) as Array<{ count: unknown }>;
 
     const isPrimary = (toNumber(primaryRows[0]?.count) ?? 0) === 0;
 
-    const inserted = await this.prisma.$queryRawUnsafe<WalletRow[]>(
+    const inserted = (await this.prisma.$queryRawUnsafe(
       `
       insert into user_wallets (
         user_id,
@@ -278,7 +278,7 @@ export class WalletsService {
       address,
       label,
       isPrimary
-    );
+    )) as WalletRow[];
 
     return {
       created: true,
@@ -289,7 +289,7 @@ export class WalletsService {
   async getWallets(userId?: string) {
     const normalizedUserId = this.normalizeUserId(userId);
 
-    const rows = await this.prisma.$queryRawUnsafe<WalletRow[]>(
+    const rows = (await this.prisma.$queryRawUnsafe(
       `
       select
         id,
@@ -307,7 +307,7 @@ export class WalletsService {
       order by is_primary desc, created_at desc, address asc
       `,
       normalizedUserId
-    );
+    )) as WalletRow[];
 
     return {
       userId: normalizedUserId,
@@ -319,7 +319,7 @@ export class WalletsService {
   async getWalletsOverview(userId?: string) {
     const normalizedUserId = this.normalizeUserId(userId);
 
-    const overviewRows = await this.prisma.$queryRawUnsafe<WalletOverviewRow[]>(
+    const overviewRows = (await this.prisma.$queryRawUnsafe(
       `
       select
         count(*) as total_wallets,
@@ -328,16 +328,14 @@ export class WalletsService {
       where user_id = $1::uuid
       `,
       normalizedUserId
-    );
+    )) as WalletOverviewRow[];
 
     const overview = overviewRows[0] ?? {
       total_wallets: 0,
       active_wallets: 0,
     };
 
-    const chainRows = await this.prisma.$queryRawUnsafe<
-      Array<{ chain: string; total: unknown; active: unknown }>
-    >(
+    const chainRows = (await this.prisma.$queryRawUnsafe(
       `
       select
         chain,
@@ -349,9 +347,9 @@ export class WalletsService {
       order by chain asc
       `,
       normalizedUserId
-    );
+    )) as Array<{ chain: string; total: unknown; active: unknown }>;
 
-    const walletRows = await this.prisma.$queryRawUnsafe<WalletRow[]>(
+    const walletRows = (await this.prisma.$queryRawUnsafe(
       `
       select
         id,
@@ -369,11 +367,9 @@ export class WalletsService {
       order by is_primary desc, created_at desc, address asc
       `,
       normalizedUserId
-    );
+    )) as WalletRow[];
 
-    const portfolioRows = await this.prisma.$queryRawUnsafe<
-      Array<{ total_portfolio_usd: unknown; total_tracked_positions: unknown }>
-    >(
+    const portfolioRows = (await this.prisma.$queryRawUnsafe(
       `
       select
         coalesce(sum(latest_balances.balance_usd), 0) as total_portfolio_usd,
@@ -420,7 +416,7 @@ export class WalletsService {
       where uw.user_id = $1::uuid
       `,
       normalizedUserId
-    );
+    )) as Array<{ total_portfolio_usd: unknown; total_tracked_positions: unknown }>;
 
     const portfolio = portfolioRows[0] ?? {
       total_portfolio_usd: 0,
@@ -450,7 +446,7 @@ export class WalletsService {
 
     const wallet = await this.getWalletOrThrow(walletId, userId);
 
-    const rows = await this.prisma.$queryRawUnsafe<WalletBalanceRow[]>(
+    const rows = (await this.prisma.$queryRawUnsafe(
       `
       select distinct on (
         wbs.user_wallet_id,
@@ -478,7 +474,7 @@ export class WalletsService {
         wbs.created_at desc
       `,
       walletId
-    );
+    )) as WalletBalanceRow[];
 
     const balances = rows.map((row) => ({
       id: row.id,
@@ -521,7 +517,7 @@ export class WalletsService {
       userId
     );
 
-    const updated = await this.prisma.$queryRawUnsafe<WalletRow[]>(
+    const updated = (await this.prisma.$queryRawUnsafe(
       `
       update user_wallets
       set
@@ -544,7 +540,7 @@ export class WalletsService {
       `,
       walletId,
       userId
-    );
+    )) as WalletRow[];
 
     return {
       updated: true,
@@ -567,7 +563,7 @@ export class WalletsService {
     const current = await this.getWalletOrThrow(walletId, userId);
 
     if (!params.isActive && current.is_primary) {
-      const otherActiveRows = await this.prisma.$queryRawUnsafe<Array<{ id: string }>>(
+      const otherActiveRows = (await this.prisma.$queryRawUnsafe(
         `
         select id
         from user_wallets
@@ -579,12 +575,10 @@ export class WalletsService {
         `,
         userId,
         walletId
-      );
+      )) as Array<{ id: string }>;
 
       if (!otherActiveRows[0]) {
-        throw new BadRequestException(
-          'Cannot deactivate the only active primary wallet'
-        );
+        throw new BadRequestException('Cannot deactivate the only active primary wallet');
       }
 
       await this.prisma.$executeRawUnsafe(
@@ -599,7 +593,7 @@ export class WalletsService {
       );
     }
 
-    const updated = await this.prisma.$queryRawUnsafe<WalletRow[]>(
+    const updated = (await this.prisma.$queryRawUnsafe(
       `
       update user_wallets
       set
@@ -626,7 +620,7 @@ export class WalletsService {
       walletId,
       userId,
       params.isActive
-    );
+    )) as WalletRow[];
 
     return {
       updated: true,
@@ -641,7 +635,7 @@ export class WalletsService {
     const current = await this.getWalletOrThrow(walletId, userId);
 
     if (current.is_primary) {
-      const otherActiveRows = await this.prisma.$queryRawUnsafe<Array<{ id: string }>>(
+      const otherActiveRows = (await this.prisma.$queryRawUnsafe(
         `
         select id
         from user_wallets
@@ -653,12 +647,10 @@ export class WalletsService {
         `,
         userId,
         walletId
-      );
+      )) as Array<{ id: string }>;
 
       if (!otherActiveRows[0]) {
-        throw new BadRequestException(
-          'Cannot delete the only active primary wallet'
-        );
+        throw new BadRequestException('Cannot delete the only active primary wallet');
       }
 
       await this.prisma.$executeRawUnsafe(
