@@ -1,0 +1,101 @@
+[
+    {
+      "protocol": "blend",
+      "input_type": "pool_id",
+      "input_a": "CAJJZSGMMM3PD7N33TAPHGBUGTB43OC73HVIK2L2G6BNGGGYOSSYBXBD",
+      "input_b": null,
+      "label": "Fixed Pool",
+      "priority": "high",
+      "status": "api_ready"
+    },
+    {
+      "protocol": "blend",
+      "input_type": "pool_id",
+      "input_a": "CAE7QVOMBLZ53CDRGK3UNRRHG5EZ5NQA7HHTFASEMYBWHG6MDFZTYHXC",
+      "input_b": null,
+      "label": "Orbit Pool",
+      "priority": "high",
+      "status": "todo"
+    },
+    {
+      "protocol": "blend",
+      "input_type": "pool_id",
+      "input_a": "CDMAVJPFXPADND3YRL4BSM3AKZWCTFMX27GLLXCML3PD62HEQS5FPVAI",
+      "input_b": null,
+      "label": "Etherfuse Pool",
+      "priority": "medium",
+      "status": "todo"
+    },
+    {
+      "protocol": "aquarius",
+      "input_type": "pool_id",
+      "input_a": "CDMH535JSD224YXPET3B4SJOLXTQQ24GRSCWACGYBKSH2DKFJYWI7SUW",
+      "input_b": null,
+      "label": "PYUSD / USDC",
+      "priority": "high",
+      "status": "todo"
+    },
+    {
+      "protocol": "aquarius",
+      "input_type": "pool_id",
+      "input_a": "CD2O2B6PWKXDVFXMHXHQMF25C4TWOSQAENA7DNFR5G27F5CHJ7AJP5F6",
+      "input_b": null,
+      "label": "XLM / SolvBTC",
+      "priority": "medium",
+      "status": "todo"
+    },
+    {
+      "protocol": "aquarius",
+      "input_type": "pool_id",
+      "input_a": "CA6PUJLBYKZKUEKLZJMKBZLEKP2OTHANDEOWSFF44FTSYLKQPIICCJBE",
+      "input_b": null,
+      "label": "XLM / USDC",
+      "priority": "high",
+      "status": "todo"
+    },
+    {
+      "protocol": "aquarius",
+      "input_type": "pool_id",
+      "input_a": "CCNXGPE4AQCSNEBZO3XJDKKDI3CRLYMVS6UWBBTVDLALLWMJEXBORQ2A",
+      "input_b": null,
+      "label": "xSolvBTC / SolvBTC",
+      "priority": "medium",
+      "status": "todo"
+    },
+    {
+      "protocol": "soroswap",
+      "input_type": "token_pair",
+      "input_a": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "input_b": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "label": "native / USDC",
+      "priority": "high",
+      "status": "api_ready"
+    },
+    {
+      "protocol": "soroswap",
+      "input_type": "token_pair",
+      "input_a": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "input_b": "CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV",
+      "label": "native / EURC",
+      "priority": "high",
+      "status": "candidate"
+    },
+    {
+      "protocol": "soroswap",
+      "input_type": "token_pair",
+      "input_a": "CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV",
+      "input_b": "CDDS7IQJGQ2ZMO66E3MUYXZ56H2OO7RBTTAGZLZKOEA4EXCGZX65JGA7",
+      "label": "EURC / tokenX",
+      "priority": "medium",
+      "status": "candidate"
+    },
+    {
+      "protocol": "soroswap",
+      "input_type": "token_pair",
+      "input_a": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "input_b": "CDDS7IQJGQ2ZMO66E3MUYXZ56H2OO7RBTTAGZLZKOEA4EXCGZX65JGA7",
+      "label": "native / tokenX",
+      "priority": "medium",
+      "status": "candidate"
+    }
+  ]
