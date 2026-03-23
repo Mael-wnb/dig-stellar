@@ -46,6 +46,20 @@ type WalletOverviewRow = {
   active_wallets: unknown;
 };
 
+type WalletBalanceRow = {
+  id: string;
+  user_wallet_id: string;
+  asset_id: string | null;
+  asset_contract_id: string | null;
+  asset_symbol: string | null;
+  balance_raw: unknown;
+  balance_scaled: unknown;
+  price_usd: unknown;
+  balance_usd: unknown;
+  snapshot_at: unknown;
+  metadata: unknown;
+};
+
 @Injectable()
 export class WalletsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -427,6 +441,65 @@ export class WalletsService {
         activeWallets: toNumber(row.active) ?? 0,
       })),
       wallets: walletRows.map((row) => this.mapWallet(row)),
+    };
+  }
+
+  async getWalletBalances(params: { userId?: string; walletId?: string }) {
+    const userId = this.normalizeUserId(params.userId);
+    const walletId = this.normalizeWalletId(params.walletId);
+
+    const wallet = await this.getWalletOrThrow(walletId, userId);
+
+    const rows = await this.prisma.$queryRawUnsafe<WalletBalanceRow[]>(
+      `
+      select distinct on (
+        wbs.user_wallet_id,
+        coalesce(wbs.asset_id, '00000000-0000-0000-0000-000000000000'::uuid),
+        coalesce(wbs.asset_contract_id, '')
+      )
+        wbs.id,
+        wbs.user_wallet_id,
+        wbs.asset_id,
+        wbs.asset_contract_id,
+        wbs.asset_symbol,
+        wbs.balance_raw,
+        wbs.balance_scaled,
+        wbs.price_usd,
+        wbs.balance_usd,
+        wbs.snapshot_at,
+        wbs.metadata
+      from wallet_balance_snapshots wbs
+      where wbs.user_wallet_id = $1::uuid
+      order by
+        wbs.user_wallet_id,
+        coalesce(wbs.asset_id, '00000000-0000-0000-0000-000000000000'::uuid),
+        coalesce(wbs.asset_contract_id, ''),
+        wbs.snapshot_at desc,
+        wbs.created_at desc
+      `,
+      walletId
+    );
+
+    const balances = rows.map((row) => ({
+      id: row.id,
+      assetId: row.asset_id,
+      assetContractId: row.asset_contract_id,
+      symbol: row.asset_symbol,
+      balanceRaw: row.balance_raw,
+      balance: toNumber(row.balance_scaled),
+      priceUsd: toNumber(row.price_usd),
+      balanceUsd: toNumber(row.balance_usd),
+      snapshotAt: row.snapshot_at,
+      metadata: row.metadata,
+    }));
+
+    const totalPortfolioUsd = balances.reduce((sum, row) => sum + (row.balanceUsd ?? 0), 0);
+
+    return {
+      wallet: this.mapWallet(wallet),
+      count: balances.length,
+      totalPortfolioUsd,
+      balances,
     };
   }
 

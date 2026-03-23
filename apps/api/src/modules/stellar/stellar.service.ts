@@ -101,7 +101,7 @@ export class StellarService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getProtocols() {
-    const rows = await this.prisma.$queryRawUnsafe<ProtocolRow[]>(`
+    const rows = (await this.prisma.$queryRawUnsafe(`
       select
         v.slug,
         v.name,
@@ -116,7 +116,7 @@ export class StellarService {
       from venues v
       left join protocol_metrics_latest pm on pm.venue_id = v.id
       order by v.slug asc
-    `);
+    `)) as ProtocolRow[];
 
     return rows.map((row) => ({
       id: row.slug,
@@ -156,7 +156,7 @@ export class StellarService {
     const sortColumn = sort && allowedSorts[sort] ? allowedSorts[sort] : 'v.slug, e.slug';
     const sortDirection = order === 'asc' ? 'asc' : 'desc';
 
-    const rows = await this.prisma.$queryRawUnsafe<PoolListRow[]>(
+    const rows = (await this.prisma.$queryRawUnsafe(
       `
       select
         e.slug as entity_slug,
@@ -180,16 +180,9 @@ export class StellarService {
       order by ${sortColumn} ${sortColumn === 'v.slug, e.slug' ? '' : sortDirection}, e.slug asc
       `,
       ...params
-    );
+    )) as PoolListRow[];
 
-    const tokenRows = await this.prisma.$queryRawUnsafe<
-      Array<{
-        entity_slug: string;
-        asset_id: string;
-        symbol: string | null;
-        role: string;
-      }>
-    >(`
+    const tokenRows = (await this.prisma.$queryRawUnsafe(`
       select
         e.slug as entity_slug,
         a.id as asset_id,
@@ -199,11 +192,22 @@ export class StellarService {
       join entities e on e.id = ea.entity_id
       join assets a on a.id = ea.asset_id
       order by e.slug asc, ea.role asc, a.symbol asc
-    `);
+    `)) as Array<{
+      entity_slug: string;
+      asset_id: string;
+      symbol: string | null;
+      role: string;
+    }>;
 
-    const tokensByEntity = new Map<string, Array<{ assetId: string; symbol: string | null; role: string }>>();
+    const tokensByEntity = new Map<
+      string,
+      Array<{ assetId: string; symbol: string | null; role: string }>
+    >();
+
     for (const row of tokenRows) {
-      if (!tokensByEntity.has(row.entity_slug)) tokensByEntity.set(row.entity_slug, []);
+      if (!tokensByEntity.has(row.entity_slug)) {
+        tokensByEntity.set(row.entity_slug, []);
+      }
       tokensByEntity.get(row.entity_slug)!.push({
         assetId: row.asset_id,
         symbol: row.symbol,
@@ -236,7 +240,7 @@ export class StellarService {
 
   async getPoolDetail(poolSlug: string) {
     try {
-      const poolRows = await this.prisma.$queryRawUnsafe<PoolDetailRow[]>(
+      const poolRows = (await this.prisma.$queryRawUnsafe(
         `
         select
           e.id as entity_id,
@@ -264,14 +268,14 @@ export class StellarService {
         limit 1
         `,
         poolSlug
-      );
+      )) as PoolDetailRow[];
 
       const pool = poolRows[0];
       if (!pool) {
         throw new NotFoundException(`Pool not found: ${poolSlug}`);
       }
 
-      const reserveRows = await this.prisma.$queryRawUnsafe<ReserveRow[]>(
+      const reserveRows = (await this.prisma.$queryRawUnsafe(
         `
         select
           a.id as asset_id,
@@ -304,7 +308,7 @@ export class StellarService {
         order by rs.symbol asc nulls last
         `,
         pool.entity_id
-      );
+      )) as ReserveRow[];
 
       const protocolType = pool.protocol_type;
       const entityType = pool.entity_type;
