@@ -45,6 +45,17 @@ export class WalletsController {
     return this.walletsService.getWalletsOverview(userId);
   }
 
+  @Get(':walletId/balances')
+  getWalletBalances(
+    @Param('walletId') walletId: string,
+    @Query('userId') userId?: string
+  ) {
+    return this.walletsService.getWalletBalances({
+      walletId,
+      userId,
+    });
+  }
+
   @Patch(':walletId/primary')
   setPrimaryWallet(
     @Param('walletId') walletId: string,
