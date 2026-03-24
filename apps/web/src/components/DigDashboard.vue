@@ -26,14 +26,7 @@ const { stats } = useNetworkStats()
   <div class="dash">
 
     <!-- ── HEADER + STATS ── -->
-    <DashboardHeader
-      :stats="stats"
-      description="Grant application demo — this is a light preview of what Dig will deliver for the Stellar ecosystem. Full scope on GitHub & Stellar Community Fund."
-      :links="[
-        { label: 'GitHub', url: 'https://github.com/Mael-wnb/dig-stellar' },
-        { label: 'Grant submission', url: 'https://communityfund.stellar.org/submissions/recoebnaQgCsMeEjm' },
-      ]"
-    />
+    <DashboardHeader :stats="stats" />
 
     <!-- ── WALLET SECTION ── -->
     <section>
@@ -55,14 +48,12 @@ const { stats } = useNetworkStats()
         <span class="section-sub">Select a protocol</span>
       </div>
 
-      <!-- Protocol selector (Blend / Aquarius / Soroswap / DeFindex) -->
       <ProtocolTabs
         :protocols="protocols"
         :selected-protocol-id="selectedProtocolId"
         @select="selectProtocol"
       />
 
-      <!-- Pool selector - tous les pools de tous les protocoles -->
       <PoolTabs
         :protocols="protocols"
         :selected-pool-id="selectedPoolId"
@@ -72,7 +63,6 @@ const { stats } = useNetworkStats()
         @select-protocol="selectProtocol"
       />
 
-      <!-- Pool detail: metrics + on-chain info + reserves -->
       <PoolDetail
         v-if="selectedPool && selectedProtocol"
         :pool="selectedPool"

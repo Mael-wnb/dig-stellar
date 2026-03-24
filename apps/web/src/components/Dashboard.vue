@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import logoUrl from '@/assets/dig-logo.svg?url'
+import {
+  StellarWalletsKit,
+  WalletNetwork,
+  allowAllModules,
+  XBULL_ID,
+} from '@creit.tech/stellar-wallets-kit'
 
 // ─── TYPES ────────────────────────────────────────────────────────────────
 
@@ -56,7 +62,6 @@ const props = defineProps<{
   wallets: Wallet[]
   totalBalance: string
   description?: string
-  // données live injectées depuis l'indexer
   blendMetrics?: ProtocolMetric[]
   blendInfoRows?: ProtocolInfo[]
   blendPoolRows?: ReserveRow[]
@@ -68,9 +73,44 @@ const totalBalance = props.totalBalance
 
 const selectedWallet = ref<Wallet | null>(null)
 
+// ─── WALLET KIT ───────────────────────────────────────────────────────────
+
+const connectedAddress = ref<string | null>(null)
+const isConnecting = ref(false)
+
+const kit = new StellarWalletsKit({
+  network: WalletNetwork.PUBLIC,
+  selectedWalletId: XBULL_ID,
+  modules: allowAllModules(),
+})
+
+async function openWalletModal() {
+  isConnecting.value = true
+  try {
+    await kit.openModal({
+      onWalletSelected: async (option) => {
+        kit.setWallet(option.id)
+        const { address } = await kit.getAddress()
+        connectedAddress.value = address
+      },
+    })
+  } catch (e) {
+    console.error('Wallet connection cancelled or failed', e)
+  } finally {
+    isConnecting.value = false
+  }
+}
+
+function disconnectWallet() {
+  connectedAddress.value = null
+}
+
+const shortAddress = computed(() => {
+  if (!connectedAddress.value) return null
+  return `${connectedAddress.value.slice(0, 4)}…${connectedAddress.value.slice(-4)}`
+})
+
 // ─── PROTOCOLES ───────────────────────────────────────────────────────────
-// Les metrics/infoRows/poolRows de Blend V2 sont injectés via props
-// quand les données live arrivent — le reste est statique en attendant
 
 const selectedId = ref<number>(1)
 
@@ -180,6 +220,8 @@ const selectedProtocol = computed(() =>
 
     <!-- HEADER -->
     <div class="flex items-center justify-between gap-6">
+
+      <!-- Logo + titre -->
       <div class="flex items-center gap-3 flex-shrink-0">
         <div
           class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
@@ -199,9 +241,32 @@ const selectedProtocol = computed(() =>
           </span>
         </div>
       </div>
-      <p class="text-xs text-right" style="color: #9A9B99; max-width: 36rem;">
-        {{ description ?? 'Stellar DeFi ecosystem built on Soroban smart contracts — TVL grew 193% in 2025. Tracking Blend V2, Aquarius, Soroswap & DeFindex across $88M+ combined TVL.' }}
-      </p>
+
+      <!-- Description + Connect Wallet -->
+      <div class="flex items-center gap-4 flex-shrink-0">
+        <p class="text-xs text-right hidden md:block" style="color: #9A9B99; max-width: 28rem;">
+          {{ description ?? 'Stellar DeFi ecosystem built on Soroban smart contracts — TVL grew 193% in 2025.' }}
+        </p>
+
+        <!-- Bouton déconnecté -->
+        <button
+          v-if="!connectedAddress"
+          class="wallet-connect-btn"
+          :disabled="isConnecting"
+          @click="openWalletModal"
+        >
+          <span class="wallet-dot" />
+          <span>{{ isConnecting ? 'Connecting…' : 'Connect Wallet' }}</span>
+        </button>
+
+        <!-- Adresse connectée -->
+        <div v-else class="wallet-connected" @click="disconnectWallet" title="Click to disconnect">
+          <span class="wallet-dot wallet-dot--active" />
+          <span class="wallet-addr">{{ shortAddress }}</span>
+          <span class="wallet-network">Mainnet</span>
+        </div>
+      </div>
+
     </div>
 
     <!-- STATS -->
@@ -326,7 +391,6 @@ const selectedProtocol = computed(() =>
       <!-- DÉTAIL DYNAMIQUE -->
       <div v-if="selectedProtocol" class="grid grid-cols-1 md:grid-cols-2 gap-3">
 
-        <!-- GAUCHE : métriques -->
         <div class="rounded-xl p-4 flex flex-col gap-3" style="background-color: #1a1a1a; border: 1px solid #2a2a2a;">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
@@ -341,7 +405,6 @@ const selectedProtocol = computed(() =>
             </button>
           </div>
 
-          <!-- Metrics grid -->
           <div class="grid grid-cols-3 gap-2">
             <div
               v-for="metric in selectedProtocol.metrics"
@@ -356,14 +419,12 @@ const selectedProtocol = computed(() =>
             </div>
           </div>
 
-          <!-- Description -->
           <p class="text-xs leading-relaxed rounded-lg p-3"
             style="color: #9A9B99; background-color: #222; border-left: 2px solid #D5FF2F;">
             {{ selectedProtocol.description }}
           </p>
         </div>
 
-        <!-- DROITE : on-chain info -->
         <div class="rounded-xl p-4 flex flex-col gap-1" style="background-color: #1a1a1a; border: 1px solid #2a2a2a;">
           <div class="flex items-center justify-between mb-3">
             <span class="text-sm font-semibold" style="color: #E2E6E1;">
@@ -388,7 +449,7 @@ const selectedProtocol = computed(() =>
 
       </div>
 
-      <!-- TABLE DES RESERVES (Blend V2 uniquement pour l'instant) -->
+      <!-- TABLE DES RESERVES -->
       <div
         v-if="selectedProtocol?.poolRows && selectedProtocol.poolRows.length > 0"
         class="rounded-xl overflow-hidden mt-3"
@@ -442,4 +503,76 @@ const selectedProtocol = computed(() =>
 </template>
 
 <style scoped>
+/* ── Connect Wallet button ── */
+.wallet-connect-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #D5FF2F;
+  background: transparent;
+  color: #D5FF2F;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.wallet-connect-btn:hover:not(:disabled) {
+  background: rgba(213, 255, 47, 0.08);
+}
+.wallet-connect-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Connected state ── */
+.wallet-connected {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(213, 255, 47, 0.3);
+  background: #1a1f0e;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  flex-shrink: 0;
+}
+.wallet-connected:hover {
+  border-color: rgba(255, 90, 90, 0.5);
+}
+
+/* ── Dots ── */
+.wallet-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #9A9B99;
+  flex-shrink: 0;
+}
+.wallet-dot--active {
+  background: #D5FF2F;
+  animation: wallet-pulse 2s infinite;
+}
+@keyframes wallet-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.wallet-addr {
+  font-size: 12px;
+  font-weight: 700;
+  color: #D5FF2F;
+  letter-spacing: 0.04em;
+  font-family: ui-monospace, monospace;
+}
+.wallet-network {
+  font-size: 10px;
+  color: #9A9B99;
+  letter-spacing: 0.06em;
+}
 </style>

@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@creit-tech/stellar-wallets-kit": "jsr:^2.0.1",
-    "@creit.tech/stellar-wallets-kit": "^2.0.1",
+    "@creit.tech/stellar-wallets-kit": "^1.0.0",
     "vue": "^3.5.30"
   },
   "devDependencies": {
