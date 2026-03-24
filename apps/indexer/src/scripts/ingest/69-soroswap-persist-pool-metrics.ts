@@ -1,31 +1,77 @@
+import 'dotenv/config';
+
 import { loadJson, nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
 import { getEntityBySlugOrThrow, getVenueBySlugOrThrow } from '../shared/lookup';
 
-function toNumber(value: unknown): number {
-  if (value === null || value === undefined) return 0;
+type LatestPriceRow = {
+  asset_id: string;
+  price_usd: string;
+};
+
+type ReserveSnapshotRow = {
+  asset_id: string;
+  symbol: string | null;
+  name: string | null;
+  d_supply_scaled: string | null;
+  snapshot_at: string;
+};
+
+type NormalizedEventRow = {
+  event_key: string | null;
+  token_in_asset_id: string | null;
+  token_out_asset_id: string | null;
+  token_amount_in_scaled: string | null;
+  token_amount_out_scaled: string | null;
+  occurred_at: string;
+  metadata: Record<string, unknown> | null;
+};
+
+function toFiniteNumber(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
 }
 
-async function resolveEntitySlug(): Promise<string> {
-  const fromEnv = process.env.ENTITY_SLUG?.trim();
-  if (fromEnv) return fromEnv;
+function resolveEntitySlug(params: {
+  envEntitySlug: string | undefined;
+  registry: any;
+}): string {
+  const entitySlug =
+    params.envEntitySlug ??
+    params.registry?.pair?.entitySlug;
 
-  const registry = await loadJson<any>('59-soroswap-final-registry.json');
-  const fromRegistry = registry?.pair?.entitySlug;
-
-  if (typeof fromRegistry === 'string' && fromRegistry.length > 0) {
-    return fromRegistry;
+  if (!entitySlug || typeof entitySlug !== 'string') {
+    throw new Error(
+      'Missing entitySlug. Checked ENTITY_SLUG env and 59-soroswap-final-registry.json'
+    );
   }
 
-  throw new Error(
-    'Missing ENTITY_SLUG. Set ENTITY_SLUG in env or generate 59-soroswap-final-registry.json first.'
-  );
+  return entitySlug;
 }
 
 async function main() {
-  const entitySlug = await resolveEntitySlug();
+  const registry = await loadJson<any>('59-soroswap-final-registry.json');
+
+  if (!registry) {
+    throw new Error('Missing 59-soroswap-final-registry.json');
+  }
+
+  const envEntitySlug = process.env.ENTITY_SLUG;
+  const envPairId = process.env.SOROSWAP_PAIR_ID;
+
+  const entitySlug = resolveEntitySlug({
+    envEntitySlug,
+    registry,
+  });
+
+  const registryPairId =
+    typeof registry?.pair?.pairId === 'string' ? registry.pair.pairId : null;
+
+  if (envPairId && registryPairId && envPairId !== registryPairId) {
+    throw new Error(
+      `Mismatch between SOROSWAP_PAIR_ID and 59 pairId: ${envPairId} !== ${registryPairId}`
+    );
+  }
 
   const client = createPgClient();
   await client.connect();
@@ -34,24 +80,19 @@ async function main() {
     const venue = await getVenueBySlugOrThrow(client, 'soroswap');
     const entity = await getEntityBySlugOrThrow(client, entitySlug);
 
-    const pricesRes = await client.query(
-      `
+    const pricesRes = await client.query<LatestPriceRow>(`
       select distinct on (ap.asset_id)
         ap.asset_id,
         ap.price_usd
       from asset_prices ap
       order by ap.asset_id, ap.observed_at desc
-      `
-    );
+    `);
 
     const priceMap = new Map<string, number>(
-      pricesRes.rows.map((row: { asset_id: string; price_usd: string | number }) => [
-        row.asset_id,
-        Number(row.price_usd),
-      ])
+      pricesRes.rows.map((row) => [row.asset_id, Number(row.price_usd)])
     );
 
-    const reserveRes = await client.query(
+    const reserveRes = await client.query<ReserveSnapshotRow>(
       `
       select distinct on (rs.asset_id)
         rs.asset_id,
@@ -60,14 +101,14 @@ async function main() {
         rs.d_supply_scaled,
         rs.snapshot_at
       from reserve_snapshots rs
-      join entities e on e.id = rs.entity_id
-      where e.slug = $1
+      where rs.entity_id = $1
       order by rs.asset_id, rs.snapshot_at desc, rs.created_at desc
       `,
-      [entitySlug]
+      [entity.id]
     );
 
     let tvlUsd = 0;
+
     const reserveBreakdown: Array<{
       assetId: string;
       symbol: string | null;
@@ -77,14 +118,9 @@ async function main() {
       reserveUsd: number | null;
     }> = [];
 
-    for (const row of reserveRes.rows as Array<{
-      asset_id: string;
-      symbol: string | null;
-      name: string | null;
-      d_supply_scaled: string | number | null;
-    }>) {
-      const reserve = toNumber(row.d_supply_scaled);
-      const priceUsd = priceMap.has(row.asset_id) ? priceMap.get(row.asset_id)! : null;
+    for (const row of reserveRes.rows) {
+      const reserve = toFiniteNumber(row.d_supply_scaled);
+      const priceUsd = priceMap.has(row.asset_id) ? priceMap.get(row.asset_id) ?? null : null;
       const reserveUsd = priceUsd !== null ? reserve * priceUsd : null;
 
       if (reserveUsd !== null) {
@@ -101,32 +137,28 @@ async function main() {
       });
     }
 
-    const eventsRes = await client.query(
+    const eventsRes = await client.query<NormalizedEventRow>(
       `
       select
         ne.event_key,
         ne.token_in_asset_id,
         ne.token_out_asset_id,
         ne.token_amount_in_scaled,
-        ne.token_amount_out_scaled
+        ne.token_amount_out_scaled,
+        ne.occurred_at,
+        ne.metadata
       from normalized_events ne
-      join entities e on e.id = ne.entity_id
-      where e.slug = $1
+      where ne.entity_id = $1
         and ne.occurred_at >= now() - interval '24 hours'
+      order by ne.occurred_at desc
       `,
-      [entitySlug]
+      [entity.id]
     );
 
     let swaps24h = 0;
     let volume24hUsd = 0;
 
-    for (const row of eventsRes.rows as Array<{
-      event_key: string | null;
-      token_in_asset_id: string | null;
-      token_out_asset_id: string | null;
-      token_amount_in_scaled: string | number | null;
-      token_amount_out_scaled: string | number | null;
-    }>) {
+    for (const row of eventsRes.rows) {
       if (row.event_key !== 'SoroswapPair:swap') continue;
 
       swaps24h += 1;
@@ -141,8 +173,8 @@ async function main() {
           ? priceMap.get(row.token_out_asset_id) ?? 0
           : 0;
 
-      const amountIn = toNumber(row.token_amount_in_scaled);
-      const amountOut = toNumber(row.token_amount_out_scaled);
+      const amountIn = toFiniteNumber(row.token_amount_in_scaled);
+      const amountOut = toFiniteNumber(row.token_amount_out_scaled);
 
       const amountInUsd = amountIn * tokenInPrice;
       const amountOutUsd = amountOut * tokenOutPrice;
@@ -206,6 +238,7 @@ async function main() {
         JSON.stringify({
           source: '69-soroswap-persist-pool-metrics',
           entitySlug,
+          pairId: registryPairId,
           swaps24h,
           reserveBreakdown,
         }),

@@ -8,44 +8,100 @@ import {
   getVenueBySlugOrThrow,
 } from '../shared/lookup';
 
+type SoroswapNormalizedEventRow = {
+  pairId?: string;
+  eventId?: string;
+  txHash?: string;
+  ledger?: number | string | null;
+  occurredAt?: string | null;
+  eventName?: string | null;
+  subEventName?: string | null;
+  eventKey?: string | null;
+  tokenIn?: string | null;
+  tokenOut?: string | null;
+  tokenAmountInRaw?: string | null;
+  tokenAmountOutRaw?: string | null;
+  tokenAmountInScaled?: string | null;
+  tokenAmountOutScaled?: string | null;
+  reserve0Raw?: string | null;
+  reserve1Raw?: string | null;
+};
+
+function resolveEntitySlug(params: {
+  envEntitySlug: string | undefined;
+  eventsFile: any;
+  registry: any;
+}): string {
+  const entitySlug =
+    params.envEntitySlug ??
+    params.eventsFile?.entitySlug ??
+    params.registry?.pair?.entitySlug;
+
+  if (!entitySlug || typeof entitySlug !== 'string') {
+    throw new Error(
+      'Missing entitySlug. Checked ENTITY_SLUG env, 58-soroswap-active-pair-events-normalized.json, and 59-soroswap-final-registry.json'
+    );
+  }
+
+  return entitySlug;
+}
+
+function resolveExpectedPairId(params: {
+  envPairId: string | undefined;
+  eventsFile: any;
+  registry: any;
+}): string | null {
+  const pairId =
+    params.envPairId ??
+    params.eventsFile?.pairId ??
+    params.registry?.pair?.pairId ??
+    null;
+
+  return typeof pairId === 'string' ? pairId : null;
+}
+
 async function main() {
   const eventsFile = await loadJson<any>('58-soroswap-active-pair-events-normalized.json');
   const registry = await loadJson<any>('59-soroswap-final-registry.json');
 
-  if (!eventsFile || !registry) {
-    throw new Error('Missing 58 or 59 Soroswap files');
+  if (!eventsFile) {
+    throw new Error('Missing 58-soroswap-active-pair-events-normalized.json');
   }
 
-  const registryEntitySlug = registry.pair?.entitySlug;
-  const registryPairId = registry.pair?.pairId;
-
-  if (!registryEntitySlug) {
-    throw new Error('Missing entitySlug in 59-soroswap-final-registry.json');
+  if (!registry) {
+    throw new Error('Missing 59-soroswap-final-registry.json');
   }
 
-  if (!registryPairId) {
-    throw new Error('Missing pairId in 59-soroswap-final-registry.json');
+  const envEntitySlug = process.env.ENTITY_SLUG;
+  const envPairId = process.env.SOROSWAP_PAIR_ID;
+
+  const entitySlug = resolveEntitySlug({
+    envEntitySlug,
+    eventsFile,
+    registry,
+  });
+
+  const expectedPairId = resolveExpectedPairId({
+    envPairId,
+    eventsFile,
+    registry,
+  });
+
+  const rows: SoroswapNormalizedEventRow[] = Array.isArray(eventsFile.rows)
+    ? eventsFile.rows
+    : [];
+
+  if (!rows.length) {
+    throw new Error('No rows found in 58-soroswap-active-pair-events-normalized.json');
   }
 
-  if (!eventsFile.entitySlug) {
-    throw new Error('Missing entitySlug in 58-soroswap-active-pair-events-normalized.json');
+  if (expectedPairId) {
+    for (const row of rows) {
+      if (row.pairId && row.pairId !== expectedPairId) {
+        throw new Error(`Row pairId mismatch: ${row.pairId} !== ${expectedPairId}`);
+      }
+    }
   }
-
-  if (!eventsFile.pairId) {
-    throw new Error('Missing pairId in 58-soroswap-active-pair-events-normalized.json');
-  }
-
-  if (eventsFile.entitySlug !== registryEntitySlug) {
-    throw new Error(
-      `Mismatch between 58 and 59 entitySlug: ${eventsFile.entitySlug} !== ${registryEntitySlug}`
-    );
-  }
-
-  if (eventsFile.pairId !== registryPairId) {
-    throw new Error(`Mismatch between 58 and 59 pairId: ${eventsFile.pairId} !== ${registryPairId}`);
-  }
-
-  const entitySlug = registryEntitySlug;
 
   const client = createPgClient();
   await client.connect();
@@ -57,15 +113,14 @@ async function main() {
 
     let processed = 0;
 
-    for (const row of eventsFile.rows ?? []) {
-      if (row.entitySlug !== entitySlug) {
-        throw new Error(
-          `Row entitySlug mismatch inside 58 file: ${row.entitySlug} !== ${entitySlug}`
-        );
+    for (const row of rows) {
+      if (!row.eventId || !row.txHash || !row.occurredAt || !row.eventKey) {
+        continue;
       }
 
-      if (row.pairId !== registryPairId) {
-        throw new Error(`Row pairId mismatch inside 58 file: ${row.pairId} !== ${registryPairId}`);
+      const contractAddress = row.pairId ?? expectedPairId;
+      if (!contractAddress) {
+        throw new Error(`Missing pairId for event ${row.eventId}`);
       }
 
       await client.query(
@@ -97,6 +152,9 @@ async function main() {
         )
         on conflict (contract_address, event_id)
         do update set
+          venue_id = excluded.venue_id,
+          entity_id = excluded.entity_id,
+          contract_address = excluded.contract_address,
           tx_hash = excluded.tx_hash,
           ledger = excluded.ledger,
           occurred_at = excluded.occurred_at,
@@ -116,13 +174,13 @@ async function main() {
         [
           venue.id,
           entity.id,
-          row.pairId,
+          contractAddress,
           row.eventId,
           row.txHash,
-          row.ledger,
+          row.ledger ?? null,
           row.occurredAt,
-          row.eventName,
-          row.subEventName,
+          row.eventName ?? null,
+          row.subEventName ?? null,
           row.eventKey,
           null,
           row.tokenIn ? assetIdByContract.get(row.tokenIn) ?? null : null,
@@ -134,6 +192,7 @@ async function main() {
           true,
           JSON.stringify({
             source: '58-soroswap-active-pair-events-normalized',
+            entitySlug,
             reserve0Raw: row.reserve0Raw ?? null,
             reserve1Raw: row.reserve1Raw ?? null,
           }),
@@ -146,6 +205,7 @@ async function main() {
     console.log({
       completedAt: nowIso(),
       entitySlug,
+      expectedPairId,
       processed,
     });
   } finally {
