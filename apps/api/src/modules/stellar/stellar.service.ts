@@ -6,6 +6,7 @@ function toNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (typeof value === 'bigint') return Number(value);
+
   if (typeof value === 'string') {
     const n = Number(value);
     return Number.isFinite(n) ? n : null;
@@ -49,6 +50,8 @@ type PoolListRow = {
   contract_address: string | null;
   protocol_slug: string;
   protocol_name: string;
+  protocol_type: string;
+  chain: string;
   tvl_usd: unknown;
   volume_24h_usd: unknown;
   fees_24h_usd: unknown;
@@ -68,6 +71,7 @@ type PoolDetailRow = {
   protocol_slug: string;
   protocol_name: string;
   protocol_type: string;
+  chain: string;
   tvl_usd: unknown;
   volume_24h_usd: unknown;
   fees_24h_usd: unknown;
@@ -94,6 +98,11 @@ type ReserveRow = {
   supply_apr: unknown;
   est_supply_apy: unknown;
   price_usd: unknown;
+};
+
+type EventCountRow = {
+  events_24h: unknown;
+  swaps_24h: unknown;
 };
 
 @Injectable()
@@ -165,6 +174,8 @@ export class StellarService {
         e.contract_address,
         v.slug as protocol_slug,
         v.name as protocol_name,
+        v.venue_type as protocol_type,
+        v.chain,
         pml.tvl_usd,
         pml.volume_24h_usd,
         pml.fees_24h_usd,
@@ -217,12 +228,14 @@ export class StellarService {
 
     return rows.map((row) => ({
       id: row.entity_slug,
+      name: row.entity_name,
+      type: row.entity_type,
       protocol: {
         id: row.protocol_slug,
         name: row.protocol_name,
+        type: row.protocol_type,
       },
-      type: row.entity_type,
-      name: row.entity_name,
+      chain: row.chain,
       contractAddress: row.contract_address,
       tokens: tokensByEntity.get(row.entity_slug) ?? [],
       metrics: {
@@ -251,6 +264,7 @@ export class StellarService {
           v.slug as protocol_slug,
           v.name as protocol_name,
           v.venue_type as protocol_type,
+          v.chain,
           pml.tvl_usd,
           pml.volume_24h_usd,
           pml.fees_24h_usd,
@@ -310,59 +324,105 @@ export class StellarService {
         pool.entity_id
       )) as ReserveRow[];
 
+      const eventCountRows = (await this.prisma.$queryRawUnsafe(
+        `
+        select
+          count(*)::int as events_24h,
+          count(*) filter (where ne.event_key like '%:trade' or ne.event_key like '%:swap')::int as swaps_24h
+        from normalized_events ne
+        where ne.entity_id = $1::uuid
+          and ne.occurred_at >= now() - interval '24 hours'
+        `,
+        pool.entity_id
+      )) as EventCountRow[];
+
+      const eventCounts = eventCountRows[0] ?? null;
+      const events24h = eventCounts ? toNumber(eventCounts.events_24h) : null;
+      const swaps24h = eventCounts ? toNumber(eventCounts.swaps_24h) : null;
+
       const protocolType = pool.protocol_type;
       const entityType = pool.entity_type;
       const isAmm = protocolType === 'amm' || entityType === 'amm_pool';
 
-      const reserves = reserveRows.map((row) => {
-        const base = {
-          assetId: row.asset_id,
-          symbol: row.symbol,
-          name: row.name,
-          decimals: toNumber(row.decimals),
-          priceUsd: toNumber(row.price_usd),
-        };
+      if (isAmm) {
+        const tokens = reserveRows.map((row) => {
+          const reserve = toNumber(row.d_supply_scaled);
+          const priceUsd = toNumber(row.price_usd);
+          const reserveUsd =
+            reserve !== null && priceUsd !== null ? reserve * priceUsd : null;
 
-        if (isAmm) {
           return {
-            ...base,
-            reserve: toNumber(row.d_supply_scaled),
+            assetId: row.asset_id,
+            symbol: row.symbol,
+            name: row.name,
+            decimals: toNumber(row.decimals),
+            priceUsd,
+            reserve,
+            reserveUsd,
           };
-        }
+        });
 
         return {
-          ...base,
-          supplied: toNumber(row.d_supply_scaled),
-          borrowed: toNumber(row.b_supply_scaled),
-          backstopCredit: toNumber(row.backstop_credit_scaled),
-          supplyCap: toNumber(row.supply_cap_scaled),
-          supplyApr: toNumber(row.supply_apr),
-          supplyApy: toNumber(row.est_supply_apy),
-          borrowApr: toNumber(row.borrow_apr),
-          borrowApy: toNumber(row.est_borrow_apy),
+          id: pool.entity_slug,
+          name: pool.entity_name,
+          protocol: {
+            id: pool.protocol_slug,
+            name: pool.protocol_name,
+            type: 'amm',
+          },
+          chain: pool.chain,
+          type: pool.entity_type,
+          contractAddress: pool.contract_address,
+          metrics: {
+            tvlUsd: toNumber(pool.tvl_usd),
+            volume24hUsd: toNumber(pool.volume_24h_usd) ?? 0,
+            fees24hUsd: toNumber(pool.fees_24h_usd) ?? 0,
+            events24h,
+            swaps24h,
+          },
+          tokens,
+          updatedAt: pool.as_of,
         };
-      });
+      }
+
+      const reserves = reserveRows.map((row) => ({
+        assetId: row.asset_id,
+        symbol: row.symbol,
+        name: row.name,
+        decimals: toNumber(row.decimals),
+        priceUsd: toNumber(row.price_usd),
+        supplied: toNumber(row.d_supply_scaled),
+        borrowed: toNumber(row.b_supply_scaled),
+        backstopCredit: toNumber(row.backstop_credit_scaled),
+        supplyCap: toNumber(row.supply_cap_scaled),
+        supplyApr: toNumber(row.supply_apr),
+        supplyApy: toNumber(row.est_supply_apy),
+        borrowApr: toNumber(row.borrow_apr),
+        borrowApy: toNumber(row.est_borrow_apy),
+      }));
 
       return {
         id: pool.entity_slug,
+        name: pool.entity_name,
         protocol: {
           id: pool.protocol_slug,
           name: pool.protocol_name,
-          type: pool.protocol_type,
+          type: 'lending',
         },
-        name: pool.entity_name,
+        chain: pool.chain,
         type: pool.entity_type,
         contractAddress: pool.contract_address,
         metrics: {
           tvlUsd: toNumber(pool.tvl_usd),
-          volume24hUsd: toNumber(pool.volume_24h_usd) ?? 0,
-          fees24hUsd: toNumber(pool.fees_24h_usd) ?? 0,
           totalSuppliedUsd: toNumber(pool.total_supplied_usd),
           totalBorrowedUsd: toNumber(pool.total_borrowed_usd),
-          netLiquidityUsd: toNumber(pool.net_liquidity_usd),
           totalBackstopCreditUsd: toNumber(pool.total_backstop_credit_usd),
+          netLiquidityUsd: toNumber(pool.net_liquidity_usd),
           supplyApy: toNumber(pool.weighted_supply_apy),
           borrowApy: toNumber(pool.weighted_borrow_apy),
+          volume24hUsd: toNumber(pool.volume_24h_usd) ?? 0,
+          fees24hUsd: toNumber(pool.fees_24h_usd) ?? 0,
+          events24h,
         },
         reserves,
         updatedAt: pool.as_of,
