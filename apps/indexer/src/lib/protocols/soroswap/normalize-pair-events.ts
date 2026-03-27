@@ -1,3 +1,4 @@
+// app/indexer/src/lib/protocols/soroswap/normalize-pair-events.ts
 import { SoroswapFetchEventsResult, SoroswapNormalizedEventRow, SoroswapPairState } from './types';
 
 function scale(raw: string | null | undefined, decimals: number | null | undefined): string | null {

@@ -1,3 +1,4 @@
+// app/indexer/src/lib/protocols/soroswap/types.ts
 export type SoroswapAsset = {
     contractId: string;
     name: string | null;

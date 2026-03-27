@@ -1,4 +1,4 @@
-import { Client } from 'pg';
+import type { Client, PoolClient } from 'pg';
 import { SoroswapNormalizedEventRow } from './types';
 import {
   getAssetIdByContractMap,
@@ -6,8 +6,10 @@ import {
   getVenueBySlugOrThrow,
 } from '../../../scripts/shared/lookup';
 
+type DbClient = Pick<Client | PoolClient, 'query'>;
+
 export async function persistSoroswapPairEvents(params: {
-  client: Client;
+  client: DbClient;
   entitySlug: string;
   expectedPairId: string;
   rows: SoroswapNormalizedEventRow[];
