@@ -1,11 +1,13 @@
+// apps/indexer/src/scripts/ingest/run-soroswap-pair-refresh.ts
 import 'dotenv/config';
 
-import { saveJson, nowIso } from '../discovery/00-common';
+import { saveJson } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
 import { fetchSoroswapPairState } from '../../lib/protocols/soroswap/fetch-pair-state';
 import { fetchSoroswapPairEvents } from '../../lib/protocols/soroswap/fetch-pair-events';
 import { normalizeSoroswapPairEvents } from '../../lib/protocols/soroswap/normalize-pair-events';
 import { persistSoroswapPairEvents } from '../../lib/protocols/soroswap/persist-pair-events';
+import { persistSoroswapPairMetrics } from '../../lib/protocols/soroswap/persist-pair-metrics';
 
 async function main() {
   const pairId = process.env.SOROSWAP_PAIR_ID;
@@ -28,47 +30,41 @@ async function main() {
     verbose: true,
   });
 
-  await saveJson('lib-soroswap-pair-state.json', {
-    generatedAt: nowIso(),
-    ...pairState,
-  });
+  await saveJson('lib-soroswap-pair-state.json', pairState);
 
   const pairEvents = await fetchSoroswapPairEvents({
     pairId,
     verbose: false,
   });
 
-  await saveJson('lib-soroswap-pair-events.json', {
-    generatedAt: nowIso(),
-    ...pairEvents,
-  });
+  await saveJson('lib-soroswap-pair-events.json', pairEvents);
 
   const normalized = normalizeSoroswapPairEvents({
     pairState,
     pairEvents,
   });
 
-  await saveJson('lib-soroswap-pair-events-normalized.json', {
-    generatedAt: nowIso(),
-    ...normalized,
-  });
+  await saveJson('lib-soroswap-pair-events-normalized.json', normalized);
 
   const client = createPgClient();
   await client.connect();
 
   try {
-    const persisted = await persistSoroswapPairEvents({
+    const persistedEvents = await persistSoroswapPairEvents({
       client,
       entitySlug,
       expectedPairId: pairId,
       rows: normalized.rows,
     });
 
-    console.log({
-      completedAt: nowIso(),
-      ...persisted,
-      eventCounts: normalized.eventCounts,
+    const persistedMetrics = await persistSoroswapPairMetrics({
+      client,
+      entitySlug,
+      expectedPairId: pairId,
     });
+
+    console.log(persistedEvents);
+    console.log(persistedMetrics);
   } finally {
     await client.end();
   }
