@@ -1,7 +1,8 @@
-// apps/indexer/src/scripts/shared/lookup.ts
-import type { Client } from 'pg';
+import type { Client, PoolClient } from 'pg';
 
-export async function getVenueBySlugOrThrow(client: Client, slug: string) {
+type DbClient = Pick<Client | PoolClient, 'query'>;
+
+export async function getVenueBySlugOrThrow(client: DbClient, slug: string) {
   const res = await client.query(
     `select id, slug, name from venues where slug = $1 limit 1`,
     [slug]
@@ -18,7 +19,7 @@ export async function getVenueBySlugOrThrow(client: Client, slug: string) {
   };
 }
 
-export async function getEntityBySlugOrThrow(client: Client, slug: string) {
+export async function getEntityBySlugOrThrow(client: DbClient, slug: string) {
   const res = await client.query(
     `select id, slug, name, entity_type, contract_address from entities where slug = $1 limit 1`,
     [slug]
@@ -38,7 +39,7 @@ export async function getEntityBySlugOrThrow(client: Client, slug: string) {
 }
 
 export async function getAssetIdByContractMap(
-  client: Client,
+  client: DbClient,
   chain = 'stellar-mainnet'
 ): Promise<Map<string, string>> {
   const res = await client.query(
