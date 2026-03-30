@@ -1,3 +1,4 @@
+// apps/indexer/src/scripts/ingest/run-aquarius-pool-refresh.ts
 import 'dotenv/config';
 
 import { saveJson } from '../discovery/00-common';
@@ -9,8 +10,9 @@ import { persistAquariusPoolEvents } from '../../lib/protocols/aquarius/persist-
 import { persistAquariusPoolMetrics } from '../../lib/protocols/aquarius/persist-pool-metrics';
 
 async function main() {
-  const poolId = process.env.AQUARIUS_POOL_ID;
-  const entitySlug = process.env.ENTITY_SLUG;
+  const poolId = process.env.AQUARIUS_POOL_ID?.trim();
+  const entitySlug = process.env.ENTITY_SLUG?.trim();
+  const debug = process.env.SAVE_DEBUG_JSON === '1';
 
   if (!poolId) {
     throw new Error('Missing AQUARIUS_POOL_ID');
@@ -21,7 +23,7 @@ async function main() {
   }
 
   console.log('=== Aquarius pool refresh ===');
-  console.log({ poolId, entitySlug });
+  console.log({ poolId, entitySlug, debug });
 
   const poolState = await fetchAquariusPoolState({
     poolId,
@@ -29,21 +31,27 @@ async function main() {
     verbose: true,
   });
 
-  await saveJson('lib-aquarius-pool-state.json', poolState);
+  if (debug) {
+    await saveJson('lib-aquarius-pool-state.json', poolState);
+  }
 
   const poolEvents = await fetchAquariusPoolEvents({
     poolId,
     verbose: false,
   });
 
-  await saveJson('lib-aquarius-pool-events.json', poolEvents);
+  if (debug) {
+    await saveJson('lib-aquarius-pool-events.json', poolEvents);
+  }
 
   const normalized = normalizeAquariusPoolEvents({
     poolState,
     poolEvents,
   });
 
-  await saveJson('lib-aquarius-pool-events-normalized.json', normalized);
+  if (debug) {
+    await saveJson('lib-aquarius-pool-events-normalized.json', normalized);
+  }
 
   const client = createPgClient();
   await client.connect();

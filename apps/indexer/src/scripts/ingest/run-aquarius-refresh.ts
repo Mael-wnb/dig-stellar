@@ -1,9 +1,12 @@
+// apps/indexer/src/scripts/ingest/run-aquarius-refresh.ts
+import 'dotenv/config';
+
 import { spawn } from 'node:child_process';
 import { createPgClient } from '../shared/db';
 
 type PgClient = ReturnType<typeof createPgClient>;
 
-type AmmPoolRow = {
+type AquariusPoolRow = {
   slug: string;
   contract_address: string | null;
 };
@@ -46,7 +49,7 @@ async function getAquariusPools(
     `
   );
 
-  const rows = res.rows as AmmPoolRow[];
+  const rows = res.rows as AquariusPoolRow[];
 
   return rows.map((row) => {
     const poolId = row.contract_address?.trim() ?? '';
@@ -67,9 +70,8 @@ async function main() {
   await client.connect();
 
   try {
-    const pools = await getAquariusPools(client);
-
     console.log('\n=== Aquarius refresh ===');
+    const pools = await getAquariusPools(client);
 
     for (const pool of pools) {
       console.log(`\n--- Aquarius: ${pool.entitySlug} (${pool.poolId}) ---`);

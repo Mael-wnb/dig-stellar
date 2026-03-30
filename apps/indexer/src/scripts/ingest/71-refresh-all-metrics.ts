@@ -4,11 +4,7 @@ import { createPgClient } from '../shared/db';
 
 type PgClient = ReturnType<typeof createPgClient>;
 
-type EntitySlugRow = {
-  slug: string;
-};
-
-type AquariusPoolRow = {
+type AmmPoolRow = {
   slug: string;
   contract_address: string | null;
 };
@@ -35,10 +31,15 @@ function runTsx(scriptPath: string, extraEnv?: Record<string, string>): Promise<
   });
 }
 
-async function getEntitySlugsByVenue(client: PgClient, venueSlug: string): Promise<string[]> {
+async function getAmmPoolsByVenue(
+  client: PgClient,
+  venueSlug: string
+): Promise<Array<{ entitySlug: string; contractAddress: string }>> {
   const res = await client.query(
     `
-    select e.slug
+    select
+      e.slug,
+      e.contract_address
     from entities e
     join venues v on v.id = e.venue_id
     where v.slug = $1
@@ -48,37 +49,18 @@ async function getEntitySlugsByVenue(client: PgClient, venueSlug: string): Promi
     [venueSlug]
   );
 
-  return (res.rows as EntitySlugRow[]).map((row) => row.slug);
-}
-
-async function getAquariusPools(
-  client: PgClient
-): Promise<Array<{ entitySlug: string; poolId: string }>> {
-  const res = await client.query(
-    `
-    select
-      e.slug,
-      e.contract_address
-    from entities e
-    join venues v on v.id = e.venue_id
-    where v.slug = 'aquarius'
-      and e.entity_type = 'amm_pool'
-    order by e.slug asc
-    `
-  );
-
-  const rows = res.rows as AquariusPoolRow[];
+  const rows = res.rows as AmmPoolRow[];
 
   return rows.map((row) => {
-    const poolId = row.contract_address?.trim() ?? '';
+    const contractAddress = row.contract_address?.trim() ?? '';
 
-    if (!poolId) {
-      throw new Error(`Missing contract_address for Aquarius entity "${row.slug}"`);
+    if (!contractAddress) {
+      throw new Error(`Missing contract_address for ${venueSlug} entity "${row.slug}"`);
     }
 
     return {
       entitySlug: row.slug,
-      poolId,
+      contractAddress,
     };
   });
 }
@@ -92,43 +74,37 @@ async function main() {
     await runTsx('src/scripts/ingest/62-price-reference-assets.ts');
 
     console.log('\n=== 2. Refresh derived Soroswap prices ===');
-    const soroswapEntitySlugs = await getEntitySlugsByVenue(client, 'soroswap');
+    const soroswapPools = await getAmmPoolsByVenue(client, 'soroswap');
 
-    for (const entitySlug of soroswapEntitySlugs) {
+    for (const pool of soroswapPools) {
       await runTsx('src/scripts/ingest/63-price-soroswap-derived.ts', {
-        ENTITY_SLUG: entitySlug,
+        ENTITY_SLUG: pool.entitySlug,
       });
     }
 
     console.log('\n=== 3. Refresh Blend pool metrics ===');
     await runTsx('src/scripts/ingest/68-blend-persist-pool-metrics.ts');
 
-    console.log('\n=== 4. Refresh Soroswap pool metrics ===');
-    for (const entitySlug of soroswapEntitySlugs) {
-      await runTsx('src/scripts/ingest/69-soroswap-persist-pool-metrics.ts', {
-        ENTITY_SLUG: entitySlug,
+    console.log('\n=== 4. Refresh Soroswap pools + metrics ===');
+    for (const pool of soroswapPools) {
+      console.log(`\n--- Soroswap: ${pool.entitySlug} (${pool.contractAddress}) ---`);
+
+      await runTsx('src/scripts/ingest/run-soroswap-pair-refresh.ts', {
+        ENTITY_SLUG: pool.entitySlug,
+        SOROSWAP_PAIR_ID: pool.contractAddress,
       });
     }
 
     console.log('\n=== 5. Refresh Aquarius pools + metrics ===');
-    const aquariusPools = await getAquariusPools(client);
+    const aquariusPools = await getAmmPoolsByVenue(client, 'aquarius');
 
     for (const pool of aquariusPools) {
-      const env = {
+      console.log(`\n--- Aquarius: ${pool.entitySlug} (${pool.contractAddress}) ---`);
+
+      await runTsx('src/scripts/ingest/run-aquarius-pool-refresh.ts', {
         ENTITY_SLUG: pool.entitySlug,
-        AQUARIUS_POOL_ID: pool.poolId,
-      };
-
-      console.log(`\n--- Aquarius: ${pool.entitySlug} (${pool.poolId}) ---`);
-
-      await runTsx('src/scripts/discovery/55-aquarius-active-pool-probe.ts', env);
-      await runTsx('src/scripts/discovery/56-aquarius-active-pool-assets-resolve.ts', env);
-      await runTsx('src/scripts/discovery/57-aquarius-active-pool-db-shape.ts', env);
-      await runTsx('src/scripts/discovery/50-aquarius-pool-events.ts', env);
-      await runTsx('src/scripts/discovery/58-aquarius-active-pool-events-normalized.ts', env);
-      await runTsx('src/scripts/discovery/59-aquarius-final-registry.ts', env);
-      await runTsx('src/scripts/ingest/aquarius-insert-events.ts', env);
-      await runTsx('src/scripts/ingest/69-aquarius-persist-pool-metrics.ts', env);
+        AQUARIUS_POOL_ID: pool.contractAddress,
+      });
     }
 
     console.log('\n=== 6. Refresh protocol metrics ===');
