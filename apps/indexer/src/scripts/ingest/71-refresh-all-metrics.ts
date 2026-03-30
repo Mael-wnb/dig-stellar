@@ -1,4 +1,4 @@
-// src/scripts/ingest/71-refresh-all-metrics.ts
+// apps/indexer/src/scripts/ingest/71-refresh-all-metrics.ts
 import { spawn } from 'node:child_process';
 import { createPgClient } from '../shared/db';
 
@@ -7,6 +7,10 @@ type PgClient = ReturnType<typeof createPgClient>;
 type AmmPoolRow = {
   slug: string;
   contract_address: string | null;
+};
+
+type LendingPoolRow = {
+  slug: string;
 };
 
 function runTsx(scriptPath: string, extraEnv?: Record<string, string>): Promise<void> {
@@ -65,6 +69,26 @@ async function getAmmPoolsByVenue(
   });
 }
 
+async function getLendingPoolsByVenue(
+  client: PgClient,
+  venueSlug: string
+): Promise<string[]> {
+  const res = await client.query(
+    `
+    select
+      e.slug
+    from entities e
+    join venues v on v.id = e.venue_id
+    where v.slug = $1
+      and e.entity_type = 'lending_pool'
+    order by e.slug asc
+    `,
+    [venueSlug]
+  );
+
+  return (res.rows as LendingPoolRow[]).map((row) => row.slug);
+}
+
 async function main() {
   const client = createPgClient();
   await client.connect();
@@ -82,8 +106,16 @@ async function main() {
       });
     }
 
-    console.log('\n=== 3. Refresh Blend pool metrics ===');
-    await runTsx('src/scripts/ingest/68-blend-persist-pool-metrics.ts');
+    console.log('\n=== 3. Refresh Blend pools + metrics ===');
+    const blendPools = await getLendingPoolsByVenue(client, 'blend');
+
+    for (const entitySlug of blendPools) {
+      console.log(`\n--- Blend: ${entitySlug} ---`);
+
+      await runTsx('src/scripts/ingest/run-blend-pool-refresh.ts', {
+        ENTITY_SLUG: entitySlug,
+      });
+    }
 
     console.log('\n=== 4. Refresh Soroswap pools + metrics ===');
     for (const pool of soroswapPools) {
