@@ -1,3 +1,4 @@
+// apps/indexer/src/scripts/ingest/68-blend-persist-pool-metrics.ts
 import { createPgClient } from '../shared/db';
 import { getVenueBySlugOrThrow, getEntityBySlugOrThrow } from '../shared/lookup';
 import { nowIso } from '../discovery/00-common';
