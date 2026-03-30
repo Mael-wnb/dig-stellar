@@ -1,3 +1,4 @@
+// apps/indexer/src/scripts/discovery/44-blend-missing-prices.ts
 import { loadJson, saveJson, nowIso } from "./00-common";
 
 async function main() {

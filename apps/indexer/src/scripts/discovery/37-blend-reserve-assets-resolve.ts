@@ -1,3 +1,4 @@
+// apps/indexer/src/scripts/discovery/37-blend-reserve-assets-resolve.ts
 import { loadJson, saveJson, nowIso, getEnv, simulateContractRead } from "./00-common";
 
 async function main() {

@@ -1,3 +1,4 @@
+// apps/indexer/src/scripts/discovery/35-blend-sdk-user-load.ts
 import { saveJson, nowIso } from "./00-common";
 import { Networks } from "@stellar/stellar-sdk";
 import { PoolV2 } from "@blend-capital/blend-sdk";

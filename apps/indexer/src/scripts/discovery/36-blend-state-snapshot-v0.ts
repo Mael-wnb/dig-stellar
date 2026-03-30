@@ -1,4 +1,4 @@
-
+// apps/indexer/src/scripts/discovery/36-blend-state-snapshot-v0.ts
 import { loadJson, saveJson, nowIso } from "./00-common";
 
 async function main() {

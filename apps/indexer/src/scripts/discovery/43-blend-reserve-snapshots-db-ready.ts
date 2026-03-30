@@ -1,3 +1,4 @@
+// apps/indexer/src/scripts/discovery/43-blend-reserve-snapshots-db-ready.ts
 import { loadJson, saveJson, nowIso } from "./00-common";
 
 async function main() {

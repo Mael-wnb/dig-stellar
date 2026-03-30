@@ -1,3 +1,4 @@
+// apps/indexer/src/lib/protocols/aquarius/types.ts
 import { loadJson, saveJson, nowIso } from "./00-common";
 
 function scale(raw: string | null, decimals: number | null): string | null {

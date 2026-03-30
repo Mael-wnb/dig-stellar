@@ -1,3 +1,4 @@
+// apps/indexer/src/scripts/discovery/38-blend-state-flatten.ts
 import { loadJson, saveJson, nowIso } from "./00-common";
 
 async function main() {
