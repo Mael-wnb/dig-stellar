@@ -1,10 +1,8 @@
 // apps/indexer/src/lib/protocols/blend/persist-pool-metrics.ts
+
 import type { Client, PoolClient } from 'pg';
 import { nowIso } from '../../../scripts/discovery/00-common';
-import {
-  getEntityBySlugOrThrow,
-  getVenueBySlugOrThrow,
-} from '../../../scripts/shared/lookup';
+import { getEntityBySlugOrThrow, getVenueBySlugOrThrow } from '../../../scripts/shared/lookup';
 import { computeBlendPoolMetrics } from './compute-pool-metrics';
 
 type DbClient = Pick<Client | PoolClient, 'query'>;
@@ -17,12 +15,7 @@ export async function persistBlendPoolMetrics(params: {
 
   const venue = await getVenueBySlugOrThrow(client, 'blend');
   const entity = await getEntityBySlugOrThrow(client, entitySlug);
-
-  const metrics = await computeBlendPoolMetrics({
-    client,
-    entitySlug,
-  });
-
+  const metrics = await computeBlendPoolMetrics({ client, entitySlug });
   const asOf = nowIso();
 
   await client.query(
@@ -77,8 +70,7 @@ export async function persistBlendPoolMetrics(params: {
       metrics.weightedBorrowApy,
       JSON.stringify({
         source: 'lib/protocols/blend/persist-pool-metrics',
-        entitySlug: metrics.entitySlug,
-        note: 'For Blend lending pools, tvlUsd currently mirrors totalSuppliedUsd',
+        note: 'For lending pools, tvl_usd mirrors total_supplied_usd',
         reserveBreakdown: metrics.reserveBreakdown,
       }),
     ]
@@ -86,7 +78,7 @@ export async function persistBlendPoolMetrics(params: {
 
   return {
     completedAt: asOf,
-    entitySlug: metrics.entitySlug,
+    entitySlug,
     tvlUsd: metrics.tvlUsd,
     totalSuppliedUsd: metrics.totalSuppliedUsd,
     totalBorrowedUsd: metrics.totalBorrowedUsd,
