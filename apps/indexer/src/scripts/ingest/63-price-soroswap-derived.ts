@@ -1,3 +1,4 @@
+// apps/indexer/src/scripts/ingest/63-price-soroswap-derived.ts
 import { nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
 import { safeDivide } from '../shared/pricing';

@@ -1,3 +1,4 @@
+// apps/indexer/src/scripts/ingest/62-price-reference-assets.ts
 import { nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
 import { inferStablePrice } from '../shared/pricing';

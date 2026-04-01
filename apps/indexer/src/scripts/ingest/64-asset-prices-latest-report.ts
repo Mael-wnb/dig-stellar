@@ -1,3 +1,4 @@
+// apps/indexer/src/scripts/ingest/64-asset-prices-latest-report.ts
 import { createPgClient } from '../shared/db';
 
 async function main() {
