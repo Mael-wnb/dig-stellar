@@ -2,12 +2,27 @@
 import { nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
 import { inferStablePrice } from '../shared/pricing';
+import { PRICING_RULES_BY_SYMBOL, type PricingRule } from '../shared/pricing-config';
 
 type PriceResolution = {
   price: number;
   source: string;
   metadata: Record<string, unknown>;
 };
+
+type AssetRow = {
+  id: string;
+  contract_address: string;
+  symbol: string | null;
+  name: string | null;
+};
+
+type CoinGeckoSimplePriceResponse = Record<
+  string,
+  {
+    usd?: number;
+  }
+>;
 
 async function fetchJson(url: string, headers?: Record<string, string>) {
   const res = await fetch(url, { headers });
@@ -26,48 +41,6 @@ function getOptionalNumberEnv(name: string): number | null {
 
   const value = Number(raw);
   return Number.isFinite(value) ? value : null;
-}
-
-async function fetchNativeUsdPrice(): Promise<number> {
-  const apiKey = process.env.COINGECKO_API_KEY;
-  const headers: Record<string, string> = {};
-
-  if (apiKey) {
-    headers['x-cg-demo-api-key'] = apiKey;
-  }
-
-  const data = await fetchJson(
-    'https://api.coingecko.com/api/v3/simple/price?ids=stellar&vs_currencies=usd',
-    headers
-  );
-
-  const price = data?.stellar?.usd;
-  if (typeof price !== 'number') {
-    throw new Error('Could not fetch XLM/USD price');
-  }
-
-  return price;
-}
-
-async function fetchBtcUsdPrice(): Promise<number> {
-  const apiKey = process.env.COINGECKO_API_KEY;
-  const headers: Record<string, string> = {};
-
-  if (apiKey) {
-    headers['x-cg-demo-api-key'] = apiKey;
-  }
-
-  const data = await fetchJson(
-    'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd',
-    headers
-  );
-
-  const price = data?.bitcoin?.usd;
-  if (typeof price !== 'number') {
-    throw new Error('Could not fetch BTC/USD price');
-  }
-
-  return price;
 }
 
 async function getLatestPriceBySource(
@@ -91,129 +64,138 @@ async function getLatestPriceBySource(
   return Number.isFinite(value) ? value : null;
 }
 
-async function resolveNativeUsdPrice(
+async function fetchCoinGeckoPrices(ids: string[]): Promise<Map<string, number>> {
+  if (!ids.length) {
+    return new Map<string, number>();
+  }
+
+  const apiKey = process.env.COINGECKO_API_KEY;
+  const headers: Record<string, string> = {};
+
+  if (apiKey) {
+    headers['x-cg-demo-api-key'] = apiKey;
+  }
+
+  const uniqueIds = Array.from(new Set(ids));
+  const query = encodeURIComponent(uniqueIds.join(','));
+
+  const data = (await fetchJson(
+    `https://api.coingecko.com/api/v3/simple/price?ids=${query}&vs_currencies=usd`,
+    headers
+  )) as CoinGeckoSimplePriceResponse;
+
+  const out = new Map<string, number>();
+
+  for (const id of uniqueIds) {
+    const price = data?.[id]?.usd;
+    if (typeof price === 'number' && Number.isFinite(price)) {
+      out.set(id, price);
+    }
+  }
+
+  return out;
+}
+
+async function resolveCoinGeckoBasePrices(
   client: ReturnType<typeof createPgClient>
-): Promise<PriceResolution> {
+): Promise<{
+  xlm: PriceResolution;
+  btc: PriceResolution;
+  coinGeckoPrices: Map<string, number>;
+}> {
+  const configuredIds = Object.values(PRICING_RULES_BY_SYMBOL)
+    .filter((rule): rule is Extract<PricingRule, { kind: 'coingecko' }> => rule.kind === 'coingecko')
+    .map((rule) => rule.id);
+
+  const requiredIds = Array.from(new Set(['stellar', 'bitcoin', ...configuredIds]));
+
   try {
-    const price = await fetchNativeUsdPrice();
-    return {
-      price,
-      source: 'coingecko_xlm_usd',
-      metadata: {
-        confidence: 'high',
-        method: 'direct_native_price',
-      },
-    };
-  } catch (error) {
-    const dbFallback = await getLatestPriceBySource(client, 'coingecko_xlm_usd');
-    if (dbFallback !== null) {
-      return {
-        price: dbFallback,
-        source: 'db_cached_xlm_usd',
-        metadata: {
-          confidence: 'medium',
-          method: 'latest_db_fallback_after_api_failure',
-          fallbackFrom: 'coingecko_xlm_usd',
-          error: error instanceof Error ? error.message : String(error),
-        },
-      };
+    const prices = await fetchCoinGeckoPrices(requiredIds);
+
+    const xlmPrice = prices.get('stellar');
+    if (xlmPrice === undefined) {
+      throw new Error('Missing stellar price in CoinGecko response');
     }
 
-    const envFallback =
+    const btcPrice = prices.get('bitcoin');
+    if (btcPrice === undefined) {
+      throw new Error('Missing bitcoin price in CoinGecko response');
+    }
+
+    return {
+      xlm: {
+        price: xlmPrice,
+        source: 'coingecko_xlm_usd',
+        metadata: {
+          confidence: 'high',
+          method: 'direct_native_price',
+        },
+      },
+      btc: {
+        price: btcPrice,
+        source: 'coingecko_btc_usd',
+        metadata: {
+          confidence: 'high',
+          method: 'direct_btc_price',
+        },
+      },
+      coinGeckoPrices: prices,
+    };
+  } catch (error) {
+    const dbXlm = await getLatestPriceBySource(client, 'coingecko_xlm_usd');
+    const dbBtc = await getLatestPriceBySource(client, 'coingecko_btc_usd');
+
+    const xlmFallback =
+      dbXlm ??
       getOptionalNumberEnv('MANUAL_XLM_USD') ??
       getOptionalNumberEnv('XLM_USD_FALLBACK') ??
       0.165416;
 
-    return {
-      price: envFallback,
-      source: 'manual_xlm_fallback',
-      metadata: {
-        confidence: 'medium',
-        method: 'manual_fallback_after_api_failure',
-        fallbackFrom: 'coingecko_xlm_usd',
-        error: error instanceof Error ? error.message : String(error),
-      },
-    };
-  }
-}
-
-async function resolveBtcUsdPrice(
-  client: ReturnType<typeof createPgClient>
-): Promise<PriceResolution> {
-  try {
-    const price = await fetchBtcUsdPrice();
-    return {
-      price,
-      source: 'coingecko_btc_usd',
-      metadata: {
-        confidence: 'high',
-        method: 'direct_btc_price',
-      },
-    };
-  } catch (error) {
-    const dbFallback = await getLatestPriceBySource(client, 'coingecko_btc_usd');
-    if (dbFallback !== null) {
-      return {
-        price: dbFallback,
-        source: 'db_cached_btc_usd',
-        metadata: {
-          confidence: 'medium',
-          method: 'latest_db_fallback_after_api_failure',
-          fallbackFrom: 'coingecko_btc_usd',
-          error: error instanceof Error ? error.message : String(error),
-        },
-      };
-    }
-
-    const envFallback =
+    const btcFallback =
+      dbBtc ??
       getOptionalNumberEnv('MANUAL_BTC_USD') ??
       getOptionalNumberEnv('BTC_USD_FALLBACK') ??
       69846;
 
     return {
-      price: envFallback,
-      source: 'manual_btc_fallback',
-      metadata: {
-        confidence: 'medium',
-        method: 'manual_fallback_after_api_failure',
-        fallbackFrom: 'coingecko_btc_usd',
-        error: error instanceof Error ? error.message : String(error),
+      xlm: {
+        price: xlmFallback,
+        source: dbXlm !== null ? 'db_cached_xlm_usd' : 'manual_xlm_fallback',
+        metadata: {
+          confidence: dbXlm !== null ? 'medium' : 'low',
+          method:
+            dbXlm !== null
+              ? 'latest_db_fallback_after_api_failure'
+              : 'manual_fallback_after_api_failure',
+          fallbackFrom: 'coingecko_xlm_usd',
+          error: error instanceof Error ? error.message : String(error),
+        },
       },
+      btc: {
+        price: btcFallback,
+        source: dbBtc !== null ? 'db_cached_btc_usd' : 'manual_btc_fallback',
+        metadata: {
+          confidence: dbBtc !== null ? 'medium' : 'low',
+          method:
+            dbBtc !== null
+              ? 'latest_db_fallback_after_api_failure'
+              : 'manual_fallback_after_api_failure',
+          fallbackFrom: 'coingecko_btc_usd',
+          error: error instanceof Error ? error.message : String(error),
+        },
+      },
+      coinGeckoPrices: new Map<string, number>(),
     };
   }
 }
 
-function inferManualPrice(symbol: string): {
+function resolveStableFallback(symbol: string): {
   priceUsd: number | null;
   source: string;
   metadata: Record<string, unknown>;
 } {
-  const s = symbol.toUpperCase();
+  const stable = inferStablePrice(symbol);
 
-  if (s === 'USDC' || s === 'PYUSD') {
-    return {
-      priceUsd: 1,
-      source: 'manual_stable',
-      metadata: {
-        confidence: 'high',
-        method: 'hardcoded_stable_assumption',
-      },
-    };
-  }
-
-  if (s === 'EURC') {
-    return {
-      priceUsd: 1.16,
-      source: 'manual_eurc_fallback',
-      metadata: {
-        confidence: 'medium',
-        method: 'temporary_manual_eurc_usd',
-        note: 'Replace later with FX-backed EUR/USD source',
-      },
-    };
-  }
-
-  const stable = inferStablePrice(s);
   if (stable !== null) {
     return {
       priceUsd: stable,
@@ -222,6 +204,142 @@ function inferManualPrice(symbol: string): {
         confidence: 'high',
         method: 'hardcoded_stable_assumption',
       },
+    };
+  }
+
+  return {
+    priceUsd: null,
+    source: 'unknown',
+    metadata: {},
+  };
+}
+
+function resolvePriceFromRule(params: {
+  symbol: string;
+  rule: PricingRule | undefined;
+  xlm: PriceResolution;
+  btc: PriceResolution;
+  coinGeckoPrices: Map<string, number>;
+}): {
+  priceUsd: number | null;
+  source: string;
+  metadata: Record<string, unknown>;
+} {
+  const { symbol, rule, xlm, btc, coinGeckoPrices } = params;
+
+  if (!rule) {
+    return resolveStableFallback(symbol);
+  }
+
+  if (rule.kind === 'stable') {
+    return {
+      priceUsd: rule.priceUsd,
+      source: 'manual_stable',
+      metadata: {
+        confidence: 'high',
+        method: 'pricing_config_stable',
+      },
+    };
+  }
+
+  if (rule.kind === 'manual') {
+    const envPrice = getOptionalNumberEnv(rule.envVar);
+
+    if (envPrice !== null) {
+      return {
+        priceUsd: envPrice,
+        source: 'manual_env',
+        metadata: {
+          confidence: 'medium',
+          method: 'pricing_config_manual_env',
+          envVar: rule.envVar,
+        },
+      };
+    }
+
+    if (rule.fallbackPriceUsd !== undefined) {
+      return {
+        priceUsd: rule.fallbackPriceUsd,
+        source: 'manual_fallback',
+        metadata: {
+          confidence: 'medium',
+          method: 'pricing_config_manual_fallback',
+          envVar: rule.envVar,
+        },
+      };
+    }
+
+    return {
+      priceUsd: null,
+      source: 'unknown',
+      metadata: {},
+    };
+  }
+
+  if (rule.kind === 'proxy') {
+    if (rule.base === 'BTC') {
+      return {
+        priceUsd: btc.price,
+        source: 'coingecko_btc_proxy',
+        metadata: {
+          confidence: 'medium',
+          method: 'pricing_config_proxy',
+          proxy: 'BTC',
+          upstreamSource: btc.source,
+          upstreamMetadata: btc.metadata,
+        },
+      };
+    }
+
+    if (rule.base === 'XLM') {
+      return {
+        priceUsd: xlm.price,
+        source: 'coingecko_xlm_proxy',
+        metadata: {
+          confidence: 'medium',
+          method: 'pricing_config_proxy',
+          proxy: 'XLM',
+          upstreamSource: xlm.source,
+          upstreamMetadata: xlm.metadata,
+        },
+      };
+    }
+  }
+
+  if (rule.kind === 'coingecko') {
+    const direct = coinGeckoPrices.get(rule.id);
+    if (direct !== undefined) {
+      return {
+        priceUsd: direct,
+        source: 'coingecko_direct',
+        metadata: {
+          confidence: 'high',
+          method: 'pricing_config_coingecko',
+          coinGeckoId: rule.id,
+        },
+      };
+    }
+
+    if (rule.fallbackEnvVar) {
+      const envPrice = getOptionalNumberEnv(rule.fallbackEnvVar);
+      if (envPrice !== null) {
+        return {
+          priceUsd: envPrice,
+          source: 'manual_env_fallback',
+          metadata: {
+            confidence: 'medium',
+            method: 'pricing_config_coingecko_env_fallback',
+            coinGeckoId: rule.id,
+            envVar: rule.fallbackEnvVar,
+          },
+        };
+      }
+    }
+
+    return {
+      priceUsd: null,
+      source: 'unknown',
+      metadata: {},
     };
   }
 
@@ -248,47 +366,27 @@ async function main() {
       `
     );
 
-    const nativeResolved = await resolveNativeUsdPrice(client);
-    const btcResolved = await resolveBtcUsdPrice(client);
+    const { xlm, btc, coinGeckoPrices } = await resolveCoinGeckoBasePrices(client);
 
     let inserted = 0;
 
-    for (const asset of assetsRes.rows as Array<{
-      id: string;
-      contract_address: string;
-      symbol: string | null;
-      name: string | null;
-    }>) {
-      const symbol = asset.symbol ?? '';
-      const symbolUpper = symbol.toUpperCase();
+    for (const asset of assetsRes.rows as AssetRow[]) {
+      const symbol = (asset.symbol ?? '').trim();
+      if (!symbol) continue;
 
-      let priceUsd: number | null = null;
-      let source = 'manual';
-      let metadata: Record<string, unknown> = {};
+      const rule = PRICING_RULES_BY_SYMBOL[symbol] ?? PRICING_RULES_BY_SYMBOL[symbol.toUpperCase()];
 
-      if (symbol.toLowerCase() === 'native') {
-        priceUsd = nativeResolved.price;
-        source = nativeResolved.source;
-        metadata = nativeResolved.metadata;
-      } else if (symbolUpper === 'SOLVBTC' || symbolUpper === 'XSOLVBTC') {
-        priceUsd = btcResolved.price;
-        source = 'coingecko_btc_proxy';
-        metadata = {
-          confidence: 'medium',
-          method: 'btc_proxy_price',
-          proxy: 'BTC',
-          upstreamSource: btcResolved.source,
-          upstreamMetadata: btcResolved.metadata,
-          note: 'Temporary assumption: wrapped / derivative BTC assets priced at BTC spot',
-        };
-      } else {
-        const manual = inferManualPrice(symbol);
-        priceUsd = manual.priceUsd;
-        source = manual.source;
-        metadata = manual.metadata;
+      const resolved = resolvePriceFromRule({
+        symbol,
+        rule,
+        xlm,
+        btc,
+        coinGeckoPrices,
+      });
+
+      if (resolved.priceUsd === null) {
+        continue;
       }
-
-      if (priceUsd === null) continue;
 
       await client.query(
         `
@@ -296,20 +394,26 @@ async function main() {
         values ($1, $2, $3, $4, $5::jsonb)
         on conflict (asset_id, source, observed_at) do nothing
         `,
-        [asset.id, priceUsd, source, observedAt, JSON.stringify(metadata)]
+        [
+          asset.id,
+          resolved.priceUsd,
+          resolved.source,
+          observedAt,
+          JSON.stringify(resolved.metadata),
+        ]
       );
 
       inserted += 1;
-      console.log(symbol || asset.contract_address, '=>', priceUsd, source);
+      console.log(symbol || asset.contract_address, '=>', resolved.priceUsd, resolved.source);
     }
 
     console.log({
       completedAt: observedAt,
       inserted,
-      nativeUsd: nativeResolved.price,
-      nativeSource: nativeResolved.source,
-      btcUsd: btcResolved.price,
-      btcSource: btcResolved.source,
+      nativeUsd: xlm.price,
+      nativeSource: xlm.source,
+      btcUsd: btc.price,
+      btcSource: btc.source,
     });
   } finally {
     await client.end();

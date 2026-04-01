@@ -1,3 +1,4 @@
+// apps/indexer/src/scripts/shared/prices.ts
 import type { Client } from 'pg';
 
 export async function getLatestAssetPricesMap(client: Client): Promise<Map<string, number>> {
