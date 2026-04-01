@@ -4,13 +4,9 @@ import { createPgClient } from '../shared/db';
 
 type PgClient = ReturnType<typeof createPgClient>;
 
-type AmmPoolRow = {
+type PoolRow = {
   slug: string;
   contract_address: string | null;
-};
-
-type LendingPoolRow = {
-  slug: string;
 };
 
 function runTsx(scriptPath: string, extraEnv?: Record<string, string>): Promise<void> {
@@ -35,9 +31,10 @@ function runTsx(scriptPath: string, extraEnv?: Record<string, string>): Promise<
   });
 }
 
-async function getAmmPoolsByVenue(
+async function getPoolsByVenue(
   client: PgClient,
-  venueSlug: string
+  venueSlug: string,
+  entityType: 'amm_pool' | 'lending_pool'
 ): Promise<Array<{ entitySlug: string; contractAddress: string }>> {
   const res = await client.query(
     `
@@ -47,13 +44,13 @@ async function getAmmPoolsByVenue(
     from entities e
     join venues v on v.id = e.venue_id
     where v.slug = $1
-      and e.entity_type = 'amm_pool'
+      and e.entity_type = $2
     order by e.slug asc
     `,
-    [venueSlug]
+    [venueSlug, entityType]
   );
 
-  const rows = res.rows as AmmPoolRow[];
+  const rows = res.rows as PoolRow[];
 
   return rows.map((row) => {
     const contractAddress = row.contract_address?.trim() ?? '';
@@ -69,26 +66,6 @@ async function getAmmPoolsByVenue(
   });
 }
 
-async function getLendingPoolsByVenue(
-  client: PgClient,
-  venueSlug: string
-): Promise<string[]> {
-  const res = await client.query(
-    `
-    select
-      e.slug
-    from entities e
-    join venues v on v.id = e.venue_id
-    where v.slug = $1
-      and e.entity_type = 'lending_pool'
-    order by e.slug asc
-    `,
-    [venueSlug]
-  );
-
-  return (res.rows as LendingPoolRow[]).map((row) => row.slug);
-}
-
 async function main() {
   const client = createPgClient();
   await client.connect();
@@ -98,7 +75,7 @@ async function main() {
     await runTsx('src/scripts/ingest/62-price-reference-assets.ts');
 
     console.log('\n=== 2. Refresh derived Soroswap prices ===');
-    const soroswapPools = await getAmmPoolsByVenue(client, 'soroswap');
+    const soroswapPools = await getPoolsByVenue(client, 'soroswap', 'amm_pool');
 
     for (const pool of soroswapPools) {
       await runTsx('src/scripts/ingest/63-price-soroswap-derived.ts', {
@@ -107,13 +84,14 @@ async function main() {
     }
 
     console.log('\n=== 3. Refresh Blend pools + metrics ===');
-    const blendPools = await getLendingPoolsByVenue(client, 'blend');
+    const blendPools = await getPoolsByVenue(client, 'blend', 'lending_pool');
 
-    for (const entitySlug of blendPools) {
-      console.log(`\n--- Blend: ${entitySlug} ---`);
+    for (const pool of blendPools) {
+      console.log(`\n--- Blend: ${pool.entitySlug} (${pool.contractAddress}) ---`);
 
       await runTsx('src/scripts/ingest/run-blend-pool-refresh.ts', {
-        ENTITY_SLUG: entitySlug,
+        ENTITY_SLUG: pool.entitySlug,
+        BLEND_POOL_ID: pool.contractAddress,
       });
     }
 
@@ -128,7 +106,7 @@ async function main() {
     }
 
     console.log('\n=== 5. Refresh Aquarius pools + metrics ===');
-    const aquariusPools = await getAmmPoolsByVenue(client, 'aquarius');
+    const aquariusPools = await getPoolsByVenue(client, 'aquarius', 'amm_pool');
 
     for (const pool of aquariusPools) {
       console.log(`\n--- Aquarius: ${pool.entitySlug} (${pool.contractAddress}) ---`);
