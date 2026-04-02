@@ -1,55 +1,77 @@
 <!-- src/components/PoolTabs.vue -->
 <script setup lang="ts">
-import type { Protocol, Pool } from '../data/protocols'
+import { PROTOCOL_META } from '../data/protocolMeta'
+import type { PoolListItem } from '../types/protocol'
 
 const props = defineProps<{
-  protocols: Protocol[]
+  pools: PoolListItem[]
   selectedPoolId: string
-  selectedProtocolId: string
 }>()
 
 const emit = defineEmits<{
   selectPool: [poolId: string]
-  selectProtocol: [protocolId: string]
 }>()
 
-function handleClick(protocol: Protocol, pool: Pool) {
-  emit('selectProtocol', protocol.id)
-  emit('selectPool', pool.id)
+function formatUsdCompact(value?: number | null): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—'
+  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`
+  return `$${value.toFixed(0)}`
+}
+
+function getProtocolMeta(protocolId: string) {
+  return (
+    PROTOCOL_META[protocolId] ?? {
+      icon: '•',
+      iconColor: '#D5FF2F',
+      iconBg: '#1a1a1a',
+    }
+  )
 }
 </script>
 
 <template>
   <div class="all-pools">
-    <template v-for="protocol in protocols" :key="protocol.id">
-      <div
-        v-for="pool in protocol.pools"
-        :key="pool.id"
-        class="pool-tab"
-        :class="{ active: pool.id === selectedPoolId }"
-        :style="pool.id === selectedPoolId
-          ? { borderColor: '#2a2a2a', borderLeftColor: protocol.iconColor, borderLeftWidth: '3px', background: '#1a1a1a' }
-          : {}"
-        @click="handleClick(protocol, pool)"
-      >
-        <div class="pool-header">
-          <span
-            class="pool-name"
-            :style="pool.id === selectedPoolId ? { color: protocol.iconColor } : {}"
-          >{{ pool.name }}</span>
-        </div>
-        <div class="pool-bottom">
-          <span class="pool-proto">{{ protocol.name }}</span>
-          <span class="pool-tvl-row">
-            <span class="pool-type">TVL</span>
-            <span
-              class="pool-tvl"
-              :style="pool.id === selectedPoolId ? { color: '#D5FF2F' } : {}"
-            >{{ pool.tvl }}</span>
-          </span>
-        </div>
+    <div
+      v-for="pool in props.pools"
+      :key="pool.id"
+      class="pool-tab"
+      :class="{ active: pool.id === selectedPoolId }"
+      :style="pool.id === selectedPoolId
+        ? {
+            borderColor: '#2a2a2a',
+            borderLeftColor: getProtocolMeta(pool.protocol.id).iconColor,
+            borderLeftWidth: '3px',
+            background: '#1a1a1a'
+          }
+        : {}"
+      @click="emit('selectPool', pool.id)"
+    >
+      <div class="pool-header">
+        <span
+          class="pool-name"
+          :style="pool.id === selectedPoolId
+            ? { color: getProtocolMeta(pool.protocol.id).iconColor }
+            : {}"
+        >
+          {{ pool.name }}
+        </span>
       </div>
-    </template>
+
+      <div class="pool-bottom">
+        <span class="pool-proto">{{ pool.protocol.name }}</span>
+        <span class="pool-tvl-row">
+          <span class="pool-type">TVL</span>
+          <span
+            class="pool-tvl"
+            :style="pool.id === selectedPoolId ? { color: '#D5FF2F' } : {}"
+          >
+            {{ formatUsdCompact(pool.metrics.tvlUsd) }}
+          </span>
+        </span>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -59,7 +81,11 @@ function handleClick(protocol: Protocol, pool: Pool) {
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
-@media (max-width: 700px) { .all-pools { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 700px) {
+  .all-pools {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
 
 .pool-tab {
   background: #181818;
@@ -72,7 +98,9 @@ function handleClick(protocol: Protocol, pool: Pool) {
   flex-direction: column;
   gap: 4px;
 }
-.pool-tab:hover:not(.active) { border-color: #3a3a3a; }
+.pool-tab:hover:not(.active) {
+  border-color: #3a3a3a;
+}
 
 .pool-header {
   display: flex;
@@ -95,7 +123,11 @@ function handleClick(protocol: Protocol, pool: Pool) {
   gap: 4px;
 }
 
-.pool-proto { font-size: 11px; font-weight: 500; color: #9A9B99; }
+.pool-proto {
+  font-size: 11px;
+  font-weight: 500;
+  color: #9A9B99;
+}
 
 .pool-tvl-row {
   display: flex;
@@ -104,6 +136,16 @@ function handleClick(protocol: Protocol, pool: Pool) {
   flex-shrink: 0;
 }
 
-.pool-type { font-size: 10px; color: #555; letter-spacing: 0.08em; text-transform: uppercase; }
-.pool-tvl  { font-size: 11px; font-weight: 600; color: #9A9B99; }
+.pool-type {
+  font-size: 10px;
+  color: #555;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pool-tvl {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9A9B99;
+}
 </style>

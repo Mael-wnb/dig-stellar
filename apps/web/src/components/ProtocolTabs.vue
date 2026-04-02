@@ -1,13 +1,29 @@
 <!-- src/components/ProtocolTabs.vue -->
 <script setup lang="ts">
-import type { Protocol } from '../data/protocols'
+import { PROTOCOL_META } from '../data/protocolMeta'
+
+interface ProtocolTabItem {
+  id: string
+  name: string
+  type: string
+}
 
 defineProps<{
-  protocols: Protocol[]
+  protocols: ProtocolTabItem[]
   selectedProtocolId: string
 }>()
 
 const emit = defineEmits<{ select: [id: string] }>()
+
+function getProtocolMeta(protocolId: string) {
+  return (
+    PROTOCOL_META[protocolId] ?? {
+      icon: '•',
+      iconColor: '#D5FF2F',
+      iconBg: '#1a1a1a',
+    }
+  )
+}
 </script>
 
 <template>
@@ -18,25 +34,37 @@ const emit = defineEmits<{ select: [id: string] }>()
       class="proto-tab"
       :class="{ active: p.id === selectedProtocolId }"
       :style="p.id === selectedProtocolId
-        ? { borderColor: '#2a2a2a', borderLeftColor: p.iconColor, borderLeftWidth: '3px', background: '#1a1a1a' }
+        ? {
+            borderColor: '#2a2a2a',
+            borderLeftColor: getProtocolMeta(p.id).iconColor,
+            borderLeftWidth: '3px',
+            background: '#1a1a1a'
+          }
         : {}"
       @click="emit('select', p.id)"
     >
-      <div class="proto-icon" :style="{ background: p.iconBg, color: p.iconColor }">
-        {{ p.icon }}
+      <div
+        class="proto-icon"
+        :style="{
+          background: getProtocolMeta(p.id).iconBg,
+          color: getProtocolMeta(p.id).iconColor
+        }"
+      >
+        {{ getProtocolMeta(p.id).icon }}
       </div>
+
       <div class="proto-info">
         <div class="proto-header">
           <span
             class="proto-name"
-            :style="p.id === selectedProtocolId ? { color: p.iconColor } : {}"
-          >{{ p.name }}</span>
-          <span
-            class="proto-tvl"
-            :style="p.id === selectedProtocolId ? { color: p.iconColor } : {}"
-          >{{ p.tvl }}</span>
+            :style="p.id === selectedProtocolId
+              ? { color: getProtocolMeta(p.id).iconColor }
+              : {}"
+          >
+            {{ p.name }}
+          </span>
         </div>
-        <span class="proto-type">{{ p.type }} · TVL</span>
+        <span class="proto-type">{{ p.type }}</span>
       </div>
     </div>
   </div>
@@ -48,7 +76,11 @@ const emit = defineEmits<{ select: [id: string] }>()
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
-@media (max-width: 640px) { .proto-tabs { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) {
+  .proto-tabs {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
 
 .proto-tab {
   background: #181818;
@@ -61,17 +93,28 @@ const emit = defineEmits<{ select: [id: string] }>()
   cursor: pointer;
   transition: border-left-color 0.15s, background 0.15s;
 }
-.proto-tab:hover:not(.active) { border-color: #3a3a3a; }
+.proto-tab:hover:not(.active) {
+  border-color: #3a3a3a;
+}
 
 .proto-icon {
-  width: 30px; height: 30px;
+  width: 30px;
+  height: 30px;
   border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 15px;
   flex-shrink: 0;
 }
 
-.proto-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.proto-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
 
 .proto-header {
   display: flex;
@@ -89,12 +132,8 @@ const emit = defineEmits<{ select: [id: string] }>()
   text-overflow: ellipsis;
 }
 
-.proto-tvl {
-  font-size: 15px;
-  font-weight: 600;
+.proto-type {
+  font-size: 13px;
   color: #9A9B99;
-  flex-shrink: 0;
 }
-
-.proto-type { font-size: 15px; color: #9A9B99; }
 </style>

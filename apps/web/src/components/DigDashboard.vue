@@ -1,21 +1,25 @@
 <!-- src/components/DigDashboard.vue -->
 <script setup lang="ts">
-import { WALLETS, NOTIFICATIONS } from '../data/protocols'
+import { NOTIFICATIONS } from '../data/mock/notifications'
 import { useProtocol } from '../composables/useProtocol'
 import { useNetworkStats } from '../composables/useNetworkStats'
 
 import DashboardHeader from './DashboardHeader.vue'
-import WalletSection   from './WalletSection.vue'
-import ProtocolTabs    from './ProtocolTabs.vue'
-import PoolTabs        from './PoolTabs.vue'
-import PoolDetail      from './PoolDetail.vue'
+import WalletSection from './WalletSection.vue'
+import ProtocolTabs from './ProtocolTabs.vue'
+import PoolTabs from './PoolTabs.vue'
+import PoolDetail from './PoolDetail.vue'
 
 const {
   protocols,
+  protocolPools,
   selectedProtocolId,
   selectedPoolId,
   selectedProtocol,
   selectedPool,
+  loadingProtocols,
+  loadingPoolDetail,
+  error,
   selectProtocol,
   selectPool,
 } = useProtocol()
@@ -25,24 +29,17 @@ const { stats } = useNetworkStats()
 
 <template>
   <div class="dash">
-
-    <!-- ── HEADER + STATS ── -->
     <DashboardHeader :stats="stats" />
 
-    <!-- ── WALLET SECTION ── -->
     <section>
       <div class="section-hd">
         <span class="section-label">Stellar Multi-Wallet</span>
         <span class="section-sub">TVL · Protocol comparison</span>
       </div>
-      <WalletSection
-        total-balance="$14,523.89"
-        :wallets="WALLETS"
-        :notifications="NOTIFICATIONS"
-      />
+
+      <WalletSection :notifications="NOTIFICATIONS" />
     </section>
 
-    <!-- ── PROTOCOL VIEW ── -->
     <section>
       <div class="section-hd">
         <span class="section-label">Protocol View</span>
@@ -56,22 +53,27 @@ const { stats } = useNetworkStats()
       />
 
       <PoolTabs
-        :protocols="protocols"
+        :pools="protocolPools"
         :selected-pool-id="selectedPoolId"
-        :selected-protocol-id="selectedProtocolId"
         style="margin-top: 8px;"
         @select-pool="selectPool"
-        @select-protocol="selectProtocol"
       />
 
+      <div v-if="loadingProtocols || loadingPoolDetail" class="state-box">
+        Loading…
+      </div>
+
+      <div v-else-if="error" class="state-box state-box--error">
+        {{ error }}
+      </div>
+
       <PoolDetail
-        v-if="selectedPool && selectedProtocol"
+        v-else-if="selectedPool && selectedProtocol"
         :pool="selectedPool"
         :protocol="selectedProtocol"
         style="margin-top: 8px;"
       />
     </section>
-
   </div>
 </template>
 
@@ -107,5 +109,18 @@ const { stats } = useNetworkStats()
 .section-sub {
   font-size: 11px;
   color: #9A9B99;
+}
+
+.state-box {
+  margin-top: 8px;
+  padding: 16px;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  background: #181818;
+  color: #9A9B99;
+}
+
+.state-box--error {
+  color: #FF5A5A;
 }
 </style>
