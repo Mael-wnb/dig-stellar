@@ -1,13 +1,21 @@
 // src/api/client.ts
+const RAW_API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_BASE ||
+  'http://localhost:3000'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/v1'
+const API_BASE_URL = RAW_API_BASE.endsWith('/v1')
+  ? RAW_API_BASE
+  : `${RAW_API_BASE}/v1`
 
 export function getApiBaseUrl(): string {
   return API_BASE_URL
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+
+  const response = await fetch(`${API_BASE_URL}${normalizedPath}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
