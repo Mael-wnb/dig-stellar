@@ -1,12 +1,29 @@
 // src/composables/useProtocol.ts
 import { computed, onMounted, ref, watch } from 'vue'
 import { fetchPoolById, fetchPools } from '../api/pools'
+import { PROTOCOL_META } from '../data/protocolMeta'
 import type { PoolDetailData, PoolListItem } from '../types/protocol'
 
 export interface ProtocolOption {
   id: string
   name: string
   type: string
+}
+
+export interface ProtocolDisplay extends ProtocolOption {
+  icon: string
+  iconColor: string
+  iconBg: string
+}
+
+function getProtocolMeta(protocolId: string) {
+  return (
+    PROTOCOL_META[protocolId] ?? {
+      icon: '•',
+      iconColor: '#D5FF2F',
+      iconBg: '#1a1a1a',
+    }
+  )
 }
 
 export function useProtocol() {
@@ -35,13 +52,29 @@ export function useProtocol() {
     return Array.from(map.values())
   })
 
+  const protocolDisplays = computed<ProtocolDisplay[]>(() =>
+    protocols.value.map((protocol) => ({
+      ...protocol,
+      ...getProtocolMeta(protocol.id),
+    }))
+  )
+
   const protocolPools = computed(() =>
     pools.value.filter((pool) => pool.protocol.id === selectedProtocolId.value)
   )
 
-  const selectedProtocol = computed(() =>
-    protocols.value.find((protocol) => protocol.id === selectedProtocolId.value)
-  )
+  const selectedProtocol = computed<ProtocolDisplay | null>(() => {
+    const protocol = protocols.value.find(
+      (item) => item.id === selectedProtocolId.value
+    )
+
+    if (!protocol) return null
+
+    return {
+      ...protocol,
+      ...getProtocolMeta(protocol.id),
+    }
+  })
 
   async function loadPools() {
     loadingProtocols.value = true
@@ -58,16 +91,24 @@ export function useProtocol() {
         return
       }
 
-      if (!selectedProtocolId.value) {
-        selectedProtocolId.value = data[0].protocol.id
-      }
-
-      const firstPoolForProtocol = data.find(
+      const hasCurrentProtocol = data.some(
         (pool) => pool.protocol.id === selectedProtocolId.value
       )
 
-      if (!selectedPoolId.value && firstPoolForProtocol) {
-        selectedPoolId.value = firstPoolForProtocol.id
+      if (!selectedProtocolId.value || !hasCurrentProtocol) {
+        selectedProtocolId.value = data[0].protocol.id
+      }
+
+      const poolsForProtocol = data.filter(
+        (pool) => pool.protocol.id === selectedProtocolId.value
+      )
+
+      const hasCurrentPool = poolsForProtocol.some(
+        (pool) => pool.id === selectedPoolId.value
+      )
+
+      if (!selectedPoolId.value || !hasCurrentPool) {
+        selectedPoolId.value = poolsForProtocol[0]?.id ?? ''
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load pools'
@@ -95,31 +136,29 @@ export function useProtocol() {
     }
   }
 
-  async function selectProtocol(protocolId: string) {
+  function selectProtocol(protocolId: string) {
     selectedProtocolId.value = protocolId
 
     const firstPool = pools.value.find((pool) => pool.protocol.id === protocolId)
     selectedPoolId.value = firstPool?.id ?? ''
   }
 
-  async function selectPool(poolId: string) {
+  function selectPool(poolId: string) {
     selectedPoolId.value = poolId
   }
 
-  watch(selectedPoolId, async (poolId) => {
-    await loadPoolDetail(poolId)
+  watch(selectedPoolId, (poolId) => {
+    void loadPoolDetail(poolId)
   })
 
-  onMounted(async () => {
-    await loadPools()
-    if (selectedPoolId.value) {
-      await loadPoolDetail(selectedPoolId.value)
-    }
+  onMounted(() => {
+    void loadPools()
   })
 
   return {
     pools,
     protocols,
+    protocolDisplays,
     protocolPools,
     selectedProtocolId,
     selectedPoolId,

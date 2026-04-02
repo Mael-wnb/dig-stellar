@@ -1,6 +1,6 @@
 <!-- src/components/DigDashboard.vue -->
 <script setup lang="ts">
-import { NOTIFICATIONS } from '../data/mock/notifications'
+import { NOTIFICATIONS } from '../data/protocols'
 import { useProtocol } from '../composables/useProtocol'
 import { useNetworkStats } from '../composables/useNetworkStats'
 
@@ -11,7 +11,7 @@ import PoolTabs from './PoolTabs.vue'
 import PoolDetail from './PoolDetail.vue'
 
 const {
-  protocols,
+  protocolDisplays,
   protocolPools,
   selectedProtocolId,
   selectedPoolId,
@@ -34,7 +34,7 @@ const { stats } = useNetworkStats()
     <section>
       <div class="section-hd">
         <span class="section-label">Stellar Multi-Wallet</span>
-        <span class="section-sub">TVL · Protocol comparison</span>
+        <span class="section-sub">Portfolio and wallet connection</span>
       </div>
 
       <WalletSection :notifications="NOTIFICATIONS" />
@@ -43,36 +43,46 @@ const { stats } = useNetworkStats()
     <section>
       <div class="section-hd">
         <span class="section-label">Protocol View</span>
-        <span class="section-sub">Select a protocol</span>
+        <span class="section-sub">Live backend data</span>
       </div>
 
-      <ProtocolTabs
-        :protocols="protocols"
-        :selected-protocol-id="selectedProtocolId"
-        @select="selectProtocol"
-      />
-
-      <PoolTabs
-        :pools="protocolPools"
-        :selected-pool-id="selectedPoolId"
-        style="margin-top: 8px;"
-        @select-pool="selectPool"
-      />
-
-      <div v-if="loadingProtocols || loadingPoolDetail" class="state-box">
-        Loading…
-      </div>
-
-      <div v-else-if="error" class="state-box state-box--error">
+      <div v-if="error" class="state-box state-box--error">
         {{ error }}
       </div>
 
-      <PoolDetail
-        v-else-if="selectedPool && selectedProtocol"
-        :pool="selectedPool"
-        :protocol="selectedProtocol"
-        style="margin-top: 8px;"
-      />
+      <div v-else-if="loadingProtocols" class="state-box">
+        Loading protocols...
+      </div>
+
+      <template v-else>
+        <ProtocolTabs
+          :protocols="protocolDisplays"
+          :selected-protocol-id="selectedProtocolId"
+          @select="selectProtocol"
+        />
+
+        <PoolTabs
+          :pools="protocolPools"
+          :selected-pool-id="selectedPoolId"
+          style="margin-top: 8px;"
+          @select-pool="selectPool"
+        />
+
+        <div v-if="loadingPoolDetail" class="state-box" style="margin-top: 8px;">
+          Loading pool detail...
+        </div>
+
+        <PoolDetail
+          v-else-if="selectedPool && selectedProtocol"
+          :pool="selectedPool"
+          :protocol="selectedProtocol"
+          style="margin-top: 8px;"
+        />
+
+        <div v-else class="state-box" style="margin-top: 8px;">
+          No pool selected.
+        </div>
+      </template>
     </section>
   </div>
 </template>
@@ -87,7 +97,7 @@ const { stats } = useNetworkStats()
   flex-direction: column;
   gap: 20px;
   font-family: 'DM Mono', 'Courier New', monospace;
-  max-width: 960px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -112,15 +122,16 @@ const { stats } = useNetworkStats()
 }
 
 .state-box {
-  margin-top: 8px;
-  padding: 16px;
-  border: 1px solid #2a2a2a;
-  border-radius: 12px;
   background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 12px;
   color: #9A9B99;
 }
 
 .state-box--error {
-  color: #FF5A5A;
+  border-color: rgba(255, 90, 90, 0.35);
+  color: #ff8b8b;
 }
 </style>

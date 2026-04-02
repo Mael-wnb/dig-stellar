@@ -3,7 +3,7 @@
 import { PROTOCOL_META } from '../data/protocolMeta'
 import type { PoolListItem } from '../types/protocol'
 
-const props = defineProps<{
+defineProps<{
   pools: PoolListItem[]
   selectedPoolId: string
 }>()
@@ -34,7 +34,7 @@ function getProtocolMeta(protocolId: string) {
 <template>
   <div class="all-pools">
     <div
-      v-for="pool in props.pools"
+      v-for="pool in pools"
       :key="pool.id"
       class="pool-tab"
       :class="{ active: pool.id === selectedPoolId }"
