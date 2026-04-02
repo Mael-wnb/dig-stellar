@@ -1,3 +1,4 @@
+<!-- src/components/ProtocolTabs.vue -->
 <script setup lang="ts">
 import type { Protocol } from '../data/protocols'
 

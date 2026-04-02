@@ -1,3 +1,4 @@
+<!-- src/components/PoolTabs.vue -->
 <script setup lang="ts">
 import type { Protocol, Pool } from '../data/protocols'
 

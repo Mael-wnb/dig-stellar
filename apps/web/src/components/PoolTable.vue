@@ -1,3 +1,4 @@
+<!-- src/components/PoolTable.vue -->
 <script setup lang="ts">
 interface Pool {
   name: string

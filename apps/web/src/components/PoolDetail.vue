@@ -1,3 +1,4 @@
+<!-- src/components/PoolDetail.vue -->
 <script setup>
 defineProps({
   pool:     { type: Object, required: true },

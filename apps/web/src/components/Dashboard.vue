@@ -1,3 +1,4 @@
+<!-- src/components/Dasjboard.vue -->
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import logoUrl from '@/assets/dig-logo.svg?url'

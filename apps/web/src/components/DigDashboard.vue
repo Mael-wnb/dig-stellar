@@ -1,3 +1,4 @@
+<!-- src/components/DigDashboard.vue -->
 <script setup lang="ts">
 import { WALLETS, NOTIFICATIONS } from '../data/protocols'
 import { useProtocol } from '../composables/useProtocol'
