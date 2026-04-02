@@ -1,4 +1,4 @@
-// apps/indexer/src/lib/protocols/aquarius/types.ts
+// apps/web/src/composables/useNetworkStats.ts
 import { ref, onMounted } from 'vue'
 
 export interface NetworkStat {
