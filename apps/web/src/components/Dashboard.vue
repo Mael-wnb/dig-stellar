@@ -232,13 +232,13 @@ const selectedProtocol = computed(() =>
         </div>
         <div class="flex items-center gap-2">
           <h1 class="font-semibold tracking-wide" style="color: #FFFFFF !important; font-size: 1.25rem; margin: 0;">
-            Stellar Grant by Dig
+            Dig Stellar
           </h1>
           <span
             class="text-xs font-semibold px-2 py-0.5 rounded"
             style="background-color: #373B26; color: #D5FF2F; border: 1px solid #D5FF2F; letter-spacing: 0.08em;"
           >
-            BETA
+            ALPHA
           </span>
         </div>
       </div>

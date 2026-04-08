@@ -59,8 +59,8 @@ const shortAddress = computed(() => {
           <img src="../assets/stellar.svg" alt="Stellar" width="48" height="48" />
         </div>
         <div class="title-row">
-          <h1>Stellar Grant by Dig</h1>
-          <span class="badge-beta">BETA</span>
+          <h1>Dig Stellar</h1>
+          <span class="badge-beta">ALPHA</span>
         </div>
       </div>
 
@@ -83,12 +83,12 @@ const shortAddress = computed(() => {
         </div>
 
         <div class="desc-block">
-          <p class="desc">
+          <!-- <p class="desc">
             Dig is applying for a Stellar Community Fund grant to build the go-to analytics &amp;
             portfolio dashboard for Stellar DeFi — real-time TVL, multi-wallet tracking, on-chain
             actions, protocol notifications, inflow/outflow monitoring, and Stellar market cap
             tracking across Soroban protocols. This is an early demo.
-          </p>
+          </p> -->
           <div class="links-row">
             <a href="https://github.com/Mael-wnb/dig-stellar" target="_blank" class="link-pill">GitHub ↗</a>
             <a href="https://communityfund.stellar.org/submissions/recoebnaQgCsMeEjm" target="_blank" class="link-pill">Grant submission ↗</a>
