@@ -7,6 +7,7 @@ allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true
   '@reown/appkit': true
+  '@stellar/stellar-sdk': true
   blake-hash: true
   bufferutil: true
   esbuild: true
