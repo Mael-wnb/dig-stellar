@@ -1,5 +1,7 @@
-// apps/api/src/modules/wallets/wallets.service.ts
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { PrismaService } from '../../db/prisma.service';
 
 function toNumber(value: unknown): number | null {
@@ -170,6 +172,80 @@ export class WalletsService {
     }
 
     return wallet;
+  }
+
+  private resolveIndexerDir(): string {
+    const candidates = [
+      process.env.INDEXER_DIR,
+      path.resolve(process.cwd(), '../indexer'),
+      path.resolve(process.cwd(), '../../apps/indexer'),
+      path.resolve(__dirname, '../../../../indexer'),
+      path.resolve(__dirname, '../../../../../apps/indexer'),
+    ].filter((value): value is string => Boolean(value));
+
+    for (const candidate of candidates) {
+      const normalized = path.resolve(candidate);
+      if (existsSync(normalized)) {
+        return normalized;
+      }
+    }
+
+    throw new InternalServerErrorException(
+      'Could not resolve indexer directory. Set INDEXER_DIR if needed.'
+    );
+  }
+
+  private runWalletBalanceRefreshScript(walletId: string): Promise<void> {
+    const indexerDir = this.resolveIndexerDir();
+
+    return new Promise((resolve, reject) => {
+      const child = spawn(
+        'pnpm',
+        ['tsx', 'src/scripts/wallets/80-stellar-wallet-balance-snapshots.ts'],
+        {
+          cwd: indexerDir,
+          env: {
+            ...process.env,
+            WALLET_ID: walletId,
+          },
+          stdio: 'pipe',
+        }
+      );
+
+      let stderr = '';
+      let stdout = '';
+
+      child.stdout.on('data', (chunk) => {
+        stdout += chunk.toString();
+      });
+
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk.toString();
+      });
+
+      child.on('error', (error) => {
+        reject(error);
+      });
+
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+          return;
+        }
+
+        reject(
+          new Error(
+            [
+              `Wallet refresh script failed with exit code ${code}.`,
+              stdout ? `stdout:\n${stdout}` : '',
+              stderr ? `stderr:\n${stderr}` : '',
+            ]
+              .filter(Boolean)
+              .join('\n\n')
+          )
+        );
+      });
+    });
   }
 
   async createWallet(params: {
@@ -496,6 +572,34 @@ export class WalletsService {
       count: balances.length,
       totalPortfolioUsd,
       balances,
+    };
+  }
+
+  async refreshWallet(params: { userId?: string; walletId?: string }) {
+    const userId = this.normalizeUserId(params.userId);
+    const walletId = this.normalizeWalletId(params.walletId);
+
+    const wallet = await this.getWalletOrThrow(walletId, userId);
+
+    try {
+      await this.runWalletBalanceRefreshScript(walletId);
+    } catch (error) {
+      throw new InternalServerErrorException(
+        error instanceof Error ? error.message : 'Wallet refresh failed'
+      );
+    }
+
+    const refreshedBalances = await this.getWalletBalances({
+      userId,
+      walletId,
+    });
+
+    return {
+      refreshed: true,
+      wallet: this.mapWallet(wallet),
+      count: refreshedBalances.count,
+      totalPortfolioUsd: refreshedBalances.totalPortfolioUsd,
+      balances: refreshedBalances.balances,
     };
   }
 

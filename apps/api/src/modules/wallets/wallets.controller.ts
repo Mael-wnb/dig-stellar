@@ -1,4 +1,3 @@
-// apps/api/src/modules/wallets/wallets.controller.ts
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { WalletsService } from './wallets.service';
 
@@ -16,6 +15,10 @@ type SetPrimaryBody = {
 type SetActiveBody = {
   userId?: string;
   isActive?: boolean;
+};
+
+type RefreshWalletBody = {
+  userId?: string;
 };
 
 @Controller('v1/wallets')
@@ -53,6 +56,18 @@ export class WalletsController {
     return this.walletsService.getWalletBalances({
       walletId,
       userId,
+    });
+  }
+
+  @Post(':walletId/refresh')
+  refreshWallet(
+    @Param('walletId') walletId: string,
+    @Query('userId') queryUserId?: string,
+    @Body() body?: RefreshWalletBody
+  ) {
+    return this.walletsService.refreshWallet({
+      walletId,
+      userId: queryUserId ?? body?.userId,
     });
   }
 
