@@ -7,8 +7,9 @@ import {
   allowAllModules,
   XBULL_ID,
 } from '@creit.tech/stellar-wallets-kit'
-import { createWallet, fetchWalletBalances, fetchWalletOverview } from '../api/wallets'
-import type { WalletItem, WalletNotification } from '../types/wallet'
+
+import { createWallet, fetchWalletBalances, fetchWalletOverview, refreshWallet } from '../api/wallets'
+import type { WalletBalanceItem, WalletItem, WalletNotification } from '../types/wallet'
 
 defineProps<{
   notifications: WalletNotification[]
@@ -17,7 +18,10 @@ defineProps<{
 const USER_ID = '11111111-1111-4111-8111-111111111111'
 
 const kit = new StellarWalletsKit({
-  network: WalletNetwork.PUBLIC,
+  network:
+    import.meta.env.VITE_STELLAR_NETWORK === 'TESTNET'
+      ? WalletNetwork.TESTNET
+      : WalletNetwork.PUBLIC,
   selectedWalletId: XBULL_ID,
   modules: allowAllModules(),
 })
@@ -41,36 +45,55 @@ const pendingSignMessage = computed(() =>
   `I confirm that I own this Stellar wallet:\n${pendingAddress.value}\n\nTimestamp: ${Date.now()}`
 )
 
-function formatUsd(value: number): string {
-  return `$${value.toLocaleString('en-US', {
+function fmtUsd(value: number | null | undefined): string {
+  const amount = typeof value === 'number' && Number.isFinite(value) ? value : 0
+  return `$${amount.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`
 }
 
-function shortAddress(address: string): string {
+function shortAddr(address: string): string {
   return address.length > 14 ? `${address.slice(0, 6)}…${address.slice(-6)}` : address
 }
 
-async function loadOverview() {
+function displaySymbol(balance: WalletBalanceItem): string {
+  if (balance.metadata?.assetType === 'native') return 'XLM'
+  if (balance.symbol?.toLowerCase() === 'native') return 'XLM'
+  return balance.symbol ?? 'Unknown'
+}
+
+async function loadOverview(): Promise<void> {
   overviewLoading.value = true
+  connectError.value = ''
 
   try {
     const data = await fetchWalletOverview(USER_ID)
-    wallets.value = (data.wallets ?? []).map((wallet) => ({
+
+    wallets.value = data.wallets.map((wallet) => ({
       ...wallet,
+      totalPortfolioUsd: 0,
+      balances: [],
       loading: false,
     }))
 
     await Promise.all(wallets.value.map((wallet) => loadWalletBalances(wallet.id)))
+
+    if (selectedWallet.value) {
+      const updatedSelectedWallet = wallets.value.find(
+        (wallet) => wallet.id === selectedWallet.value?.id
+      )
+      selectedWallet.value = updatedSelectedWallet ?? null
+    }
   } catch (error) {
-    console.error('Failed to fetch overview', error)
+    connectError.value =
+      error instanceof Error ? error.message : 'Failed to fetch wallet overview.'
   } finally {
     overviewLoading.value = false
   }
 }
 
-async function loadWalletBalances(walletId: string) {
+async function loadWalletBalances(walletId: string): Promise<void> {
   const wallet = wallets.value.find((item) => item.id === walletId)
   if (!wallet) return
 
@@ -78,8 +101,8 @@ async function loadWalletBalances(walletId: string) {
 
   try {
     const data = await fetchWalletBalances(walletId, USER_ID)
-    wallet.totalPortfolioUsd = data.totalPortfolioUsd ?? 0
-    wallet.balances = data.balances ?? []
+    wallet.totalPortfolioUsd = data.totalPortfolioUsd
+    wallet.balances = data.balances
   } catch (error) {
     console.error(`Failed to fetch balances for ${walletId}`, error)
   } finally {
@@ -87,17 +110,19 @@ async function loadWalletBalances(walletId: string) {
   }
 }
 
-async function submitWallet(address: string, signature: string) {
-  return createWallet({
+async function submitWallet(address: string): Promise<WalletItem> {
+  const response = await createWallet({
     userId: USER_ID,
     chain: 'stellar',
     address,
-    label: newLabel.value.trim() || `Wallet ${wallets.value.length + 1}`,
-    signature,
+    label: newLabel.value.trim() || null,
+    signature: '',
   })
+
+  return response.wallet
 }
 
-async function openConnectModal() {
+async function openConnectModal(): Promise<void> {
   connectError.value = ''
   isConnecting.value = true
 
@@ -128,21 +153,25 @@ async function openConnectModal() {
   }
 }
 
-async function signAndAdd() {
+async function signAndAdd(): Promise<void> {
   if (!pendingAddress.value) return
 
   signLoading.value = true
   connectError.value = ''
 
   try {
-    const { signedMessage } = await (kit as any).signMessage({
+    await (kit as any).signMessage({
       message: pendingSignMessage.value,
       publicKey: pendingAddress.value,
     })
 
-    const createdWallet = await submitWallet(pendingAddress.value, signedMessage ?? '')
-    wallets.value.push({ ...createdWallet, loading: false })
-    await loadWalletBalances(createdWallet.id)
+    const createdWallet = await submitWallet(pendingAddress.value)
+    await refreshWallet(createdWallet.id, USER_ID)
+    await loadOverview()
+
+    const justAddedWallet = wallets.value.find((wallet) => wallet.id === createdWallet.id) ?? null
+    selectedWallet.value = justAddedWallet
+
     closeSignModal()
   } catch (error: unknown) {
     connectError.value = error instanceof Error ? error.message : 'Signature failed.'
@@ -151,14 +180,14 @@ async function signAndAdd() {
   }
 }
 
-function closeSignModal() {
+function closeSignModal(): void {
   showSignModal.value = false
   pendingAddress.value = ''
   newLabel.value = ''
   connectError.value = ''
 }
 
-function selectWallet(wallet: WalletItem) {
+function selectWallet(wallet: WalletItem): void {
   selectedWallet.value = selectedWallet.value?.id === wallet.id ? null : wallet
 }
 
@@ -171,9 +200,9 @@ onMounted(loadOverview)
       <div class="balance-block">
         <p class="balance-label">Multi-Wallet Amount</p>
         <p v-if="overviewLoading" class="balance-total">—</p>
-        <p v-else class="balance-total">{{ formatUsd(totalPortfolioUsd) }}</p>
+        <p v-else class="balance-total">{{ fmtUsd(totalPortfolioUsd) }}</p>
         <p v-if="selectedWallet" class="balance-sub">
-          {{ selectedWallet.label }} — {{ formatUsd(selectedWallet.totalPortfolioUsd ?? 0) }}
+          {{ selectedWallet.label || 'Wallet' }} — {{ fmtUsd(selectedWallet.totalPortfolioUsd ?? 0) }}
         </p>
       </div>
 
@@ -185,31 +214,35 @@ onMounted(loadOverview)
           :class="{ active: selectedWallet?.id === wallet.id }"
           @click="selectWallet(wallet)"
         >
-          <span class="wallet-num">{{ wallet.label }}</span>
-          <span class="wallet-addr">{{ shortAddress(wallet.address) }}</span>
+          <span class="wallet-num">{{ wallet.label || 'Unnamed wallet' }}</span>
+          <span class="wallet-addr">{{ shortAddr(wallet.address) }}</span>
 
           <div class="wallet-right">
             <span v-if="wallet.loading" class="wallet-amount">…</span>
             <span v-else class="wallet-amount">
-              {{ formatUsd(wallet.totalPortfolioUsd ?? 0) }}
+              {{ fmtUsd(wallet.totalPortfolioUsd ?? 0) }}
             </span>
 
-            <button class="btn-sel" @click.stop="selectWallet(wallet)">Select ›</button>
+            <button class="btn-sel" @click.stop="selectWallet(wallet)">
+              Select ›
+            </button>
           </div>
         </div>
 
         <transition name="slide">
           <div v-if="selectedWallet?.balances?.length" class="token-breakdown">
-            <div v-for="balance in selectedWallet.balances" :key="balance.id" class="token-row">
+            <div
+              v-for="balance in selectedWallet.balances"
+              :key="balance.id"
+              class="token-row"
+            >
               <div class="token-left">
-                <span class="token-symbol">
-                  {{ balance.metadata.assetType === 'native' ? 'XLM' : balance.symbol }}
-                </span>
+                <span class="token-symbol">{{ displaySymbol(balance) }}</span>
                 <span class="token-balance">
-                  {{ balance.balance.toLocaleString('en-US', { maximumFractionDigits: 4 }) }}
+                  {{ (balance.balance ?? 0).toLocaleString('en-US', { maximumFractionDigits: 4 }) }}
                 </span>
               </div>
-              <span class="token-usd">{{ formatUsd(balance.balanceUsd) }}</span>
+              <span class="token-usd">{{ fmtUsd(balance.balanceUsd) }}</span>
             </div>
           </div>
         </transition>
@@ -279,8 +312,8 @@ onMounted(loadOverview)
           </div>
 
           <p class="sign-info">
-            Your wallet will prompt you to sign this message. No transaction is broadcast — this
-            only proves ownership.
+            Your wallet will prompt you to sign this message.
+            No transaction is broadcast — this only proves ownership.
           </p>
 
           <p v-if="connectError" class="connect-error">{{ connectError }}</p>
@@ -458,9 +491,7 @@ onMounted(loadOverview)
   font-weight: 600;
   cursor: pointer;
   letter-spacing: 0.04em;
-  transition:
-    border-color 0.15s,
-    background 0.15s;
+  transition: border-color 0.15s, background 0.15s;
   font-family: 'DM Mono', monospace;
 }
 .add-wallet-btn:hover:not(:disabled) {
@@ -745,8 +776,7 @@ onMounted(loadOverview)
   animation: pulse 2s ease-in-out infinite;
 }
 @keyframes pulse {
-  0%,
-  100% {
+  0%, 100% {
     opacity: 1;
   }
   50% {
