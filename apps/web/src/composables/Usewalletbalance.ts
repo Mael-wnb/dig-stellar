@@ -1,4 +1,4 @@
-// apps/web/src/composables/usewalletbalance.ts
+// apps/web/src/composables/ugsewalletbalance.ts
 import { ref } from 'vue'
 
 export interface TokenBalance {
