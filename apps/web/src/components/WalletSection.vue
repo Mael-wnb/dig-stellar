@@ -1,197 +1,326 @@
 <!-- src/components/WalletSection.vue -->
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from "vue";
 import {
   StellarWalletsKit,
   WalletNetwork,
   allowAllModules,
   XBULL_ID,
-} from '@creit.tech/stellar-wallets-kit'
+} from "@creit.tech/stellar-wallets-kit";
 
-import { createWallet, fetchWalletBalances, fetchWalletOverview, refreshWallet } from '../api/wallets'
-import type { WalletBalanceItem, WalletItem, WalletNotification } from '../types/wallet'
+import {
+  createWallet,
+  deleteWallet,
+  fetchWalletBalances,
+  fetchWalletOverview,
+  refreshWallet,
+  setPrimaryWallet,
+  setWalletActive,
+} from "../api/wallets";
+import type {
+  WalletBalanceItem,
+  WalletItem,
+  WalletNotification,
+} from "../types/wallet";
 
 defineProps<{
-  notifications: WalletNotification[]
-}>()
+  notifications: WalletNotification[];
+}>();
 
-const USER_ID = '11111111-1111-4111-8111-111111111111'
+const USER_ID = "11111111-1111-4111-8111-111111111111";
 
 const kit = new StellarWalletsKit({
   network:
-    import.meta.env.VITE_STELLAR_NETWORK === 'TESTNET'
+    import.meta.env.VITE_STELLAR_NETWORK === "TESTNET"
       ? WalletNetwork.TESTNET
       : WalletNetwork.PUBLIC,
   selectedWalletId: XBULL_ID,
   modules: allowAllModules(),
-})
+});
 
-const wallets = ref<WalletItem[]>([])
-const selectedWallet = ref<WalletItem | null>(null)
-const overviewLoading = ref(true)
+const wallets = ref<WalletItem[]>([]);
+const selectedWallet = ref<WalletItem | null>(null);
+const overviewLoading = ref(true);
 
-const isConnecting = ref(false)
-const connectError = ref('')
-const showSignModal = ref(false)
-const pendingAddress = ref('')
-const newLabel = ref('')
-const signLoading = ref(false)
+const isConnecting = ref(false);
+const connectError = ref("");
+const showSignModal = ref(false);
+const pendingAddress = ref("");
+const newLabel = ref("");
+const signLoading = ref(false);
+
+const actionLoadingWalletId = ref<string | null>(null);
+const actionError = ref("");
 
 const totalPortfolioUsd = computed(() =>
-  wallets.value.reduce((sum, wallet) => sum + (wallet.totalPortfolioUsd ?? 0), 0)
-)
+  wallets.value.reduce(
+    (sum, wallet) => sum + (wallet.totalPortfolioUsd ?? 0),
+    0
+  )
+);
 
-const pendingSignMessage = computed(() =>
-  `I confirm that I own this Stellar wallet:\n${pendingAddress.value}\n\nTimestamp: ${Date.now()}`
-)
+const pendingSignMessage = computed(
+  () =>
+    `I confirm that I own this Stellar wallet:\n${
+      pendingAddress.value
+    }\n\nTimestamp: ${Date.now()}`
+);
 
 function fmtUsd(value: number | null | undefined): string {
-  const amount = typeof value === 'number' && Number.isFinite(value) ? value : 0
-  return `$${amount.toLocaleString('en-US', {
+  const amount =
+    typeof value === "number" && Number.isFinite(value) ? value : 0;
+  return `$${amount.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  })}`
+  })}`;
 }
 
 function shortAddr(address: string): string {
-  return address.length > 14 ? `${address.slice(0, 6)}…${address.slice(-6)}` : address
+  return address.length > 14
+    ? `${address.slice(0, 6)}…${address.slice(-6)}`
+    : address;
 }
 
 function displaySymbol(balance: WalletBalanceItem): string {
-  if (balance.metadata?.assetType === 'native') return 'XLM'
-  if (balance.symbol?.toLowerCase() === 'native') return 'XLM'
-  return balance.symbol ?? 'Unknown'
+  if (balance.metadata?.assetType === "native") return "XLM";
+  if (balance.symbol?.toLowerCase() === "native") return "XLM";
+  return balance.symbol ?? "Unknown";
+}
+
+function isBusy(walletId?: string): boolean {
+  return !!walletId && actionLoadingWalletId.value === walletId;
 }
 
 async function loadOverview(): Promise<void> {
-  overviewLoading.value = true
-  connectError.value = ''
+  overviewLoading.value = true;
+  connectError.value = "";
+  actionError.value = "";
 
   try {
-    const data = await fetchWalletOverview(USER_ID)
+    const data = await fetchWalletOverview(USER_ID);
 
     wallets.value = data.wallets.map((wallet) => ({
       ...wallet,
       totalPortfolioUsd: 0,
       balances: [],
       loading: false,
-    }))
+    }));
 
-    await Promise.all(wallets.value.map((wallet) => loadWalletBalances(wallet.id)))
+    await Promise.all(
+      wallets.value.map((wallet) => loadWalletBalances(wallet.id))
+    );
 
     if (selectedWallet.value) {
       const updatedSelectedWallet = wallets.value.find(
         (wallet) => wallet.id === selectedWallet.value?.id
-      )
-      selectedWallet.value = updatedSelectedWallet ?? null
+      );
+      selectedWallet.value = updatedSelectedWallet ?? null;
     }
   } catch (error) {
     connectError.value =
-      error instanceof Error ? error.message : 'Failed to fetch wallet overview.'
+      error instanceof Error
+        ? error.message
+        : "Failed to fetch wallet overview.";
   } finally {
-    overviewLoading.value = false
+    overviewLoading.value = false;
   }
 }
 
 async function loadWalletBalances(walletId: string): Promise<void> {
-  const wallet = wallets.value.find((item) => item.id === walletId)
-  if (!wallet) return
+  const wallet = wallets.value.find((item) => item.id === walletId);
+  if (!wallet) return;
 
-  wallet.loading = true
+  wallet.loading = true;
 
   try {
-    const data = await fetchWalletBalances(walletId, USER_ID)
-    wallet.totalPortfolioUsd = data.totalPortfolioUsd
-    wallet.balances = data.balances
+    const data = await fetchWalletBalances(walletId, USER_ID);
+    wallet.totalPortfolioUsd = data.totalPortfolioUsd;
+    wallet.balances = data.balances;
   } catch (error) {
-    console.error(`Failed to fetch balances for ${walletId}`, error)
+    console.error(`Failed to fetch balances for ${walletId}`, error);
   } finally {
-    wallet.loading = false
+    wallet.loading = false;
   }
 }
 
 async function submitWallet(address: string): Promise<WalletItem> {
   const response = await createWallet({
     userId: USER_ID,
-    chain: 'stellar',
+    chain: "stellar",
     address,
     label: newLabel.value.trim() || null,
-    signature: '',
-  })
+    signature: "",
+  });
 
-  return response.wallet
+  return response.wallet;
 }
 
 async function openConnectModal(): Promise<void> {
-  connectError.value = ''
-  isConnecting.value = true
+  connectError.value = "";
+  isConnecting.value = true;
 
   try {
     await kit.openModal({
       onWalletSelected: async (option) => {
-        kit.setWallet(option.id)
-        const { address } = await kit.getAddress()
+        kit.setWallet(option.id);
+        const { address } = await kit.getAddress();
 
         if (!address || !/^G[A-Z2-7]{55}$/.test(address)) {
-          throw new Error('Invalid Stellar address returned by wallet.')
+          throw new Error("Invalid Stellar address returned by wallet.");
         }
 
         if (wallets.value.find((wallet) => wallet.address === address)) {
-          throw new Error('This wallet is already added.')
+          throw new Error("This wallet is already added.");
         }
 
-        pendingAddress.value = address
-        newLabel.value = ''
-        showSignModal.value = true
+        pendingAddress.value = address;
+        newLabel.value = "";
+        showSignModal.value = true;
       },
-    })
+    });
   } catch (error: unknown) {
     connectError.value =
-      error instanceof Error ? error.message : 'Connection failed or cancelled.'
+      error instanceof Error
+        ? error.message
+        : "Connection failed or cancelled.";
   } finally {
-    isConnecting.value = false
+    isConnecting.value = false;
   }
 }
 
 async function signAndAdd(): Promise<void> {
-  if (!pendingAddress.value) return
+  if (!pendingAddress.value) return;
 
-  signLoading.value = true
-  connectError.value = ''
+  signLoading.value = true;
+  connectError.value = "";
 
   try {
-    await (kit as any).signMessage({
-      message: pendingSignMessage.value,
-      publicKey: pendingAddress.value,
-    })
+    await (kit as any).signMessage(pendingSignMessage.value, {
+      address: pendingAddress.value,
+    });
 
-    const createdWallet = await submitWallet(pendingAddress.value)
-    await refreshWallet(createdWallet.id, USER_ID)
-    await loadOverview()
+    const result = await (kit as any).signMessage(
+  pendingSignMessage.value,
+  { address: pendingAddress.value }
+)
 
-    const justAddedWallet = wallets.value.find((wallet) => wallet.id === createdWallet.id) ?? null
-    selectedWallet.value = justAddedWallet
+console.log('signMessage result', result)
 
-    closeSignModal()
+    const createdWallet = await submitWallet(pendingAddress.value);
+    await refreshWallet(createdWallet.id, USER_ID);
+    await loadOverview();
+
+    const justAddedWallet =
+      wallets.value.find((wallet) => wallet.id === createdWallet.id) ?? null;
+    selectedWallet.value = justAddedWallet;
+
+    closeSignModal();
   } catch (error: unknown) {
-    connectError.value = error instanceof Error ? error.message : 'Signature failed.'
+    connectError.value =
+      error instanceof Error ? error.message : "Signature failed.";
   } finally {
-    signLoading.value = false
+    signLoading.value = false;
+  }
+}
+
+async function handleRefreshWallet(wallet: WalletItem): Promise<void> {
+  actionError.value = "";
+  actionLoadingWalletId.value = wallet.id;
+
+  try {
+    await refreshWallet(wallet.id, USER_ID);
+    await loadWalletBalances(wallet.id);
+
+    if (selectedWallet.value?.id === wallet.id) {
+      const updatedWallet =
+        wallets.value.find((item) => item.id === wallet.id) ?? null;
+      selectedWallet.value = updatedWallet;
+    }
+  } catch (error) {
+    actionError.value =
+      error instanceof Error ? error.message : "Failed to refresh wallet.";
+  } finally {
+    actionLoadingWalletId.value = null;
+  }
+}
+
+async function handleSetPrimary(wallet: WalletItem): Promise<void> {
+  actionError.value = "";
+  actionLoadingWalletId.value = wallet.id;
+
+  try {
+    await setPrimaryWallet(wallet.id, USER_ID);
+    await loadOverview();
+
+    if (selectedWallet.value?.id === wallet.id) {
+      selectedWallet.value =
+        wallets.value.find((item) => item.id === wallet.id) ?? null;
+    }
+  } catch (error) {
+    actionError.value =
+      error instanceof Error ? error.message : "Failed to set primary wallet.";
+  } finally {
+    actionLoadingWalletId.value = null;
+  }
+}
+
+async function handleToggleActive(wallet: WalletItem): Promise<void> {
+  actionError.value = "";
+  actionLoadingWalletId.value = wallet.id;
+
+  try {
+    await setWalletActive(wallet.id, USER_ID, !wallet.isActive);
+    await loadOverview();
+
+    if (selectedWallet.value?.id === wallet.id) {
+      selectedWallet.value =
+        wallets.value.find((item) => item.id === wallet.id) ?? null;
+    }
+  } catch (error) {
+    actionError.value =
+      error instanceof Error
+        ? error.message
+        : "Failed to update wallet status.";
+  } finally {
+    actionLoadingWalletId.value = null;
+  }
+}
+
+async function handleDeleteWallet(wallet: WalletItem): Promise<void> {
+  const confirmed = window.confirm(
+    `Delete wallet ${wallet.label || shortAddr(wallet.address)}?`
+  );
+  if (!confirmed) return;
+
+  actionError.value = "";
+  actionLoadingWalletId.value = wallet.id;
+
+  try {
+    await deleteWallet(wallet.id, USER_ID);
+    if (selectedWallet.value?.id === wallet.id) {
+      selectedWallet.value = null;
+    }
+    await loadOverview();
+  } catch (error) {
+    actionError.value =
+      error instanceof Error ? error.message : "Failed to delete wallet.";
+  } finally {
+    actionLoadingWalletId.value = null;
   }
 }
 
 function closeSignModal(): void {
-  showSignModal.value = false
-  pendingAddress.value = ''
-  newLabel.value = ''
-  connectError.value = ''
+  showSignModal.value = false;
+  pendingAddress.value = "";
+  newLabel.value = "";
+  connectError.value = "";
 }
 
 function selectWallet(wallet: WalletItem): void {
-  selectedWallet.value = selectedWallet.value?.id === wallet.id ? null : wallet
+  selectedWallet.value = selectedWallet.value?.id === wallet.id ? null : wallet;
 }
 
-onMounted(loadOverview)
+onMounted(loadOverview);
 </script>
 
 <template>
@@ -202,7 +331,8 @@ onMounted(loadOverview)
         <p v-if="overviewLoading" class="balance-total">—</p>
         <p v-else class="balance-total">{{ fmtUsd(totalPortfolioUsd) }}</p>
         <p v-if="selectedWallet" class="balance-sub">
-          {{ selectedWallet.label || 'Wallet' }} — {{ fmtUsd(selectedWallet.totalPortfolioUsd ?? 0) }}
+          {{ selectedWallet.label || "Wallet" }} —
+          {{ fmtUsd(selectedWallet.totalPortfolioUsd ?? 0) }}
         </p>
       </div>
 
@@ -214,8 +344,21 @@ onMounted(loadOverview)
           :class="{ active: selectedWallet?.id === wallet.id }"
           @click="selectWallet(wallet)"
         >
-          <span class="wallet-num">{{ wallet.label || 'Unnamed wallet' }}</span>
-          <span class="wallet-addr">{{ shortAddr(wallet.address) }}</span>
+          <div class="wallet-main">
+            <div class="wallet-topline">
+              <span class="wallet-num">
+                {{ wallet.label || "Unnamed wallet" }}
+                <span v-if="wallet.isPrimary" class="pill primary"
+                  >Primary</span
+                >
+                <span v-if="!wallet.isActive" class="pill inactive"
+                  >Inactive</span
+                >
+              </span>
+            </div>
+
+            <span class="wallet-addr">{{ shortAddr(wallet.address) }}</span>
+          </div>
 
           <div class="wallet-right">
             <span v-if="wallet.loading" class="wallet-amount">…</span>
@@ -230,29 +373,82 @@ onMounted(loadOverview)
         </div>
 
         <transition name="slide">
-          <div v-if="selectedWallet?.balances?.length" class="token-breakdown">
-            <div
-              v-for="balance in selectedWallet.balances"
-              :key="balance.id"
-              class="token-row"
-            >
-              <div class="token-left">
-                <span class="token-symbol">{{ displaySymbol(balance) }}</span>
-                <span class="token-balance">
-                  {{ (balance.balance ?? 0).toLocaleString('en-US', { maximumFractionDigits: 4 }) }}
-                </span>
+          <div v-if="selectedWallet" class="wallet-detail-panel">
+            <div class="wallet-actions">
+              <button
+                class="mini-btn"
+                :disabled="isBusy(selectedWallet.id)"
+                @click="handleRefreshWallet(selectedWallet)"
+              >
+                {{ isBusy(selectedWallet.id) ? "Refreshing…" : "Refresh" }}
+              </button>
+
+              <button
+                class="mini-btn"
+                :disabled="
+                  isBusy(selectedWallet.id) || selectedWallet.isPrimary
+                "
+                @click="handleSetPrimary(selectedWallet)"
+              >
+                Set primary
+              </button>
+
+              <button
+                class="mini-btn"
+                :disabled="isBusy(selectedWallet.id)"
+                @click="handleToggleActive(selectedWallet)"
+              >
+                {{ selectedWallet.isActive ? "Deactivate" : "Activate" }}
+              </button>
+
+              <button
+                class="mini-btn danger"
+                :disabled="isBusy(selectedWallet.id)"
+                @click="handleDeleteWallet(selectedWallet)"
+              >
+                Delete
+              </button>
+            </div>
+
+            <div v-if="selectedWallet.balances?.length" class="token-breakdown">
+              <div
+                v-for="balance in selectedWallet.balances"
+                :key="balance.id"
+                class="token-row"
+              >
+                <div class="token-left">
+                  <span class="token-symbol">{{ displaySymbol(balance) }}</span>
+                  <span class="token-balance">
+                    {{
+                      (balance.balance ?? 0).toLocaleString("en-US", {
+                        maximumFractionDigits: 4,
+                      })
+                    }}
+                  </span>
+                </div>
+                <span class="token-usd">{{ fmtUsd(balance.balanceUsd) }}</span>
               </div>
-              <span class="token-usd">{{ fmtUsd(balance.balanceUsd) }}</span>
+            </div>
+
+            <div v-else class="empty-balances">
+              No balances found for this wallet.
             </div>
           </div>
         </transition>
 
-        <button class="add-wallet-btn" :disabled="isConnecting" @click="openConnectModal">
+        <button
+          class="add-wallet-btn"
+          :disabled="isConnecting"
+          @click="openConnectModal"
+        >
           <span class="add-icon">+</span>
-          {{ isConnecting ? 'Opening wallet…' : 'Add Stellar Wallet' }}
+          {{ isConnecting ? "Opening wallet…" : "Add Stellar Wallet" }}
         </button>
 
-        <p v-if="connectError && !showSignModal" class="inline-error">{{ connectError }}</p>
+        <p v-if="connectError && !showSignModal" class="inline-error">
+          {{ connectError }}
+        </p>
+        <p v-if="actionError" class="inline-error">{{ actionError }}</p>
       </div>
     </div>
 
@@ -260,9 +456,14 @@ onMounted(loadOverview)
       <p class="notif-title">Notifications</p>
 
       <div class="notif-list">
-        <div v-for="(notification, index) in notifications" :key="index" class="notif-row">
+        <div
+          v-for="(notification, index) in notifications"
+          :key="index"
+          class="notif-row"
+        >
           <span class="notif-text">
-            <strong>{{ notification.wallet }}</strong> : {{ notification.protocol }} ›
+            <strong>{{ notification.wallet }}</strong> :
+            {{ notification.protocol }} ›
           </span>
           <span class="notif-badge" :style="{ color: notification.color }">
             {{ notification.status }}
@@ -285,7 +486,11 @@ onMounted(loadOverview)
     </div>
 
     <transition name="fade">
-      <div v-if="showSignModal" class="modal-overlay" @click.self="closeSignModal">
+      <div
+        v-if="showSignModal"
+        class="modal-overlay"
+        @click.self="closeSignModal"
+      >
         <div class="connect-modal">
           <div class="modal-header">
             <span class="modal-title">Prove Ownership</span>
@@ -312,15 +517,19 @@ onMounted(loadOverview)
           </div>
 
           <p class="sign-info">
-            Your wallet will prompt you to sign this message.
-            No transaction is broadcast — this only proves ownership.
+            Your wallet will prompt you to sign this message. No transaction is
+            broadcast — this only proves ownership.
           </p>
 
           <p v-if="connectError" class="connect-error">{{ connectError }}</p>
 
           <div class="modal-actions">
-            <button class="btn-confirm" :disabled="signLoading" @click="signAndAdd">
-              {{ signLoading ? 'Waiting for signature…' : 'Sign & Add Wallet' }}
+            <button
+              class="btn-confirm"
+              :disabled="signLoading"
+              @click="signAndAdd"
+            >
+              {{ signLoading ? "Waiting for signature…" : "Sign & Add Wallet" }}
             </button>
             <button class="btn-cancel" @click="closeSignModal">Cancel</button>
           </div>
@@ -380,7 +589,7 @@ onMounted(loadOverview)
 
 .wallet-row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
   gap: 10px;
   background: #202020;
@@ -398,6 +607,19 @@ onMounted(loadOverview)
   background: #1a1f0e;
 }
 
+.wallet-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.wallet-topline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .wallet-num {
   font-size: 12px;
   font-weight: 700;
@@ -407,7 +629,7 @@ onMounted(loadOverview)
 .wallet-addr {
   font-size: 11px;
   color: #9a9b99;
-  font-family: 'DM Mono', monospace;
+  font-family: "DM Mono", monospace;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -426,18 +648,64 @@ onMounted(loadOverview)
   white-space: nowrap;
 }
 
-.btn-sel {
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.pill.primary {
+  color: #d5ff2f;
+  background: rgba(213, 255, 47, 0.08);
+  border: 1px solid rgba(213, 255, 47, 0.3);
+}
+.pill.inactive {
+  color: #ffb86b;
+  background: rgba(255, 184, 107, 0.08);
+  border: 1px solid rgba(255, 184, 107, 0.3);
+}
+
+.btn-sel,
+.mini-btn {
   font-size: 11px;
   color: #d5ff2f;
   border: 1px solid rgba(213, 255, 47, 0.3);
   background: transparent;
   border-radius: 5px;
-  padding: 3px 8px;
+  padding: 4px 8px;
   cursor: pointer;
   transition: background 0.15s;
 }
-.btn-sel:hover {
+.btn-sel:hover,
+.mini-btn:hover:not(:disabled) {
   background: rgba(213, 255, 47, 0.1);
+}
+.mini-btn:disabled,
+.btn-sel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.mini-btn.danger {
+  color: #ff7b7b;
+  border-color: rgba(255, 123, 123, 0.35);
+}
+.mini-btn.danger:hover:not(:disabled) {
+  background: rgba(255, 123, 123, 0.1);
+}
+
+.wallet-detail-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wallet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .token-breakdown {
@@ -477,6 +745,15 @@ onMounted(loadOverview)
   font-weight: 600;
 }
 
+.empty-balances {
+  font-size: 12px;
+  color: #9a9b99;
+  background: #161616;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 12px;
+}
+
 .add-wallet-btn {
   display: flex;
   align-items: center;
@@ -492,7 +769,7 @@ onMounted(loadOverview)
   cursor: pointer;
   letter-spacing: 0.04em;
   transition: border-color 0.15s, background 0.15s;
-  font-family: 'DM Mono', monospace;
+  font-family: "DM Mono", monospace;
 }
 .add-wallet-btn:hover:not(:disabled) {
   border-color: #d5ff2f;
@@ -590,13 +867,13 @@ onMounted(loadOverview)
 .sign-address {
   font-size: 11px;
   color: #d5ff2f;
-  font-family: 'DM Mono', monospace;
+  font-family: "DM Mono", monospace;
   word-break: break-all;
 }
 .sign-message-text {
   font-size: 10px;
   color: #9a9b99;
-  font-family: 'DM Mono', monospace;
+  font-family: "DM Mono", monospace;
   white-space: pre-wrap;
   word-break: break-all;
   margin: 0;
@@ -614,7 +891,7 @@ onMounted(loadOverview)
   padding: 7px 10px;
   font-size: 12px;
   color: #e2e6e1;
-  font-family: 'DM Mono', monospace;
+  font-family: "DM Mono", monospace;
   outline: none;
   width: 100%;
   transition: border-color 0.15s;
@@ -776,7 +1053,8 @@ onMounted(loadOverview)
   animation: pulse 2s ease-in-out infinite;
 }
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
