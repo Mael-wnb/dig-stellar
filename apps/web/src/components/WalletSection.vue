@@ -1,27 +1,17 @@
 <!-- src/components/WalletSection.vue -->
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { onMounted, ref } from "vue";
 import { useWalletSession } from "../composables/useWalletSession";
-import {
-  createWallet,
-  deleteWallet,
-  fetchWalletBalances,
-  fetchWalletOverview,
-  refreshWallet,
-  setPrimaryWallet,
-  setWalletActive,
-} from "../api/wallets";
+import { useWallets } from "../composables/useWallets";
 import type {
   WalletBalanceItem,
-  WalletItem,
   WalletNotification,
+  WalletItem,
 } from "../types/wallet";
 
 defineProps<{
   notifications: WalletNotification[];
 }>();
-
-const USER_ID = "11111111-1111-4111-8111-111111111111";
 
 const {
   isConnecting,
@@ -29,9 +19,21 @@ const {
   restoreWalletSession,
 } = useWalletSession();
 
-const wallets = ref<WalletItem[]>([]);
-const selectedWallet = ref<WalletItem | null>(null);
-const overviewLoading = ref(true);
+const {
+  wallets,
+  selectedWallet,
+  overviewLoading,
+  error,
+  totalPortfolioUsd,
+  isBusy,
+  loadOverview,
+  addWallet,
+  refreshOneWallet,
+  setPrimary,
+  toggleActive,
+  removeWallet,
+  selectWallet,
+} = useWallets();
 
 const connectError = ref("");
 const showAddModal = ref(false);
@@ -39,16 +41,6 @@ const pendingAddress = ref("");
 const pendingWalletProviderId = ref<string | null>(null);
 const newLabel = ref("");
 const addLoading = ref(false);
-
-const actionLoadingWalletId = ref<string | null>(null);
-const actionError = ref("");
-
-const totalPortfolioUsd = computed(() =>
-  wallets.value.reduce(
-    (sum, wallet) => sum + (wallet.totalPortfolioUsd ?? 0),
-    0
-  )
-);
 
 function fmtUsd(value: number | null | undefined): string {
   const amount =
@@ -70,72 +62,6 @@ function displaySymbol(balance: WalletBalanceItem): string {
   if (balance.metadata?.assetType === "native") return "XLM";
   if (balance.symbol?.toLowerCase() === "native") return "XLM";
   return balance.symbol ?? "Unknown";
-}
-
-function isBusy(walletId?: string): boolean {
-  return !!walletId && actionLoadingWalletId.value === walletId;
-}
-
-async function loadOverview(): Promise<void> {
-  overviewLoading.value = true;
-  connectError.value = "";
-  actionError.value = "";
-
-  try {
-    const data = await fetchWalletOverview(USER_ID);
-
-    wallets.value = data.wallets.map((wallet) => ({
-      ...wallet,
-      totalPortfolioUsd: wallet.totalPortfolioUsd ?? 0,
-      balances: wallet.balances ?? [],
-      loading: false,
-    }));
-
-    await Promise.all(wallets.value.map((wallet) => loadWalletBalances(wallet.id)));
-
-    if (selectedWallet.value) {
-      const updatedSelectedWallet = wallets.value.find(
-        (wallet) => wallet.id === selectedWallet.value?.id
-      );
-      selectedWallet.value = updatedSelectedWallet ?? null;
-    }
-  } catch (error) {
-    connectError.value =
-      error instanceof Error
-        ? error.message
-        : "Failed to fetch wallet overview.";
-  } finally {
-    overviewLoading.value = false;
-  }
-}
-
-async function loadWalletBalances(walletId: string): Promise<void> {
-  const wallet = wallets.value.find((item) => item.id === walletId);
-  if (!wallet) return;
-
-  wallet.loading = true;
-
-  try {
-    const data = await fetchWalletBalances(walletId, USER_ID);
-    wallet.totalPortfolioUsd = data.totalPortfolioUsd;
-    wallet.balances = data.balances;
-  } catch (error) {
-    console.error(`Failed to fetch balances for ${walletId}`, error);
-  } finally {
-    wallet.loading = false;
-  }
-}
-
-async function submitWallet(address: string): Promise<WalletItem> {
-  const response = await createWallet({
-    userId: USER_ID,
-    chain: "stellar",
-    address,
-    label: newLabel.value.trim() || "",
-    signature: "",
-  });
-
-  return response.wallet ?? response;
 }
 
 async function openConnectModal(): Promise<void> {
@@ -160,11 +86,9 @@ async function openConnectModal(): Promise<void> {
     pendingWalletProviderId.value = result.providerId;
     newLabel.value = "";
     showAddModal.value = true;
-  } catch (error: unknown) {
+  } catch (err: unknown) {
     connectError.value =
-      error instanceof Error
-        ? error.message
-        : "Connection failed or cancelled.";
+      err instanceof Error ? err.message : "Connection failed or cancelled.";
   }
 }
 
@@ -175,85 +99,18 @@ async function addWalletWithoutSignature(): Promise<void> {
   connectError.value = "";
 
   try {
-    const createdWallet = await submitWallet(pendingAddress.value);
+    await addWallet({
+      address: pendingAddress.value,
+      label: newLabel.value,
+    });
 
-    await refreshWallet(createdWallet.id, USER_ID);
-    await loadOverview();
-
-    const justAddedWallet =
-      wallets.value.find((wallet) => wallet.id === createdWallet.id) ?? null;
-
-    selectedWallet.value = justAddedWallet;
     closeAddModal();
-  } catch (error: unknown) {
-    console.error("[wallet] addWalletWithoutSignature failed", error);
+  } catch (err: unknown) {
+    console.error("[wallet] addWalletWithoutSignature failed", err);
     connectError.value =
-      error instanceof Error ? error.message : "Failed to add wallet.";
+      err instanceof Error ? err.message : "Failed to add wallet.";
   } finally {
     addLoading.value = false;
-  }
-}
-
-async function handleRefreshWallet(wallet: WalletItem): Promise<void> {
-  actionError.value = "";
-  actionLoadingWalletId.value = wallet.id;
-
-  try {
-    await refreshWallet(wallet.id, USER_ID);
-    await loadWalletBalances(wallet.id);
-
-    if (selectedWallet.value?.id === wallet.id) {
-      const updatedWallet =
-        wallets.value.find((item) => item.id === wallet.id) ?? null;
-      selectedWallet.value = updatedWallet;
-    }
-  } catch (error) {
-    actionError.value =
-      error instanceof Error ? error.message : "Failed to refresh wallet.";
-  } finally {
-    actionLoadingWalletId.value = null;
-  }
-}
-
-async function handleSetPrimary(wallet: WalletItem): Promise<void> {
-  actionError.value = "";
-  actionLoadingWalletId.value = wallet.id;
-
-  try {
-    await setPrimaryWallet(wallet.id, USER_ID);
-    await loadOverview();
-
-    if (selectedWallet.value?.id === wallet.id) {
-      selectedWallet.value =
-        wallets.value.find((item) => item.id === wallet.id) ?? null;
-    }
-  } catch (error) {
-    actionError.value =
-      error instanceof Error ? error.message : "Failed to set primary wallet.";
-  } finally {
-    actionLoadingWalletId.value = null;
-  }
-}
-
-async function handleToggleActive(wallet: WalletItem): Promise<void> {
-  actionError.value = "";
-  actionLoadingWalletId.value = wallet.id;
-
-  try {
-    await setWalletActive(wallet.id, USER_ID, !wallet.isActive);
-    await loadOverview();
-
-    if (selectedWallet.value?.id === wallet.id) {
-      selectedWallet.value =
-        wallets.value.find((item) => item.id === wallet.id) ?? null;
-    }
-  } catch (error) {
-    actionError.value =
-      error instanceof Error
-        ? error.message
-        : "Failed to update wallet status.";
-  } finally {
-    actionLoadingWalletId.value = null;
   }
 }
 
@@ -263,21 +120,7 @@ async function handleDeleteWallet(wallet: WalletItem): Promise<void> {
   );
   if (!confirmed) return;
 
-  actionError.value = "";
-  actionLoadingWalletId.value = wallet.id;
-
-  try {
-    await deleteWallet(wallet.id, USER_ID);
-    if (selectedWallet.value?.id === wallet.id) {
-      selectedWallet.value = null;
-    }
-    await loadOverview();
-  } catch (error) {
-    actionError.value =
-      error instanceof Error ? error.message : "Failed to delete wallet.";
-  } finally {
-    actionLoadingWalletId.value = null;
-  }
+  await removeWallet(wallet);
 }
 
 function closeAddModal(): void {
@@ -286,10 +129,6 @@ function closeAddModal(): void {
   pendingWalletProviderId.value = null;
   newLabel.value = "";
   connectError.value = "";
-}
-
-function selectWallet(wallet: WalletItem): void {
-  selectedWallet.value = selectedWallet.value?.id === wallet.id ? null : wallet;
 }
 
 onMounted(() => {
@@ -349,7 +188,7 @@ onMounted(() => {
               <button
                 class="mini-btn"
                 :disabled="isBusy(selectedWallet.id)"
-                @click="handleRefreshWallet(selectedWallet)"
+                @click="refreshOneWallet(selectedWallet)"
               >
                 {{ isBusy(selectedWallet.id) ? "Refreshing…" : "Refresh" }}
               </button>
@@ -357,7 +196,7 @@ onMounted(() => {
               <button
                 class="mini-btn"
                 :disabled="isBusy(selectedWallet.id) || selectedWallet.isPrimary"
-                @click="handleSetPrimary(selectedWallet)"
+                @click="setPrimary(selectedWallet)"
               >
                 Set primary
               </button>
@@ -365,7 +204,7 @@ onMounted(() => {
               <button
                 class="mini-btn"
                 :disabled="isBusy(selectedWallet.id)"
-                @click="handleToggleActive(selectedWallet)"
+                @click="toggleActive(selectedWallet)"
               >
                 {{ selectedWallet.isActive ? "Deactivate" : "Activate" }}
               </button>
@@ -417,7 +256,7 @@ onMounted(() => {
         <p v-if="connectError && !showAddModal" class="inline-error">
           {{ connectError }}
         </p>
-        <p v-if="actionError" class="inline-error">{{ actionError }}</p>
+        <p v-if="error" class="inline-error">{{ error }}</p>
       </div>
     </div>
 
