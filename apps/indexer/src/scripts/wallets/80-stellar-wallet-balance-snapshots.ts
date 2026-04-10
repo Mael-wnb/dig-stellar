@@ -1,4 +1,3 @@
-// apps/indexer/src/scripts/wallets/80-stellar-wallet-balance-snapshots.ts
 import 'dotenv/config';
 import { createPgClient } from '../shared/db';
 import { fetchJson, nowIso } from '../discovery/00-common';
@@ -63,26 +62,53 @@ function isKnownHorizonNotFound(error: unknown): boolean {
   return message.includes('HTTP 404');
 }
 
+function getTargetWalletId(): string | null {
+  const value =
+    process.env.WALLET_ID?.trim() ??
+    process.env.USER_WALLET_ID?.trim() ??
+    null;
+
+  return value && value.length ? value : null;
+}
+
 async function main() {
   const horizonUrl = process.env.HORIZON_URL ?? 'https://horizon.stellar.org';
+  const targetWalletId = getTargetWalletId();
+
   const client = createPgClient();
   await client.connect();
 
   try {
-    const walletsRes = await client.query<ActiveWalletRow>(
+    const walletsQuery = targetWalletId
+      ? `
+        select
+          id,
+          user_id,
+          address,
+          chain,
+          label
+        from user_wallets
+        where chain = 'stellar'
+          and is_active = true
+          and id = $1::uuid
+        order by created_at asc
       `
-      select
-        id,
-        user_id,
-        address,
-        chain,
-        label
-      from user_wallets
-      where chain = 'stellar'
-        and is_active = true
-      order by created_at asc
-      `
-    );
+      : `
+        select
+          id,
+          user_id,
+          address,
+          chain,
+          label
+        from user_wallets
+        where chain = 'stellar'
+          and is_active = true
+        order by created_at asc
+      `;
+
+    const walletsRes = targetWalletId
+      ? await client.query<ActiveWalletRow>(walletsQuery, [targetWalletId])
+      : await client.query<ActiveWalletRow>(walletsQuery);
 
     const assetsRes = await client.query<AssetRow>(
       `
@@ -151,7 +177,7 @@ async function main() {
           if (balance.asset_type === 'native') {
             matchedAsset = nativeAsset;
             assetContractId = nativeAsset?.contract_address ?? STELLAR_NATIVE_CONTRACT;
-            assetSymbol = nativeAsset?.symbol ?? 'XLM';
+            assetSymbol = nativeAsset?.symbol ?? 'native';
           } else {
             const symbol = normalizeSymbol(balance.asset_code);
             assetSymbol = symbol;
@@ -213,7 +239,7 @@ async function main() {
               matchedAsset?.id ?? null,
               assetContractId,
               assetSymbol,
-              Math.round(balanceScaled * 10 ** 7).toString(), // fallback raw approximation
+              Math.round(balanceScaled * 10 ** 7).toString(),
               balanceScaled,
               priceUsd,
               balanceUsd,
@@ -247,6 +273,7 @@ async function main() {
     console.log({
       completedAt: nowIso(),
       chain: 'stellar',
+      targetWalletId,
       processedWallets,
       insertedRows,
       snapshotAt: snapshotAt.toISOString(),
