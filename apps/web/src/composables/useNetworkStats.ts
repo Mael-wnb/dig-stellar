@@ -36,28 +36,40 @@ function fmtFeeXlm(value: number): string {
 
 const FALLBACK_ACTIVE_WALLETS = {
   value: '+10M',
-  change: 'live',
+  change: 'Increase',
 }
 
 const FALLBACK_DEX_VOLUME = {
   value: '$410k',
-  change: '',
+  change: 'Stable',
 }
 
 const FALLBACK_USDC_SUPPLY = {
   value: '$242M',
-  change: '',
+  change: 'Increase',
 }
 
 export function useNetworkStats() {
   const stats = ref<NetworkStat[]>([
     { title: 'XLM Price', value: '—', change: '—' },
     { title: 'Stellar TVL', value: '—', change: '—' },
-    { title: 'Active Wallets', value: FALLBACK_ACTIVE_WALLETS.value, change: FALLBACK_ACTIVE_WALLETS.change },
+    {
+      title: 'Active Wallets',
+      value: FALLBACK_ACTIVE_WALLETS.value,
+      change: FALLBACK_ACTIVE_WALLETS.change,
+    },
     { title: 'Stable MCap', value: '—', change: '—' },
-    { title: '24h DEX Vol', value: FALLBACK_DEX_VOLUME.value, change: FALLBACK_DEX_VOLUME.change },
+    {
+      title: '24h DEX Vol',
+      value: FALLBACK_DEX_VOLUME.value,
+      change: FALLBACK_DEX_VOLUME.change,
+    },
     { title: 'Protocols', value: '—', change: 'tracked' },
-    { title: 'USDC Supply', value: FALLBACK_USDC_SUPPLY.value, change: FALLBACK_USDC_SUPPLY.change },
+    {
+      title: 'USDC Supply',
+      value: FALLBACK_USDC_SUPPLY.value,
+      change: FALLBACK_USDC_SUPPLY.change,
+    },
     { title: 'Avg Tx Fee', value: '—', change: 'stable' },
   ])
 
