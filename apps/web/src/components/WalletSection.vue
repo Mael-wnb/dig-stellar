@@ -81,17 +81,6 @@ async function openConnectModal(): Promise<void> {
       throw new Error("No wallet address returned.");
     }
 
-    const connectResponse = await connectWalletApi({
-      chain: "stellar",
-      address: sessionResult.address,
-      label: "",
-    });
-
-    setUserId(connectResponse.userId);
-    hydrateFromConnect({
-      wallets: connectResponse.wallets,
-    });
-
     pendingAddress.value = sessionResult.address;
     pendingWalletProviderId.value = sessionResult.providerId;
 
@@ -103,10 +92,37 @@ async function openConnectModal(): Promise<void> {
     if (alreadyPresent) {
       selectedWallet.value = alreadyPresent;
       showAddModal.value = false;
-      await loadOverview();
       return;
     }
 
+    // Premier login app : on résout / crée le userId backend
+    if (!userId.value) {
+      const connectResponse = await connectWalletApi({
+        chain: "stellar",
+        address: sessionResult.address,
+        label: "",
+      });
+
+      setUserId(connectResponse.userId);
+      hydrateFromConnect({
+        wallets: connectResponse.wallets,
+      });
+
+      const linkedWallet = connectResponse.wallets.find(
+        (wallet) =>
+          wallet.address.toLowerCase() === sessionResult.address.toLowerCase()
+      );
+
+      if (linkedWallet) {
+        selectedWallet.value = linkedWallet;
+      }
+
+      await loadOverview();
+      showAddModal.value = false;
+      return;
+    }
+
+    // User déjà connu : on prépare juste l'ajout d'un wallet secondaire
     newLabel.value = "";
     showAddModal.value = true;
   } catch (err: unknown) {
