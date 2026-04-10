@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -174,6 +180,88 @@ export class WalletsService {
     return wallet;
   }
 
+  private async getWalletByAddress(params: {
+    chain: string;
+    address: string;
+  }): Promise<WalletRow | null> {
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `
+      select
+        id,
+        user_id,
+        chain,
+        address,
+        label,
+        is_primary,
+        is_active,
+        metadata,
+        created_at,
+        updated_at
+      from user_wallets
+      where lower(chain) = lower($1)
+        and lower(address) = lower($2)
+      limit 1
+      `,
+      params.chain,
+      params.address
+    )) as WalletRow[];
+
+    return rows[0] ?? null;
+  }
+
+  private async createWalletForUser(params: {
+    userId: string;
+    chain: string;
+    address: string;
+    label?: string | null;
+  }) {
+    const label = this.normalizeLabel(params.label);
+
+    const primaryRows = (await this.prisma.$queryRawUnsafe(
+      `
+      select count(*) as count
+      from user_wallets
+      where user_id = $1::uuid
+      `,
+      params.userId
+    )) as Array<{ count: unknown }>;
+
+    const isPrimary = (toNumber(primaryRows[0]?.count) ?? 0) === 0;
+
+    const inserted = (await this.prisma.$queryRawUnsafe(
+      `
+      insert into user_wallets (
+        user_id,
+        chain,
+        address,
+        label,
+        is_primary,
+        is_active,
+        metadata
+      )
+      values ($1::uuid, $2, $3, $4, $5, true, '{}'::jsonb)
+      returning
+        id,
+        user_id,
+        chain,
+        address,
+        label,
+        is_primary,
+        is_active,
+        metadata,
+        created_at,
+        updated_at
+      `,
+      params.userId,
+      params.chain,
+      params.address,
+      label,
+      isPrimary
+    )) as WalletRow[];
+
+    return inserted[0];
+  }
+
   private resolveIndexerDir(): string {
     const candidates = [
       process.env.INDEXER_DIR,
@@ -248,6 +336,52 @@ export class WalletsService {
     });
   }
 
+  async connectWallet(params: {
+    chain?: string;
+    address?: string;
+    label?: string | null;
+  }) {
+    const chain = this.normalizeChain(params.chain);
+    const address = this.normalizeAddress(params.address);
+    const label = this.normalizeLabel(params.label);
+
+    const existingWallet = await this.getWalletByAddress({
+      chain,
+      address,
+    });
+
+    if (existingWallet) {
+      const overview = await this.getWalletsOverview(existingWallet.user_id);
+
+      return {
+        connected: true,
+        createdUser: false,
+        createdWallet: false,
+        wallet: this.mapWallet(existingWallet),
+        ...overview,
+      };
+    }
+
+    const newUserId = randomUUID();
+
+    const createdWallet = await this.createWalletForUser({
+      userId: newUserId,
+      chain,
+      address,
+      label,
+    });
+
+    const overview = await this.getWalletsOverview(newUserId);
+
+    return {
+      connected: true,
+      createdUser: true,
+      createdWallet: true,
+      wallet: this.mapWallet(createdWallet),
+      ...overview,
+    };
+  }
+
   async createWallet(params: {
     userId?: string;
     chain?: string;
@@ -314,51 +448,16 @@ export class WalletsService {
       };
     }
 
-    const primaryRows = (await this.prisma.$queryRawUnsafe(
-      `
-      select count(*) as count
-      from user_wallets
-      where user_id = $1::uuid
-      `,
-      userId
-    )) as Array<{ count: unknown }>;
-
-    const isPrimary = (toNumber(primaryRows[0]?.count) ?? 0) === 0;
-
-    const inserted = (await this.prisma.$queryRawUnsafe(
-      `
-      insert into user_wallets (
-        user_id,
-        chain,
-        address,
-        label,
-        is_primary,
-        is_active,
-        metadata
-      )
-      values ($1::uuid, $2, $3, $4, $5, true, '{}'::jsonb)
-      returning
-        id,
-        user_id,
-        chain,
-        address,
-        label,
-        is_primary,
-        is_active,
-        metadata,
-        created_at,
-        updated_at
-      `,
+    const inserted = await this.createWalletForUser({
       userId,
       chain,
       address,
       label,
-      isPrimary
-    )) as WalletRow[];
+    });
 
     return {
       created: true,
-      wallet: this.mapWallet(inserted[0]),
+      wallet: this.mapWallet(inserted),
     };
   }
 

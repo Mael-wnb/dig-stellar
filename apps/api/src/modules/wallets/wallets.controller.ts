@@ -8,6 +8,12 @@ type CreateWalletBody = {
   label?: string | null;
 };
 
+type ConnectWalletBody = {
+  chain?: string;
+  address?: string;
+  label?: string | null;
+};
+
 type SetPrimaryBody = {
   userId?: string;
 };
@@ -24,6 +30,15 @@ type RefreshWalletBody = {
 @Controller('v1/wallets')
 export class WalletsController {
   constructor(private readonly walletsService: WalletsService) {}
+
+  @Post('connect')
+  connectWallet(@Body() body?: ConnectWalletBody) {
+    return this.walletsService.connectWallet({
+      chain: body?.chain,
+      address: body?.address,
+      label: body?.label ?? null,
+    });
+  }
 
   @Post()
   createWallet(
