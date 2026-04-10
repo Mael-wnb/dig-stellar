@@ -1,58 +1,36 @@
 <!-- src/components/DashboardHeader.vue -->
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import {
-  StellarWalletsKit,
-  WalletNetwork,
-  allowAllModules,
-  XBULL_ID,
-} from '@creit.tech/stellar-wallets-kit'
+import { onMounted } from "vue";
+import { useWalletSession } from "../composables/useWalletSession";
 
 defineProps<{
-  stats: { title: string; value: string; change?: string }[]
-}>()
+  stats: { title: string; value: string; change?: string }[];
+}>();
 
-// ── Wallet Kit ───────────────────────────────────────────────────────────────
-const connectedAddress = ref<string | null>(null)
-const isConnecting = ref(false)
-
-const kit = new StellarWalletsKit({
-  network: WalletNetwork.PUBLIC,
-  selectedWalletId: XBULL_ID,
-  modules: allowAllModules(),
-})
+const {
+  connectedAddress,
+  shortConnectedAddress,
+  isConnecting,
+  connectWallet,
+  disconnectWallet,
+  restoreWalletSession,
+} = useWalletSession();
 
 async function openWalletModal() {
-  isConnecting.value = true
   try {
-    await kit.openModal({
-      onWalletSelected: async (option) => {
-        kit.setWallet(option.id)
-        const { address } = await kit.getAddress()
-        connectedAddress.value = address
-      },
-    })
-  } catch (e) {
-    console.error('Wallet connection cancelled or failed', e)
-  } finally {
-    isConnecting.value = false
+    await connectWallet();
+  } catch (error) {
+    console.error("Wallet connection cancelled or failed", error);
   }
 }
 
-function disconnectWallet() {
-  connectedAddress.value = null
-}
-
-const shortAddress = computed(() => {
-  if (!connectedAddress.value) return null
-  return `${connectedAddress.value.slice(0, 6)}…${connectedAddress.value.slice(-4)}`
-})
+onMounted(() => {
+  restoreWalletSession();
+});
 </script>
 
 <template>
   <div class="header-wrap">
-
-    <!-- Top bar -->
     <div class="topbar">
       <div class="logo-group">
         <div class="logo-circle">
@@ -65,7 +43,6 @@ const shortAddress = computed(() => {
       </div>
 
       <div class="right-block">
-        <!-- Connect Wallet -->
         <button
           v-if="!connectedAddress"
           class="wallet-connect-btn"
@@ -73,31 +50,41 @@ const shortAddress = computed(() => {
           @click="openWalletModal"
         >
           <span class="wallet-dot" />
-          {{ isConnecting ? 'Connecting…' : 'Connect Wallet' }}
+          {{ isConnecting ? "Connecting…" : "Connect Wallet" }}
         </button>
 
-        <div v-else class="wallet-connected" title="Click to disconnect" @click="disconnectWallet">
+        <div
+          v-else
+          class="wallet-connected"
+          title="Click to disconnect"
+          @click="disconnectWallet"
+        >
           <span class="wallet-dot wallet-dot--active" />
-          <span class="wallet-addr">{{ shortAddress }}</span>
+          <span class="wallet-addr">{{ shortConnectedAddress }}</span>
           <span class="wallet-network">Mainnet</span>
         </div>
 
         <div class="desc-block">
-          <!-- <p class="desc">
-            Dig is applying for a Stellar Community Fund grant to build the go-to analytics &amp;
-            portfolio dashboard for Stellar DeFi — real-time TVL, multi-wallet tracking, on-chain
-            actions, protocol notifications, inflow/outflow monitoring, and Stellar market cap
-            tracking across Soroban protocols. This is an early demo.
-          </p> -->
           <div class="links-row">
-            <a href="https://github.com/Mael-wnb/dig-stellar" target="_blank" class="link-pill">GitHub ↗</a>
-            <a href="https://communityfund.stellar.org/submissions/recoebnaQgCsMeEjm" target="_blank" class="link-pill">Grant submission ↗</a>
+            <a
+              href="https://github.com/Mael-wnb/dig-stellar"
+              target="_blank"
+              class="link-pill"
+            >
+              GitHub ↗
+            </a>
+            <a
+              href="https://communityfund.stellar.org/submissions/recoebnaQgCsMeEjm"
+              target="_blank"
+              class="link-pill"
+            >
+              Grant submission ↗
+            </a>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Stats grid -->
     <div class="stats-grid">
       <div v-for="stat in stats" :key="stat.title" class="stat-card">
         <div class="stat-label">{{ stat.title }}</div>
@@ -111,7 +98,6 @@ const shortAddress = computed(() => {
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -158,7 +144,6 @@ h1 {
   letter-spacing: 0.1em;
 }
 
-/* Right side: desc + wallet */
 .right-block {
   display: flex;
   flex-direction: column;
@@ -172,14 +157,6 @@ h1 {
   align-items: flex-end;
   gap: 8px;
   max-width: 380px;
-}
-
-.desc {
-  font-size: 11px;
-  color: #9A9B99;
-  text-align: right;
-  line-height: 1.6;
-  margin: 0;
 }
 
 .links-row { display: flex; gap: 6px; }
@@ -198,7 +175,6 @@ h1 {
 }
 .link-pill:hover { background: rgba(213,255,47,0.15); }
 
-/* Connect Wallet */
 .wallet-connect-btn {
   display: flex;
   align-items: center;
@@ -244,7 +220,7 @@ h1 {
 }
 @keyframes wpulse {
   0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
+  50% { opacity: 0.4; }
 }
 
 .wallet-addr {
@@ -256,7 +232,6 @@ h1 {
 }
 .wallet-network { font-size: 10px; color: #9A9B99; letter-spacing: 0.06em; }
 
-/* Stats */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);

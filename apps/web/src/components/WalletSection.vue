@@ -1,13 +1,7 @@
 <!-- src/components/WalletSection.vue -->
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import {
-  StellarWalletsKit,
-  WalletNetwork,
-  allowAllModules,
-  XBULL_ID,
-} from "@creit.tech/stellar-wallets-kit";
-
+import { useWalletSession } from "../composables/useWalletSession";
 import {
   createWallet,
   deleteWallet,
@@ -29,22 +23,17 @@ defineProps<{
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 
-const kit = new StellarWalletsKit({
-  network:
-    import.meta.env.VITE_STELLAR_NETWORK === "TESTNET"
-      ? WalletNetwork.TESTNET
-      : WalletNetwork.PUBLIC,
-  selectedWalletId: XBULL_ID,
-  modules: allowAllModules(),
-});
+const {
+  isConnecting,
+  connectWallet,
+  restoreWalletSession,
+} = useWalletSession();
 
 const wallets = ref<WalletItem[]>([]);
 const selectedWallet = ref<WalletItem | null>(null);
 const overviewLoading = ref(true);
 
-const isConnecting = ref(false);
 const connectError = ref("");
-
 const showAddModal = ref(false);
 const pendingAddress = ref("");
 const pendingWalletProviderId = ref<string | null>(null);
@@ -151,40 +140,31 @@ async function submitWallet(address: string): Promise<WalletItem> {
 
 async function openConnectModal(): Promise<void> {
   connectError.value = "";
-  isConnecting.value = true;
 
   try {
-    await kit.openModal({
-      onWalletSelected: async (option: { id: string }) => {
-        pendingWalletProviderId.value = option.id;
-        kit.setWallet(option.id);
+    const result = await connectWallet();
 
-        const { address } = await kit.getAddress();
+    if (!result?.address) {
+      throw new Error("No wallet address returned.");
+    }
 
-        if (!address || !/^G[A-Z2-7]{55}$/.test(address)) {
-          throw new Error("Invalid Stellar address returned by wallet.");
-        }
+    if (
+      wallets.value.find(
+        (wallet) => wallet.address.toLowerCase() === result.address.toLowerCase()
+      )
+    ) {
+      throw new Error("This wallet is already added.");
+    }
 
-        if (
-          wallets.value.find(
-            (wallet) => wallet.address.toLowerCase() === address.toLowerCase()
-          )
-        ) {
-          throw new Error("This wallet is already added.");
-        }
-
-        pendingAddress.value = address;
-        newLabel.value = "";
-        showAddModal.value = true;
-      },
-    });
+    pendingAddress.value = result.address;
+    pendingWalletProviderId.value = result.providerId;
+    newLabel.value = "";
+    showAddModal.value = true;
   } catch (error: unknown) {
     connectError.value =
       error instanceof Error
         ? error.message
         : "Connection failed or cancelled.";
-  } finally {
-    isConnecting.value = false;
   }
 }
 
@@ -195,11 +175,6 @@ async function addWalletWithoutSignature(): Promise<void> {
   connectError.value = "";
 
   try {
-    console.log("[wallet] add without signature", {
-      providerId: pendingWalletProviderId.value,
-      address: pendingAddress.value,
-    });
-
     const createdWallet = await submitWallet(pendingAddress.value);
 
     await refreshWallet(createdWallet.id, USER_ID);
@@ -317,7 +292,10 @@ function selectWallet(wallet: WalletItem): void {
   selectedWallet.value = selectedWallet.value?.id === wallet.id ? null : wallet;
 }
 
-onMounted(loadOverview);
+onMounted(() => {
+  restoreWalletSession();
+  loadOverview();
+});
 </script>
 
 <template>
@@ -839,8 +817,7 @@ onMounted(loadOverview);
   color: #e2e6e1;
 }
 
-.sign-address-block,
-.sign-message-block {
+.sign-address-block {
   background: #141414;
   border: 1px solid #2a2a2a;
   border-radius: 8px;
