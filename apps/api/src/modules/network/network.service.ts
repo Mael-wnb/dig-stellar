@@ -180,18 +180,43 @@ export class NetworkService {
   }
 
   private async safeGetUsdcSupply(): Promise<number | null> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT_MS);
+  
     try {
-      const data = await this.fetchJsonWithTimeout<StellarExpertSupplyResponse>(
-        'https://api.stellar.expert/explorer/public/asset/USDC-GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN/supply'
+      const response = await fetch(
+        'https://api.stellar.expert/explorer/public/asset/USDC-GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN/supply',
+        {
+          method: 'GET',
+          signal: controller.signal,
+          headers: {
+            Accept: 'text/plain, application/json',
+          },
+        }
       );
-
-      const issued = this.toFiniteNumber(data?.issued);
-      if (issued === null) return null;
-
-      return issued / 10_000_000;
+  
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} on USDC supply endpoint`);
+      }
+  
+      const raw = (await response.text()).trim();
+  
+      if (!raw) {
+        return null;
+      }
+  
+      const value = Number(raw);
+      if (!Number.isFinite(value)) {
+        this.logger.warn(`safeGetUsdcSupply received non-numeric payload: ${raw}`);
+        return null;
+      }
+  
+      return value;
     } catch (error) {
       this.logger.warn(`safeGetUsdcSupply failed: ${this.getErrorMessage(error)}`);
       return null;
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
