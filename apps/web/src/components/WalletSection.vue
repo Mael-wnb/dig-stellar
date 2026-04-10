@@ -44,10 +44,12 @@ const overviewLoading = ref(true);
 
 const isConnecting = ref(false);
 const connectError = ref("");
-const showSignModal = ref(false);
+
+const showAddModal = ref(false);
 const pendingAddress = ref("");
+const pendingWalletProviderId = ref<string | null>(null);
 const newLabel = ref("");
-const signLoading = ref(false);
+const addLoading = ref(false);
 
 const actionLoadingWalletId = ref<string | null>(null);
 const actionError = ref("");
@@ -59,16 +61,10 @@ const totalPortfolioUsd = computed(() =>
   )
 );
 
-const pendingSignMessage = computed(
-  () =>
-    `I confirm that I own this Stellar wallet:\n${
-      pendingAddress.value
-    }\n\nTimestamp: ${Date.now()}`
-);
-
 function fmtUsd(value: number | null | undefined): string {
   const amount =
     typeof value === "number" && Number.isFinite(value) ? value : 0;
+
   return `$${amount.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -101,14 +97,12 @@ async function loadOverview(): Promise<void> {
 
     wallets.value = data.wallets.map((wallet) => ({
       ...wallet,
-      totalPortfolioUsd: 0,
-      balances: [],
+      totalPortfolioUsd: wallet.totalPortfolioUsd ?? 0,
+      balances: wallet.balances ?? [],
       loading: false,
     }));
 
-    await Promise.all(
-      wallets.value.map((wallet) => loadWalletBalances(wallet.id))
-    );
+    await Promise.all(wallets.value.map((wallet) => loadWalletBalances(wallet.id)));
 
     if (selectedWallet.value) {
       const updatedSelectedWallet = wallets.value.find(
@@ -148,11 +142,11 @@ async function submitWallet(address: string): Promise<WalletItem> {
     userId: USER_ID,
     chain: "stellar",
     address,
-    label: newLabel.value.trim() || null,
+    label: newLabel.value.trim() || "",
     signature: "",
   });
 
-  return response.wallet;
+  return response.wallet ?? response;
 }
 
 async function openConnectModal(): Promise<void> {
@@ -161,21 +155,27 @@ async function openConnectModal(): Promise<void> {
 
   try {
     await kit.openModal({
-      onWalletSelected: async (option) => {
+      onWalletSelected: async (option: { id: string }) => {
+        pendingWalletProviderId.value = option.id;
         kit.setWallet(option.id);
+
         const { address } = await kit.getAddress();
 
         if (!address || !/^G[A-Z2-7]{55}$/.test(address)) {
           throw new Error("Invalid Stellar address returned by wallet.");
         }
 
-        if (wallets.value.find((wallet) => wallet.address === address)) {
+        if (
+          wallets.value.find(
+            (wallet) => wallet.address.toLowerCase() === address.toLowerCase()
+          )
+        ) {
           throw new Error("This wallet is already added.");
         }
 
         pendingAddress.value = address;
         newLabel.value = "";
-        showSignModal.value = true;
+        showAddModal.value = true;
       },
     });
   } catch (error: unknown) {
@@ -188,38 +188,34 @@ async function openConnectModal(): Promise<void> {
   }
 }
 
-async function signAndAdd(): Promise<void> {
+async function addWalletWithoutSignature(): Promise<void> {
   if (!pendingAddress.value) return;
 
-  signLoading.value = true;
+  addLoading.value = true;
   connectError.value = "";
 
   try {
-    await (kit as any).signMessage(pendingSignMessage.value, {
+    console.log("[wallet] add without signature", {
+      providerId: pendingWalletProviderId.value,
       address: pendingAddress.value,
     });
 
-    const result = await (kit as any).signMessage(
-  pendingSignMessage.value,
-  { address: pendingAddress.value }
-)
-
-console.log('signMessage result', result)
-
     const createdWallet = await submitWallet(pendingAddress.value);
+
     await refreshWallet(createdWallet.id, USER_ID);
     await loadOverview();
 
     const justAddedWallet =
       wallets.value.find((wallet) => wallet.id === createdWallet.id) ?? null;
-    selectedWallet.value = justAddedWallet;
 
-    closeSignModal();
+    selectedWallet.value = justAddedWallet;
+    closeAddModal();
   } catch (error: unknown) {
+    console.error("[wallet] addWalletWithoutSignature failed", error);
     connectError.value =
-      error instanceof Error ? error.message : "Signature failed.";
+      error instanceof Error ? error.message : "Failed to add wallet.";
   } finally {
-    signLoading.value = false;
+    addLoading.value = false;
   }
 }
 
@@ -309,9 +305,10 @@ async function handleDeleteWallet(wallet: WalletItem): Promise<void> {
   }
 }
 
-function closeSignModal(): void {
-  showSignModal.value = false;
+function closeAddModal(): void {
+  showAddModal.value = false;
   pendingAddress.value = "";
+  pendingWalletProviderId.value = null;
   newLabel.value = "";
   connectError.value = "";
 }
@@ -348,12 +345,8 @@ onMounted(loadOverview);
             <div class="wallet-topline">
               <span class="wallet-num">
                 {{ wallet.label || "Unnamed wallet" }}
-                <span v-if="wallet.isPrimary" class="pill primary"
-                  >Primary</span
-                >
-                <span v-if="!wallet.isActive" class="pill inactive"
-                  >Inactive</span
-                >
+                <span v-if="wallet.isPrimary" class="pill primary">Primary</span>
+                <span v-if="!wallet.isActive" class="pill inactive">Inactive</span>
               </span>
             </div>
 
@@ -385,9 +378,7 @@ onMounted(loadOverview);
 
               <button
                 class="mini-btn"
-                :disabled="
-                  isBusy(selectedWallet.id) || selectedWallet.isPrimary
-                "
+                :disabled="isBusy(selectedWallet.id) || selectedWallet.isPrimary"
                 @click="handleSetPrimary(selectedWallet)"
               >
                 Set primary
@@ -445,7 +436,7 @@ onMounted(loadOverview);
           {{ isConnecting ? "Opening wallet…" : "Add Stellar Wallet" }}
         </button>
 
-        <p v-if="connectError && !showSignModal" class="inline-error">
+        <p v-if="connectError && !showAddModal" class="inline-error">
           {{ connectError }}
         </p>
         <p v-if="actionError" class="inline-error">{{ actionError }}</p>
@@ -487,14 +478,14 @@ onMounted(loadOverview);
 
     <transition name="fade">
       <div
-        v-if="showSignModal"
+        v-if="showAddModal"
         class="modal-overlay"
-        @click.self="closeSignModal"
+        @click.self="closeAddModal"
       >
         <div class="connect-modal">
           <div class="modal-header">
-            <span class="modal-title">Prove Ownership</span>
-            <button class="modal-close" @click="closeSignModal">✕</button>
+            <span class="modal-title">Add Wallet</span>
+            <button class="modal-close" @click="closeAddModal">✕</button>
           </div>
 
           <div class="sign-address-block">
@@ -502,9 +493,9 @@ onMounted(loadOverview);
             <span class="sign-address">{{ pendingAddress }}</span>
           </div>
 
-          <div class="sign-message-block">
-            <span class="sign-label">Message to sign</span>
-            <pre class="sign-message-text">{{ pendingSignMessage }}</pre>
+          <div class="sign-address-block">
+            <span class="sign-label">Wallet provider</span>
+            <span class="sign-address">{{ pendingWalletProviderId || "Unknown" }}</span>
           </div>
 
           <div class="sign-label-row">
@@ -517,8 +508,8 @@ onMounted(loadOverview);
           </div>
 
           <p class="sign-info">
-            Your wallet will prompt you to sign this message. No transaction is
-            broadcast — this only proves ownership.
+            This wallet will be added directly after connection, without message
+            signing for now.
           </p>
 
           <p v-if="connectError" class="connect-error">{{ connectError }}</p>
@@ -526,12 +517,12 @@ onMounted(loadOverview);
           <div class="modal-actions">
             <button
               class="btn-confirm"
-              :disabled="signLoading"
-              @click="signAndAdd"
+              :disabled="addLoading"
+              @click="addWalletWithoutSignature"
             >
-              {{ signLoading ? "Waiting for signature…" : "Sign & Add Wallet" }}
+              {{ addLoading ? "Adding wallet…" : "Add Wallet" }}
             </button>
-            <button class="btn-cancel" @click="closeSignModal">Cancel</button>
+            <button class="btn-cancel" @click="closeAddModal">Cancel</button>
           </div>
         </div>
       </div>
@@ -869,15 +860,6 @@ onMounted(loadOverview);
   color: #d5ff2f;
   font-family: "DM Mono", monospace;
   word-break: break-all;
-}
-.sign-message-text {
-  font-size: 10px;
-  color: #9a9b99;
-  font-family: "DM Mono", monospace;
-  white-space: pre-wrap;
-  word-break: break-all;
-  margin: 0;
-  line-height: 1.5;
 }
 .sign-label-row {
   display: flex;
