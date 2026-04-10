@@ -1,31 +1,77 @@
 <!-- src/components/DashboardHeader.vue -->
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { computed, onMounted } from "vue";
+import { connectWallet as connectWalletApi } from "../api/wallets";
+import { useAppUser } from "../composables/useAppUser";
 import { useWalletSession } from "../composables/useWalletSession";
 
 defineProps<{
   stats: { title: string; value: string; change?: string }[];
 }>();
 
+const { userId, setUserId, restoreUser, clearUser } = useAppUser();
+
 const {
   connectedAddress,
   shortConnectedAddress,
   isConnecting,
   connectWallet,
-  disconnectWallet,
+  disconnectWallet: disconnectWalletSession,
   restoreWalletSession,
 } = useWalletSession();
 
+const resolvedUser = computed(() => !!userId.value);
+
 async function openWalletModal() {
   try {
-    await connectWallet();
+    const sessionResult = await connectWallet();
+    console.log("[header] sessionResult", sessionResult);
+
+    if (!sessionResult?.address) {
+      throw new Error("No wallet address returned.");
+    }
+
+    const connectResponse = await connectWalletApi({
+      chain: "stellar",
+      address: sessionResult.address,
+      label: "",
+    });
+
+    console.log("[header] connectResponse", connectResponse);
+
+    const backendUserId = connectResponse?.userId?.trim();
+
+    if (!backendUserId) {
+      throw new Error("Backend did not return userId.");
+    }
+
+    window.localStorage.setItem("dig_stellar_user_id", backendUserId);
+    setUserId(backendUserId);
+
+    console.log("[header] user linked", {
+      backendUserId,
+      storedUserId: window.localStorage.getItem("dig_stellar_user_id"),
+    });
   } catch (error) {
-    console.error("Wallet connection cancelled or failed", error);
+    console.error("[header] Wallet connection cancelled or failed", error);
   }
+}
+
+function disconnectWallet() {
+  disconnectWalletSession();
+  clearUser();
+  window.localStorage.removeItem("dig_stellar_user_id");
 }
 
 onMounted(() => {
   restoreWalletSession();
+  restoreUser();
+
+  console.log("[header] mounted", {
+    connectedAddress: connectedAddress.value,
+    userId: userId.value,
+    storedUserId: window.localStorage.getItem("dig_stellar_user_id"),
+  });
 });
 </script>
 
@@ -61,7 +107,9 @@ onMounted(() => {
         >
           <span class="wallet-dot wallet-dot--active" />
           <span class="wallet-addr">{{ shortConnectedAddress }}</span>
-          <span class="wallet-network">Mainnet</span>
+          <span class="wallet-network">
+            {{ resolvedUser ? "Linked" : "Session only" }}
+          </span>
         </div>
 
         <div class="desc-block">

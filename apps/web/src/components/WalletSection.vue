@@ -1,6 +1,8 @@
 <!-- src/components/WalletSection.vue -->
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
+import { connectWallet as connectWalletApi } from "../api/wallets";
+import { useAppUser } from "../composables/useAppUser";
 import { useWalletSession } from "../composables/useWalletSession";
 import { useWallets } from "../composables/useWallets";
 import type {
@@ -13,10 +15,13 @@ defineProps<{
   notifications: WalletNotification[];
 }>();
 
+const { userId, setUserId, restoreUser, clearUser } = useAppUser();
+
 const {
   isConnecting,
   connectWallet,
   restoreWalletSession,
+  disconnectWallet,
 } = useWalletSession();
 
 const {
@@ -32,8 +37,10 @@ const {
   setPrimary,
   toggleActive,
   removeWallet,
+  hydrateFromConnect,
+  clearWallets,
   selectWallet,
-} = useWallets();
+} = useWallets(userId);
 
 const connectError = ref("");
 const showAddModal = ref(false);
@@ -68,22 +75,38 @@ async function openConnectModal(): Promise<void> {
   connectError.value = "";
 
   try {
-    const result = await connectWallet();
+    const sessionResult = await connectWallet();
 
-    if (!result?.address) {
+    if (!sessionResult?.address) {
       throw new Error("No wallet address returned.");
     }
 
-    if (
-      wallets.value.find(
-        (wallet) => wallet.address.toLowerCase() === result.address.toLowerCase()
-      )
-    ) {
-      throw new Error("This wallet is already added.");
+    const connectResponse = await connectWalletApi({
+      chain: "stellar",
+      address: sessionResult.address,
+      label: "",
+    });
+
+    setUserId(connectResponse.userId);
+    hydrateFromConnect({
+      wallets: connectResponse.wallets,
+    });
+
+    pendingAddress.value = sessionResult.address;
+    pendingWalletProviderId.value = sessionResult.providerId;
+
+    const alreadyPresent = wallets.value.find(
+      (wallet) =>
+        wallet.address.toLowerCase() === sessionResult.address.toLowerCase()
+    );
+
+    if (alreadyPresent) {
+      selectedWallet.value = alreadyPresent;
+      showAddModal.value = false;
+      await loadOverview();
+      return;
     }
 
-    pendingAddress.value = result.address;
-    pendingWalletProviderId.value = result.providerId;
     newLabel.value = "";
     showAddModal.value = true;
   } catch (err: unknown) {
@@ -99,6 +122,17 @@ async function addWalletWithoutSignature(): Promise<void> {
   connectError.value = "";
 
   try {
+    const alreadyPresent = wallets.value.find(
+      (wallet) =>
+        wallet.address.toLowerCase() === pendingAddress.value.toLowerCase()
+    );
+
+    if (alreadyPresent) {
+      selectedWallet.value = alreadyPresent;
+      closeAddModal();
+      return;
+    }
+
     await addWallet({
       address: pendingAddress.value,
       label: newLabel.value,
@@ -121,6 +155,12 @@ async function handleDeleteWallet(wallet: WalletItem): Promise<void> {
   if (!confirmed) return;
 
   await removeWallet(wallet);
+
+  if (wallets.value.length === 0) {
+    disconnectWallet();
+    clearUser();
+    clearWallets();
+  }
 }
 
 function closeAddModal(): void {
@@ -131,9 +171,21 @@ function closeAddModal(): void {
   connectError.value = "";
 }
 
+watch(
+  () => userId.value,
+  async (nextUserId) => {
+    if (nextUserId) {
+      await loadOverview();
+    } else {
+      clearWallets();
+    }
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
   restoreWalletSession();
-  loadOverview();
+  restoreUser();
 });
 </script>
 
@@ -325,8 +377,7 @@ onMounted(() => {
           </div>
 
           <p class="sign-info">
-            This wallet will be added directly after connection, without message
-            signing for now.
+            This wallet will be attached to your current app profile.
           </p>
 
           <p v-if="connectError" class="connect-error">{{ connectError }}</p>

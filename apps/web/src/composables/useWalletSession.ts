@@ -7,91 +7,118 @@ import {
   XBULL_ID,
 } from "@creit.tech/stellar-wallets-kit";
 
-type WalletConnectResult = {
+const STORAGE_CONNECTED_ADDRESS_KEY = "dig_stellar_connected_address";
+const STORAGE_CONNECTED_PROVIDER_KEY = "dig_stellar_connected_provider";
+
+type WalletSessionResult = {
   address: string;
-  providerId: string | null;
-} | null;
-
-const STORAGE_ADDRESS_KEY = "dig_stellar_connected_address";
-const STORAGE_PROVIDER_KEY = "dig_stellar_connected_provider";
-
-const isTestnet = import.meta.env.VITE_STELLAR_NETWORK === "TESTNET";
+  providerId: string;
+};
 
 const connectedAddress = ref<string | null>(null);
-const connectedProviderId = ref<string | null>(null);
+const connectedProvider = ref<string | null>(null);
 const isConnecting = ref(false);
 const initialized = ref(false);
 
 const kit = new StellarWalletsKit({
-  network: isTestnet ? WalletNetwork.TESTNET : WalletNetwork.PUBLIC,
+  network:
+    import.meta.env.VITE_STELLAR_NETWORK === "TESTNET"
+      ? WalletNetwork.TESTNET
+      : WalletNetwork.PUBLIC,
   selectedWalletId: XBULL_ID,
   modules: allowAllModules(),
 });
 
-function restoreWalletSession(): void {
-  if (initialized.value) return;
-  if (typeof window === "undefined") return;
+function persistSession(address: string, providerId: string): void {
+  connectedAddress.value = address;
+  connectedProvider.value = providerId;
 
-  connectedAddress.value = localStorage.getItem(STORAGE_ADDRESS_KEY);
-  connectedProviderId.value = localStorage.getItem(STORAGE_PROVIDER_KEY);
-  initialized.value = true;
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(STORAGE_CONNECTED_ADDRESS_KEY, address);
+    window.localStorage.setItem(STORAGE_CONNECTED_PROVIDER_KEY, providerId);
+  }
 }
 
-function persistWalletSession(address: string, providerId: string | null): void {
-  connectedAddress.value = address;
-  connectedProviderId.value = providerId;
+function clearSession(): void {
+  connectedAddress.value = null;
+  connectedProvider.value = null;
+
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(STORAGE_CONNECTED_ADDRESS_KEY);
+    window.localStorage.removeItem(STORAGE_CONNECTED_PROVIDER_KEY);
+  }
+}
+
+function restoreWalletSession(): void {
+  if (initialized.value) return;
+  initialized.value = true;
 
   if (typeof window === "undefined") return;
 
-  localStorage.setItem(STORAGE_ADDRESS_KEY, address);
+  const storedAddress = window.localStorage.getItem(STORAGE_CONNECTED_ADDRESS_KEY);
+  const storedProvider = window.localStorage.getItem(STORAGE_CONNECTED_PROVIDER_KEY);
 
-  if (providerId) {
-    localStorage.setItem(STORAGE_PROVIDER_KEY, providerId);
-  } else {
-    localStorage.removeItem(STORAGE_PROVIDER_KEY);
+  connectedAddress.value =
+    storedAddress && storedAddress.trim().length > 0 ? storedAddress : null;
+  connectedProvider.value =
+    storedProvider && storedProvider.trim().length > 0 ? storedProvider : null;
+
+  console.log("[wallet-session] restore", {
+    connectedAddress: connectedAddress.value,
+    connectedProvider: connectedProvider.value,
+  });
+}
+
+async function connectWallet(): Promise<WalletSessionResult | null> {
+  isConnecting.value = true;
+
+  try {
+    const result = await new Promise<WalletSessionResult>((resolve, reject) => {
+      let resolved = false;
+
+      void kit.openModal({
+        onWalletSelected: async (option: { id: string }) => {
+          try {
+            kit.setWallet(option.id);
+
+            const { address } = await kit.getAddress();
+
+            if (!address || !/^G[A-Z2-7]{55}$/.test(address)) {
+              throw new Error("Invalid Stellar address returned by wallet.");
+            }
+
+            const sessionResult: WalletSessionResult = {
+              address,
+              providerId: option.id,
+            };
+
+            persistSession(sessionResult.address, sessionResult.providerId);
+
+            resolved = true;
+            resolve(sessionResult);
+          } catch (error) {
+            reject(error);
+          }
+        },
+      }).catch((error: unknown) => {
+        if (!resolved) {
+          reject(error);
+        }
+      });
+    });
+
+    console.log("[wallet-session] connectWallet resolved", result);
+    return result;
+  } catch (error) {
+    console.error("[wallet-session] connectWallet failed", error);
+    return null;
+  } finally {
+    isConnecting.value = false;
   }
 }
 
 function disconnectWallet(): void {
-  connectedAddress.value = null;
-  connectedProviderId.value = null;
-
-  if (typeof window === "undefined") return;
-
-  localStorage.removeItem(STORAGE_ADDRESS_KEY);
-  localStorage.removeItem(STORAGE_PROVIDER_KEY);
-}
-
-async function connectWallet(): Promise<WalletConnectResult> {
-  restoreWalletSession();
-  isConnecting.value = true;
-
-  try {
-    let result: WalletConnectResult = null;
-
-    await kit.openModal({
-      onWalletSelected: async (option: { id: string }) => {
-        kit.setWallet(option.id);
-
-        const { address } = await kit.getAddress();
-
-        if (!address || !/^G[A-Z2-7]{55}$/.test(address)) {
-          throw new Error("Invalid Stellar address returned by wallet.");
-        }
-
-        persistWalletSession(address, option.id);
-
-        result = {
-          address,
-          providerId: option.id,
-        };
-      },
-    });
-
-    return result;
-  } finally {
-    isConnecting.value = false;
-  }
+  clearSession();
 }
 
 const shortConnectedAddress = computed(() => {
@@ -103,9 +130,8 @@ export function useWalletSession() {
   restoreWalletSession();
 
   return {
-    kit,
     connectedAddress,
-    connectedProviderId,
+    connectedProvider,
     shortConnectedAddress,
     isConnecting,
     connectWallet,

@@ -11,9 +11,7 @@ import {
 } from "../api/wallets";
 import type { WalletItem } from "../types/wallet";
 
-const USER_ID = "11111111-1111-4111-8111-111111111111";
-
-export function useWallets() {
+export function useWallets(userIdRef: { value: string | null }) {
   const wallets = ref<WalletItem[]>([]);
   const selectedWallet = ref<WalletItem | null>(null);
   const overviewLoading = ref(true);
@@ -27,16 +25,33 @@ export function useWallets() {
     )
   );
 
+  function requireUserId(): string {
+    const userId = userIdRef.value?.trim();
+    if (!userId) {
+      throw new Error("No connected app user found.");
+    }
+    return userId;
+  }
+
   function isBusy(walletId?: string): boolean {
     return !!walletId && actionLoadingWalletId.value === walletId;
   }
 
   async function loadOverview(): Promise<void> {
+    const userId = userIdRef.value?.trim();
+
+    if (!userId) {
+      wallets.value = [];
+      selectedWallet.value = null;
+      overviewLoading.value = false;
+      return;
+    }
+
     overviewLoading.value = true;
     error.value = "";
 
     try {
-      const data = await fetchWalletOverview(USER_ID);
+      const data = await fetchWalletOverview(userId);
 
       wallets.value = data.wallets.map((wallet) => ({
         ...wallet,
@@ -62,13 +77,14 @@ export function useWallets() {
   }
 
   async function loadWalletBalances(walletId: string): Promise<void> {
+    const userId = requireUserId();
     const wallet = wallets.value.find((item) => item.id === walletId);
     if (!wallet) return;
 
     wallet.loading = true;
 
     try {
-      const data = await fetchWalletBalances(walletId, USER_ID);
+      const data = await fetchWalletBalances(walletId, userId);
       wallet.totalPortfolioUsd = data.totalPortfolioUsd;
       wallet.balances = data.balances;
     } catch (err) {
@@ -82,10 +98,11 @@ export function useWallets() {
     address: string;
     label?: string;
   }): Promise<WalletItem> {
+    const userId = requireUserId();
     error.value = "";
 
     const response = await createWallet({
-      userId: USER_ID,
+      userId,
       chain: "stellar",
       address: params.address,
       label: params.label?.trim() || "",
@@ -94,7 +111,7 @@ export function useWallets() {
 
     const createdWallet = response.wallet ?? response;
 
-    await refreshWallet(createdWallet.id, USER_ID);
+    await refreshWallet(createdWallet.id, userId);
     await loadOverview();
 
     const justAddedWallet =
@@ -106,11 +123,12 @@ export function useWallets() {
   }
 
   async function refreshOneWallet(wallet: WalletItem): Promise<void> {
+    const userId = requireUserId();
     error.value = "";
     actionLoadingWalletId.value = wallet.id;
 
     try {
-      await refreshWallet(wallet.id, USER_ID);
+      await refreshWallet(wallet.id, userId);
       await loadWalletBalances(wallet.id);
 
       if (selectedWallet.value?.id === wallet.id) {
@@ -127,11 +145,12 @@ export function useWallets() {
   }
 
   async function setPrimary(wallet: WalletItem): Promise<void> {
+    const userId = requireUserId();
     error.value = "";
     actionLoadingWalletId.value = wallet.id;
 
     try {
-      await setPrimaryWallet(wallet.id, USER_ID);
+      await setPrimaryWallet(wallet.id, userId);
       await loadOverview();
 
       if (selectedWallet.value?.id === wallet.id) {
@@ -147,11 +166,12 @@ export function useWallets() {
   }
 
   async function toggleActive(wallet: WalletItem): Promise<void> {
+    const userId = requireUserId();
     error.value = "";
     actionLoadingWalletId.value = wallet.id;
 
     try {
-      await setWalletActive(wallet.id, USER_ID, !wallet.isActive);
+      await setWalletActive(wallet.id, userId, !wallet.isActive);
       await loadOverview();
 
       if (selectedWallet.value?.id === wallet.id) {
@@ -167,11 +187,12 @@ export function useWallets() {
   }
 
   async function removeWallet(wallet: WalletItem): Promise<void> {
+    const userId = requireUserId();
     error.value = "";
     actionLoadingWalletId.value = wallet.id;
 
     try {
-      await deleteWallet(wallet.id, USER_ID);
+      await deleteWallet(wallet.id, userId);
 
       if (selectedWallet.value?.id === wallet.id) {
         selectedWallet.value = null;
@@ -186,13 +207,38 @@ export function useWallets() {
     }
   }
 
+  function hydrateFromConnect(payload: {
+    wallets: WalletItem[];
+  }): void {
+    wallets.value = payload.wallets.map((wallet) => ({
+      ...wallet,
+      totalPortfolioUsd: wallet.totalPortfolioUsd ?? 0,
+      balances: wallet.balances ?? [],
+      loading: false,
+    }));
+
+    if (selectedWallet.value) {
+      const updatedSelectedWallet = wallets.value.find(
+        (wallet) => wallet.id === selectedWallet.value?.id
+      );
+      selectedWallet.value = updatedSelectedWallet ?? null;
+    }
+  }
+
   function selectWallet(wallet: WalletItem): void {
     selectedWallet.value =
       selectedWallet.value?.id === wallet.id ? null : wallet;
   }
 
+  function clearWallets(): void {
+    wallets.value = [];
+    selectedWallet.value = null;
+    error.value = "";
+    overviewLoading.value = false;
+    actionLoadingWalletId.value = null;
+  }
+
   return {
-    userId: USER_ID,
     wallets,
     selectedWallet,
     overviewLoading,
@@ -207,6 +253,8 @@ export function useWallets() {
     setPrimary,
     toggleActive,
     removeWallet,
+    hydrateFromConnect,
+    clearWallets,
     selectWallet,
   };
 }
