@@ -36,7 +36,7 @@ function fmtFeeXlm(value: number): string {
 
 const FALLBACK_ACTIVE_WALLETS = {
   value: '+10M',
-  change: 'Increase',
+  change: '▲ increase',
 }
 
 const FALLBACK_DEX_VOLUME = {
@@ -46,7 +46,7 @@ const FALLBACK_DEX_VOLUME = {
 
 const FALLBACK_USDC_SUPPLY = {
   value: '$242M',
-  change: 'Increase',
+  change: '▲ increase',
 }
 
 export function useNetworkStats() {

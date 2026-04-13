@@ -63,6 +63,30 @@ function disconnectWallet() {
   window.localStorage.removeItem("dig_stellar_user_id");
 }
 
+function getStatChangeClass(change?: string) {
+  if (!change) return "";
+
+  const normalized = change.trim().toLowerCase();
+
+  if (
+    normalized.startsWith("▼") ||
+    normalized.startsWith("-") ||
+    normalized === "decrease"
+  ) {
+    return "down";
+  }
+
+  if (
+    normalized.startsWith("▲") ||
+    normalized.startsWith("+") ||
+    normalized === "increase"
+  ) {
+    return "up";
+  }
+
+  return "neutral";
+}
+
 onMounted(() => {
   restoreWalletSession();
   restoreUser();
@@ -140,7 +164,7 @@ onMounted(() => {
         <div
           v-if="stat.change"
           class="stat-change"
-          :class="{ down: stat.change.startsWith('▼') || stat.change.startsWith('-') }"
+          :class="getStatChangeClass(stat.change)"
         >
           {{ stat.change }}
         </div>
@@ -319,6 +343,20 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
-.stat-change { font-size: 11px; color: #D5FF2F; font-weight: 500; }
-.stat-change.down { color: #FF5A5A; }
+.stat-change {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.stat-change.up {
+  color: #D5FF2F;
+}
+
+.stat-change.down {
+  color: #FF5A5A;
+}
+
+.stat-change.neutral {
+  color: #9A9B99;
+}
 </style>
