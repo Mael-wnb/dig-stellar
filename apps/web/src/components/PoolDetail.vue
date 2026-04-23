@@ -1,5 +1,7 @@
 <!-- src/components/PoolDetail.vue -->
 <script setup lang="ts">
+import { computed } from 'vue'
+import { getBlendPoolDisplayConfig } from '../constants/blendPoolDisplayConfig'
 import type {
   PoolDetailData,
   PoolReserveDetail,
@@ -19,6 +21,8 @@ const props = defineProps<{
   pool: PoolDetailData
   protocol: ProtocolDisplay
 }>()
+
+const blendDisplayConfig = computed(() => getBlendPoolDisplayConfig(props.pool.id))
 
 function formatUsd(value?: number | null): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return '—'
@@ -101,27 +105,27 @@ function ammTokens(pool: PoolDetailData): PoolTokenSummary[] {
           <div class="metrics-grid">
             <template v-if="isLendingPool(pool)">
               <div class="metric-tile">
-                <span class="metric-label">TVL</span>
-                <span class="metric-value lime">{{ formatUsd(pool.metrics.tvlUsd) }}</span>
-              </div>
-              <div class="metric-tile">
                 <span class="metric-label">Supplied</span>
-                <span class="metric-value">{{ formatUsd(pool.metrics.totalSuppliedUsd) }}</span>
+                <span class="metric-value lime">{{ formatUsd(pool.metrics.totalSuppliedUsd) }}</span>
               </div>
               <div class="metric-tile">
                 <span class="metric-label">Borrowed</span>
                 <span class="metric-value">{{ formatUsd(pool.metrics.totalBorrowedUsd) }}</span>
               </div>
               <div class="metric-tile">
-                <span class="metric-label">Net Liquidity</span>
-                <span class="metric-value">{{ formatUsd(pool.metrics.netLiquidityUsd) }}</span>
+                <span class="metric-label">Max Position</span>
+                <span class="metric-value">{{ blendDisplayConfig.maxPosition }}</span>
               </div>
               <div class="metric-tile">
-                <span class="metric-label">Supply APY</span>
+                <span class="metric-label">Min Collateral</span>
+                <span class="metric-value">{{ blendDisplayConfig.minCollateral }}</span>
+              </div>
+              <div class="metric-tile">
+                <span class="metric-label">Avg Supply APY</span>
                 <span class="metric-value">{{ formatPercentFromRatio(pool.metrics.supplyApy) }}</span>
               </div>
               <div class="metric-tile">
-                <span class="metric-label">Borrow APY</span>
+                <span class="metric-label">Avg Borrow APY</span>
                 <span class="metric-value">{{ formatPercentFromRatio(pool.metrics.borrowApy) }}</span>
               </div>
             </template>
@@ -150,7 +154,7 @@ function ammTokens(pool: PoolDetailData): PoolTokenSummary[] {
 
           <p class="description">
             <template v-if="isLendingPool(pool)">
-              Lending pool with live reserve balances, supplied and borrowed amounts, APYs, and backstop exposure.
+              Lending pool with live reserve balances, supplied and borrowed amounts, average APYs, and collateral monitoring hints.
             </template>
             <template v-else>
               AMM pool with live protocol metrics and token composition from backend data.
@@ -201,8 +205,8 @@ function ammTokens(pool: PoolDetailData): PoolTokenSummary[] {
             </div>
 
             <div v-if="isLendingPool(pool)" class="info-row">
-              <span class="info-key">Backstop Credit</span>
-              <span class="info-val">{{ formatUsd(pool.metrics.totalBackstopCreditUsd) }}</span>
+              <span class="info-key">TVL</span>
+              <span class="info-val">{{ formatUsd(pool.metrics.tvlUsd) }}</span>
             </div>
 
             <div v-if="isAmmPool(pool)" class="info-row">
