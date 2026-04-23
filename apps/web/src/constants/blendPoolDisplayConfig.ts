@@ -7,16 +7,16 @@ export type BlendPoolDisplayConfig = {
   
   export const BLEND_POOL_DISPLAY_CONFIG: Record<string, BlendPoolDisplayConfig> = {
     'blend-fixed-pool': {
-      maxPosition: '$—',
-      minCollateral: '—%',
+      maxPosition: '6',
+      minCollateral: '$5.00',
     },
     'blend-etherfuse-pool': {
-      maxPosition: '$—',
-      minCollateral: '—%',
+      maxPosition: '6',
+      minCollateral: '$5.00',
     },
     'blend-orbit-pool': {
-      maxPosition: '$—',
-      minCollateral: '—%',
+      maxPosition: '6',
+      minCollateral: '$10.00',
     },
   }
   
