@@ -79,7 +79,8 @@ function getStatChangeClass(change?: string) {
   if (
     normalized.startsWith("▲") ||
     normalized.startsWith("+") ||
-    normalized === "increase"
+    normalized === "increase" ||
+    normalized === "live"
   ) {
     return "up";
   }

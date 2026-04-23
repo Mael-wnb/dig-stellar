@@ -35,7 +35,6 @@ const {
   addWallet,
   refreshOneWallet,
   setPrimary,
-  toggleActive,
   removeWallet,
   hydrateFromConnect,
   clearWallets,
@@ -57,6 +56,15 @@ function fmtUsd(value: number | null | undefined): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function getWalletXlmBalance(wallet: WalletItem): number {
+  const nativeBalance = wallet.balances?.find((balance) => {
+    if (balance.metadata?.assetType === "native") return true;
+    return balance.symbol?.toLowerCase() === "native";
+  });
+
+  return nativeBalance?.balance ?? 0;
 }
 
 function shortAddr(address: string): string {
@@ -95,7 +103,6 @@ async function openConnectModal(): Promise<void> {
       return;
     }
 
-    // Premier login app : on résout / crée le userId backend
     if (!userId.value) {
       const connectResponse = await connectWalletApi({
         chain: "stellar",
@@ -122,7 +129,6 @@ async function openConnectModal(): Promise<void> {
       return;
     }
 
-    // User déjà connu : on prépare juste l'ajout d'un wallet secondaire
     newLabel.value = "";
     showAddModal.value = true;
   } catch (err: unknown) {
@@ -231,7 +237,6 @@ onMounted(() => {
               <span class="wallet-num">
                 {{ wallet.label || "Unnamed wallet" }}
                 <span v-if="wallet.isPrimary" class="pill primary">Primary</span>
-                <span v-if="!wallet.isActive" class="pill inactive">Inactive</span>
               </span>
             </div>
 
@@ -239,15 +244,26 @@ onMounted(() => {
           </div>
 
           <div class="wallet-right">
-            <span v-if="wallet.loading" class="wallet-amount">…</span>
-            <span v-else class="wallet-amount">
-              {{ fmtUsd(wallet.totalPortfolioUsd ?? 0) }}
-            </span>
+  <template v-if="wallet.loading">
+    <span class="wallet-amount">…</span>
+  </template>
 
-            <button class="btn-sel" @click.stop="selectWallet(wallet)">
-              Select ›
-            </button>
-          </div>
+  <template v-else>
+    <div class="wallet-metrics">
+      <span class="wallet-xlm">
+        {{
+          getWalletXlmBalance(wallet).toLocaleString("en-US", {
+            maximumFractionDigits: 2,
+          })
+        }}
+        XLM
+      </span>
+      <span class="wallet-amount">
+        {{ fmtUsd(wallet.totalPortfolioUsd ?? 0) }}
+      </span>
+    </div>
+  </template>
+</div>
         </div>
 
         <transition name="slide">
@@ -267,14 +283,6 @@ onMounted(() => {
                 @click="setPrimary(selectedWallet)"
               >
                 Set primary
-              </button>
-
-              <button
-                class="mini-btn"
-                :disabled="isBusy(selectedWallet.id)"
-                @click="toggleActive(selectedWallet)"
-              >
-                {{ selectedWallet.isActive ? "Deactivate" : "Activate" }}
               </button>
 
               <button
@@ -536,11 +544,6 @@ onMounted(() => {
   color: #d5ff2f;
   background: rgba(213, 255, 47, 0.08);
   border: 1px solid rgba(213, 255, 47, 0.3);
-}
-.pill.inactive {
-  color: #ffb86b;
-  background: rgba(255, 184, 107, 0.08);
-  border: 1px solid rgba(255, 184, 107, 0.3);
 }
 
 .btn-sel,
@@ -863,16 +866,18 @@ onMounted(() => {
   width: fit-content;
   letter-spacing: 0.05em;
 }
-.btn-claim {
-  font-size: 12px;
-  font-weight: 700;
-  color: #fff;
-  background: #222;
-  border: 1px solid #3a3a3a;
-  border-radius: 6px;
-  padding: 7px 14px;
-  cursor: pointer;
-  width: fit-content;
+.wallet-metrics {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.wallet-xlm {
+  font-size: 11px;
+  color: #9a9b99;
+  font-weight: 500;
+  white-space: nowrap;
 }
 .see-all {
   font-size: 12px;
