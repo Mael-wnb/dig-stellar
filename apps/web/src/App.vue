@@ -3,21 +3,50 @@ import DigDashboard from './components/DigDashboard.vue'
 </script>
 
 <template>
-  <div class="relative min-h-screen bg-bg text-text overflow-hidden">
+  <div class="layout">
 
-    <!-- BACKGROUND -->
-    <img
-      src="/background.svg"
-      class="absolute inset-0 w-full h-full object-cover opacity-50 pointer-events-none z-0"
-    />
-
-    <!-- GLOW / OVERLAY -->
-    <div class="absolute inset-0 bg-bg/70 z-0 pointer-events-none"></div>
-
-    <!-- CONTENT -->
-    <div class="relative z-10">
+    <div class="content">
       <DigDashboard />
     </div>
 
   </div>
 </template>
+
+<style scoped>
+.layout {
+  position: relative;
+  min-height: 100vh;
+  background-color: #0e0e0e;
+
+  /* 🔥 LE FIX IMPORTANT */
+  background-image: url('/background.svg');
+  background-repeat: no-repeat;
+
+  /* 👉 on ancre le visuel sur TON coin important */
+  background-position: top right;
+
+  /* 👉 comportement responsive clean */
+  background-size: cover;
+}
+
+/* 🔥 AJUSTEMENT FIN PAR BREAKPOINT */
+
+@media (max-width: 640px) {
+  .layout {
+    background-size: 140%;
+    background-position: top right;
+  }
+}
+
+@media (min-width: 1024px) {
+  .layout {
+    background-size: 110%;
+    background-position: top right;
+  }
+}
+
+.content {
+  position: relative;
+  z-index: 10;
+}
+</style>

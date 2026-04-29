@@ -1,4 +1,3 @@
-// src/composables/useProtocol.ts
 import { computed, onMounted, ref, watch } from 'vue'
 import { fetchPoolById, fetchPools } from '../api/pools'
 import { PROTOCOL_META } from '../data/protocolMeta'
@@ -108,6 +107,8 @@ export function useProtocol() {
 
     try {
       const data = await fetchPools()
+
+      // ✅ IMPORTANT : ne pas recréer les refs (évite flicker)
       pools.value = data
 
       if (!data.length) {
@@ -117,7 +118,6 @@ export function useProtocol() {
         return
       }
 
-      // ✅ assure un protocol valide
       if (
         !selectedProtocolId.value ||
         !data.some(p => p.protocol.id === selectedProtocolId.value)
@@ -129,7 +129,6 @@ export function useProtocol() {
         (pool) => pool.protocol.id === selectedProtocolId.value
       )
 
-      // ✅ assure un pool valide
       if (
         !selectedPoolId.value ||
         !poolsForProtocol.some(p => p.id === selectedPoolId.value)
@@ -146,14 +145,11 @@ export function useProtocol() {
   }
 
   /* ───────────────────────── */
-  /* LOAD DETAIL */
+  /* LOAD DETAIL (FIXED) */
   /* ───────────────────────── */
 
   async function loadPoolDetail(poolId: string) {
-    if (!poolId) {
-      selectedPool.value = null
-      return
-    }
+    if (!poolId) return
 
     loadingPoolDetail.value = true
     error.value = null
@@ -161,13 +157,13 @@ export function useProtocol() {
     try {
       const data = await fetchPoolById(poolId)
 
-      // ✅ mapping clean (clé du système)
+      // ✅ NE MET PAS selectedPool à null → évite flicker
       selectedPool.value = mapPoolToDisplay(data)
 
     } catch (err) {
       error.value =
         err instanceof Error ? err.message : 'Failed to load pool detail'
-      selectedPool.value = null
+      // ❌ ne pas reset selectedPool ici
     } finally {
       loadingPoolDetail.value = false
     }
@@ -195,13 +191,16 @@ export function useProtocol() {
   }
 
   /* ───────────────────────── */
-  /* WATCHERS */
+  /* WATCHERS (FIXED) */
   /* ───────────────────────── */
 
   watch(selectedPoolId, (poolId) => {
-    if (poolId) {
+    if (!poolId) return
+
+    // ✅ laisse le DOM se stabiliser AVANT fetch
+    requestAnimationFrame(() => {
       void loadPoolDetail(poolId)
-    }
+    })
   })
 
   /* ───────────────────────── */

@@ -1,80 +1,88 @@
-import type { PoolDetailData } from '../types/protocol'
+// src/mappers/poolMapper.ts
+
+import type {
+  PoolDetailData,
+  PoolReserveDetail,
+  PoolTokenSummary,
+} from '../types/protocol'
+
 import type { PoolDisplay } from '../types/poolDisplay'
 
-function formatUsd(v?: number | null) {
-  if (!v) return '—'
-  if (v >= 1_000_000_000) return `$${(v / 1e9).toFixed(1)}B`
-  if (v >= 1_000_000) return `$${(v / 1e6).toFixed(1)}M`
-  if (v >= 1_000) return `$${(v / 1e3).toFixed(1)}K`
-  return `$${v.toFixed(0)}`
+/* ──────────────────────────────────────────────── */
+/* SAFE HELPERS */
+/* ──────────────────────────────────────────────── */
+
+function n(value: any): number | null {
+  if (value === null || value === undefined) return null
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
 }
 
-function formatPercent(v?: number | null) {
-  if (v == null) return '—'
-  return `${(v * 100).toFixed(2)}%`
-}
+/* ──────────────────────────────────────────────── */
+/* MAIN MAPPER */
+/* ──────────────────────────────────────────────── */
 
 export function mapPoolToDisplay(data: PoolDetailData): PoolDisplay {
-  const isLending = data.type === 'lending_pool'
-  const isAmm = data.type === 'amm_pool'
-
-  let metrics: PoolDisplay['metrics'] = []
-
-  /* ───────────────────────── */
-  /* AMM */
-  /* ───────────────────────── */
-
-  if (isAmm) {
-    metrics = [
-      { label: 'TVL', value: formatUsd(data.metrics.tvlUsd), lime: true },
-      { label: 'Volume 24h', value: formatUsd(data.metrics.volume24hUsd) },
-      { label: 'Fees 24h', value: formatUsd(data.metrics.fees24hUsd) },
-      { label: 'Swaps 24h', value: data.metrics.swaps24h?.toString() ?? '—' },
-      { label: 'Tokens', value: data.tokens?.length?.toString() ?? '—' },
-      { label: 'Type', value: 'AMM' },
-    ]
-  }
-
-  /* ───────────────────────── */
-  /* LENDING */
-  /* ───────────────────────── */
-
-  if (isLending) {
-    metrics = [
-      { label: 'TVL', value: formatUsd(data.metrics.tvlUsd), lime: true },
-      { label: 'Supplied', value: formatUsd(data.metrics.totalSuppliedUsd) },
-      { label: 'Borrowed', value: formatUsd(data.metrics.totalBorrowedUsd) },
-      { label: 'Net Liquidity', value: formatUsd(data.metrics.netLiquidityUsd) },
-      { label: 'Supply APY', value: formatPercent(data.metrics.supplyApy) },
-      { label: 'Borrow APY', value: formatPercent(data.metrics.borrowApy) },
-    ]
-  }
-
-  /* ───────────────────────── */
-  /* ON-CHAIN INFO (inchangé) */
-  /* ───────────────────────── */
-
-  const onChainInfo = [
-    { key: 'Protocol', value: data.protocol.name },
-    { key: 'Type', value: data.type },
-    { key: 'Chain', value: data.chain },
-    {
-      key: 'Contract',
-      value: data.contractAddress
-        ? data.contractAddress.slice(0, 6) + '...' + data.contractAddress.slice(-4)
-        : '—',
-    },
-    {
-      key: 'Updated',
-      value: data.updatedAt
-        ? new Date(data.updatedAt).toLocaleString()
-        : '—',
-    },
-  ]
-
   return {
-    ...data,
-    metrics,
-    onChainInfo,
+    id: data.id,
+    name: data.name,
+    type: data.type,
+    chain: data.chain,
+    contractAddress: data.contractAddress,
+    updatedAt: data.updatedAt,
+
+    /* ───────────────────────── */
+    /* METRICS (CRITICAL FIX) */
+    /* ───────────────────────── */
+
+    metrics: {
+      // COMMON
+      tvlUsd: n(data.metrics?.tvlUsd),
+
+      // AMM
+      volume24hUsd: n(data.metrics?.volume24hUsd),
+      fees24hUsd: n(data.metrics?.fees24hUsd),
+      swaps24h: n(data.metrics?.swaps24h ?? data.metrics?.events24h),
+
+      // LENDING
+      totalSuppliedUsd: n(data.metrics?.totalSuppliedUsd),
+      totalBorrowedUsd: n(data.metrics?.totalBorrowedUsd),
+      netLiquidityUsd: n(data.metrics?.netLiquidityUsd),
+      totalBackstopCreditUsd: n(data.metrics?.totalBackstopCreditUsd),
+
+      supplyApy: n(data.metrics?.supplyApy),
+      borrowApy: n(data.metrics?.borrowApy),
+    },
+
+    /* ───────────────────────── */
+    /* LENDING RESERVES */
+    /* ───────────────────────── */
+
+    reserves: (data.reserves ?? []).map((r): PoolReserveDetail => ({
+      assetId: r.assetId,
+      symbol: r.symbol,
+      name: r.name,
+
+      priceUsd: n(r.priceUsd),
+
+      supplied: n(r.supplied),
+      borrowed: n(r.borrowed),
+
+      backstopCredit: n(r.backstopCredit),
+      supplyCap: n(r.supplyCap),
+
+      supplyApy: n(r.supplyApy),
+      borrowApy: n(r.borrowApy),
+    })),
+
+    /* ───────────────────────── */
+    /* AMM TOKENS */
+    /* ───────────────────────── */
+
+    tokens: (data.tokens ?? []).map((t): PoolTokenSummary => ({
+      assetId: t.assetId,
+      symbol: t.symbol,
+      role: t.role,
+    })),
   }
 }

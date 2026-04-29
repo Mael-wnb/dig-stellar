@@ -43,13 +43,13 @@ const { stats } = useNetworkStats()
     <!-- HERO -->
     <HeroBanner
       title="Stellar"
-      description="Stellar DeFi ecosystem built on Soroban smart contracts — TVL grew 193% in 2025. Tracking Blend V2, Aquarius, Soroswap & DeFindex across $88M+ combined TVL."
+      description="Stellar DeFi ecosystem built on Soroban smart contracts. TVL grew 193% in 2025. Tracking Blend V2, Aquarius, Soroswap & DeFindex across $88M+ combined TVL."
       :image="heroImg"
       :logo="stellarLogo"
 
     />
 
-    <!-- ✅ STATS (MAINTENANT OK) -->
+    <!-- ✅ STATS -->
     <NetworkStats :stats="stats" />
 
     <!-- WALLET -->
@@ -121,11 +121,18 @@ const { stats } = useNetworkStats()
         </div>
 
         <PoolDetail
-          v-else-if="selectedPool && selectedProtocol"
-          class="mt-2"
-          :pool="selectedPool"
-          :protocol="selectedProtocol"
-        />
+  v-if="selectedPool && selectedProtocol"
+  class="mt-2"
+  :pool="selectedPool"
+  :protocol="selectedProtocol"
+/>
+
+<div
+  v-else-if="loadingPoolDetail"
+  class="bg-card border border-border rounded-lg p-3 text-xs text-muted mt-2"
+>
+  Loading pool detail...
+</div>
 
         <div
           v-else
