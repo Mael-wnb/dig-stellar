@@ -62,15 +62,17 @@ export function mapPoolToDisplay(data: PoolDetailData): PoolDisplay {
       assetId: r.assetId,
       symbol: r.symbol,
       name: r.name,
-
+    
+      decimals: r.decimals ?? 0, // ✅ FIX ICI
+    
       priceUsd: n(r.priceUsd),
-
+    
       supplied: n(r.supplied),
       borrowed: n(r.borrowed),
-
+    
       backstopCredit: n(r.backstopCredit),
       supplyCap: n(r.supplyCap),
-
+    
       supplyApy: n(r.supplyApy),
       borrowApy: n(r.borrowApy),
     })),

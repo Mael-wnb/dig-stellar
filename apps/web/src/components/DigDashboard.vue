@@ -123,7 +123,7 @@ const { stats } = useNetworkStats()
         <PoolDetail
   v-if="selectedPool && selectedProtocol"
   class="mt-2"
-  :pool="selectedPool"
+  :pool="selectedPool as any"
   :protocol="selectedProtocol"
 />
 
