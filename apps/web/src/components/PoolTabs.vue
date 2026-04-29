@@ -1,9 +1,8 @@
-<!-- src/components/PoolTabs.vue -->
 <script setup lang="ts">
 import { PROTOCOL_META } from '../data/protocolMeta'
 import type { PoolListItem } from '../types/protocol'
 
-defineProps<{
+const props = defineProps<{
   pools: PoolListItem[]
   selectedPoolId: string
 }>()
@@ -25,127 +24,60 @@ function getProtocolMeta(protocolId: string) {
     PROTOCOL_META[protocolId] ?? {
       icon: '•',
       iconColor: '#D5FF2F',
-      iconBg: '#1a1a1a',
     }
   )
 }
 </script>
 
 <template>
-  <div class="all-pools">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+
     <div
       v-for="pool in pools"
       :key="pool.id"
-      class="pool-tab"
-      :class="{ active: pool.id === selectedPoolId }"
-      :style="pool.id === selectedPoolId
-        ? {
-            borderColor: '#2a2a2a',
-            borderLeftColor: getProtocolMeta(pool.protocol.id).iconColor,
-            borderLeftWidth: '3px',
-            background: '#1a1a1a'
-          }
-        : {}"
       @click="emit('selectPool', pool.id)"
+      class="cursor-pointer rounded-xl p-3 flex flex-col gap-2 border transition-all"
+
+      :class="[
+        pool.id === selectedPoolId
+          ? 'bg-cardSoft border-accent'
+          : 'bg-card border-border hover:border-accent/40'
+      ]"
     >
-      <div class="pool-header">
+
+      <!-- NAME -->
+      <div class="flex items-center justify-between">
         <span
-          class="pool-name"
-          :style="pool.id === selectedPoolId
-            ? { color: getProtocolMeta(pool.protocol.id).iconColor }
-            : {}"
+          class="text-sm font-semibold truncate"
+          :class="pool.id === selectedPoolId ? 'text-accent' : 'text-text'"
         >
           {{ pool.name }}
         </span>
       </div>
 
-      <div class="pool-bottom">
-        <span class="pool-proto">{{ pool.protocol.name }}</span>
-        <span class="pool-tvl-row">
-          <span class="pool-type">TVL</span>
+      <!-- BOTTOM -->
+      <div class="flex items-center justify-between text-xs">
+
+        <span class="text-muted">
+          {{ pool.protocol?.name }}
+        </span>
+
+        <span class="flex items-center gap-1">
+          <span class="uppercase text-[10px] text-muted tracking-wider">
+            TVL
+          </span>
+
           <span
-            class="pool-tvl"
-            :style="pool.id === selectedPoolId ? { color: '#D5FF2F' } : {}"
+            class="font-semibold"
+            :class="pool.id === selectedPoolId ? 'text-accent' : 'text-muted'"
           >
-            {{ formatUsdCompact(pool.metrics.tvlUsd) }}
+            {{ formatUsdCompact(pool.metrics?.tvlUsd) }}
           </span>
         </span>
+
       </div>
+
     </div>
+
   </div>
 </template>
-
-<style scoped>
-.all-pools {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-}
-@media (max-width: 700px) {
-  .all-pools {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-.pool-tab {
-  background: #181818;
-  border: 1px solid #2a2a2a;
-  border-radius: 10px;
-  padding: 10px 12px;
-  cursor: pointer;
-  transition: border-left-color 0.15s, background 0.15s;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.pool-tab:hover:not(.active) {
-  border-color: #3a3a3a;
-}
-
-.pool-header {
-  display: flex;
-  align-items: center;
-}
-
-.pool-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: #E2E6E1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pool-bottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-}
-
-.pool-proto {
-  font-size: 11px;
-  font-weight: 500;
-  color: #9A9B99;
-}
-
-.pool-tvl-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.pool-type {
-  font-size: 10px;
-  color: #555;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.pool-tvl {
-  font-size: 11px;
-  font-weight: 600;
-  color: #9A9B99;
-}
-</style>

@@ -1,14 +1,17 @@
-<!-- src/components/DigDashboard.vue -->
 <script setup lang="ts">
 import { NOTIFICATIONS } from '../data/protocols'
 import { useProtocol } from '../composables/useProtocol'
 import { useNetworkStats } from '../composables/useNetworkStats'
 
 import DashboardHeader from './DashboardHeader.vue'
+import HeroBanner from './HeroBanner.vue'
+import NetworkStats from './NetworkStats.vue' // ✅ FIX
 import WalletSection from './WalletSection.vue'
 import ProtocolTabs from './ProtocolTabs.vue'
 import PoolTabs from './PoolTabs.vue'
 import PoolDetail from './PoolDetail.vue'
+
+import heroImg from '@/assets/hero.png'
 
 const {
   protocolDisplays,
@@ -28,33 +31,72 @@ const { stats } = useNetworkStats()
 </script>
 
 <template>
-  <div class="dash">
-    <DashboardHeader :stats="stats" />
+<div class="min-h-screen bg-bg text-text">
 
-    <section>
-      <div class="section-hd">
-        <span class="section-label">Stellar Multi-Wallet</span>
-        <span class="section-sub">Portfolio and wallet connection</span>
+  <!-- 👇 IMPORTANT: on réduit la largeur pour voir le background -->
+  <div class="max-w-[1100px] mx-auto px-6 py-8 flex flex-col gap-8">
+
+    <!-- HEADER -->
+    <DashboardHeader />
+
+    <!-- HERO -->
+    <HeroBanner
+      title="Stellar"
+      description="Stellar DeFi ecosystem built on Soroban smart contracts — TVL grew 193% in 2025. Tracking Blend V2, Aquarius, Soroswap & DeFindex across $88M+ combined TVL."
+      :image="heroImg"
+    />
+
+    <!-- ✅ STATS (MAINTENANT OK) -->
+    <NetworkStats :stats="stats" />
+
+    <!-- WALLET -->
+    <section class="flex flex-col gap-3">
+
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold uppercase tracking-[0.14em] text-accent">
+          Stellar Multi-Wallet
+        </span>
+
+        <span class="text-[11px] text-muted">
+          Portfolio and wallet connection
+        </span>
       </div>
 
       <WalletSection :notifications="NOTIFICATIONS" />
     </section>
 
-    <section>
-      <div class="section-hd">
-        <span class="section-label">Protocol View</span>
-        <span class="section-sub">Live backend data</span>
+    <!-- PROTOCOL -->
+    <section class="flex flex-col gap-3">
+
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold uppercase tracking-[0.14em] text-accent">
+          Protocol View
+        </span>
+
+        <span class="text-[11px] text-muted">
+          Live backend data
+        </span>
       </div>
 
-      <div v-if="error" class="state-box state-box--error">
+      <!-- ERROR -->
+      <div
+        v-if="error"
+        class="bg-card border border-red-500/30 text-red-400 rounded-lg p-3 text-xs"
+      >
         {{ error }}
       </div>
 
-      <div v-else-if="loadingProtocols" class="state-box">
+      <!-- LOADING -->
+      <div
+        v-else-if="loadingProtocols"
+        class="bg-card border border-border rounded-lg p-3 text-xs text-muted"
+      >
         Loading protocols...
       </div>
 
+      <!-- CONTENT -->
       <template v-else>
+
         <ProtocolTabs
           :protocols="protocolDisplays"
           :selected-protocol-id="selectedProtocolId"
@@ -62,76 +104,38 @@ const { stats } = useNetworkStats()
         />
 
         <PoolTabs
+          class="mt-2"
           :pools="protocolPools"
           :selected-pool-id="selectedPoolId"
-          style="margin-top: 8px;"
           @select-pool="selectPool"
         />
 
-        <div v-if="loadingPoolDetail" class="state-box" style="margin-top: 8px;">
+        <div
+          v-if="loadingPoolDetail"
+          class="bg-card border border-border rounded-lg p-3 text-xs text-muted mt-2"
+        >
           Loading pool detail...
         </div>
 
         <PoolDetail
           v-else-if="selectedPool && selectedProtocol"
+          class="mt-2"
           :pool="selectedPool"
           :protocol="selectedProtocol"
-          style="margin-top: 8px;"
         />
 
-        <div v-else class="state-box" style="margin-top: 8px;">
+        <div
+          v-else
+          class="bg-card border border-border rounded-lg p-3 text-xs text-muted mt-2"
+        >
           No pool selected.
         </div>
+
       </template>
+
     </section>
+
   </div>
+
+</div>
 </template>
-
-<style scoped>
-.dash {
-  min-height: 100vh;
-  background: #0e0e0e;
-  color: #E2E6E1;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  font-family: 'DM Mono', 'Courier New', monospace;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.section-hd {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.section-label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: #D5FF2F;
-}
-
-.section-sub {
-  font-size: 11px;
-  color: #9A9B99;
-}
-
-.state-box {
-  background: #181818;
-  border: 1px solid #2a2a2a;
-  border-radius: 10px;
-  padding: 14px;
-  font-size: 12px;
-  color: #9A9B99;
-}
-
-.state-box--error {
-  border-color: rgba(255, 90, 90, 0.35);
-  color: #ff8b8b;
-}
-</style>
