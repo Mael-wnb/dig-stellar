@@ -1,4 +1,3 @@
-<!-- src/components/PoolDetail.vue -->
 <script setup lang="ts">
 import type {
   PoolDetailData,
@@ -20,24 +19,29 @@ const props = defineProps<{
 
 function formatUsd(value?: number | null): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return '—'
+
+  const v = value as number
+
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    notation: value >= 1_000_000 ? 'compact' : 'standard',
-    maximumFractionDigits: value >= 100 ? 0 : 2,
-  }).format(value)
+    notation: v >= 1_000_000 ? 'compact' : 'standard',
+    maximumFractionDigits: v >= 100 ? 0 : 2,
+  }).format(v)
 }
 
 function formatNumber(value?: number | null, maxFractionDigits = 2): string {
-  if (!Number.isFinite(value!)) return '—'
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—'
+
   return new Intl.NumberFormat('en-US', {
     maximumFractionDigits: maxFractionDigits,
-  }).format(value)
+  }).format(value as number)
 }
 
 function formatPercentFromRatio(value?: number | null): string {
-  if (!Number.isFinite(value!)) return '—'
-  return `${(value! * 100).toFixed(2)}%`
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—'
+
+  return `${((value as number) * 100).toFixed(2)}%`
 }
 
 function shortAddress(value?: string | null): string {
