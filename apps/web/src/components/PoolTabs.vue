@@ -1,4 +1,3 @@
-<!-- src/components/PoolTabs.vue -->
 <script setup lang="ts">
 import { PROTOCOL_META } from '../data/protocolMeta'
 import type { PoolListItem } from '../types/protocol'
@@ -32,120 +31,74 @@ function getProtocolMeta(protocolId: string) {
 </script>
 
 <template>
-  <div class="all-pools">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-[6px]">
+
     <div
       v-for="pool in pools"
       :key="pool.id"
-      class="pool-tab"
-      :class="{ active: pool.id === selectedPoolId }"
-      :style="pool.id === selectedPoolId
-        ? {
-            borderColor: '#2a2a2a',
-            borderLeftColor: getProtocolMeta(pool.protocol.id).iconColor,
-            borderLeftWidth: '3px',
-            background: '#1a1a1a'
-          }
-        : {}"
       @click="emit('selectPool', pool.id)"
+      class="group cursor-pointer rounded-[10px] px-[12px] py-[10px] border flex flex-col gap-[8px] transition-all"
+
+      :class="pool.id === selectedPoolId
+        ? 'bg-[#1a1a1a] border-[#D5FF2F]/50'
+        : 'bg-[#181818] border-[#2a2a2a] hover:border-[#3a3a3a]'"
     >
-      <div class="pool-header">
+
+      <!-- TOP -->
+      <div class="flex items-center justify-between gap-[6px]">
+
+        <!-- NAME -->
         <span
-          class="pool-name"
-          :style="pool.id === selectedPoolId
-            ? { color: getProtocolMeta(pool.protocol.id).iconColor }
-            : {}"
+          class="text-[14px] font-semibold truncate"
+          :class="pool.id === selectedPoolId
+            ? 'text-[#D5FF2F]'
+            : 'text-[#E2E6E1]'"
         >
           {{ pool.name }}
         </span>
+
+        <!-- PROTOCOL BADGE -->
+        <div
+          class="flex items-center gap-[4px] text-[11px] px-[6px] py-[2px] rounded-[4px]"
+          :style="{
+            background: getProtocolMeta(pool.protocol?.id || '').iconBg,
+            color: getProtocolMeta(pool.protocol?.id || '').iconColor
+          }"
+        >
+          <span>{{ getProtocolMeta(pool.protocol?.id || '').icon }}</span>
+        </div>
+
       </div>
 
-      <div class="pool-bottom">
-        <span class="pool-proto">{{ pool.protocol.name }}</span>
-        <span class="pool-tvl-row">
-          <span class="pool-type">TVL</span>
-          <span
-            class="pool-tvl"
-            :style="pool.id === selectedPoolId ? { color: '#D5FF2F' } : {}"
-          >
-            {{ formatUsdCompact(pool.metrics.tvlUsd) }}
-          </span>
+      <!-- BOTTOM -->
+      <div class="flex items-center justify-between text-[11px]">
+
+        <!-- PROTOCOL NAME -->
+        <span class="text-[#9A9B99] truncate">
+          {{ pool.protocol?.name }}
         </span>
+
+        <!-- TVL -->
+        <div class="flex items-center gap-[4px]">
+
+          <span class="uppercase text-[9px] tracking-wider text-[#5e5f5d]">
+            TVL
+          </span>
+
+          <span
+            class="font-semibold"
+            :class="pool.id === selectedPoolId
+              ? 'text-[#D5FF2F]'
+              : 'text-[#9A9B99] group-hover:text-[#E2E6E1]'"
+          >
+            {{ formatUsdCompact(pool.metrics?.tvlUsd) }}
+          </span>
+
+        </div>
+
       </div>
+
     </div>
+
   </div>
 </template>
-
-<style scoped>
-.all-pools {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-}
-@media (max-width: 700px) {
-  .all-pools {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-.pool-tab {
-  background: #181818;
-  border: 1px solid #2a2a2a;
-  border-radius: 10px;
-  padding: 10px 12px;
-  cursor: pointer;
-  transition: border-left-color 0.15s, background 0.15s;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.pool-tab:hover:not(.active) {
-  border-color: #3a3a3a;
-}
-
-.pool-header {
-  display: flex;
-  align-items: center;
-}
-
-.pool-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: #E2E6E1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pool-bottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-}
-
-.pool-proto {
-  font-size: 11px;
-  font-weight: 500;
-  color: #9A9B99;
-}
-
-.pool-tvl-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.pool-type {
-  font-size: 10px;
-  color: #555;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.pool-tvl {
-  font-size: 11px;
-  font-weight: 600;
-  color: #9A9B99;
-}
-</style>
