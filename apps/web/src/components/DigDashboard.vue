@@ -12,6 +12,7 @@ import PoolTabs from './PoolTabs.vue'
 import PoolDetail from './PoolDetail.vue'
 
 import heroImg from '@/assets/hero.png'
+import stellarLogo from '@/assets/stellar-logo.svg'
 
 const {
   protocolDisplays,
@@ -44,6 +45,8 @@ const { stats } = useNetworkStats()
       title="Stellar"
       description="Stellar DeFi ecosystem built on Soroban smart contracts — TVL grew 193% in 2025. Tracking Blend V2, Aquarius, Soroswap & DeFindex across $88M+ combined TVL."
       :image="heroImg"
+      :logo="stellarLogo"
+
     />
 
     <!-- ✅ STATS (MAINTENANT OK) -->

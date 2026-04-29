@@ -1,24 +1,29 @@
 @import "tailwindcss";
 
-@import "tailwindcss";
-
+/* DESIGN TOKENS */
 :root {
   --bg: #0b0d12;
 
-  --card: #14171d;
+  /* surfaces */
+  --card: #141414;        /* Grey-4 */
   --card-soft: #1a1f28;
 
-  --border: rgba(255,255,255,0.06);
+  /* borders */
+  --border: #383838;      /* Grey-2 */
 
-  --text: #e5e7eb;
+  /* text */
+  --text: #E2E6E1;        /* Grey-11 */
   --text-muted: #9ca3af;
 
-  --accent: #d5ff2f;
+  /* brand */
+  --accent: #D5FF2F;
   --accent-soft: rgba(213,255,47,0.12);
 
-  --danger: #ff5a5a;
+  /* state */
+  --danger: #FF5A5A;
 }
 
+/* GLOBAL */
 body {
   background: var(--bg);
   color: var(--text);
