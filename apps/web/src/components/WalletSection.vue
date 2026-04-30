@@ -194,7 +194,7 @@ void _addWalletWithoutSignature
   <div class="grid grid-cols-2 gap-[10px] max-sm:grid-cols-1">
 
     <!-- LEFT CARD -->
-    <div class="bg-[#181818] border border-[#2a2a2a] rounded-[12px] p-4 flex flex-col gap-[14px]">
+    <div class="bg-[#2A2A2A] border border-[#383838] rounded-[12px] p-4 flex flex-col gap-[14px]">
 
       <!-- BALANCE -->
       <div class="flex flex-col gap-1">
@@ -220,7 +220,7 @@ void _addWalletWithoutSignature
         <div
           v-for="wallet in wallets"
           :key="wallet.id"
-          class="grid grid-cols-[1fr_auto] items-center gap-[10px] bg-[#202020] border border-[#2a2a2a] rounded-[8px] px-3 py-[10px] cursor-pointer transition"
+          class="grid grid-cols-[1fr_auto] items-center gap-[10px] bg-[#202020] border border-[#383838] rounded-[8px] px-3 py-[10px] cursor-pointer transition"
           :class="[
             selectedWallet?.id === wallet.id
               ? 'border-[#d5ff2f] bg-[#1a1f0e]'
@@ -301,7 +301,7 @@ void _addWalletWithoutSignature
             </div>
 
             <div v-if="selectedWallet.balances?.length"
-              class="bg-[#161616] border border-[#2a2a2a] rounded-[8px] px-3 py-2 flex flex-col gap-1"
+              class="bg-[#161616] border border-[#383838] rounded-[8px] px-3 py-2 flex flex-col gap-1"
             >
 
               <div
@@ -325,7 +325,7 @@ void _addWalletWithoutSignature
 
             </div>
 
-            <div v-else class="text-[12px] text-[#9a9b99] bg-[#161616] border border-[#2a2a2a] rounded-[8px] p-3">
+            <div v-else class="text-[12px] text-[#9a9b99] bg-[#161616] border border-[#383838] rounded-[8px] p-3">
               No balances found for this wallet.
             </div>
 
@@ -348,7 +348,7 @@ void _addWalletWithoutSignature
     </div>
 
     <!-- RIGHT CARD (UNCHANGED VISU) -->
-    <div class="bg-[#181818] border border-[#2a2a2a] rounded-[12px] p-4 flex flex-col gap-[14px] relative overflow-hidden">
+    <div class="bg-[#2A2A2A] border border-[#383838] rounded-[12px] p-4 flex flex-col gap-[14px] relative overflow-hidden">
 
       <p class="text-[12px] text-[#9a9b99]">Notifications</p>
 
@@ -356,7 +356,7 @@ void _addWalletWithoutSignature
         <div
           v-for="(notification, index) in notifications"
           :key="index"
-          class="flex justify-between items-center py-[9px] border-b border-[#2a2a2a]"
+          class="flex justify-between items-center py-[9px] border-b border-[#383838]"
         >
           <span class="text-[12px] text-[#9a9b99]">
             <strong class="text-[#e2e6e1]">{{ notification.wallet }}</strong> :

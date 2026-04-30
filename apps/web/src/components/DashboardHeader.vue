@@ -4,7 +4,11 @@ import { connectWallet as connectWalletApi } from "../api/wallets";
 import { useAppUser } from "../composables/useAppUser";
 import { useWalletSession } from "../composables/useWalletSession";
 
-const { userId, setUserId, restoreUser, clearUser } = useAppUser();
+import digLogotype from "../assets/icons/dig-logotype.svg";
+import stellarBadge from "../assets/icons/stellar-badge.svg";
+import iconWallet from "../assets/icons/icon-wallet.svg";
+
+const { setUserId, restoreUser, clearUser } = useAppUser();
 
 const {
   connectedAddress,
@@ -15,9 +19,18 @@ const {
   restoreWalletSession,
 } = useWalletSession();
 
-const resolvedUser = computed(() => !!userId.value);
+const walletLabel = computed(() => {
+  if (isConnecting.value) return "Connecting…";
+  if (connectedAddress.value) return shortConnectedAddress.value;
+  return "Connect wallet";
+});
 
 async function openWalletModal() {
+  if (connectedAddress.value) {
+    disconnectWallet();
+    return;
+  }
+
   try {
     const sessionResult = await connectWallet();
 
@@ -39,7 +52,6 @@ async function openWalletModal() {
 
     window.localStorage.setItem("dig_stellar_user_id", backendUserId);
     setUserId(backendUserId);
-
   } catch (error) {
     console.error("[header] Wallet connection failed", error);
   }
@@ -58,81 +70,214 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex items-center justify-between">
+  <header class="header">
+    <!-- LEFT: Logo + chain selector -->
+    <div class="header-left">
+      <img :src="digLogotype" alt="DIG" class="logotype" />
 
-    <!-- LEFT -->
-    <div class="flex items-center gap-3">
-
-      <!-- LOGO -->
-      <div class="w-12 h-12 rounded-full bg-[#373B26] border border-accent flex items-center justify-center overflow-hidden">
-        <img src="../assets/stellar.svg" alt="Stellar" class="w-6 h-6 object-contain" />
-      </div>
-
-      <!-- TITLE -->
-      <div class="flex items-center gap-2">
-        <h1 class="text-lg font-semibold text-white tracking-tight">
-          Dig Stellar
-        </h1>
-
-        <span class="text-[10px] font-bold px-2 py-[2px] rounded border border-accent text-accent bg-[#373B26] tracking-widest">
-          ALPHA
-        </span>
-      </div>
-
-    </div>
-
-    <!-- RIGHT -->
-    <div class="flex flex-col items-end gap-2">
-
-      <!-- WALLET -->
-      <div>
-        <button
-          v-if="!connectedAddress"
-          class="flex items-center gap-2 px-4 py-2 rounded-lg border border-accent text-accent text-xs font-semibold tracking-wide hover:bg-accent/10 transition"
-          :disabled="isConnecting"
-          @click="openWalletModal"
-        >
-          <span class="w-2 h-2 rounded-full bg-muted"></span>
-          {{ isConnecting ? "Connecting…" : "Connect Wallet" }}
-        </button>
-
-        <div
-          v-else
-          class="flex items-center gap-2 px-4 py-2 rounded-lg border border-accent/30 bg-[#1a1f0e] cursor-pointer hover:border-red-400/50 transition"
-          @click="disconnectWallet"
-        >
-          <span class="w-2 h-2 rounded-full bg-accent animate-pulse"></span>
-
-          <span class="text-xs font-semibold text-accent font-mono">
-            {{ shortConnectedAddress }}
-          </span>
-
-          <span class="text-[10px] text-muted">
-            {{ resolvedUser ? "Linked" : "Session" }}
-          </span>
+      <div class="chain-selectors">
+        <div class="chain-item">
+          <span class="chain-label">x</span>
+        </div>
+        <div class="chain-item chain-item-stellar">
+          <img :src="stellarBadge" alt="" class="chain-badge" />
+          <span class="chain-label chain-label-active">Stellar </span>
         </div>
       </div>
-
-      <!-- LINKS -->
-      <div class="flex gap-2">
-        <a
-          href="https://github.com/Mael-wnb/dig-stellar"
-          target="_blank"
-          class="text-[11px] font-semibold text-accent bg-[#373B26] border border-accent/30 px-3 py-[3px] rounded hover:bg-accent/10 transition"
-        >
-          GitHub ↗
-        </a>
-
-        <a
-          href="https://communityfund.stellar.org/submissions/recoebnaQgCsMeEjm"
-          target="_blank"
-          class="text-[11px] font-semibold text-accent bg-[#373B26] border border-accent/30 px-3 py-[3px] rounded hover:bg-accent/10 transition"
-        >
-          Grant ↗
-        </a>
-      </div>
-
     </div>
 
-  </div>
+    <!-- RIGHT: Links + wallet -->
+    <div class="header-right">
+      <a
+        href="https://github.com/Mael-wnb/dig-stellar"
+        target="_blank"
+        class="header-link"
+      >
+        GitHub ↗
+      </a>
+
+      <a
+        href="https://communityfund.stellar.org/submissions/recJYN4fvS3EaRjp7?fbclid=IwY2xjawRgA0NleHRuA2FlbQIxMQBzcnRjBmFwcF9pZAEwAAEeznPTB0FwHVjiNAyREUO5Y03DKrJno27X1vfo6AZaydpyegrPd2ll4KTGL6Y_aem_xbCicjCQO-VX3ay8iZnH6g"
+        target="_blank"
+        class="header-link"
+      >
+        Grant ↗
+      </a>
+
+      <div class="action-separator" />
+
+      <button
+        class="wallet-btn"
+        :class="{ 'wallet-btn--connected': connectedAddress }"
+        :disabled="isConnecting"
+        @click="openWalletModal"
+      >
+        <img :src="iconWallet" alt="" class="wallet-icon" />
+        <span class="wallet-label">{{ walletLabel }}</span>
+      </button>
+    </div>
+  </header>
 </template>
+
+<style scoped>
+.header {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  height: 60px;
+  padding: 5px 197px;
+  border-bottom: 1px solid #4b4c4b;
+  background: #252525;
+}
+
+@media (max-width: 1440px) {
+  .header {
+    padding: 5px 48px;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 5px 16px;
+  }
+}
+
+/* ── LEFT ── */
+.header-left {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+}
+
+.logotype {
+  height: 17px;
+  width: auto;
+}
+
+.chain-selectors {
+  display: flex;
+  align-items: stretch;
+  align-self: stretch;
+}
+
+.chain-item {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  padding: 0 10px;
+}
+
+.chain-item-stellar {
+  gap: 5px;
+  padding: 0 10px 0 0;
+}
+
+.chain-badge {
+  width: 14px;
+  height: 14px;
+}
+
+.chain-label {
+  font-family: "Space Mono", monospace;
+  font-weight: 700;
+  font-size: 12px;
+  color: #838583;
+  text-align: center;
+  user-select: none;
+}
+
+.chain-label-active {
+  color: #d5ff2f;
+}
+
+/* ── RIGHT ── */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-link {
+  font-family: "Space Mono", monospace;
+  font-weight: 700;
+  font-size: 12px;
+  color: #d5ff2f;
+  background: #373b26;
+  border: 1px solid rgba(213, 255, 47, 0.3);
+  padding: 4px 12px;
+  border-radius: 4px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.header-link:hover {
+  background: rgba(213, 255, 47, 0.15);
+  border-color: #d5ff2f;
+}
+
+.action-separator {
+  width: 1px;
+  align-self: stretch;
+  background: #4b4c4b;
+}
+
+/* ── Wallet button (prominent) ── */
+.wallet-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 18px;
+  height: 31px;
+  background: rgba(213, 255, 47, 0.08);
+  border: 1px solid #d5ff2f;
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.wallet-btn:hover {
+  background: rgba(213, 255, 47, 0.16);
+}
+
+.wallet-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.wallet-btn--connected {
+  border-color: rgba(213, 255, 47, 0.4);
+  background: rgba(213, 255, 47, 0.06);
+}
+
+.wallet-icon {
+  width: 18px;
+  height: 18px;
+  filter: brightness(0) saturate(100%) invert(91%) sepia(30%) saturate(1000%)
+    hue-rotate(25deg) brightness(105%);
+}
+
+.wallet-label {
+  font-family: "Space Mono", monospace;
+  font-weight: 700;
+  font-size: 12px;
+  color: #d5ff2f;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .header-link {
+    display: none;
+  }
+  .action-separator {
+    display: none;
+  }
+  .wallet-btn {
+    padding: 0 12px;
+  }
+}
+</style>

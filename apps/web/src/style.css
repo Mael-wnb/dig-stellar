@@ -5,7 +5,7 @@
   --bg: #0b0d12;
 
   /* surfaces */
-  --card: #141414;        /* Grey-4 */
+  --card: #2A2A2A;        /* Grey-4 */
   --card-soft: #1a1f28;
 
   /* borders */
@@ -27,4 +27,14 @@
 body {
   background: var(--bg);
   color: var(--text);
+}
+
+/* SKELETON LOADING */
+.skeleton-pulse {
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
 }
