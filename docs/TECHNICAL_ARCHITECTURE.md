@@ -193,6 +193,66 @@ flowchart TB
   UI --> Submit --> Net[Stellar network]
 ```
 
+## 6 bis. Protocol Integration Model
+
+Dig integrates Stellar DeFi protocols through a unified adapter layer, with two levels of support depending on integration depth:
+
+- **Read-only**: analytics, metrics, positions, and monitoring  
+- **Execution**: non-custodial on-chain interactions through transaction proposals  
+
+Each protocol is integrated via a dedicated adapter, then normalized into a shared internal model (protocol → pools → reserves → snapshots). When execution is supported, interactions follow a consistent transaction lifecycle across protocols.
+
+### 6 bis.1 Integration overview
+
+| Protocol   | Type     | Mode                  | Supported interactions |
+|------------|----------|-----------------------|------------------------|
+| Blend      | Lending  | Execution             | Supply, withdraw, borrow, repay, claim rewards, position monitoring |
+| Soroswap   | AMM      | Execution             | Swaps, add/remove liquidity, fee claiming, LP management |
+| Aquarius   | AMM      | Execution             | Swaps, add/remove liquidity, fee claiming |
+| DeFindex   | Vault    | Execution (partial)   | Deposit, withdraw, yield tracking, strategy exposure |
+| Allbridge  | Bridge   | Read-only             | Cross-chain inflow/outflow tracking, bridge volume monitoring |
+
+### 6 bis.2 Integration model
+
+Each protocol adapter is responsible for:
+
+- fetching and normalizing protocol-specific data into the unified schema  
+- resolving positions for portfolio aggregation and alerting  
+- exposing execution capabilities where supported  
+
+Execution-enabled protocols share a common transaction lifecycle:
+
+build → simulate → sign → submit → track  
+
+The underlying logic varies depending on protocol type:
+
+- AMMs follow a similar pool interaction model, allowing reuse of transaction builders across protocols  
+- Lending protocols require stateful position tracking and risk-aware execution (collateral, borrow, health factor)  
+- Vault protocols introduce strategy-level abstractions and indirect exposure  
+
+### 6 bis.3 Read-only vs execution separation
+
+Not all protocols require execution support from the start.
+
+Dig separates:
+
+- **analytics-first integrations**, focused on visibility, monitoring, and ecosystem understanding  
+- **execution-enabled integrations**, where users can directly interact with protocols from the interface  
+
+This approach allows fast integration of new protocols while progressively enabling deeper interaction where it provides clear user value.
+
+### 6 bis.4 Bridge integration (Allbridge)
+
+Allbridge is integrated as a data source for cross-chain flow attribution, not as an execution layer at this stage.
+
+It enables:
+
+- tracking inflows and outflows of assets entering or leaving the Stellar ecosystem  
+- attributing liquidity movements across chains where data is available  
+- enriching protocol and asset-level analytics with cross-chain context  
+
+This data is used in snapshots, dashboards, and alerting, particularly for detecting flow-driven changes in liquidity and activity.
+
 ## 7. Alerting and Risk Signals
 
 The alerting system turns on-chain activity and metric changes into actionable in-app signals. Alerts are computed from a combination of time-windowed snapshots and protocol activity streams.
