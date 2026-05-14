@@ -209,7 +209,7 @@ Each protocol is integrated via a dedicated adapter, then normalized into a shar
 | Blend      | Lending  | Execution             | Supply, withdraw, borrow, repay, claim rewards, position monitoring |
 | Soroswap   | AMM      | Execution             | Swaps, add/remove liquidity, fee claiming, LP management |
 | Aquarius   | AMM      | Execution             | Swaps, add/remove liquidity, fee claiming |
-| SDEX       | DEX      | Read-only             | Trade activity, volume tracking, liquidity monitoring
+| SDEX       | DEX      | Execution             | Order placement, cancellation, path payments |
 | DeFindex   | Vault    | Execution             | Deposit, withdraw, yield tracking, strategy exposure |
 | Allbridge  | Bridge   | Read-only             | Cross-chain inflow/outflow tracking, bridge volume monitoring |
 
