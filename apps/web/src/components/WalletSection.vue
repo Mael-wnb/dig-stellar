@@ -35,7 +35,6 @@ const {
   addWallet,
   refreshOneWallet,
   setPrimary,
-  toggleActive,
   removeWallet,
   hydrateFromConnect,
   clearWallets,
@@ -57,6 +56,15 @@ function fmtUsd(value: number | null | undefined): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function getWalletXlmBalance(wallet: WalletItem): number {
+  const nativeBalance = wallet.balances?.find((balance) => {
+    if (balance.metadata?.assetType === "native") return true;
+    return balance.symbol?.toLowerCase() === "native";
+  });
+
+  return nativeBalance?.balance ?? 0;
 }
 
 function shortAddr(address: string): string {
@@ -81,17 +89,6 @@ async function openConnectModal(): Promise<void> {
       throw new Error("No wallet address returned.");
     }
 
-    const connectResponse = await connectWalletApi({
-      chain: "stellar",
-      address: sessionResult.address,
-      label: "",
-    });
-
-    setUserId(connectResponse.userId);
-    hydrateFromConnect({
-      wallets: connectResponse.wallets,
-    });
-
     pendingAddress.value = sessionResult.address;
     pendingWalletProviderId.value = sessionResult.providerId;
 
@@ -103,7 +100,32 @@ async function openConnectModal(): Promise<void> {
     if (alreadyPresent) {
       selectedWallet.value = alreadyPresent;
       showAddModal.value = false;
+      return;
+    }
+
+    if (!userId.value) {
+      const connectResponse = await connectWalletApi({
+        chain: "stellar",
+        address: sessionResult.address,
+        label: "",
+      });
+
+      setUserId(connectResponse.userId);
+      hydrateFromConnect({
+        wallets: connectResponse.wallets,
+      });
+
+      const linkedWallet = connectResponse.wallets.find(
+        (wallet) =>
+          wallet.address.toLowerCase() === sessionResult.address.toLowerCase()
+      );
+
+      if (linkedWallet) {
+        selectedWallet.value = linkedWallet;
+      }
+
       await loadOverview();
+      showAddModal.value = false;
       return;
     }
 

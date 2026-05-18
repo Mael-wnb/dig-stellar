@@ -8,7 +8,8 @@
     "run:once": "tsx src/run-once.ts",
     "run:blend": "tsx src/run-blend.ts",
     "run:horizon": "tsx src/run-horizon.ts",
-    "run:defindex": "tsx src/run-defindex.ts"
+    "run:defindex": "tsx src/run-defindex.ts",
+    "job:refresh": "tsx src/scripts/ingest/72-run-refresh-job.ts"
   },
   "keywords": [],
   "author": "",
