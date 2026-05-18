@@ -93,27 +93,120 @@ export async function loadJson<T = unknown>(filename: string): Promise<T | null>
 
 export async function fetchJson<T = unknown>(
   url: string,
-  init?: RequestInit
+  init?: RequestInit,
+  options?: {
+    retries?: number;
+    retryDelayMs?: number;
+    timeoutMs?: number;
+  }
 ): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      "content-type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+  const retries = options?.retries ?? 5;
+  const retryDelayMs = options?.retryDelayMs ?? 1000;
+  const timeoutMs = options?.timeoutMs ?? 15000;
 
-  const text = await res.text();
+  let lastError: unknown;
 
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} on ${url}\n${text.slice(0, 1500)}`);
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController();
+
+      const timeout = setTimeout(() => {
+        controller.abort();
+      }, timeoutMs);
+
+      const res = await fetch(url, {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          "content-type": "application/json",
+          ...(init?.headers ?? {}),
+        },
+      });
+
+      clearTimeout(timeout);
+
+      const text = await res.text();
+
+      // SUCCESS
+      if (res.ok) {
+        try {
+          return JSON.parse(text) as T;
+        } catch {
+          throw new Error(
+            `Invalid JSON from ${url}\n${text.slice(0, 1500)}`
+          );
+        }
+      }
+
+      // RATE LIMIT
+      if (res.status === 429) {
+        const delay = retryDelayMs * Math.pow(2, attempt);
+
+        console.warn(
+          `[fetchJson] 429 rate limit on ${url} (attempt ${attempt + 1}/${retries + 1})`
+        );
+
+        console.warn(`[fetchJson] Retrying in ${delay}ms`);
+
+        await sleep(delay);
+
+        continue;
+      }
+
+      // TEMP SERVER ERRORS
+      if (res.status >= 500) {
+        const delay = retryDelayMs * Math.pow(2, attempt);
+
+        console.warn(
+          `[fetchJson] ${res.status} server error on ${url} (attempt ${attempt + 1}/${retries + 1})`
+        );
+
+        await sleep(delay);
+
+        continue;
+      }
+
+      // OTHER ERRORS
+      throw new Error(
+        `HTTP ${res.status} on ${url}\n${text.slice(0, 1500)}`
+      );
+    } catch (err) {
+      lastError = err;
+
+      const isAbort =
+        err instanceof Error &&
+        (err.name === "AbortError" ||
+          err.message.includes("aborted"));
+
+      const isLastAttempt = attempt >= retries;
+
+      if (isLastAttempt) {
+        break;
+      }
+
+      const delay = retryDelayMs * Math.pow(2, attempt);
+
+      console.warn(
+        `[fetchJson] Request failed on ${url} (attempt ${attempt + 1}/${retries + 1})`
+      );
+
+      if (err instanceof Error) {
+        console.warn(`[fetchJson] ${err.message}`);
+      }
+
+      if (isAbort) {
+        console.warn(`[fetchJson] Request timeout after ${timeoutMs}ms`);
+      }
+
+      console.warn(`[fetchJson] Retrying in ${delay}ms`);
+
+      await sleep(delay);
+    }
   }
 
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    throw new Error(`Invalid JSON from ${url}\n${text.slice(0, 1500)}`);
-  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Unknown fetchJson error on ${url}`);
 }
 
 export async function rpcCall<T = unknown>(

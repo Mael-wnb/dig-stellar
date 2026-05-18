@@ -41,8 +41,8 @@ async function main() {
   const jobEnv: Record<string, string> = {
     STELLAR_RPC_URL: stellarRpcUrl,
     LEDGER_LOOKBACK: process.env.LEDGER_LOOKBACK ?? '20000',
-    EVENTS_LIMIT: process.env.EVENTS_LIMIT ?? '200',
-    MAX_EVENT_PAGES: process.env.MAX_EVENT_PAGES ?? '50',
+    EVENTS_LIMIT: process.env.EVENTS_LIMIT ?? '50',
+    MAX_EVENT_PAGES: process.env.MAX_EVENT_PAGES ?? '10',
   };
 
   console.log('=== Starting global refresh job ===');

@@ -110,11 +110,17 @@ async function main() {
 
     for (const pool of aquariusPools) {
       console.log(`\n--- Aquarius: ${pool.entitySlug} (${pool.contractAddress}) ---`);
-
-      await runTsx('src/scripts/ingest/run-aquarius-pool-refresh.ts', {
-        ENTITY_SLUG: pool.entitySlug,
-        AQUARIUS_POOL_ID: pool.contractAddress,
-      });
+    
+      try {
+        await runTsx('src/scripts/ingest/run-aquarius-pool-refresh.ts', {
+          ENTITY_SLUG: pool.entitySlug,
+          AQUARIUS_POOL_ID: pool.contractAddress,
+        });
+      } catch (err) {
+        console.error(`Failed Aquarius pool ${pool.entitySlug}`, err);
+      }
+    
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
     console.log('\n=== 6. Refresh protocol metrics ===');
