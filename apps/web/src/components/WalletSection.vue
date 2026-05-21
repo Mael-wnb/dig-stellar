@@ -39,6 +39,7 @@ const {
   hydrateFromConnect,
   clearWallets,
   selectWallet,
+  toggleActive,
 } = useWallets(userId);
 
 const connectError = ref("");
@@ -58,14 +59,14 @@ function fmtUsd(value: number | null | undefined): string {
   })}`;
 }
 
-function getWalletXlmBalance(wallet: WalletItem): number {
-  const nativeBalance = wallet.balances?.find((balance) => {
-    if (balance.metadata?.assetType === "native") return true;
-    return balance.symbol?.toLowerCase() === "native";
-  });
+// function getWalletXlmBalance(wallet: WalletItem): number {
+//   const nativeBalance = wallet.balances?.find((balance) => {
+//     if (balance.metadata?.assetType === "native") return true;
+//     return balance.symbol?.toLowerCase() === "native";
+//   });
 
-  return nativeBalance?.balance ?? 0;
-}
+//   return nativeBalance?.balance ?? 0;
+// }
 
 function shortAddr(address: string): string {
   return address.length > 14

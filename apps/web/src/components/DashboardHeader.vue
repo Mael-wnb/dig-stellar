@@ -63,30 +63,30 @@ function disconnectWallet() {
   window.localStorage.removeItem("dig_stellar_user_id");
 }
 
-function getStatChangeClass(change?: string) {
-  if (!change) return "";
+// function getStatChangeClass(change?: string) {
+//   if (!change) return "";
 
-  const normalized = change.trim().toLowerCase();
+//   const normalized = change.trim().toLowerCase();
 
-  if (
-    normalized.startsWith("▼") ||
-    normalized.startsWith("-") ||
-    normalized === "decrease"
-  ) {
-    return "down";
-  }
+//   if (
+//     normalized.startsWith("▼") ||
+//     normalized.startsWith("-") ||
+//     normalized === "decrease"
+//   ) {
+//     return "down";
+//   }
 
-  if (
-    normalized.startsWith("▲") ||
-    normalized.startsWith("+") ||
-    normalized === "increase" ||
-    normalized === "live"
-  ) {
-    return "up";
-  }
+//   if (
+//     normalized.startsWith("▲") ||
+//     normalized.startsWith("+") ||
+//     normalized === "increase" ||
+//     normalized === "live"
+//   ) {
+//     return "up";
+//   }
 
-  return "neutral";
-}
+//   return "neutral";
+// }
 
 onMounted(() => {
   restoreWalletSession();
