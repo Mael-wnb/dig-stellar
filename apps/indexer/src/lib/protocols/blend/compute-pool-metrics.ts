@@ -82,8 +82,11 @@ export async function computeBlendPoolMetrics(params: {
   for (const row of reserveRes.rows as ReserveSnapshotRow[]) {
     const priceUsd = priceMap.has(row.asset_id) ? priceMap.get(row.asset_id) ?? null : null;
 
-    const supplied = toFiniteNumber(row.d_supply_scaled);
-    const borrowed = toFiniteNumber(row.b_supply_scaled);
+    // Blend note:
+    // d_supply_scaled / b_supply_scaled are intentionally interpreted inverted
+    // compared to our previous assumption, based on validation against blend.capital UI.
+    const supplied = toFiniteNumber(row.b_supply_scaled);
+    const borrowed = toFiniteNumber(row.d_supply_scaled);
     const backstopCredit = toFiniteNumber(row.backstop_credit_scaled);
 
     const suppliedUsd = priceUsd !== null ? supplied * priceUsd : null;

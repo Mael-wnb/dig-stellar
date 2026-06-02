@@ -1,3 +1,4 @@
+<!-- src/components/PoolDetail.vue -->
 <script setup lang="ts">
 import type {
   PoolDetailData,
@@ -17,8 +18,10 @@ const props = defineProps<{
   protocol: ProtocolDisplay
 }>()
 
+/* ✅ SAFE FORMATTERS */
+
 function formatUsd(value?: number | null): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return '—'
+  if (!Number.isFinite(value)) return '—'
 
   const v = value as number
 
@@ -31,7 +34,7 @@ function formatUsd(value?: number | null): string {
 }
 
 function formatNumber(value?: number | null, maxFractionDigits = 2): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return '—'
+  if (!Number.isFinite(value)) return '—'
 
   return new Intl.NumberFormat('en-US', {
     maximumFractionDigits: maxFractionDigits,
@@ -39,7 +42,7 @@ function formatNumber(value?: number | null, maxFractionDigits = 2): string {
 }
 
 function formatPercentFromRatio(value?: number | null): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return '—'
+  if (!Number.isFinite(value)) return '—'
 
   return `${((value as number) * 100).toFixed(2)}%`
 }
@@ -62,6 +65,7 @@ function isLendingPool(pool: PoolDetailData) {
 }
 
 /* 🆕 AMM COLLATERAL */
+
 function getMinCollateral(pool: PoolDetailData): number {
   return (pool as any)?.metrics?.minCollateral ?? 5
 }
@@ -106,35 +110,35 @@ function getMaxCollateral(pool: PoolDetailData): number {
 
             <div class="metric">
               <span class="label">TVL</span>
-              <span class="value lime">{{ formatUsd(pool.metrics.tvlUsd) }}</span>
+              <span class="value lime">{{ formatUsd(pool.metrics?.tvlUsd) }}</span>
             </div>
 
             <div class="metric">
               <span class="label">Supplied</span>
-              <span class="value">{{ formatUsd(pool.metrics.totalSuppliedUsd) }}</span>
+              <span class="value">{{ formatUsd(pool.metrics?.totalSuppliedUsd) }}</span>
             </div>
 
             <div class="metric">
               <span class="label">Borrowed</span>
-              <span class="value">{{ formatUsd(pool.metrics.totalBorrowedUsd) }}</span>
+              <span class="value">{{ formatUsd(pool.metrics?.totalBorrowedUsd) }}</span>
             </div>
 
             <div class="metric">
               <span class="label">Net Liquidity</span>
-              <span class="value">{{ formatUsd(pool.metrics.netLiquidityUsd) }}</span>
+              <span class="value">{{ formatUsd(pool.metrics?.netLiquidityUsd) }}</span>
             </div>
 
             <div class="metric">
               <span class="label">Supply APY</span>
               <span class="value lime">
-                {{ formatPercentFromRatio(pool.metrics.supplyApy) }}
+                {{ formatPercentFromRatio(pool.metrics?.supplyApy) }}
               </span>
             </div>
 
             <div class="metric">
               <span class="label">Borrow APY</span>
               <span class="value text-[#FF5A5A]">
-                {{ formatPercentFromRatio(pool.metrics.borrowApy) }}
+                {{ formatPercentFromRatio(pool.metrics?.borrowApy) }}
               </span>
             </div>
 
@@ -145,27 +149,26 @@ function getMaxCollateral(pool: PoolDetailData): number {
 
             <div class="metric">
               <span class="label">TVL</span>
-              <span class="value lime">{{ formatUsd(pool.metrics.tvlUsd) }}</span>
+              <span class="value lime">{{ formatUsd(pool.metrics?.tvlUsd) }}</span>
             </div>
 
             <div class="metric">
               <span class="label">Volume 24h</span>
-              <span class="value">{{ formatUsd(pool.metrics.volume24hUsd) }}</span>
+              <span class="value">{{ formatUsd(pool.metrics?.volume24hUsd) }}</span>
             </div>
 
             <div class="metric">
               <span class="label">Fees 24h</span>
-              <span class="value">{{ formatUsd(pool.metrics.fees24hUsd) }}</span>
+              <span class="value">{{ formatUsd(pool.metrics?.fees24hUsd) }}</span>
             </div>
 
             <div class="metric">
               <span class="label">Swaps 24h</span>
               <span class="value">
-                {{ formatNumber(pool.metrics.swaps24h ?? pool.metrics.events24h, 0) }}
+                {{ formatNumber(pool.metrics?.swaps24h ?? pool.metrics?.events24h, 0) }}
               </span>
             </div>
 
-            <!-- 🆕 -->
             <div class="metric">
               <span class="label">Min Collateral</span>
               <span class="value">{{ getMinCollateral(pool) }}</span>
@@ -220,7 +223,7 @@ function getMaxCollateral(pool: PoolDetailData): number {
 
     </div>
 
-    <!-- TABLE (UNCHANGED) -->
+    <!-- TABLE -->
     <div class="bg-[#181818] border border-[#2a2a2a] rounded-xl overflow-x-auto">
       <table class="w-full text-[13px]">
         <thead>
@@ -257,31 +260,3 @@ function getMaxCollateral(pool: PoolDetailData): number {
 
   </div>
 </template>
-
-<style scoped>
-.metric {
-  background: #202020;
-  border: 1px solid #2a2a2a;
-  border-radius: 8px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.label {
-  font-size: 10px;
-  color: #9A9B99;
-  text-transform: uppercase;
-}
-
-.value {
-  font-size: 15px;
-  font-weight: 700;
-  color: #E2E6E1;
-}
-
-.value.lime {
-  color: #D5FF2F;
-}
-</style>

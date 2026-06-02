@@ -1,3 +1,4 @@
+// apps/indexer/src/scripts/bootstrap/soroswap-upsert-core.ts
 import { loadJson, nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
 

@@ -28,7 +28,7 @@ const {
   wallets,
   selectedWallet,
   overviewLoading,
-  error: _error,
+  error,
   totalPortfolioUsd,
   isBusy,
   loadOverview,
@@ -115,8 +115,8 @@ async function openConnectModal(): Promise<void> {
   }
 }
 
-async function _addWalletWithoutSignature(): Promise<void> {
-    if (!pendingAddress.value) return;
+async function addWalletWithoutSignature(): Promise<void> {
+  if (!pendingAddress.value) return;
 
   addLoading.value = true;
   connectError.value = "";
@@ -187,7 +187,6 @@ onMounted(() => {
   restoreWalletSession();
   restoreUser();
 });
-void _addWalletWithoutSignature
 </script>
 
 <template>

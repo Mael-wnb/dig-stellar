@@ -1,4 +1,5 @@
-// src/scripts/ingest/72-run-refresh-job.ts
+// apps/indexer/src/scripts/ingest/72-run-refresh-job.ts
+import 'dotenv/config';
 import { spawn } from 'node:child_process';
 
 function runCommand(
