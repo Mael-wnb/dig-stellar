@@ -174,56 +174,93 @@ The backend should become the single authoritative UI-facing layer for:
 
 ---
 
-# 3. Indexer / data layer — `apps/indexer`
+# 3. Indexer / data layer — apps/indexer
 
 ## Current status
-**Real and already valuable, but still needs operationalization.**
+
+Substantially advanced and already powering the core product.
 
 ## What already exists
-The indexer layer already includes:
-- dedicated scripts
-- real data ingestion behavior
+
+The indexer now includes:
+
+- Horizon ingestion
+- Soroban ingestion
+- protocol-specific adapters
+- protocol metrics persistence
+- pool metrics persistence
+- asset price refresh pipelines
 - wallet balance snapshot generation
-- protocol-specific work for at least part of the Stellar DeFi ecosystem
-- real writes into the DB used by the API/frontend
+- refresh orchestration scripts
+- cron-compatible refresh jobs
+- real writes into PostgreSQL consumed by the API
 
 ## What already works well
-- the project already has a genuine data pipeline mindset
-- this is not a “frontend-only beta”
-- wallet snapshots are real and can be refreshed
-- protocol data ingestion has clearly already started in meaningful ways
-- the architecture choice to separate indexer from API is sound
+
+The following protocol coverage is operational today.
+
+### Soroban
+
+- Blend
+- Soroswap
+- Aquarius
+
+### Horizon
+
+- Stellar Native DEX liquidity pools
+
+The indexer currently persists:
+
+- asset prices
+- pool snapshots
+- pool metrics
+- protocol metrics
+- wallet balance snapshots
+
+The architecture now follows a clear separation between:
+
+- ingestion
+- normalization
+- persistence
+- API consumption
+
+which aligns closely with the grant requirements.
 
 ## What is partially working
-- several scripts likely work correctly when run manually
-- some adapters/protocol flows are already real, but not yet uniformly documented
-- the refresh model exists, but may not yet be fully standardized across all data domains
+
+- refresh jobs run successfully end-to-end
+- protocol metrics aggregation is operational
+- Stellar Native DEX ingestion is operational
+- refresh orchestration is centralized through a single global refresh flow
+- some freshness and operational metadata still need to be surfaced more clearly
 
 ## What is still weak or incomplete
-- cron/readiness is likely not fully formalized
-- script ownership and naming may still need cleanup
-- freshness tracking is probably not yet first-class across all sources
-- stale detection and retry/backoff may still be partial
-- operational runbooks are likely still too light
+
+- retry and backoff strategies are not yet standardized
+- health visibility is still limited
+- operational observability remains lightweight
+- some protocol adapters require additional documentation
+- DeFindex coverage is not yet implemented
 
 ## Indexer architecture direction
-The indexer must become:
-- predictable
-- schedulable
-- explainable
-- easy to debug
-- clearly tied to the data expectations of the API
 
-It should not remain a loose collection of scripts only the founder can reason about.
+The indexer is now moving from:
+
+- a collection of independent ingestion scripts
+
+toward:
+
+- a documented ingestion platform with predictable refresh behavior
+
+The goal is for protocol ingestion, refresh cadence, and freshness expectations to be understandable without requiring founder knowledge.
 
 ## Current indexer priorities
-1. map exactly which scripts exist and what they feed
-2. define which scripts are manual vs cron-ready
-3. standardize operational usage
-4. surface freshness/staleness more clearly
-5. document source ownership by protocol/metric
 
----
+1. document protocol ownership and source mapping
+2. formalize refresh cadence expectations
+3. add freshness visibility
+4. improve retry and failure handling
+5. expand protocol coverage where required by the roadmap
 
 # 4. Wallets / identity / portfolio model
 
@@ -269,43 +306,154 @@ The current model is strong enough to support portfolio/product iteration, but n
 # 5. Protocol coverage / analytics reality
 
 ## Current status
-**Real but unevenly formalized.**
 
-## What appears already true
-The product already has real integration work or visibility around:
-- Blend
-- Aquarius
-- Soroswap
-- Stellar network-level stats in some form
-- wallet balance tracking against real chain data
+Real, operational, and largely demonstrable.
 
-There is also grant-level ambition around:
-- DeFindex
-- SDEX / native Stellar liquidity visibility
-- bridge inflows
-- protocol and asset-level flows
+## Current protocol coverage
 
-## What is likely true today
-- some protocols are already far enough to support UI presence
-- others are present conceptually or partially
-- not all coverage is equally mature
-- not all protocol data paths are equally clean or equally API-centralized
+### Blend
 
-## What is still missing for clarity
-The project still needs a more explicit source map:
-- which protocol data is ingested via Horizon
-- which is ingested via Soroban
-- which is enriched via SDK/API
-- which powers real UI today
-- which remains partial or roadmap
+Source:
+- Soroban RPC
+
+Current state:
+- pool discovery
+- pool snapshots
+- TVL calculations
+- borrow metrics
+- supply metrics
+- APY calculations
+
+Status:
+- operational
+
+### Soroswap
+
+Source:
+- Soroban RPC
+
+Current state:
+- pair discovery
+- pool metrics
+- TVL
+- volume
+- fees
+- swap counts
+
+Status:
+- operational
+
+### Aquarius
+
+Source:
+- Soroban RPC
+
+Current state:
+- pool discovery
+- pool metrics
+- TVL
+- volume
+- fees
+- swap counts
+
+Status:
+- operational
+
+### Stellar Native DEX
+
+Source:
+- Horizon
+
+Current state:
+- liquidity pool discovery
+- entity generation
+- pool snapshots
+- pool metrics persistence
+
+Status:
+- operational
+
+### Wallet balances
+
+Sources:
+- Horizon
+- Stellar RPC
+
+Status:
+- operational
+
+## Protocol coverage maturity
+
+The project now has production-style ingestion across both major Stellar data surfaces:
+
+- Horizon
+- Soroban
+
+Protocol metrics are persisted into the database and exposed through the API layer.
+
+Pool metrics are persisted into the database and exposed through the API layer.
+
+This is one of the strongest areas relative to Tranche 1 Deliverable 1.
+
+## Remaining gaps
+
+The main remaining gaps are:
+
+- DeFindex integration
+- protocol source documentation
+- freshness visibility
+- operational documentation
+- stronger retry/backoff handling
 
 ## Current priority
-Make protocol coverage explicit and auditable internally.
-Right now, this is probably one of the biggest “understood by founder but not yet documented enough” areas.
 
----
+Make protocol coverage explicit, auditable, and documented internally.
+
+The technical implementation now largely exists; the remaining work is increasingly documentation, operationalization, and freshness visibility.
 
 # 6. Data freshness / reliability
+
+## Current status
+
+Partially operationalized.
+
+## What already exists
+
+The project now includes:
+
+- refresh jobs
+- protocol snapshots
+- protocol metrics
+- pool metrics
+- asset pricing refreshes
+- scheduled refresh execution
+- persisted timestamps
+
+The architecture already supports freshness tracking at the data layer.
+
+## What is still incomplete
+
+- freshness metadata is not yet consistently exposed through the API
+- stale detection is not yet first-class
+- retries remain protocol-specific
+- health visibility remains limited
+
+## Why this matters
+
+This is critical for:
+
+- Tranche 1 data credibility
+- Tranche 3 freshness tracking promises
+- user trust
+- operational debugging
+
+## Current freshness priorities
+
+1. expose freshness through API responses
+2. define expected refresh intervals per dataset
+3. identify stale sources automatically
+4. standardize retry/backoff behavior
+5. introduce minimal health visibility for ingestion pipelines
 
 ## Current status
 **Important but not yet fully operationalized.**
