@@ -8,9 +8,6 @@ import { persistHorizonPools } from "../../lib/protocols/stellar-native/persist-
 
 import { persistHorizonPoolSnapshots } from "../../lib/protocols/stellar-native/persist-pool-snapshots";
 
-import { persistStellarNativePoolMetrics }
-from "../../lib/protocols/stellar-native/persist-pool-metrics";
-
 async function main() {
   const client = createPgClient();
 
@@ -35,16 +32,10 @@ async function main() {
         client,
         result.pools
       );
-    
-      const metrics =
-      await persistStellarNativePoolMetrics({
-        client,
-      });
-
+  
     console.log({
       entities,
       snapshots,
-      metrics,
     });
   } finally {
     await client.end();
