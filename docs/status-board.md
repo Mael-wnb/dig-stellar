@@ -14,7 +14,7 @@
 | Deliverable | Status | Confidence | Evidence | Main gap | Owner | Next action |
 |---|---|---:|---|---|---|---|
 | Data Indexing Foundation | Partial | 70% | Blend adapter, wallet snapshots, protocol endpoints | freshness + full protocol coverage + clearer runbook | Maël | map actual adapters to grant promise |
-| Analytics Dashboard MVP | Partial | 75% | live beta, wallet UI, pool views | centralize external stats via API + responsive pass | Maël + Staky | move network stats behind API |
+| Analytics Dashboard MVP | Partial | 75% | live beta, wallet UI, pool views | centralize external stats via API + responsive pass | Maël | move network stats behind API |
 | Smart Transaction Builder (Testnet) | Not started / early | 15% | wallet connect exists | builder scope and first flow not implemented | Maël | define exact tranche-1 testnet action |
 
 ---
