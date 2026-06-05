@@ -2,621 +2,244 @@
 
 ## Purpose
 
-This document captures the real current state of Dig Stellar.
+This document captures the real, current state of Dig Stellar. It is an internal execution document,
+not a pitch. It answers: what works, what is partial, what is fragile, what is still placeholder, and
+what blocks tranche-aligned progress.
 
-It must remain practical, explicit, and honest.
-
-It is not a pitch document.  
-It is an internal execution document used to answer:
-- what already works
-- what is partially working
-- what is still fragile
-- what is still placeholder or under-defined
-- what is ready for beta use
-- what still blocks tranche-aligned progress
-
-This file should be updated regularly and kept aligned with:
-- `docs/grant-roadmap.md`
-- `docs/status-board.md`
+Keep it honest and aligned with `docs/grant-roadmap.md` and `docs/status-board.md`. Prefer brutal
+clarity over optimism — this file improves decision quality, not morale.
 
 ---
 
 ## Overall project state
 
-Dig Stellar is no longer at prototype stage.
+Dig Stellar is past prototype stage. It already has a live beta frontend, a dedicated backend API, an
+indexer layer, real protocol data ingestion across Horizon and Soroban, real wallet connection, real
+grouped multi-wallet behavior, and DB-backed wallet balance refresh flows.
 
-The project already has:
-- a live beta frontend
-- a dedicated backend API
-- an indexer layer
-- real protocol data ingestion in multiple areas
-- real wallet connection flows
-- real grouped multi-wallet behavior
-- real DB-backed wallet balance refresh flows
-
-The project is now in a **transition phase** between:
-- “functional beta with real foundations”
-and
-- “operational grant-aligned product ready for tranche progression and structured deployment”
-
-The main challenge is no longer to invent the product, but to:
-- stabilize data flows
-- tighten backend/frontend boundaries
-- reduce fragility
-- align work with grant deliverables
-- prepare for clean beta and later tranche execution
+The project is in a **transition phase**: from "functional beta with real foundations" toward
+"operational, grant-aligned product that is clearly evidenced and tranche-claimable." The challenge is
+no longer to invent the product but to stabilize data flows, tighten the API boundary, surface
+freshness, and align work with the grant contract.
 
 ---
 
-## Current product state
+## Data architecture reality (read this first)
 
-### What the product already is
-Dig Stellar already functions as:
-- a Stellar DeFi analytics interface
-- a protocol and pool exploration interface
-- a wallet-connected portfolio experience
-- a grouped multi-wallet dashboard foundation
-- a real-data product, not just a static concept demo
+Three table families coexist in the same Postgres DB. This is the single most important thing to know,
+and it corrects the older docs:
 
-### What the product is not yet
-It is not yet:
-- a fully production-hardened mainnet platform
-- a fully centralized API-only frontend across all data surfaces
-- a finalized action execution platform
-- a fully operational alerting / bridge monitoring / observability product
+- **raw SQL v1 — the product pipeline.** `entities`, `venues`, `assets`, `entity_assets`,
+  `pool_snapshots`, `reserve_snapshots`, `normalized_events`, `pool_metrics_latest`,
+  `protocol_metrics_latest`, `asset_prices`, `sync_cursors` (defined in `apps/api/src/db/stellar_v1*.sql`).
+  Written by `job:refresh` (`72-run-refresh-job.ts` → `71-refresh-all-metrics.ts` → per-protocol steps).
+  Read by the `/v1/*` routes (`StellarController`).
+- **raw SQL v2 — wallet layer.** `user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions`
+  (`stellar_v2_multiwallet.sql`). Read by `/v1/wallets/*` (`WalletsController`).
+- **Prisma models — legacy / parallel.** `Protocol`, `Venue`, `Snapshot`. Written by
+  `run:blend` / `run:horizon` / `run:once`; read only by the prefix-less `/protocols`, `/venues`,
+  `/venues/:key/snapshots` routes (`AppController`). Not part of the product pipeline. Elsewhere the
+  Prisma client is used only as a raw-SQL connection (`$queryRawUnsafe`), not as an ORM.
 
----
-
-# 1. Frontend — `apps/web`
-
-## Current status
-**Substantially advanced, but not fully stabilized.**
-
-## What already exists
-The frontend already includes:
-- a real dashboard structure
-- a real protocol browsing experience
-- pool detail views
-- wallet connection UX
-- wallet display and multi-wallet portfolio UX
-- backend-driven wallet data in important flows
-- a public beta that can be shown and used
-
-## What is already working well
-- general product direction is clear
-- the app looks like a real product, not an internal tool
-- wallet connection is visible and understandable
-- wallet grouping behavior now works across multiple wallets
-- pool/protocol pages already exist and are usable
-- the frontend is far enough along that iteration is more important than invention
-
-## What is partially working
-The following areas are usable but still not fully “clean”:
-- some top-level/global dashboard stats may still rely on direct external fetches from the frontend
-- some loading/error states may still be inconsistent across views
-- some UI zones may still combine real features and placeholder “coming soon” sections
-- some product logic may still live too close to the frontend where it should be API-centered
-
-## What is still weak or beta-level
-- responsive behavior likely still needs a real pass
-- stale/freshness states are not yet consistently surfaced
-- certain sections may still require manual understanding to interpret correctly
-- some UX areas are still more “founder-use beta” than “external-user polished beta”
-
-## Frontend architecture direction
-The frontend should increasingly become:
-- a UI layer
-- a composables/state layer
-- a consumer of internal API contracts
-
-It should increasingly stop being:
-- a place where external analytics providers are called directly for core product data
-- a place where business/data aggregation logic grows
-
-## Current frontend priorities
-1. centralize remaining external-facing stats behind the API
-2. clean responsive behavior
-3. standardize loading/error/stale behavior
-4. clarify which sections are real vs deferred
-5. keep product polish proportional to tranche goals
+Bottom line: **`/v1/*` + raw SQL = the real product; Prisma `Protocol/Venue/Snapshot` = legacy.**
+Ingestion *logic* lives in `apps/indexer/src/lib/protocols/<protocol>/`; `src/scripts/ingest/` holds
+both live entry points and superseded legacy scripts. (See `docs/repo-structure.md` and
+`docs/data-model.md`.)
 
 ---
 
-# 2. Backend API — `apps/api`
+## 1. Frontend — `apps/web`
 
-## Current status
-**Already meaningful and structurally important, but not yet complete as the single frontend façade.**
+**Substantially advanced, not fully stabilized.** Vue 3 + Vite + Tailwind.
 
-## What already exists
-The backend already includes:
-- a NestJS API
-- wallet-related routes
-- wallet connect flow
-- wallet grouping through backend `userId`
-- wallet overview and balances endpoints
-- wallet refresh endpoint
-- protocol / pools endpoints in meaningful form
-- Prisma integration and database-backed logic
+Working: real dashboard structure, protocol browsing, pool detail views, wallet connection UX,
+multi-wallet portfolio UX, backend-driven data in the important flows, a public beta that can be shown.
 
-## What already works well
-- the backend is not a placeholder
-- wallet-based grouping logic is real and useful
-- the API already acts as the product backbone in several important flows
-- wallet refresh + DB persistence + API retrieval is already demonstrable
-- protocol/pool routes already provide real value to the frontend
+Partial / weak: some global/network stats still reach external providers directly via
+`GET /v1/network/stats` (see §2); loading/error/stale states are not yet consistent; responsive
+behavior needs a real pass; some zones still mix real features and "coming soon" placeholders.
 
-## What is partially working
-- the API is already central in many places, but not yet fully the only source for all dashboard data
-- some frontend surfaces may still depend on direct external providers instead of API endpoints
-- endpoint contracts may still be evolving rather than stabilized
+Direction: become a pure UI + composables/state + internal-API-consumer layer. Stop hosting data
+aggregation or calling external analytics providers for core data.
 
-## What is still weak or incomplete
-- health/operational endpoints are likely still incomplete
-- freshness exposure is probably not yet systematic
-- the API may still be acting partly as a thin pass-through in some places instead of a proper façade
-- some future grant-oriented capabilities (alerts, action execution, observability endpoints) are not yet structured
-
-## Backend architecture direction
-The backend should become the single authoritative UI-facing layer for:
-- dashboard stats
-- protocol analytics
-- wallet grouping and balances
-- future alerts
-- future action preparation
-- freshness and stale metadata
-
-## Current backend priorities
-1. move remaining product-critical data fetches behind the API
-2. stabilize API contracts used by the frontend
-3. add health/freshness visibility
-4. keep business/data logic out of the frontend
-5. prepare the backend to support the next tranche-oriented features incrementally
+Priorities: (1) centralize remaining external-facing stats behind the API; (2) responsive pass;
+(3) standardize loading/error/stale; (4) clarify real vs deferred sections.
 
 ---
 
-# 3. Indexer / data layer — apps/indexer
+## 2. Backend API — `apps/api`
 
-## Current status
+**Meaningful and structurally central, but not yet the single façade for every surface.** NestJS 11.
 
-Substantially advanced and already powering the core product.
+Working: wallet routes (connect, overview, balances, refresh, primary/active/delete), wallet grouping
+by persistent `userId`, protocol/pool routes serving real indexed data via `/v1/*` (raw SQL),
+Prisma client used as the DB connection for raw queries.
 
-## What already exists
+Partial / weak: health/operational endpoints incomplete; freshness not yet exposed systematically in
+responses; **`GET /v1/network/stats` (`NetworkController`) does no DB access at all** — it calls
+CoinGecko, DefiLlama, stellar.expert, and Horizon live, with no persistence or freshness. That is the
+concrete "core data still fetched externally" item for T1-D2.
 
-The indexer now includes:
+Direction: be the single authoritative UI-facing layer for dashboard stats, protocol analytics, wallet
+data, freshness metadata, and (later) alerts and action preparation.
 
-- Horizon ingestion
-- Soroban ingestion
-- protocol-specific adapters
-- protocol metrics persistence
-- pool metrics persistence
-- asset price refresh pipelines
-- wallet balance snapshot generation
-- refresh orchestration scripts
-- cron-compatible refresh jobs
-- real writes into PostgreSQL consumed by the API
-
-## What already works well
-
-The following protocol coverage is operational today.
-
-### Soroban
-
-- Blend
-- Soroswap
-- Aquarius
-
-### Horizon
-
-- Stellar Native DEX liquidity pools
-
-The indexer currently persists:
-
-- asset prices
-- pool snapshots
-- pool metrics
-- protocol metrics
-- wallet balance snapshots
-
-The architecture now follows a clear separation between:
-
-- ingestion
-- normalization
-- persistence
-- API consumption
-
-which aligns closely with the grant requirements.
-
-## What is partially working
-
-- refresh jobs run successfully end-to-end
-- protocol metrics aggregation is operational
-- Stellar Native DEX ingestion is operational
-- refresh orchestration is centralized through a single global refresh flow
-- some freshness and operational metadata still need to be surfaced more clearly
-
-## What is still weak or incomplete
-
-- retry and backoff strategies are not yet standardized
-- health visibility is still limited
-- operational observability remains lightweight
-- some protocol adapters require additional documentation
-- DeFindex coverage is not yet implemented
-
-## Indexer architecture direction
-
-The indexer is now moving from:
-
-- a collection of independent ingestion scripts
-
-toward:
-
-- a documented ingestion platform with predictable refresh behavior
-
-The goal is for protocol ingestion, refresh cadence, and freshness expectations to be understandable without requiring founder knowledge.
-
-## Current indexer priorities
-
-1. document protocol ownership and source mapping
-2. formalize refresh cadence expectations
-3. add freshness visibility
-4. improve retry and failure handling
-5. expand protocol coverage where required by the roadmap
-
-# 4. Wallets / identity / portfolio model
-
-## Current status
-**A strong area relative to overall project maturity, but still beta-level in security/session modeling.**
-
-## What already works
-The following is already real:
-- wallet session UI in frontend
-- wallet address retrieval through wallet connect flow
-- backend resolution of a persistent grouped `userId`
-- grouped multi-wallet portfolio behavior
-- adding secondary wallets to an existing portfolio group
-- wallet overview and per-wallet balances
-- wallet refresh flow from API to DB-backed balance snapshots
-- wallet management operations such as select / refresh / delete / activate / primary in meaningful form
-
-## What is now one of the strongest product areas
-Compared to many other grant deliverables, this area is already meaningfully ahead because:
-- the user model is no longer fake-hardcoded in the frontend
-- multi-wallet grouping is functioning
-- portfolio grouping is demonstrable
-- the product now has a real “returning user with multiple wallets” foundation
-
-## What is still weak / not final
-- auth/session is still not a final cryptographic production model
-- strong proof-of-ownership flows are not yet the final version
-- “active signer” vs “watch-only” distinction is not yet fully explicit
-- richer DeFi position aggregation beyond wallet balances may still be limited
-
-## Current stance
-This is acceptable for a beta phase.
-The current model is strong enough to support portfolio/product iteration, but not yet the final security/session posture.
-
-## Current wallet priorities
-1. formalize the “active signer” vs “tracked wallet” model
-2. keep the current multi-wallet foundation stable
-3. avoid overcomplicating auth before tranche-critical data and dashboard work are stabilized
-4. later, strengthen signature/session guarantees when action flows become more central
+Priorities: (1) move `/v1/network/stats`-type fetches behind a persisted, fresh API surface;
+(2) stabilize the contracts the frontend depends on; (3) add health + freshness visibility.
 
 ---
 
-# 5. Protocol coverage / analytics reality
+## 3. Indexer / data layer — `apps/indexer`
 
-## Current status
+**Substantially advanced and already powering the product.** Runner: tsx.
 
-Real, operational, and largely demonstrable.
+Working: Horizon + Soroban ingestion; protocol adapters in `lib/protocols/`; canonical refresh chain
+`job:refresh` → 72 → 71 → per-protocol steps; persistence of asset prices, pool/reserve snapshots,
+pool + protocol metrics; wallet balance snapshot generation; cron-compatible jobs; real writes to
+Postgres consumed by the API.
 
-## Current protocol coverage
+Operational protocol coverage (verified in DB, Jun 5, 2026):
+- Soroban — Blend, Soroswap, Aquarius
+- Horizon — Stellar native DEX liquidity pools
 
-### Blend
+Partial / weak: retry/backoff not standardized; health visibility limited; observability lightweight;
+some adapters under-documented; DeFindex scaffolded (`run:defindex`, `@defindex/sdk`) but **not
+validated** — and it belongs to **T3-D1**, not T1-D1.
 
-Source:
-- Soroban RPC
+Direction: move from "collection of ingestion scripts" to a documented ingestion platform with
+predictable refresh behavior and surfaced freshness.
 
-Current state:
-- pool discovery
-- pool snapshots
-- TVL calculations
-- borrow metrics
-- supply metrics
-- APY calculations
-
-Status:
-- operational
-
-### Soroswap
-
-Source:
-- Soroban RPC
-
-Current state:
-- pair discovery
-- pool metrics
-- TVL
-- volume
-- fees
-- swap counts
-
-Status:
-- operational
-
-### Aquarius
-
-Source:
-- Soroban RPC
-
-Current state:
-- pool discovery
-- pool metrics
-- TVL
-- volume
-- fees
-- swap counts
-
-Status:
-- operational
-
-### Stellar Native DEX
-
-Source:
-- Horizon
-
-Current state:
-- liquidity pool discovery
-- entity generation
-- pool snapshots
-- pool metrics persistence
-
-Status:
-- operational
-
-### Wallet balances
-
-Sources:
-- Horizon
-- Stellar RPC
-
-Status:
-- operational
-
-## Protocol coverage maturity
-
-The project now has production-style ingestion across both major Stellar data surfaces:
-
-- Horizon
-- Soroban
-
-Protocol metrics are persisted into the database and exposed through the API layer.
-
-Pool metrics are persisted into the database and exposed through the API layer.
-
-This is one of the strongest areas relative to Tranche 1 Deliverable 1.
-
-## Remaining gaps
-
-The main remaining gaps are:
-
-- DeFindex integration
-- protocol source documentation
-- freshness visibility
-- operational documentation
-- stronger retry/backoff handling
-
-## Current priority
-
-Make protocol coverage explicit, auditable, and documented internally.
-
-The technical implementation now largely exists; the remaining work is increasingly documentation, operationalization, and freshness visibility.
-
-# 6. Data freshness / reliability
-
-## Current status
-
-Partially operationalized.
-
-## What already exists
-
-The project now includes:
-
-- refresh jobs
-- protocol snapshots
-- protocol metrics
-- pool metrics
-- asset pricing refreshes
-- scheduled refresh execution
-- persisted timestamps
-
-The architecture already supports freshness tracking at the data layer.
-
-## What is still incomplete
-
-- freshness metadata is not yet consistently exposed through the API
-- stale detection is not yet first-class
-- retries remain protocol-specific
-- health visibility remains limited
-
-## Why this matters
-
-This is critical for:
-
-- Tranche 1 data credibility
-- Tranche 3 freshness tracking promises
-- user trust
-- operational debugging
-
-## Current freshness priorities
-
-1. expose freshness through API responses
-2. define expected refresh intervals per dataset
-3. identify stale sources automatically
-4. standardize retry/backoff behavior
-5. introduce minimal health visibility for ingestion pipelines
-
-## Current status
-**Important but not yet fully operationalized.**
-
-## What already exists
-- real refresh flows exist
-- real timestamps and snapshots already exist in some areas
-- the architecture already supports freshness handling conceptually
-
-## What is still incomplete
-- stale data may not yet be clearly surfaced everywhere
-- retries/backoff are likely not yet standardized
-- there may still be ambiguity around freshness for different data domains
-- UI may not always communicate data recency clearly
-
-## Why this matters
-This is critical for:
-- tranche 1 data credibility
-- tranche 3 freshness tracking promise
-- user trust
-- operational debugging
-
-## Current freshness priorities
-1. define freshness expectations per data type
-2. expose timestamps/metadata where useful
-3. identify stale/failing sources
-4. progressively formalize retries/backoff
+Priorities: (1) document protocol ownership + source mapping; (2) formalize refresh cadence
+expectations; (3) surface freshness; (4) standardize retry/backoff; (5) expand coverage per roadmap.
 
 ---
 
-# 7. Notifications / alerting
+## 4. Wallets / identity / portfolio model
 
-## Current status
-**Mostly early / pre-foundation.**
+**Strong relative to overall maturity, still beta-level on security/session.**
 
-## What exists
-- some notification-like UI exists
-- the product direction clearly anticipates alerts and recommendations
+Working: wallet session UI; address retrieval via wallet connect; backend resolution of a persistent
+grouped `userId`; grouped multi-wallet portfolio; adding secondary wallets; per-wallet balances;
+refresh flow from API to DB-backed snapshots (raw SQL v2); select/refresh/delete/activate/primary
+operations. The user model is no longer hardcoded in the frontend — there is a real "returning user
+with multiple wallets" foundation.
 
-## What likely does not yet exist in a real tranche-ready way
-- persistent user alert rules
-- evaluation engine
-- notification generation lifecycle
-- real rule-to-event pipeline
+Weak / not final: auth/session is not a final cryptographic production model; strong
+proof-of-ownership is not the final version; **"active signer" vs "watch-only" is not yet explicit**
+(this is the exact T2-D1 gap); DeFi position aggregation beyond balances is still limited.
 
-## Current stance
-This should not be treated as “already almost there” just because some UI exists.
-This is still mostly an upcoming build area.
+Stance: acceptable for beta. Formalize active-signer vs watch-only next; do not over-engineer auth
+before T1 data/dashboard work is closed.
 
 ---
 
-# 8. On-chain actions / transaction builder
+## 5. Protocol coverage / analytics reality
 
-## Current status
-**Still early relative to the grant.**
+**Real, operational, and demonstrable.** Verified by direct DB inspection on June 5, 2026.
 
-## What exists
-- wallet connection exists
-- wallet-aware UX exists
-- product direction and architecture point toward future actions
+| Protocol | Source | Pools | TVL (verified) | State |
+|---|---|---:|---|---|
+| Blend | Soroban RPC | 3 | ≈ $156.7M | operational |
+| Aquarius | Soroban RPC | 4 | ≈ $21.0M | operational |
+| Soroswap | Soroban RPC | 2 | ≈ $0.57M | operational |
+| Stellar native DEX | Horizon | — | — | operational (liquidity pools indexed) |
+| Wallet balances | Horizon + Stellar RPC | — | — | operational |
 
-## What does not yet appear tranche-ready
-- a clear transaction builder layer
-- one narrow end-to-end testnet action flow
-- formal simulation UX
-- clearly scoped XDR-building and prerequisite bundling
+All metric rows had non-null, non-zero TVL and a synchronous `as_of` within one `job:refresh` cycle.
+(Note: an earlier static-code reading suggested Soroswap/Aquarius TVL might be 0 because
+`reserve_snapshots` is Blend-written; the runtime data disproves that — their TVL is populated. The
+exact computation path for Soroswap/Aquarius TVL is worth documenting but is not a defect.)
 
-## Current stance
-This remains one of the most important future areas, but not one of the most mature current ones.
-
----
-
-# 9. Deployment / operations
-
-## Current status
-**Partially real, not yet fully operationalized.**
-
-## What already exists
-- a public beta exists
-- local development works
-- multiple application layers already exist in deployable form conceptually
-
-## What is still incomplete
-- final clean target deployment shape is not yet fully standardized
-- indexer scheduling/cron still needs operational formalization
-- observability is not yet mature
-- runbooks are only now being structured
-
-## Recommended near-term target
-The current likely best deployment model remains:
-- `apps/web` on Vercel
-- `apps/api` on a small VPS or equivalent
-- `apps/indexer` + cron in the same controlled server environment
-
-## Why this matters now
-The project is close enough to beta maturity that deployment discipline now matters a lot.
-This is no longer something to postpone indefinitely.
+Remaining gaps: DeFindex (T3), protocol source documentation, freshness visibility, operational docs,
+stronger retry/backoff. The implementation largely exists; the remaining work is documentation,
+operationalization, and freshness exposure.
 
 ---
 
-# 10. What is strongest right now
+## 6. Data freshness / reliability
 
-The strongest current areas of the project are likely:
-1. overall product direction and architectural separation
-2. live beta existence
-3. backend/API presence
-4. grouped multi-wallet portfolio foundation
-5. real wallet balance snapshot/refresh flows
-6. protocol and pool exploration foundation
+**Partially operationalized.**
 
-These are important because they mean the project already has real traction in implementation terms.
+Exists: refresh jobs; persisted timestamps across snapshots/metrics (`snapshot_at`, `as_of`,
+`occurred_at`, `observed_at`); scheduled refresh; a recent synchronous refresh cycle is verifiable.
 
----
+Incomplete: freshness metadata is not consistently exposed through the API; stale detection is not
+first-class; retries/backoff are protocol-specific, not standardized; health visibility is limited.
 
-# 11. What is still most fragile right now
-
-The most fragile or incomplete areas are likely:
-1. remaining frontend dependence on external providers for some global stats
-2. uneven protocol/data source formalization
-3. freshness/stale/retry operationalization
-4. transaction builder/action layer
-5. alerting engine
-6. bridge monitoring
-7. deployment/observability maturity
+Why it matters: T1-D1 data credibility, the T3-D1 freshness-tracking promise, user trust, and
+debugging. Priorities: (1) expose freshness in API responses; (2) define expected intervals per
+dataset; (3) auto-detect stale sources; (4) standardize retry/backoff; (5) minimal ingestion health
+visibility.
 
 ---
 
-# 12. Closest tranche-relevant wins
+## 7. Notifications / alerting
 
-The nearest tranche-relevant wins likely are:
-1. make Tranche 1 Deliverable 1 extremely explicit and evidenced
-2. make Tranche 1 Deliverable 2 API-centered and visually coherent
-3. define the minimum viable scope for Tranche 1 Deliverable 3
-4. formalize the current multi-wallet system as groundwork for Tranche 2 Deliverable 1
-
----
-
-# 13. Current execution priorities
-
-## Immediate priorities
-1. document current protocol/data coverage more explicitly
-2. move remaining global/dashboard external calls behind internal API
-3. formalize refresh/freshness operational behavior
-4. clean responsive/UI consistency enough for serious beta usage
-5. keep `grant-roadmap.md` and `status-board.md` aligned with reality
-
-## What should not dominate right now
-- over-engineering auth/session
-- premature abstraction layers
-- broad refactors not tied to a tranche need
-- polishing low-value UI before stabilizing data and API boundaries
+**Pre-foundation.** Some notification-like UI exists, and product direction anticipates alerts. What
+does not yet exist in a claimable way: persistent user alert rules, an evaluation engine, a
+notification lifecycle, a rule-to-event pipeline. Do not treat this as "almost there." For T2-D2 the
+contract only requires rule storage + evaluation against the snapshot DB + in-app notifications — build
+the smallest version of that, not the sub-minute event stream from the architecture doc.
 
 ---
 
-# 14. How to update this file
+## 8. On-chain actions / transaction builder
 
-Update this file when:
-- a feature moves from partial to stable
-- a placeholder becomes real
-- a new backend or indexer capability becomes operational
-- deployment reality changes
-- a previously fragile area becomes dependable
-- a grant deliverable meaningfully advances
+**Early relative to the grant.** Wallet connection and wallet-aware UX exist; the builder layer does
+not. Missing: a transaction builder, one narrow end-to-end Testnet action, simulation UX, scoped
+XDR-building with prerequisite bundling. This is the real T1-D3 gap and it gates T3-D2.
 
-When updating, prefer brutal clarity over optimism.
-This file is meant to improve decision quality, not morale.
+---
+
+## 9. Deployment / operations
+
+**Partially real, not yet operationalized.** A public beta exists; local development works
+(`docker compose` → Postgres 16 + Redis 7); app layers are deployable in principle.
+
+Incomplete: a standardized target deployment shape; formalized indexer scheduling/cron; mature
+observability; runbooks (being structured now). Likely near-term target: `apps/web` on Vercel,
+`apps/api` on a small VPS, `apps/indexer` + cron in the same controlled environment. Deployment
+discipline now matters — the project is close enough to beta maturity that this can no longer be
+postponed indefinitely.
+
+---
+
+## 10. Strongest right now
+1. Product direction + architectural separation (web / api / indexer)
+2. Live beta
+3. Verified indexing foundation (coverage + freshness)
+4. Backend/API presence and the `/v1` raw-SQL product pipeline
+5. Grouped multi-wallet portfolio foundation (raw SQL v2)
+6. Real wallet balance snapshot/refresh flows
+
+## 11. Most fragile right now
+1. Transaction builder / action layer
+2. Alerting engine
+3. Bridge monitoring
+4. Freshness/stale/retry operationalization + observability
+5. Deployment maturity
+6. Remaining external-provider dependency (`/v1/network/stats`)
+
+## 12. Closest tranche-relevant wins
+1. Make T1-D1 explicit and evidenced (evidence package; resolve endpoint note)
+2. Make T1-D2 API-centered (network stats) and visually coherent
+3. Scope T1-D3 to ONE Testnet action
+4. Formalize the multi-wallet system as groundwork for T2-D1
+
+---
+
+## 13. Current execution priorities
+1. Document current protocol/data coverage explicitly (feeds the T1-D1 evidence package)
+2. Move `/v1/network/stats`-type external calls behind a persisted internal API
+3. Operationalize refresh/freshness behavior (exposure, stale detection, retry/backoff)
+4. Clean responsive/UI consistency enough for serious beta usage
+5. Keep `grant-roadmap.md` and `status-board.md` aligned with reality
+
+What should not dominate now: over-engineering auth/session, premature abstraction layers, broad
+refactors not tied to a tranche need, or polishing low-value UI before stabilizing data/API boundaries.
+
+---
+
+## 14. How to update this file
+Update when a feature moves from partial to stable, a placeholder becomes real, a new backend/indexer
+capability becomes operational, deployment reality changes, a fragile area becomes dependable, or a
+grant deliverable meaningfully advances. Prefer brutal clarity over optimism.

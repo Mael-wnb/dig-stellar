@@ -2,583 +2,356 @@
 
 ## Purpose
 
-This document translates the approved Stellar Community Fund grant into an internal execution roadmap.
+This document maps the approved Stellar Community Fund grant (SCF 43, $75k, 3 tranches) to internal
+execution. Each deliverable is recorded in two clearly separated layers:
 
-It is not meant to restate the application in reviewer language.  
-Its role is to turn each tranche and deliverable into a concrete internal execution target.
+1. **Grant criteria (validated by SCF — verbatim, do not edit).** This is the contract: the exact
+   description, completion criteria, date, budget, and KPIs that SCF approved. It is the source of
+   truth for *what we are obligated to deliver*. Do not paraphrase, soften, or "improve" it — drift
+   here creates ambiguity at claim time. If it must change, that is a grant amendment, not an edit.
+2. **Internal interpretation & status (living).** Our reading of what the criteria mean in the
+   codebase, what already exists, what the gap is, and what is out of scope. This layer changes as
+   work progresses and must stay aligned with `docs/status-board.md` and `docs/current-state.md`.
 
-For each deliverable, this file should answer:
-- what was promised
-- what it means technically in the Dig Stellar codebase
-- what already exists
-- what is still missing
-- what evidence can prove completion
-- what the minimum remaining gap is before tranche claim readiness
-
-This document should be kept aligned with:
-- `docs/current-state.md`
-- `docs/status-board.md`
+When the two layers seem to disagree, the criteria win for *obligation*; the interpretation wins for
+*current reality*. Surface the disagreement rather than hiding it.
 
 ---
 
-## Product framing
+## Deliverable index
 
-Dig Stellar is a Stellar-native extension of Dig focused on:
-- protocol analytics
-- portfolio tracking
-- wallet-based user flows
-- market visibility across Stellar DeFi
-- progressively, actionable portfolio management and non-custodial execution
+| Tranche | # | Deliverable | Date | Budget | Status* |
+|---|---|---|---|---:|---|
+| T1 | 1 | Data Indexing Foundation (Horizon & Soroban) | May 25, 2026 | $12,300 | ~90% |
+| T1 | 2 | Analytics Dashboard MVP | Jun 8, 2026 | $6,140 | ~80% |
+| T1 | 3 | Smart Transaction Builder (Testnet) | Jun 22, 2026 | $11,070 | ~15% |
+| T2 | 1 | Multi-Wallet Portfolio & "Active Signer" Model | Jul 6, 2026 | $7,380 | ~60% |
+| T2 | 2 | In-App Alerting Engine | Jul 20, 2026 | $8,610 | ~10% |
+| T2 | 3 | Bridge Flow Monitoring | Aug 3, 2026 | $6,140 | ~5% |
+| T3 | 1 | Mainnet Deployment & Freshness Tracking | Aug 10, 2026 | $8,610 | ~40% |
+| T3 | 2 | Non-Custodial Mainnet Actions | Aug 24, 2026 | $8,610 | ~5% |
+| T3 | 3 | Observability, UI/UX Polish & Reference Handoff | Aug 31, 2026 | $6,140 | ~20% |
 
-The current product already includes:
-- a live beta frontend
-- a backend API
-- an indexer layer
-- real protocol data ingestion in multiple areas
-- working wallet connection and grouped multi-wallet portfolio behavior
-
-The key challenge is no longer “build the first prototype”, but:
-- stabilize the architecture
-- centralize data flows
-- tighten the correspondence between product, API, and indexer
-- convert existing progress into tranche-aligned deliverables
-- reach a clean and defensible beta/mainnet path
+Tranche totals: T1 $29,510 · T2 $22,130 · T3 $23,360 · **Total $75,000**.
+\*Status is a snapshot — `docs/status-board.md` is the live source; treat its values as authoritative.
 
 ---
 
-## Codebase ownership model
+## Codebase ownership (summary)
 
-### `apps/web`
-Responsible for:
-- product UI
-- composables / client-side state
-- wallet UX
-- user interactions
-- consumption of internal API endpoints
+- **`apps/web`** — product UI, composables/state, wallet UX, consumption of internal API. No
+  business-critical logic, no direct external-provider fetches for core product data.
+- **`apps/api`** — frontend façade: aggregation, stable contracts, wallet/user grouping, orchestration
+  between DB and indexer output, freshness metadata.
+- **`apps/indexer`** — Horizon/Soroban ingestion, protocol adapters, snapshots, refresh cadence,
+  cron-compatible jobs.
 
-Should not become the place for:
-- critical business logic
-- long-term provider integration logic
-- direct dependency on multiple external analytics providers for core product data
-
-### `apps/api`
-Responsible for:
-- frontend-facing contracts
-- aggregation and normalization for UI
-- wallet/user grouping logic
-- runtime orchestration between DB and indexer-triggered operations
-- exposing dashboard, pools, wallet, and future alert/action endpoints
-
-### `apps/indexer`
-Responsible for:
-- Horizon and Soroban ingestion
-- protocol adapters
-- snapshots
-- refresh cadence
-- cron-compatible operational data collection
-- long-running or repeated data refresh jobs
+As-built data note (see `docs/repo-structure.md` / `docs/data-model.md`): the product runs on the
+**raw SQL v1/v2** pipeline (`job:refresh` → `pool_metrics_latest`, `protocol_metrics_latest`,
+wallet tables) read by `/v1/*` routes. The Prisma `Protocol/Venue/Snapshot` models and the
+prefix-less `/protocols` / `/venues` routes are a parallel legacy path.
 
 ---
 
 # Tranche 1 — MVP
 
----
+## Tranche 1 — Deliverable 1 — Data Indexing Foundation (Horizon & Soroban)
 
-## Deliverable 1 — Data Indexing Foundation (Horizon & Soroban)
+### Grant criteria (validated by SCF — verbatim, do not edit)
+Build the backend infrastructure to collect Stellar DeFi data. The indexer will handle Stellar's
+duality: fetching "Classic" activity via Horizon (native SDEX orderbook, trustlines, balances) and
+smart contract data via the Soroban RPC.
 
-### Grant promise
-Build the backend infrastructure to collect Stellar DeFi data through Horizon and Soroban RPC, store it in a unified database, and expose internal API endpoints with a 5 to 15-minute refresh cadence.
+How to measure completion:
+- Hybrid indexing service (Horizon + Soroban RPC) storing data in a unified database.
+- Adapters developed for Blend V2 (already initiated in our repository via `pnpm -C apps/indexer run:blend` — Soroban) and for the native Stellar DEX liquidity pools (SDEX — Classic/Horizon).
+- Internal API endpoints (`/protocols`, `/venues/:key/snapshots`) serving data with a 5 to 15-minute refresh cadence.
 
-### Internal interpretation
-This deliverable is the technical foundation of the whole product.
+Estimated date: May 25, 2026 — Budget: $12,300
 
-Internally, it means Dig Stellar must have:
-- a real hybrid ingestion model using both Horizon and Soroban
-- protocol/venue adapters for the first target Stellar DeFi sources
-- normalized database storage
-- indexer scripts that can be run manually and later scheduled
-- API endpoints exposing protocol and snapshot data in a frontend-usable way
+### Internal interpretation & status (living)
+Owner: `apps/indexer` + `apps/api`. Status: ~90%.
 
-### Apps concerned
-- `apps/indexer`
-- `apps/api`
+**Met and exceeded.** Hybrid Horizon + Soroban ingestion is live and stores into a unified Postgres
+database. Coverage is broader than the two adapters the criteria require: Blend, Soroswap, and
+Aquarius (Soroban) plus the native Stellar DEX liquidity pools (Horizon).
 
-### Current reality
-**Substantially advanced but not yet fully formalized.**
+**Verified evidence** (DB inspection, June 5, 2026):
+- Coverage: Blend 3 pools, Aquarius 4, Soroswap 2 — all with non-null, non-zero TVL
+  (Blend ≈ $156.7M, Aquarius ≈ $21.0M, Soroswap ≈ $0.57M).
+- Freshness: synchronous `as_of` across the three Soroban protocols within the same `job:refresh`
+  cycle, refreshed minutes before inspection — concrete proof of an operating cadence.
+- Canonical pipeline: `job:refresh` → `72-run-refresh-job.ts` → `71-refresh-all-metrics.ts` →
+  per-protocol refresh steps, writing the raw SQL v1 tables (`pool_metrics_latest`,
+  `protocol_metrics_latest`, `reserve_snapshots`, `normalized_events`, `asset_prices`, …).
 
-What already exists or appears already significantly underway:
-- real Mainnet data is already being fetched in the beta
-- the project already uses a monorepo with a dedicated `apps/indexer`
-- Postgres is already part of the stack
-- a wallet balance snapshot script exists and writes to DB
-- several protocol integrations or adapters already exist in at least partial form
-- backend protocol/pool endpoints already exist
-- Blend indexing has clearly already been initiated
-- real backend/frontend data circulation exists
+**Endpoint note (resolve at claim time, not a blocker).** The criteria name `/protocols` and
+`/venues/:key/snapshots`. In the current code those are the Prisma `AppController` routes (legacy
+path), while the fresh product pipeline is served under `/v1/*`. This is a deliberate result of
+keeping the original endpoint and adding the newer one under `/v1`. Resolution options for the
+tranche-verification doc: (a) state the actual endpoints serving the cadence, or (b) consolidate the
+routes. Either is fine; just make the claimed endpoint match what serves fresh data.
 
-### Current evidence
-Likely evidence already available:
-- `apps/indexer` protocol and wallet scripts
-- real DB tables used by API responses
-- `/v1/pools`, `/v1/protocols`, wallet snapshot-related flows
-- live beta consuming real data
-- wallet snapshot refresh already demonstrable via command/API
-
-### Main gaps
-The likely missing pieces before this deliverable is clearly tranche-ready are:
-- explicit documentation of which sources are covered today by Horizon vs Soroban
-- clearer mapping of protocol coverage (Blend / Aquarius / Soroswap / SDEX / DeFindex)
-- freshness strategy still not formalized enough
-- retry/stale handling not yet treated as a first-class operational concern
-- possible remaining inconsistencies in how data is normalized between protocols
-- runbook for indexer operations likely still incomplete
-
-### Minimum completion criteria internally
-We should consider this deliverable ready to claim when:
-- the first target protocols/venues are clearly indexed through the right source layers
-- data lands in normalized DB structures that the API consumes directly
-- protocol data powering the dashboard no longer depends on ad hoc frontend provider fetching for core metrics
-- refresh cadence is operationally usable
-- stale states can be detected, even if not yet perfectly surfaced everywhere
-- a developer can understand, run, and debug the data ingestion path without guesswork
-
-### Confidence
-**Medium-high**  
-This looks like one of the strongest tranche-1 candidates because a lot already exists. The main work is likely not “invent the system” but “formalize, tighten, and prove it.”
-
-### Next actions
-1. map current protocol adapters and data sources explicitly
-2. document DB tables / snapshots currently supporting protocol data
-3. identify what still relies on frontend external fetches
-4. define freshness markers and minimal stale detection
-5. update runbooks for ingestion and refresh
+**Remaining gap before claim-readiness:** freshness exposure through the API, retry/backoff
+standardization, ingestion runbook, and the evidence package itself. **DeFindex is out of scope here**
+— it belongs to Tranche 3 Deliverable 1 (which lists DeFindex among the mainnet protocols).
 
 ---
 
-## Deliverable 2 — Analytics Dashboard MVP
+## Tranche 1 — Deliverable 2 — Analytics Dashboard MVP
 
-### Grant promise
-Deliver the first version of the user interface displaying global market data and protocol-specific dashboards.
+### Grant criteria (validated by SCF — verbatim, do not edit)
+Deliver the first version of the user interface displaying global market data and protocol-specific
+dashboards using Testnet data.
 
-### Internal interpretation
-This deliverable is not just “a page exists”.
+How to measure completion:
+- Live and publicly accessible web interface.
+- Display of key metrics (TVL, volume, APY) for the protocols indexed in Deliverable 1.
+- Integration of Stellar Wallets Kit for seamless wallet connection.
 
-Internally, it means:
-- a public frontend exists and is usable
-- protocol-specific views are real, not just mocked
-- core metrics are displayed coherently
-- the dashboard feels like a real product entry point into Stellar DeFi
-- wallet connection is integrated in a meaningful way
+Estimated date: June 8, 2026 — Budget: $6,140
 
-### Apps concerned
-- `apps/web`
-- `apps/api`
+### Internal interpretation & status (living)
+Owner: `apps/web` + `apps/api`. Status: ~80%.
 
-### Current reality
-**Already significantly advanced.**
+**Largely met.** A public beta exists; protocol and pool views are real and display TVL / volume / APY
+from the indexed data; Stellar Wallets Kit is integrated (`@creit.tech/stellar-wallets-kit`,
+`@stellar/freighter-api`).
 
-What already exists:
-- a public beta exists
-- frontend structure is real and already product-shaped
-- protocol tabs / pool tabs / pool details exist
-- wallet connection exists
-- wallet section is advanced
-- multi-wallet flows have been pushed much further than a mock MVP
-- the frontend is already reading real backend data in several important areas
+**Testnet vs Mainnet note.** The criteria say "using Testnet data," but the dashboard already runs on
+real **Mainnet** data — over-delivery relative to the contract. Worth flagging in the verification doc
+so a reviewer reading the literal text is not surprised.
 
-### Current evidence
-Likely evidence already available:
-- public beta URL
-- `apps/web` components already built and connected
-- wallet connect header + wallet section
-- pool/protocol dashboard pages using live backend data
-- screenshots / walkthroughs could easily support this
-
-### Main gaps
-Most likely missing pieces:
-- remaining global/network stats still fetched directly from external providers in frontend
-- responsive pass not fully done
-- loading / stale / error states may still be inconsistent
-- some sections may still mix real and placeholder behavior
-- top-level dashboard coherence may need one polishing pass
-
-### Minimum completion criteria internally
-We should consider this deliverable ready to claim when:
-- the core dashboard is API-driven for product-critical data
-- the protocol views are clearly usable and demonstrable
-- wallet connection works reliably for beta users
-- the main screens do not break on normal desktop and mobile widths
-- the product can be shown end-to-end without caveating major broken sections
-
-### Confidence
-**Medium-high**  
-This is likely also close, but unlike Deliverable 1, this one has a stronger dependency on polish, API consistency, and cleaning up frontend-provider leakage.
-
-### Next actions
-1. centralize remaining dashboard/global stats behind internal API
-2. align frontend on API-only consumption where possible
-3. perform a responsive pass
-4. clean stale/loading/error handling
-5. clearly label or remove non-functional placeholder areas
+**Remaining gap:** some global/network stats are still served by `GET /v1/network/stats`, which calls
+external APIs live (CoinGecko, DefiLlama, stellar.expert, Horizon) with no DB persistence or freshness
+— the "centralize behind the API / no direct external fetches for core data" item. Plus a responsive
+pass and stale/loading/error consistency. None of these block the three criteria, but they are the
+polish needed for a credible external beta.
 
 ---
 
-## Deliverable 3 — Smart Transaction Builder (Testnet)
+## Tranche 1 — Deliverable 3 — Smart Transaction Builder (Testnet)
 
-### Grant promise
-Develop the engine that generates non-custodial transaction proposals, bundles prerequisites into a single XDR when needed, simulates on testnet, and executes with in-wallet signing.
+### Grant criteria (validated by SCF — verbatim, do not edit)
+Develop the engine that generates non-custodial transaction proposals. The builder will automatically
+bundle required prerequisites (e.g., missing trustlines) into a single XDR envelope for the user to
+sign in their wallet.
 
-### Internal interpretation
-This is the first real move from analytics to actions.
+How to measure completion:
+- Users can generate a multi-operation XDR transaction (e.g., `ChangeTrust` + Deposit) directly from the UI.
+- Transactions are successfully simulated and executed on the Stellar Testnet.
+- Strict adherence to the non-custodial model: signatures are exclusively performed in-wallet via Stellar Wallets Kit.
 
-Internally, it means:
-- a first supported action flow must exist
-- that flow must produce a valid transaction proposal/XDR
-- prerequisite ops (trustline, etc.) can be composed when necessary
-- execution remains non-custodial
-- simulation and execution UX are understandable
+Estimated date: June 22, 2026 — Budget: $11,070
 
-### Apps concerned
-- `apps/web`
-- `apps/api`
+### Internal interpretation & status (living)
+Owner: `apps/web` + `apps/api`. Status: ~15%. **This is the real T1 gap.**
 
-### Current reality
-**Still early.**
-
-What exists today:
-- wallet connection UX exists
-- some groundwork for wallet-aware flows exists
-- product direction clearly anticipates actions
-
-What likely does **not** yet exist in a tranche-ready form:
-- a formal transaction builder layer
-- a first narrow action flow implemented end-to-end
-- clear simulation UX
-- stable action scope definition
-
-### Current evidence
-Currently likely limited to:
-- wallet connection integration
-- possibly some prior technical exploration
-- architecture ability to support future builder work
-
-### Main gaps
-This deliverable still needs:
-- exact scope definition for the first testnet action(s)
-- clear split between frontend and backend responsibilities
-- XDR builder design
-- simulation flow
-- user-visible execution feedback
-- testnet validation path
-
-### Minimum completion criteria internally
-We should consider this ready when:
-- one concrete testnet action flow works end-to-end
-- the flow can generate and simulate a valid transaction proposal
-- trustline/precondition logic is correctly handled when needed
-- signing remains fully wallet-side
-- the UX clearly explains what is happening
-
-### Confidence
-**Low**  
-This appears to be the least mature of the tranche-1 deliverables and likely the one that still requires true new feature work.
-
-### Next actions
-1. choose one narrow reference flow only
-2. define the builder contract and UX
-3. implement simulation and execution on testnet
-4. test with one protocol/action first
-5. document the builder boundaries for future extension
+Wallet connection and wallet-aware UX exist; the builder layer itself does not. To claim this, one
+narrow reference action must work end-to-end: build a multi-operation XDR (e.g. `ChangeTrust` +
+deposit), simulate it on Testnet via `simulateTransaction`, and sign in-wallet through Stellar Wallets
+Kit — backend never touching keys. Recommended approach: pick ONE protocol/action (a Blend deposit is
+the natural candidate given existing Blend coverage), prove the full path, then generalize. Out of
+scope for the claim: multi-action menus, mainnet execution (that is T3-D2), fee sponsorship.
 
 ---
 
-# Tranche 2 — Expansion / Testnet depth
+# Tranche 2 — Expansion
+
+## Tranche 2 — Deliverable 1 — Multi-Wallet Portfolio & "Active Signer" Model
+
+### Grant criteria (validated by SCF — verbatim, do not edit)
+Implement multi-wallet tracking, allowing users to monitor a consolidated portfolio of positions
+across Stellar DeFi.
+
+How to measure completion:
+- UI supports adding one "Active Signer" wallet and multiple "watch-only" addresses.
+- Aggregation of balances and DeFi positions across all tracked addresses.
+- Clear UI distinction between watch-only addresses and the active signing context.
+
+Estimated date: July 6, 2026 — Budget: $7,380
+
+### Internal interpretation & status (living)
+Owner: `apps/web` + `apps/api` (+ `apps/indexer` as position depth grows). Status: ~60%.
+
+**Foundations in place.** Grouped multi-wallet behavior is real: add/remove/refresh/select flows,
+backend grouping by a persistent `userId`, wallet overview and per-wallet balances. Backed by the raw
+SQL v2 tables (`user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions`), refreshed via
+the indexer script spawned by `refreshWallet`.
+
+**Remaining gap, mapped to the exact criteria:** the explicit **"Active Signer" vs "watch-only"**
+distinction is not yet formalized (model + UI), and position aggregation beyond wallet balances is
+still thin. Decide whether watch-only is a backend state or a frontend designation, then surface the
+signing context clearly. The first two criteria are close; the third (clear UI distinction) is the
+real work.
 
 ---
 
-## Deliverable 1 — Multi-Wallet Portfolio & Active Signer Model
+## Tranche 2 — Deliverable 2 — In-App Alerting Engine
 
-### Grant promise
-Support one active signer wallet and multiple watch-only addresses, with aggregated balances and DeFi positions.
+### Grant criteria (validated by SCF — verbatim, do not edit)
+Build the backend logic and frontend interface for user-defined alerts based on on-chain activity and
+metric deltas (e.g., APY drops, health factor risks).
 
-### Internal interpretation
-This deliverable is about turning wallet support into a real portfolio model.
+How to measure completion:
+- Users can configure specific thresholds and alerting preferences stored in their profile.
+- The backend evaluates rules against the snapshot database and generates in-app notifications.
 
-Internally, it means:
-- one user identity can group multiple wallets
-- the app distinguishes between signing context and tracked wallets
-- the portfolio is consolidated across those wallets
-- the distinction is visible and meaningful in the UI
+Estimated date: July 20, 2026 — Budget: $8,610
 
-### Apps concerned
-- `apps/web`
-- `apps/api`
-- potentially `apps/indexer` as portfolio depth expands
+### Internal interpretation & status (living)
+Owner: `apps/api` + `apps/web` (+ scheduled evaluation). Status: ~10%.
 
-### Current reality
-**Already materially advanced.**
-
-What already exists:
-- backend wallet grouping by real `userId`
-- multi-wallet add/remove/select flows
-- wallet refresh
-- wallet overview and balances
-- ability to add secondary wallets to an existing user grouping
-
-What still seems incomplete:
-- explicit “active signer” vs “watch-only” model
-- richer DeFi position aggregation beyond current wallet balances
-- product clarity around which wallet is currently acting vs merely tracked
-
-### Main gaps
-- formal modeling of signer vs watch-only
-- possible DB/UI state changes to represent this cleanly
-- broader position aggregation if required by tranche interpretation
-
-### Minimum completion criteria internally
-We should consider this deliverable ready when:
-- a user can manage multiple wallets under one portfolio context
-- the UI clearly distinguishes signing wallet vs tracked wallet(s)
-- balances and at least the first level of portfolio aggregation are stable and intelligible
-
-### Confidence
-**Medium**  
-This one may move quickly because the foundations are already in place.
-
-### Next actions
-1. define the “active signer” model explicitly
-2. decide whether watch-only means backend state change or purely frontend designation
-3. ensure aggregation semantics match the tranche wording
-4. expose the distinction cleanly in UI
+**Scope discipline.** The criteria require only rule storage, **evaluation against the snapshot
+database**, and in-app notifications. The architecture doc envisions a sub-minute event-stream
+evaluator — that is a fine long-term direction but **must not** become a precondition for this claim.
+Build the smallest version that meets the two criteria: a persisted rule/preference model, a periodic
+evaluator over `pool_metrics_latest` / `protocol_metrics_latest` deltas, and an in-app notification
+slice. Start with one rule family (e.g. APY delta or health-factor threshold).
 
 ---
 
-## Deliverable 2 — In-App Alerting Engine
+## Tranche 2 — Deliverable 3 — Bridge Flow Monitoring
 
-### Grant promise
-Build backend logic and frontend interface for user-defined alerts based on on-chain activity and metric deltas.
+### Grant criteria (validated by SCF — verbatim, do not edit)
+Integrate bridge monitoring to track cross-chain capital inflows to the Stellar ecosystem.
 
-### Internal interpretation
-This is the monitoring layer sitting on top of the snapshot architecture.
+How to measure completion:
+- Adapter built for Allbridge to track attribution data.
+- Dashboard section dedicated to incoming bridged assets.
 
-Internally, it means:
-- users can define alert rules/preferences
-- rules are evaluated against indexed/snapshotted data
-- results are stored as notifications/events
-- these are visible in-app
+Estimated date: August 3, 2026 — Budget: $6,140
 
-### Apps concerned
-- `apps/api`
-- `apps/web`
-- likely `apps/indexer` or scheduled evaluation jobs
+### Internal interpretation & status (living)
+Owner: `apps/indexer` + `apps/api` + `apps/web`. Status: ~5%. Not meaningfully started.
 
-### Current reality
-**Very early.**
-
-What exists:
-- notification-like UI elements exist in parts of the frontend
-- the general product direction already fits this kind of feature
-
-What seems missing:
-- rule model
-- persistence
-- evaluator
-- alert lifecycle
-- profile/preferences model
-
-### Minimum completion criteria internally
-We should consider this ready when:
-- a user can define a small set of real thresholds
-- backend evaluates them periodically
-- notifications are generated and displayed in the UI
-
-### Confidence
-**Low**
-
-### Next actions
-1. define the minimum alert model
-2. choose evaluation layer (API job vs indexer job)
-3. implement one small alert family first
-4. connect it to a real in-app notification slice
-
----
-
-## Deliverable 3 — Bridge Flow Monitoring
-
-### Grant promise
-Integrate bridge monitoring to track cross-chain capital inflows to Stellar.
-
-### Internal interpretation
-This feature extends analytics beyond local protocol state into ecosystem inflow visibility.
-
-### Apps concerned
-- `apps/indexer`
-- `apps/api`
-- `apps/web`
-
-### Current reality
-**Not meaningfully started yet**, based on current known state.
-
-### Minimum completion criteria internally
-We should consider this ready when:
-- at least one source adapter is operational
-- the resulting flows are normalized
-- the dashboard exposes a coherent bridge/inflow slice
-
-### Confidence
-**Low**
-
-### Next actions
-1. choose the first bridge source
-2. define the normalized storage model
-3. implement adapter
-4. expose minimal dashboard section
+The criteria are narrow and explicit: an **Allbridge** attribution adapter and a dashboard section for
+incoming bridged assets. Axelar / Near Intents are not part of this contract — do not expand scope.
+Define the normalized inflow storage model, build the Allbridge adapter, expose a minimal dashboard
+slice.
 
 ---
 
 # Tranche 3 — Mainnet / Operational maturity
 
----
+## Tranche 3 — Deliverable 1 — Mainnet Deployment & Freshness Tracking
 
-## Deliverable 1 — Mainnet Deployment & Freshness Tracking
+### Grant criteria (validated by SCF — verbatim, do not edit)
+Switch the entire infrastructure (Indexer, API, Frontend) to the Stellar Mainnet for all integrated
+protocols. Implement data reliability monitoring (freshness tracking).
 
-### Grant promise
-Switch infrastructure to production mainnet operation with stale detection and retries.
+How to measure completion:
+- Production deployment with real Mainnet data for Blend V2, SDEX, Soroswap, Aquarius, and DeFindex.
+- The system monitors source latency: if a protocol becomes "stale", the UI explicitly indicates it and the indexer performs retries with exponential backoff.
 
-### Internal interpretation
-This is the operationalization deliverable.
+Estimated date: August 10, 2026 — Budget: $8,610
 
-Internally, it means:
-- production deployment topology is stable
-- frontend, API, and indexer are deployed in a coherent way
-- protocol freshness is observable
-- stale or failing sources trigger retries and visible indicators
+### Internal interpretation & status (living)
+Owner: `apps/web` + `apps/api` + `apps/indexer`. Status: ~40%.
 
-### Apps concerned
-- `apps/web`
-- `apps/api`
-- `apps/indexer`
+**Partly real already.** The product runs on real Mainnet data for Blend, Soroswap, Aquarius, and the
+native DEX. **DeFindex lives here**: this criterion is the one that explicitly requires DeFindex
+coverage, so the scaffolded `run:defindex` / `@defindex/sdk` work must be completed and validated for
+this deliverable (not for T1-D1).
 
-### Current reality
-**Partially advanced conceptually, but not yet formalized operationally.**
-
-What exists:
-- live beta
-- real mainnet data already present in parts of the product
-- architecture naturally supports this direction
-
-What likely remains:
-- consistent production topology
-- freshness system
-- stale flags
-- retry/backoff strategy
-- health endpoints
-
-### Confidence
-**Low-medium**
-
-### Next actions
-1. define the production topology
-2. move critical frontend data dependencies behind the API
-3. add freshness metadata and health endpoints
-4. add retry/backoff where needed
+**Remaining gap:** the freshness *system* the criterion describes — staleness surfaced in the UI,
+retries with exponential backoff — is not yet first-class (timestamps exist; stale detection and
+backoff are not standardized). Plus a formalized production topology and health visibility. This is the
+operationalization deliverable; freshness/stale/retry is the spine of it.
 
 ---
 
-## Deliverable 2 — Non-Custodial Mainnet Actions
+## Tranche 3 — Deliverable 2 — Non-Custodial Mainnet Actions
 
-### Grant promise
-Enable real mainnet swaps and vault/lending interactions from the dashboard.
+### Grant criteria (validated by SCF — verbatim, do not edit)
+Enable real transaction execution on the Mainnet. The Smart Transaction Builder interacts with the
+official smart contracts deployed by partner protocols on the main network.
 
-### Internal interpretation
-This is the mainnet extension of the transaction builder.
+How to measure completion:
+- Successful execution of swaps and vault/lending interactions on the Mainnet from the dashboard.
+- Validation of strict security: backend stores only public addresses and never processes private keys.
+- The UI cleanly manages and displays execution feedback.
 
-### Current reality
-**Not yet close.**
+KPI:
+- 50+ unique mainnet wallets
+- 200+ mainnet transactions
 
-This depends heavily on tranche-1 transaction-builder foundations.
+Estimated date: August 24, 2026 — Budget: $8,610
 
-### Confidence
-**Low**
+### Internal interpretation & status (living)
+Owner: `apps/web` + `apps/api`. Status: ~5%. Depends entirely on T1-D3.
 
-### Next actions
-1. complete tranche-1 builder
-2. validate action surface by protocol
-3. harden UX and security guarantees
-4. move to mainnet with narrow scope first
+This is the mainnet extension of the transaction builder. It cannot advance before T1-D3 proves the
+build → simulate → in-wallet-sign path on Testnet. Note the **hard KPIs** (50+ unique mainnet wallets,
+200+ mainnet transactions) — these are adoption metrics, not just functional checks, so the claim
+needs both a working action surface *and* real usage. Sequence: finish T1-D3, validate the action
+surface per protocol, harden security/UX, ship to mainnet with narrow scope first, then drive usage.
 
 ---
 
-## Deliverable 3 — Observability, UI/UX Polish & Reference Implementation Handoff
+## Tranche 3 — Deliverable 3 — Observability, UI/UX Polish & Reference Implementation Handoff
 
-### Grant promise
-Add observability, polish, packaging, and documentation for SDF handoff.
+### Grant criteria (validated by SCF — verbatim, do not edit)
+Final UI polish based on Mainnet feedback. Implementation of system observability and delivery of the
+technical architecture package to the Stellar Development Foundation.
 
-### Internal interpretation
-This is the final maturity layer:
-- health
-- latency/error visibility
-- clean docs
-- reproducible setup
-- clearer packaging of the architecture
+How to measure completion:
+- Backend observability implemented (endpoints `/health`, RPC latency metrics, error rates).
+- The application is packaged as a Reference Implementation for the SDF (functional Docker compose) with internal documentation.
+- Final report submitted to the SDF demonstrating the modular architecture and initial adoption metrics.
 
-### Current reality
-**Early, but the groundwork is starting.**
+Estimated date: August 31, 2026 — Budget: $6,140
 
-What already exists:
-- documentation effort has started
-- architecture is already modular enough to support packaging later
+### Internal interpretation & status (living)
+Owner: all apps. Status: ~20%.
 
-What remains:
-- real health/metrics endpoints
-- deployment/runbook maturity
-- formal packaging and handoff structure
-- final UI polish under production constraints
+**Partial groundwork.** A `docker-compose.yml` exists (Postgres + Redis) — partial evidence toward the
+"functional Docker compose" criterion, though it is currently the local-dev stack, not a packaged
+reference implementation. Documentation effort has started and the architecture is modular.
 
-### Confidence
-**Low**
-
-### Next actions
-1. add health and minimal observability early
-2. keep docs updated incrementally
-3. avoid postponing packaging concerns entirely until the end
+**Remaining gap:** real `/health` and metrics endpoints (RPC latency p50/p95/p99, error rates),
+packaging as an SDF reference implementation with docs, and the final report with adoption metrics
+(which depends on the T3-D2 KPIs). Note: testing/CI dependencies are installed but no suites/pipelines
+exist yet — if any testing evidence is wanted for handoff, it is built here, and must not be cited as
+already existing before then.
 
 ---
 
 # Cross-deliverable reality check
 
-## Strongest current candidates
-The deliverables that appear closest to being made tranche-claimable soon are:
-1. **Tranche 1 — Deliverable 1 (Data Indexing Foundation)**
-2. **Tranche 1 — Deliverable 2 (Analytics Dashboard MVP)**
-3. **Tranche 2 — Deliverable 1 (Multi-Wallet Portfolio)**
+## Strongest current candidates (closest to claim-readiness)
+1. T1-D1 — Data Indexing Foundation (~90%)
+2. T1-D2 — Analytics Dashboard MVP (~80%)
+3. T2-D1 — Multi-Wallet Portfolio (~60%)
 
 ## Most underdeveloped areas
-The areas that appear to still require the most new work are:
-1. **Tranche 1 — Deliverable 3 (Smart Transaction Builder)**
-2. **Tranche 2 — Deliverable 2 (Alerting Engine)**
-3. **Tranche 2 — Deliverable 3 (Bridge Monitoring)**
-4. **Tranche 3 action/observability layers**
+1. T1-D3 — Smart Transaction Builder (~15%) — gates T3-D2
+2. T2-D2 — Alerting Engine (~10%)
+3. T2-D3 — Bridge Monitoring (~5%)
+4. T3 operational/action layers
+
+## Timeline reality (be honest, not optimistic)
+As of June 5, 2026: the T1-D1 estimated date (May 25) has passed with the deliverable not yet claimed,
+and T1-D2 (June 8) is imminent. The later dates assume T1-D3 — the least mature T1 item — lands by
+June 22, which is aggressive given it still needs net-new builder work. Treat the SCF dates as the
+contractual targets, but plan internally against actual maturity: prioritize closing T1-D1 (evidence
+package) and T1-D2 (polish) now, and de-risk T1-D3 by scoping ONE action immediately rather than
+keeping it abstract.
 
 ---
 
 # Immediate execution priorities
-
-The most useful priorities now are:
-
-1. turn Tranche 1 Deliverable 1 into a clearly evidenced, well-documented near-complete deliverable
-2. turn Tranche 1 Deliverable 2 into a stable, API-centered, beta-credible dashboard
-3. define the minimum viable scope of Tranche 1 Deliverable 3 instead of keeping it abstract
-4. keep `current-state.md` and `status-board.md` aligned with reality
+1. Turn T1-D1 into a clearly evidenced, well-documented deliverable (evidence package; resolve the
+   endpoint note).
+2. Close T1-D2 polish: centralize remaining external calls behind the API, responsive pass,
+   stale/loading/error consistency.
+3. Scope T1-D3 to ONE narrow Testnet action and prove it end-to-end.
+4. Keep `current-state.md` and `status-board.md` aligned with reality.
 
 ---
 
 # How to use this file
-
-Before starting a major task, answer:
-- which tranche does this help?
-- which deliverable does it directly support?
-- what evidence will prove progress?
-- what is the smallest version that moves the deliverable closer to claim readiness?
-
-This file should remain the main internal roadmap reference for all grant-aligned execution.
+Before a major task, answer: which tranche/deliverable does it serve? what is the smallest version
+that moves it toward claim-readiness? what evidence will prove it? Keep the **Grant criteria** blocks
+verbatim; update only the **Internal interpretation & status** layer, and mirror status changes into
+`docs/status-board.md`.
