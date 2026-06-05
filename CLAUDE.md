@@ -22,19 +22,19 @@ if it does not endanger the beta. No abstraction layers "just in case." Realism 
 
 ```
 apps/web        Vue 3 + Vite + Tailwind — product UI, wallet UX, consumes internal API
-apps/api        NestJS + Prisma — the single frontend façade
-apps/indexer    Soroban RPC / Horizon ingestion, adapters, snapshots, refresh jobs
-packages/db     Prisma schema + migrations (Postgres)
-packages/core   (optional) shared types/schemas for the unified model
-packages/adapters (optional) protocol + bridge adapters
-docs/           source-of-truth documentation
+apps/api        NestJS — frontend façade; serves the product through /v1/* routes (raw SQL)
+apps/indexer    Soroban RPC / Horizon ingestion, adapters, refresh jobs (the real pipeline)
+packages/db     Prisma client + migrations (Postgres) — NB: Prisma models are legacy, see below
+docs/           project docs (some still describe the legacy schema — see below)
 ```
 
-Key entry points (verify paths against the actual tree before relying on them):
-- Prisma schema: `packages/db/prisma/schema.prisma`
-- API endpoints: `apps/api/src/app.controller.ts`
-- Blend job: `apps/indexer/src/run-blend.ts`
-- Horizon job: `apps/indexer/src/run-horizon.ts`
+Canonical entry points (verified against the code):
+- Product API routes: `apps/api/src/.../StellarController` (`/v1/*`), `WalletsController` (`/v1/wallets/*`)
+- Ingestion orchestration: `apps/indexer/src/scripts/ingest/72-run-refresh-job.ts` (`job:refresh`)
+- Ingestion logic: `apps/indexer/src/lib/protocols/<protocol>/` (fetch / normalize / persist)
+- Raw SQL schema: `apps/api/src/db/stellar_v1*.sql` (v1) and `stellar_v2_multiwallet.sql` (v2)
+- Legacy (not served to the product): `apps/api/src/app.controller.ts` (`AppController`),
+  `apps/indexer/src/run-blend.ts`, `run-horizon.ts`, `run-once.ts`, and `packages/db/prisma/schema.prisma`
 
 ---
 
@@ -56,6 +56,31 @@ This is the most important rule in the repo. Architecture drift here is a defect
   logic. Any metric that feeds an alert must be derivable from on-chain data as source of truth.
 
 When a task spans layers, state which layer owns the new logic before writing it.
+
+---
+
+## Data architecture (as-built) — verified; overrides the docs
+
+Three table families coexist in the **same** Postgres DB:
+
+- **raw SQL v1** — `entities`, `venues`, `assets`, `entity_assets`, `pool_snapshots`,
+  `reserve_snapshots`, `normalized_events`, `pool_metrics_latest`, `protocol_metrics_latest`,
+  `asset_prices` (snake_case). Schema in `apps/api/src/db/stellar_v1*.sql`. **This is the product
+  data pipeline.** Written by `job:refresh` (`72-run-refresh-job.ts` → `71-refresh-all-metrics.ts`
+  → per-protocol refresh steps). Read by `/v1/*` (`StellarController`).
+- **raw SQL v2** — `user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions`.
+  Schema in `stellar_v2_multiwallet.sql`. Read by `/v1/wallets/*` (`WalletsController`).
+- **Prisma models** — `Protocol`, `Venue`, `Snapshot` (PascalCase). **Legacy / parallel, NOT served
+  to the product.** Written by `run:blend` / `run:horizon` / `run:once`; read only by the
+  prefix-less `/protocols`, `/venues`, `/snapshots` routes (`AppController`). Elsewhere the Prisma
+  client is used only as a raw-SQL connection (`$queryRawUnsafe`) for v1/v2 — not as an ORM.
+
+Bottom line: **`/v1/*` + raw SQL = the real product. Prisma `Protocol/Venue/Snapshot` = legacy.**
+`docs/data-model.md` and `docs/repo-structure.md` still present the Prisma schema as canonical;
+they are being corrected — trust this block until they are.
+
+Also note: `GET /v1/network/stats` (`NetworkController`) hits external APIs live (CoinGecko,
+DefiLlama, stellar.expert, Horizon) with no DB persistence or freshness — a T1-D2 concern, not T1-D1.
 
 ---
 
@@ -108,10 +133,12 @@ pnpm -C apps/web build              # vue-tsc -b && vite build  (typecheck happe
 pnpm -C apps/web preview
 ```
 
-Where to find per-protocol ingestion: only `blend`, `horizon`, `defindex`, `once`, and the global
-`job:refresh` are top-level scripts. **Soroswap, Aquarius, and Stellar-native ingestion are not
-top-level scripts** — they run under `apps/indexer/src/scripts/ingest/` (numbered files) and/or via
-`run:once` / `job:refresh`. Look there before assuming a job is missing.
+Per-protocol ingestion: logic lives in `apps/indexer/src/lib/protocols/<protocol>/`. The live
+entry points are the per-protocol `run-*-refresh.ts` called by `71-refresh-all-metrics.ts`
+(Blend `run-blend-pool-refresh.ts`, Soroswap `run-soroswap-pair-refresh.ts`, Aquarius
+`run-aquarius-pool-refresh.ts`, native `run-stellar-native-refresh.ts`). `src/scripts/ingest/`
+**also contains superseded legacy** (numbered `*-v1.ts`, `*-insert-*.ts`, and duplicate
+`run-*-refresh.ts`) — confirm a file is on the live `job:refresh` path before relying on or editing it.
 
 ---
 
@@ -194,5 +221,6 @@ When a structural change lands, update the relevant doc(s) in the same change:
 
 `docs/TECHNICAL_ARCHITECTURE.md` (architecture), `docs/grant-roadmap.md` (deliverables),
 `docs/current-state.md` + `docs/status-board.md` (where things actually stand),
-`docs/data-model.md` + `packages/db/prisma/schema.prisma` (schema),
+schema: the **raw SQL v1/v2** files and the "Data architecture (as-built)" section above are
+authoritative; `docs/data-model.md` + `packages/db/prisma/schema.prisma` describe the legacy path,
 `docs/runbooks.md` + `docs/deployment.md` (operations), `docs/ai-guidelines.md` (how AI works here).
