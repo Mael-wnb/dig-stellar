@@ -10,12 +10,12 @@ defineProps<{
 </script>
 
 <template>
-  <div class="w-full rounded-xl border border-[#383838] bg-[#141414] overflow-hidden flex">
+  <div class="w-full rounded-xl border border-[#383838] bg-[#2A2A2A] overflow-hidden flex flex-wrap">
 
     <div
       v-for="(stat, i) in stats"
       :key="stat.title"
-      class="flex flex-col justify-center items-center gap-1 p-4 flex-1 relative"
+      class="flex flex-col justify-center items-center gap-1 p-3 sm:p-4 flex-1 min-w-[100px] relative"
       :class="[
         i !== stats.length - 1 ? 'border-r border-[#383838]' : '',
         stat.highlight ? 'bg-[#1a1f0e]' : ''

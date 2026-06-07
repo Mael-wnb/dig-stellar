@@ -6,9 +6,10 @@ import { DbModule } from './db/db.module';
 import { NetworkModule } from './modules/network/network.module';
 import { StellarModule } from './modules/stellar/stellar.module';
 import { WalletsModule } from './modules/wallets/wallets.module';
+import { ActionsModule } from './modules/actions/actions.module';
 
 @Module({
-  imports: [DbModule, StellarModule, WalletsModule, NetworkModule],
+  imports: [DbModule, StellarModule, WalletsModule, NetworkModule, ActionsModule],
   controllers: [AppController],
   providers: [AppService],
 })

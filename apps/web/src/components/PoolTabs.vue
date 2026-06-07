@@ -25,80 +25,80 @@ function getProtocolMeta(protocolId: string) {
       icon: '•',
       iconColor: '#D5FF2F',
       iconBg: '#1a1a1a',
+      logo: '',
     }
   )
 }
 </script>
 
 <template>
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-[6px]">
-
+  <TransitionGroup
+    name="pool-tab"
+    tag="div"
+    class="grid grid-cols-2 md:grid-cols-4 gap-2"
+  >
     <div
       v-for="pool in pools"
       :key="pool.id"
       @click="emit('selectPool', pool.id)"
-      class="group cursor-pointer rounded-[10px] px-[12px] py-[10px] border flex flex-col gap-[8px] transition-all"
-
+      class="group cursor-pointer rounded-xl px-3 py-3 border flex flex-col gap-2 transition-colors duration-200"
       :class="pool.id === selectedPoolId
-        ? 'bg-[#1a1a1a] border-[#D5FF2F]/50'
-        : 'bg-[#181818] border-[#2a2a2a] hover:border-[#3a3a3a]'"
+        ? 'bg-[#2A2A2A] border-[#D5FF2F]/40'
+        : 'bg-[#2A2A2A] border-[#383838] hover:border-[#4a4a4a]'"
     >
-
       <!-- TOP -->
-      <div class="flex items-center justify-between gap-[6px]">
-
-        <!-- NAME -->
-        <span
-          class="text-[14px] font-semibold truncate"
-          :class="pool.id === selectedPoolId
-            ? 'text-[#D5FF2F]'
-            : 'text-[#E2E6E1]'"
-        >
-          {{ pool.name }}
-        </span>
-
-        <!-- PROTOCOL BADGE -->
-        <div
-          class="flex items-center gap-[4px] text-[11px] px-[6px] py-[2px] rounded-[4px]"
-          :style="{
-            background: getProtocolMeta(pool.protocol?.id || '').iconBg,
-            color: getProtocolMeta(pool.protocol?.id || '').iconColor
-          }"
-        >
-          <span>{{ getProtocolMeta(pool.protocol?.id || '').icon }}</span>
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 min-w-0">
+          <img
+            v-if="getProtocolMeta(pool.protocol?.id || '').logo"
+            :src="getProtocolMeta(pool.protocol?.id || '').logo"
+            :alt="pool.protocol?.name"
+            class="w-[18px] h-[18px] rounded shrink-0"
+          />
+          <span
+            class="text-[14px] font-semibold truncate"
+            :class="pool.id === selectedPoolId ? 'text-[#D5FF2F]' : 'text-[#E2E6E1]'"
+          >
+            {{ pool.name }}
+          </span>
         </div>
-
       </div>
 
       <!-- BOTTOM -->
       <div class="flex items-center justify-between text-[11px]">
-
-        <!-- PROTOCOL NAME -->
-        <span class="text-[#9A9B99] truncate">
-          {{ pool.protocol?.name }}
-        </span>
-
-        <!-- TVL -->
-        <div class="flex items-center gap-[4px]">
-
-          <span class="uppercase text-[9px] tracking-wider text-[#5e5f5d]">
-            TVL
-          </span>
-
+        <span class="text-[#5E5F5D] truncate">{{ pool.protocol?.name }}</span>
+        <div class="flex items-center gap-1">
+          <span class="uppercase text-[9px] tracking-wider text-[#5e5f5d]">TVL</span>
           <span
             class="font-semibold"
             :class="pool.id === selectedPoolId
               ? 'text-[#D5FF2F]'
-              : 'text-[#9A9B99] group-hover:text-[#E2E6E1]'"
+              : 'text-[#5E5F5D] group-hover:text-[#E2E6E1]'"
           >
             {{ formatUsdCompact(pool.metrics?.tvlUsd) }}
           </span>
-
         </div>
-
       </div>
-
     </div>
-
-  </div>
+  </TransitionGroup>
 </template>
+
+<style scoped>
+.pool-tab-enter-active {
+  transition: all 0.25s ease-out;
+}
+.pool-tab-leave-active {
+  transition: all 0.15s ease-in;
+}
+.pool-tab-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.pool-tab-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+.pool-tab-move {
+  transition: transform 0.25s ease;
+}
+</style>

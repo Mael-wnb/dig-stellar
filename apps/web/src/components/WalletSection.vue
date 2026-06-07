@@ -28,18 +28,18 @@ const {
   wallets,
   selectedWallet,
   overviewLoading,
-  error,
+  error: _error,
   totalPortfolioUsd,
   isBusy,
   loadOverview,
   addWallet,
   refreshOneWallet,
   setPrimary,
-  toggleActive,
   removeWallet,
   hydrateFromConnect,
   clearWallets,
   selectWallet,
+  toggleActive,
 } = useWallets(userId);
 
 const connectError = ref("");
@@ -58,6 +58,15 @@ function fmtUsd(value: number | null | undefined): string {
     maximumFractionDigits: 2,
   })}`;
 }
+
+// function getWalletXlmBalance(wallet: WalletItem): number {
+//   const nativeBalance = wallet.balances?.find((balance) => {
+//     if (balance.metadata?.assetType === "native") return true;
+//     return balance.symbol?.toLowerCase() === "native";
+//   });
+
+//   return nativeBalance?.balance ?? 0;
+// }
 
 function shortAddr(address: string): string {
   return address.length > 14
@@ -81,17 +90,6 @@ async function openConnectModal(): Promise<void> {
       throw new Error("No wallet address returned.");
     }
 
-    const connectResponse = await connectWalletApi({
-      chain: "stellar",
-      address: sessionResult.address,
-      label: "",
-    });
-
-    setUserId(connectResponse.userId);
-    hydrateFromConnect({
-      wallets: connectResponse.wallets,
-    });
-
     pendingAddress.value = sessionResult.address;
     pendingWalletProviderId.value = sessionResult.providerId;
 
@@ -103,7 +101,32 @@ async function openConnectModal(): Promise<void> {
     if (alreadyPresent) {
       selectedWallet.value = alreadyPresent;
       showAddModal.value = false;
+      return;
+    }
+
+    if (!userId.value) {
+      const connectResponse = await connectWalletApi({
+        chain: "stellar",
+        address: sessionResult.address,
+        label: "",
+      });
+
+      setUserId(connectResponse.userId);
+      hydrateFromConnect({
+        wallets: connectResponse.wallets,
+      });
+
+      const linkedWallet = connectResponse.wallets.find(
+        (wallet) =>
+          wallet.address.toLowerCase() === sessionResult.address.toLowerCase()
+      );
+
+      if (linkedWallet) {
+        selectedWallet.value = linkedWallet;
+      }
+
       await loadOverview();
+      showAddModal.value = false;
       return;
     }
 
@@ -115,8 +138,8 @@ async function openConnectModal(): Promise<void> {
   }
 }
 
-async function addWalletWithoutSignature(): Promise<void> {
-  if (!pendingAddress.value) return;
+async function _addWalletWithoutSignature(): Promise<void> {
+    if (!pendingAddress.value) return;
 
   addLoading.value = true;
   connectError.value = "";
@@ -187,13 +210,14 @@ onMounted(() => {
   restoreWalletSession();
   restoreUser();
 });
+void _addWalletWithoutSignature
 </script>
 
 <template>
   <div class="grid grid-cols-2 gap-[10px] max-sm:grid-cols-1">
 
     <!-- LEFT CARD -->
-    <div class="bg-[#181818] border border-[#2a2a2a] rounded-[12px] p-4 flex flex-col gap-[14px]">
+    <div class="bg-[#2A2A2A] border border-[#383838] rounded-[12px] p-4 flex flex-col gap-[14px]">
 
       <!-- BALANCE -->
       <div class="flex flex-col gap-1">
@@ -219,7 +243,7 @@ onMounted(() => {
         <div
           v-for="wallet in wallets"
           :key="wallet.id"
-          class="grid grid-cols-[1fr_auto] items-center gap-[10px] bg-[#202020] border border-[#2a2a2a] rounded-[8px] px-3 py-[10px] cursor-pointer transition"
+          class="grid grid-cols-[1fr_auto] items-center gap-[10px] bg-[#202020] border border-[#383838] rounded-[8px] px-3 py-[10px] cursor-pointer transition"
           :class="[
             selectedWallet?.id === wallet.id
               ? 'border-[#d5ff2f] bg-[#1a1f0e]'
@@ -300,7 +324,7 @@ onMounted(() => {
             </div>
 
             <div v-if="selectedWallet.balances?.length"
-              class="bg-[#161616] border border-[#2a2a2a] rounded-[8px] px-3 py-2 flex flex-col gap-1"
+              class="bg-[#161616] border border-[#383838] rounded-[8px] px-3 py-2 flex flex-col gap-1"
             >
 
               <div
@@ -324,7 +348,7 @@ onMounted(() => {
 
             </div>
 
-            <div v-else class="text-[12px] text-[#9a9b99] bg-[#161616] border border-[#2a2a2a] rounded-[8px] p-3">
+            <div v-else class="text-[12px] text-[#9a9b99] bg-[#161616] border border-[#383838] rounded-[8px] p-3">
               No balances found for this wallet.
             </div>
 
@@ -347,7 +371,7 @@ onMounted(() => {
     </div>
 
     <!-- RIGHT CARD (UNCHANGED VISU) -->
-    <div class="bg-[#181818] border border-[#2a2a2a] rounded-[12px] p-4 flex flex-col gap-[14px] relative overflow-hidden">
+    <div class="bg-[#2A2A2A] border border-[#383838] rounded-[12px] p-4 flex flex-col gap-[14px] relative overflow-hidden">
 
       <p class="text-[12px] text-[#9a9b99]">Notifications</p>
 
@@ -355,7 +379,7 @@ onMounted(() => {
         <div
           v-for="(notification, index) in notifications"
           :key="index"
-          class="flex justify-between items-center py-[9px] border-b border-[#2a2a2a]"
+          class="flex justify-between items-center py-[9px] border-b border-[#383838]"
         >
           <span class="text-[12px] text-[#9a9b99]">
             <strong class="text-[#e2e6e1]">{{ notification.wallet }}</strong> :

@@ -14,7 +14,7 @@ defineProps<{
 
     <!-- LEFT -->
     <div
-      class="flex flex-col justify-center items-start text-left flex-1 p-[54px] gap-[24px]"
+      class="flex flex-col justify-center items-start text-left flex-1 p-6 sm:p-[54px] gap-4 sm:gap-[24px]"
     >
 
       <!-- TITLE ROW -->
@@ -29,7 +29,7 @@ defineProps<{
 
         <!-- TITLE -->
         <h2
-          class="text-[48px] font-bold tracking-[0.4px] text-[#FFF]"
+          class="text-[28px] sm:text-[48px] font-bold tracking-[0.4px] text-[#FFF]"
           style="font-family: 'Clash Display', sans-serif;"
         >
           {{ title }}
