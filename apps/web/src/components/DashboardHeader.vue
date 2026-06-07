@@ -3,6 +3,7 @@ import { computed, onMounted } from "vue";
 import { connectWallet as connectWalletApi } from "../api/wallets";
 import { useAppUser } from "../composables/useAppUser";
 import { useWalletSession } from "../composables/useWalletSession";
+import NetworkToggle from "./NetworkToggle.vue";
 
 import digLogotype from "../assets/icons/dig-logotype.svg";
 import stellarBadge from "../assets/icons/stellar-badge.svg";
@@ -130,6 +131,8 @@ onMounted(() => {
       </a>
 
       <div class="action-separator" />
+
+      <NetworkToggle />
 
       <button
         class="wallet-btn"

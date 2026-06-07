@@ -2,8 +2,10 @@
 import { NOTIFICATIONS } from "../data/protocols";
 import { useProtocol } from "../composables/useProtocol";
 import { useNetworkStats } from "../composables/useNetworkStats";
+import { useNetwork } from "../composables/useNetwork";
 
 import DashboardHeader from "./DashboardHeader.vue";
+import SdexSwapWidget from "./SdexSwapWidget.vue";
 import HeroBanner from "./HeroBanner.vue";
 import NetworkStats from "./NetworkStats.vue"; // ✅ FIX
 import StellarMetrics from "./StellarMetrics.vue";
@@ -32,6 +34,7 @@ const {
 } = useProtocol();
 
 const { stats } = useNetworkStats();
+const { network } = useNetwork();
 </script>
 
 <template>
@@ -67,6 +70,23 @@ const { stats } = useNetworkStats();
         </div>
 
         <WalletSection :notifications="NOTIFICATIONS" />
+      </section>
+
+      <!-- TESTNET ACTIONS -->
+      <section v-if="network === 'testnet'" class="flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <span
+            class="text-[11px] font-bold uppercase tracking-[0.14em] text-accent"
+          >
+            Testnet Actions
+          </span>
+
+          <span class="text-[11px] text-muted">
+            Non-custodial transaction builder
+          </span>
+        </div>
+
+        <SdexSwapWidget />
       </section>
 
       <!-- PROTOCOL -->

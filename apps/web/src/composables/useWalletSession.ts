@@ -121,6 +121,22 @@ function disconnectWallet(): void {
   clearSession();
 }
 
+async function signTransaction(
+  xdr: string,
+  passphrase: WalletNetwork | string,
+): Promise<{ signedTxXdr: string }> {
+  if (!connectedAddress.value) {
+    throw new Error("No wallet connected.");
+  }
+
+  const { signedTxXdr } = await kit.signTransaction(xdr, {
+    networkPassphrase: passphrase,
+    address: connectedAddress.value,
+  });
+
+  return { signedTxXdr };
+}
+
 const shortConnectedAddress = computed(() => {
   if (!connectedAddress.value) return null;
   return `${connectedAddress.value.slice(0, 6)}…${connectedAddress.value.slice(-4)}`;
@@ -137,5 +153,6 @@ export function useWalletSession() {
     connectWallet,
     disconnectWallet,
     restoreWalletSession,
+    signTransaction,
   };
 }
