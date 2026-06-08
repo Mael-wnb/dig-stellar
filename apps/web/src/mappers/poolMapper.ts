@@ -42,7 +42,8 @@ export function mapPoolToDisplay(data: PoolDetailData): PoolDisplay {
       // AMM
       volume24hUsd: n(data.metrics?.volume24hUsd),
       fees24hUsd: n(data.metrics?.fees24hUsd),
-      swaps24h: n(data.metrics?.swaps24h ?? data.metrics?.events24h),
+      swaps24h: n(data.metrics?.swaps24h),
+      events24h: n(data.metrics?.events24h),
 
       // LENDING
       totalSuppliedUsd: n(data.metrics?.totalSuppliedUsd),

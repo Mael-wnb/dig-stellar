@@ -13,6 +13,7 @@ export interface PoolDisplay {
     volume24hUsd?: number | null
     fees24hUsd?: number | null
     swaps24h?: number | null
+    events24h?: number | null
 
     totalSuppliedUsd?: number | null
     totalBorrowedUsd?: number | null

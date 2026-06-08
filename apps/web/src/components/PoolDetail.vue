@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PoolDetailData } from "../types/protocol";
+import { formatUsd } from "../utils/format";
 
 interface ProtocolDisplay {
   id: string;
@@ -15,20 +16,6 @@ const props = defineProps<{
   pool: PoolDetailData;
   protocol: ProtocolDisplay;
 }>();
-
-function formatUsd(value?: number | null): string {
-  if (value === null || value === undefined || !Number.isFinite(value))
-    return "—";
-
-  const v = value as number;
-
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: v >= 1_000_000 ? "compact" : "standard",
-    maximumFractionDigits: v >= 100 ? 0 : 2,
-  }).format(v);
-}
 
 function formatNumber(value?: number | null, maxFractionDigits = 2): string {
   if (value === null || value === undefined || !Number.isFinite(value))
@@ -65,12 +52,10 @@ function isLendingPool(pool: PoolDetailData) {
   return pool.type === "lending_pool";
 }
 
-function getMinCollateral(pool: PoolDetailData): number {
-  return (pool as any)?.metrics?.minCollateral ?? 5;
-}
-
-function getMaxCollateral(pool: PoolDetailData): number {
-  return (pool as any)?.metrics?.maxCollateral ?? 6;
+function typeLabel(type?: string | null): string {
+  if (type === "amm_pool") return "AMM";
+  if (type === "lending_pool") return "Lending";
+  return type ?? "—";
 }
 
 function poolDescription(pool: PoolDetailData): string {
@@ -255,29 +240,11 @@ function poolDescription(pool: PoolDetailData): string {
                     sans-serif;
                 "
               >
-                {{
-                  formatNumber(
-                    pool.metrics.swaps24h ?? pool.metrics.events24h,
-                    0,
-                  )
-                }}
-              </div>
-            </div>
-            <div class="flex-1 min-w-[140px] p-4 sm:p-6 border-r border-[#383838] max-sm:border-r-0 max-sm:border-b max-sm:border-[#383838]">
-              <div class="text-[16px] text-[#5E5F5D]">Min Collateral</div>
-              <div
-                class="text-[20px] font-bold text-[#E2E6E1]"
-                style="
-                  font-family:
-                    Clash Display,
-                    sans-serif;
-                "
-              >
-                {{ getMinCollateral(pool) }}
+                {{ formatNumber(pool.metrics.swaps24h, 0) }}
               </div>
             </div>
             <div class="flex-1 min-w-[140px] p-4 sm:p-6">
-              <div class="text-[16px] text-[#5E5F5D]">Max Collateral</div>
+              <div class="text-[16px] text-[#5E5F5D]">Events 24h</div>
               <div
                 class="text-[20px] font-bold text-[#E2E6E1]"
                 style="
@@ -286,7 +253,7 @@ function poolDescription(pool: PoolDetailData): string {
                     sans-serif;
                 "
               >
-                {{ getMaxCollateral(pool) }}
+                {{ formatNumber(pool.metrics.events24h, 0) }}
               </div>
             </div>
           </template>
@@ -329,7 +296,7 @@ function poolDescription(pool: PoolDetailData): string {
           </div>
           <div class="flex justify-between items-center px-3 sm:px-6 bg-[rgba(226,230,225,0.05)] rounded-[4px] flex-1">
             <span class="text-[16px] text-[#5E5F5D]">Type</span>
-            <span class="text-[14px] font-semibold text-[#E2E6E1]">{{ pool.type }}</span>
+            <span class="text-[14px] font-semibold text-[#E2E6E1]">{{ typeLabel(pool.type) }}</span>
           </div>
           <div class="flex justify-between items-center px-3 sm:px-6 bg-[rgba(226,230,225,0.05)] rounded-[4px] flex-1">
             <span class="text-[16px] text-[#5E5F5D]">Chain</span>
