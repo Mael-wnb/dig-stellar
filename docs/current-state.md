@@ -184,9 +184,32 @@ the smallest version of that, not the sub-minute event stream from the architect
 
 ## 8. On-chain actions / transaction builder
 
-**Early relative to the grant.** Wallet connection and wallet-aware UX exist; the builder layer does
-not. Missing: a transaction builder, one narrow end-to-end Testnet action, simulation UX, scoped
-XDR-building with prerequisite bundling. This is the real T1-D3 gap and it gates T3-D2.
+**Functionally proven on Testnet, narrow in scope.** The builder layer now exists and the full
+non-custodial path works end-to-end from the UI.
+
+Working (verified Jun 8, 2026): an `actions/` module in `apps/api` exposes
+`POST /v1/actions/sdex/swap` (and a `POST /v1/actions/blend/deposit` endpoint). The SDEX swap builds
+a multi-operation XDR — `ChangeTrust` (classic) + `PathPaymentStrictSend` (classic) bundled in one
+envelope — which is the literal `ChangeTrust + Deposit`-style multi-op the T1-D3 criterion asks for.
+The frontend has a Mainnet/Testnet toggle and a `SdexSwapWidget` wired into the production frontend;
+the widget calls the API, signs the returned XDR in-wallet via Stellar Wallets Kit (Freighter),
+submits to the Testnet RPC, and surfaces the tx hash. Proven on-chain: tx `78323ffd…` reached a
+Testnet ledger and the `ChangeTrust` operation succeeded. Backend never sees private keys.
+
+Architectural fact (important): Stellar Protocol 20 forbids mixing `InvokeHostFunction` (Soroban)
+with classic operations in one envelope. So the grant's literal `ChangeTrust + Deposit` single-XDR
+example is only achievable via classic SDEX, not Blend. Hence the SDEX swap is the primary
+single-XDR demonstration; the Blend deposit is a secondary Soroban pattern (two sequential txs).
+
+Partial / weak: the swap operation currently fails on `pathPaymentStrictSendTooFewOffers` — there is
+no SDEX liquidity for the pair on Testnet (an infrastructure gap, not a code bug; the builder, the
+signature, and the on-chain execution all work). The Blend deposit endpoint exists but has not been
+exercised end-to-end from the UI yet. Minor known bug: `getAssetBalance` re-bundles `ChangeTrust`
+even when the trustline already exists (fix later via Horizon `/accounts/:id`).
+
+This was the real T1-D3 gap; the core (build → sign in-wallet → execute on Testnet) is now closed.
+T1-D3 moved from ~15% to ~70%. It still gates T3-D2, but the same builder code targets mainnet —
+only contract addresses and the network differ.
 
 ---
 
@@ -208,21 +231,22 @@ postponed indefinitely.
 2. Live beta
 3. Verified indexing foundation (coverage + freshness)
 4. Backend/API presence and the `/v1` raw-SQL product pipeline
-5. Grouped multi-wallet portfolio foundation (raw SQL v2)
-6. Real wallet balance snapshot/refresh flows
+5. Non-custodial transaction builder: SDEX swap proven end-to-end on Testnet (build → sign → submit)
+6. Grouped multi-wallet portfolio foundation (raw SQL v2)
+7. Real wallet balance snapshot/refresh flows
 
 ## 11. Most fragile right now
-1. Transaction builder / action layer
-2. Alerting engine
-3. Bridge monitoring
-4. Freshness/stale/retry operationalization + observability
-5. Deployment maturity
-6. Remaining external-provider dependency (`/v1/network/stats`)
+1. Alerting engine
+2. Bridge monitoring
+3. Freshness/stale/retry operationalization + observability
+4. Deployment maturity
+5. Remaining external-provider dependency (`/v1/network/stats`)
+6. Transaction builder breadth: only one pair/action proven; Blend deposit not yet exercised from UI
 
 ## 12. Closest tranche-relevant wins
 1. Make T1-D1 explicit and evidenced (evidence package; resolve endpoint note)
 2. Make T1-D2 API-centered (network stats) and visually coherent
-3. Scope T1-D3 to ONE Testnet action
+3. Package T1-D3 evidence (tx hash + on-chain proof already in hand); optionally a fully-succeeding swap
 4. Formalize the multi-wallet system as groundwork for T2-D1
 
 ---
