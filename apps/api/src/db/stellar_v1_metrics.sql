@@ -45,3 +45,31 @@ create index if not exists idx_protocol_metrics_latest_venue_id
 
 create index if not exists idx_protocol_metrics_latest_as_of
   on protocol_metrics_latest(as_of desc);
+
+-- Network-wide stats (XLM price, Stellar TVL, stablecoin mcap, DEX volume,
+-- active wallets, USDC supply, avg tx fee). Single-row table (scope='global'),
+-- written periodically by the indexer (run-network-stats-refresh) and read by
+-- the API at GET /v1/network/stats. Replaces the previous live-fetch-per-request
+-- behaviour so the external providers (CoinGecko / DefiLlama / stellar.expert /
+-- Horizon) are hit on a job cadence, not on every request.
+create table if not exists network_stats_latest (
+  id uuid primary key default gen_random_uuid(),
+  scope text not null default 'global',
+  as_of timestamptz not null,
+  xlm_price_usd numeric,
+  xlm_price_change_24h_pct numeric,
+  stellar_tvl_usd numeric,
+  active_wallets numeric,
+  stable_mcap_usd numeric,
+  dex_volume_24h_usd numeric,
+  usdc_supply_usd numeric,
+  avg_tx_fee_xlm numeric,
+  protocol_count integer not null default 3,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(scope)
+);
+
+create index if not exists idx_network_stats_latest_as_of
+  on network_stats_latest(as_of desc);

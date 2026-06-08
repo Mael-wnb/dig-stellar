@@ -1,5 +1,6 @@
 // apps/api/src/modules/network/network.service.ts
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../db/prisma.service';
 
 export type NetworkStatsResponse = {
   xlmPriceUsd: number | null;
@@ -11,237 +12,97 @@ export type NetworkStatsResponse = {
   protocolCount: number;
   usdcSupplyUsd: number | null;
   avgTxFeeXlm: number | null;
-  updatedAt: string;
+  // null when the indexer has never populated network_stats_latest yet
+  // (cold start). Otherwise the real as_of of the stored row.
+  updatedAt: string | null;
 };
 
-type CoinGeckoPriceResponse = {
-  stellar?: {
-    usd?: number;
-    usd_24h_change?: number;
-  };
-};
-
-type DefiLlamaChainRow = {
-  name: string;
-  tvl: number;
-};
-
-type StablecoinChainRow = {
-  name: string;
-  totalCirculatingUSD?: {
-    peggedUSD?: number;
-  };
-};
-
-type StellarExpertSummaryResponse = {
-  accounts?: number;
-  dex_volume?: number;
-};
-
-type StellarExpertSupplyResponse = {
-  issued?: number;
-};
-
-type HorizonFeeStatsResponse = {
-  fee_charged?: {
-    mode?: string;
-  };
+type NetworkStatsRow = {
+  as_of: unknown;
+  xlm_price_usd: unknown;
+  xlm_price_change_24h_pct: unknown;
+  stellar_tvl_usd: unknown;
+  active_wallets: unknown;
+  stable_mcap_usd: unknown;
+  dex_volume_24h_usd: unknown;
+  usdc_supply_usd: unknown;
+  avg_tx_fee_xlm: unknown;
+  protocol_count: unknown;
 };
 
 @Injectable()
 export class NetworkService {
-  private readonly logger = new Logger(NetworkService.name);
-  private readonly REQUEST_TIMEOUT_MS = 6_000;
+  constructor(private readonly prisma: PrismaService) {}
 
+  // Reads the latest network stats from the DB (network_stats_latest, scope
+  // 'global'), populated periodically by the indexer's
+  // run-network-stats-refresh step. No external calls at request time.
   async getNetworkStats(): Promise<NetworkStatsResponse> {
-    const [
-      xlmPrice,
-      stellarTvl,
-      stableMcap,
-      stellarExpertSummary,
-      usdcSupply,
-      avgTxFeeXlm,
-    ] = await Promise.all([
-      this.safeGetXlmPrice(),
-      this.safeGetStellarTvl(),
-      this.safeGetStableMcap(),
-      this.safeGetStellarExpertSummary(),
-      this.safeGetUsdcSupply(),
-      this.safeGetAvgTxFee(),
-    ]);
+    const rows = (await this.prisma.$queryRawUnsafe(`
+      select
+        as_of,
+        xlm_price_usd,
+        xlm_price_change_24h_pct,
+        stellar_tvl_usd,
+        active_wallets,
+        stable_mcap_usd,
+        dex_volume_24h_usd,
+        usdc_supply_usd,
+        avg_tx_fee_xlm,
+        protocol_count
+      from network_stats_latest
+      where scope = 'global'
+      limit 1
+    `)) as NetworkStatsRow[];
+
+    const row = rows[0];
+
+    // Cold start: indexer has never run the step yet -> all-null payload with
+    // updatedAt null. Same shape, never an error.
+    if (!row) {
+      return {
+        xlmPriceUsd: null,
+        xlmPriceChange24hPct: null,
+        stellarTvlUsd: null,
+        activeWallets: null,
+        stableMcapUsd: null,
+        dexVolume24hUsd: null,
+        protocolCount: 3,
+        usdcSupplyUsd: null,
+        avgTxFeeXlm: null,
+        updatedAt: null,
+      };
+    }
 
     return {
-      xlmPriceUsd: xlmPrice.priceUsd,
-      xlmPriceChange24hPct: xlmPrice.change24hPct,
-      stellarTvlUsd: stellarTvl,
-      activeWallets: stellarExpertSummary.activeWallets,
-      stableMcapUsd: stableMcap,
-      dexVolume24hUsd: stellarExpertSummary.dexVolume24hUsd,
-      protocolCount: 3,
-      usdcSupplyUsd: usdcSupply,
-      avgTxFeeXlm,
-      updatedAt: new Date().toISOString(),
+      xlmPriceUsd: this.toFiniteNumber(row.xlm_price_usd),
+      xlmPriceChange24hPct: this.toFiniteNumber(row.xlm_price_change_24h_pct),
+      stellarTvlUsd: this.toFiniteNumber(row.stellar_tvl_usd),
+      activeWallets: this.toFiniteNumber(row.active_wallets),
+      stableMcapUsd: this.toFiniteNumber(row.stable_mcap_usd),
+      dexVolume24hUsd: this.toFiniteNumber(row.dex_volume_24h_usd),
+      protocolCount: this.toFiniteNumber(row.protocol_count) ?? 3,
+      usdcSupplyUsd: this.toFiniteNumber(row.usdc_supply_usd),
+      avgTxFeeXlm: this.toFiniteNumber(row.avg_tx_fee_xlm),
+      updatedAt: this.toIsoString(row.as_of),
     };
   }
 
-  private async fetchJsonWithTimeout<T>(url: string): Promise<T> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT_MS);
-
-    try {
-      const response = await fetch(url, {
-        method: 'GET',
-        signal: controller.signal,
-        headers: {
-          Accept: 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} on ${url}`);
-      }
-
-      return (await response.json()) as T;
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-
-  private async safeGetXlmPrice(): Promise<{
-    priceUsd: number | null;
-    change24hPct: number | null;
-  }> {
-    try {
-      const data = await this.fetchJsonWithTimeout<CoinGeckoPriceResponse>(
-        'https://api.coingecko.com/api/v3/simple/price?ids=stellar&vs_currencies=usd&include_24hr_change=true'
-      );
-
-      return {
-        priceUsd: this.toFiniteNumber(data?.stellar?.usd),
-        change24hPct: this.toFiniteNumber(data?.stellar?.usd_24h_change),
-      };
-    } catch (error) {
-      this.logger.warn(`safeGetXlmPrice failed: ${this.getErrorMessage(error)}`);
-      return {
-        priceUsd: null,
-        change24hPct: null,
-      };
-    }
-  }
-
-  private async safeGetStellarTvl(): Promise<number | null> {
-    try {
-      const data = await this.fetchJsonWithTimeout<DefiLlamaChainRow[]>(
-        'https://api.llama.fi/v2/chains'
-      );
-
-      const stellar = data.find((row) => row.name === 'Stellar');
-      return this.toFiniteNumber(stellar?.tvl);
-    } catch (error) {
-      this.logger.warn(`safeGetStellarTvl failed: ${this.getErrorMessage(error)}`);
-      return null;
-    }
-  }
-
-  private async safeGetStableMcap(): Promise<number | null> {
-    try {
-      const data = await this.fetchJsonWithTimeout<StablecoinChainRow[]>(
-        'https://stablecoins.llama.fi/stablecoinchains'
-      );
-
-      const stellar = data.find((row) => row.name === 'Stellar');
-      return this.toFiniteNumber(stellar?.totalCirculatingUSD?.peggedUSD);
-    } catch (error) {
-      this.logger.warn(`safeGetStableMcap failed: ${this.getErrorMessage(error)}`);
-      return null;
-    }
-  }
-
-  private async safeGetStellarExpertSummary(): Promise<{
-    activeWallets: number | null;
-    dexVolume24hUsd: number | null;
-  }> {
-    try {
-      const data = await this.fetchJsonWithTimeout<StellarExpertSummaryResponse>(
-        'https://api.stellar.expert/explorer/public/network-activity/summary'
-      );
-
-      return {
-        activeWallets: this.toFiniteNumber(data?.accounts),
-        dexVolume24hUsd: this.toFiniteNumber(data?.dex_volume),
-      };
-    } catch (error) {
-      this.logger.warn(`safeGetStellarExpertSummary failed: ${this.getErrorMessage(error)}`);
-      return {
-        activeWallets: null,
-        dexVolume24hUsd: null,
-      };
-    }
-  }
-
-  private async safeGetUsdcSupply(): Promise<number | null> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT_MS);
-  
-    try {
-      const response = await fetch(
-        'https://api.stellar.expert/explorer/public/asset/USDC-GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN/supply',
-        {
-          method: 'GET',
-          signal: controller.signal,
-          headers: {
-            Accept: 'text/plain, application/json',
-          },
-        }
-      );
-  
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} on USDC supply endpoint`);
-      }
-  
-      const raw = (await response.text()).trim();
-  
-      if (!raw) {
-        return null;
-      }
-  
-      const value = Number(raw);
-      if (!Number.isFinite(value)) {
-        this.logger.warn(`safeGetUsdcSupply received non-numeric payload: ${raw}`);
-        return null;
-      }
-  
-      return value;
-    } catch (error) {
-      this.logger.warn(`safeGetUsdcSupply failed: ${this.getErrorMessage(error)}`);
-      return null;
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-
-  private async safeGetAvgTxFee(): Promise<number | null> {
-    try {
-      const data = await this.fetchJsonWithTimeout<HorizonFeeStatsResponse>(
-        'https://horizon.stellar.org/fee_stats'
-      );
-
-      const mode = data?.fee_charged?.mode;
-      if (!mode) return null;
-
-      const stroops = Number.parseInt(mode, 10);
-      if (!Number.isFinite(stroops)) return null;
-
-      return stroops / 10_000_000;
-    } catch (error) {
-      this.logger.warn(`safeGetAvgTxFee failed: ${this.getErrorMessage(error)}`);
-      return null;
-    }
+  private toIsoString(value: unknown): string | null {
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'string' && value.trim().length > 0) return value;
+    return null;
   }
 
   private toFiniteNumber(value: unknown): number | null {
+    if (value === null || value === undefined) return null;
+
     if (typeof value === 'number') {
       return Number.isFinite(value) ? value : null;
+    }
+
+    if (typeof value === 'bigint') {
+      return Number(value);
     }
 
     if (typeof value === 'string') {
@@ -249,11 +110,25 @@ export class NetworkService {
       return Number.isFinite(parsed) ? parsed : null;
     }
 
-    return null;
-  }
+    // Postgres `numeric` columns read via prisma.$queryRawUnsafe come back as
+    // Prisma.Decimal objects (not number/string), so unwrap them via
+    // toNumber()/toString() — same approach as stellar.service.ts.
+    if (typeof value === 'object') {
+      if ('toNumber' in value && typeof (value as { toNumber: unknown }).toNumber === 'function') {
+        try {
+          const n = (value as { toNumber: () => number }).toNumber();
+          return Number.isFinite(n) ? n : null;
+        } catch {
+          return null;
+        }
+      }
 
-  private getErrorMessage(error: unknown): string {
-    if (error instanceof Error) return error.message;
-    return String(error);
+      if ('toString' in value && typeof (value as { toString: unknown }).toString === 'function') {
+        const n = Number((value as { toString: () => string }).toString());
+        return Number.isFinite(n) ? n : null;
+      }
+    }
+
+    return null;
   }
 }

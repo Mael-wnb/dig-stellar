@@ -215,6 +215,22 @@ async function main() {
     );
 
     console.log(
+      '\n=== 8. Refresh network stats ==='
+    );
+
+    // Non-fatal: external providers (CoinGecko / DefiLlama / stellar.expert /
+    // Horizon) must never break the whole refresh job. Mirror the Aquarius
+    // step's catch-and-log behaviour.
+    try {
+      await runTsx(
+        'src/scripts/ingest/73-network-stats-refresh.ts'
+      );
+    } catch (error) {
+      console.error('Network stats refresh failed (non-fatal)');
+      console.error(error);
+    }
+
+    console.log(
       '\n=== Refresh completed successfully ==='
     );
   } finally {
