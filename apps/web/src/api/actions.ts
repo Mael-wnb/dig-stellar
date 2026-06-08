@@ -7,7 +7,7 @@ export type SdexSwapRequest = {
   toAsset: "XLM" | "USDC";
   amount: string;
   minReceive: string;
-  network?: "testnet";
+  network?: "testnet" | "mainnet";
 };
 
 export type SdexSwapResponse = {

@@ -1,11 +1,18 @@
 // src/composables/useWalletSession.ts
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import {
   StellarWalletsKit,
   WalletNetwork,
   allowAllModules,
   XBULL_ID,
 } from "@creit.tech/stellar-wallets-kit";
+import { useNetwork, toWalletNetwork } from "./useNetwork";
+
+// useNetwork is the single source of truth for the active network. Resolve it
+// once at module scope (this also runs restoreNetwork() so the value already
+// reflects localStorage / the env default) so the kit can be built on the
+// current network and a single watcher can keep it in sync.
+const { network } = useNetwork();
 
 const STORAGE_CONNECTED_ADDRESS_KEY = "dig_stellar_connected_address";
 const STORAGE_CONNECTED_PROVIDER_KEY = "dig_stellar_connected_provider";
@@ -21,13 +28,23 @@ const isConnecting = ref(false);
 const initialized = ref(false);
 
 const kit = new StellarWalletsKit({
-  network:
-    import.meta.env.VITE_STELLAR_NETWORK === "TESTNET"
-      ? WalletNetwork.TESTNET
-      : WalletNetwork.PUBLIC,
+  network: toWalletNetwork(network.value),
   selectedWalletId: XBULL_ID,
   modules: allowAllModules(),
 });
+
+// Keep the kit aligned with the toggle. Registered ONCE at module scope (next
+// to the kit instance), NOT inside useWalletSession() — otherwise every mounted
+// component would add its own watcher. `immediate` reasserts the network the
+// kit was already built with, which is harmless and guards against drift.
+watch(
+  network,
+  (next) => {
+    kit.setNetwork(toWalletNetwork(next));
+    console.log("[wallet-session] kit network synced", { network: next });
+  },
+  { immediate: true },
+);
 
 function persistSession(address: string, providerId: string): void {
   connectedAddress.value = address;
@@ -138,7 +155,7 @@ function disconnectWallet(): void {
 
 async function signTransaction(
   xdr: string,
-  passphrase: WalletNetwork | string,
+  passphrase?: WalletNetwork | string,
 ): Promise<{ signedTxXdr: string }> {
   if (!connectedAddress.value) {
     throw new Error("No wallet connected.");
@@ -148,6 +165,10 @@ async function signTransaction(
     throw new Error("No wallet provider selected.");
   }
 
+  // Default to the current toggle network. Callers passing an explicit
+  // passphrase (legacy call sites) keep working unchanged.
+  const networkPassphrase = passphrase ?? toWalletNetwork(network.value);
+
   // Defensive: force the kit onto the connected wallet right before signing.
   // The kit's selected wallet lives in memory only and can drift from the
   // restored session (e.g. after a reload it defaults back to its constructor
@@ -155,7 +176,7 @@ async function signTransaction(
   kit.setWallet(connectedProvider.value);
 
   const { signedTxXdr } = await kit.signTransaction(xdr, {
-    networkPassphrase: passphrase,
+    networkPassphrase,
     address: connectedAddress.value,
   });
 

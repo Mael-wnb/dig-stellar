@@ -1,12 +1,20 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { WalletNetwork } from "@creit.tech/stellar-wallets-kit";
 import { buildSdexSwap } from "../api/actions";
 import { useWalletSession } from "../composables/useWalletSession";
+import { useNetwork, toWalletNetwork } from "../composables/useNetwork";
 
 const TESTNET_RPC_URL = "https://soroban-testnet.stellar.org";
+const MAINNET_RPC_URL = "https://mainnet.sorobanrpc.com";
 
 const { connectedAddress, signTransaction } = useWalletSession();
+const { network } = useNetwork();
+
+// RPC endpoint follows the toggle so the submit target stays consistent with
+// the network the XDR was built and signed for.
+const rpcUrl = computed(() =>
+  network.value === "testnet" ? TESTNET_RPC_URL : MAINNET_RPC_URL,
+);
 
 // Assets are fixed for this beta: XLM -> USDC.
 const fromAsset = "XLM" as const;
@@ -22,8 +30,15 @@ const txHash = ref("");
 const errorMessage = ref("");
 
 const isConnected = computed(() => !!connectedAddress.value);
+
+// Swap is Testnet-only for this beta: the Mainnet backend / liquidity path is
+// not validated yet. The rest of the decoupling (kit follows the toggle,
+// dynamic RPC, passphrase fallback) stays in place for later.
+const isMainnet = computed(() => network.value === "mainnet");
+
 const canSwap = computed(
   () =>
+    !isMainnet.value &&
     isConnected.value &&
     status.value !== "loading" &&
     parseFloat(amount.value) > 0 &&
@@ -52,7 +67,7 @@ async function submitToRpc(signedTxXdr: string): Promise<{
   hash?: string;
   errorResultXdr?: string;
 }> {
-  const response = await fetch(TESTNET_RPC_URL, {
+  const response = await fetch(rpcUrl.value, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -73,6 +88,9 @@ async function submitToRpc(signedTxXdr: string): Promise<{
 }
 
 async function onSwap() {
+  // Hard guard: never attempt a real Mainnet swap in this beta, even if the
+  // button somehow got enabled.
+  if (isMainnet.value) return;
   if (!canSwap.value || !connectedAddress.value) return;
 
   status.value = "loading";
@@ -87,11 +105,15 @@ async function onSwap() {
       toAsset,
       amount: amount.value,
       minReceive: minReceive.value,
-      network: "testnet",
+      network: network.value,
     });
 
-    // 2. Sign client-side via the wallet, using the Testnet passphrase explicitly.
-    const { signedTxXdr } = await signTransaction(xdr, WalletNetwork.TESTNET);
+    // 2. Sign client-side via the wallet on the current toggle network,
+    // using the shared StellarNetwork -> WalletNetwork mapping.
+    const { signedTxXdr } = await signTransaction(
+      xdr,
+      toWalletNetwork(network.value),
+    );
 
     // 3. Submit the signed XDR to the Testnet RPC.
     const result = await submitToRpc(signedTxXdr);
@@ -122,7 +144,16 @@ function reset() {
   <div class="bg-[#2A2A2A] border border-[#383838] rounded-lg p-4 flex flex-col gap-3">
     <div class="flex items-center justify-between">
       <span class="text-xs font-semibold text-[#e2e6e1]">SDEX Swap</span>
-      <span class="text-[10px] text-[#9a9b99] uppercase tracking-widest">Testnet</span>
+      <span class="text-[10px] text-[#9a9b99] uppercase tracking-widest">{{ network }}</span>
+    </div>
+
+    <!-- MAINNET NOTICE (Testnet-only beta) -->
+    <div
+      v-if="isMainnet"
+      class="bg-[#202020] border border-[rgba(213,255,47,0.3)] rounded-md p-3 text-[11px] text-[#9a9b99]"
+    >
+      Swap is <span class="text-[#d5ff2f] font-semibold">Testnet-only</span> in this beta.
+      Switch the network toggle to Testnet to swap.
     </div>
 
     <!-- PAIR -->
@@ -168,7 +199,8 @@ function reset() {
       :disabled="!canSwap"
       @click="onSwap"
     >
-      <template v-if="status === 'loading'">Swapping…</template>
+      <template v-if="isMainnet">Swap is Testnet-only in this beta</template>
+      <template v-else-if="status === 'loading'">Swapping…</template>
       <template v-else-if="!isConnected">Connect wallet first</template>
       <template v-else>Swap</template>
     </button>
