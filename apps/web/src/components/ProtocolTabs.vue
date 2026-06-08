@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { PROTOCOL_META } from '../data/protocolMeta'
 import type { PoolListItem } from '../types/protocol'
+import { formatUsd } from '../utils/format'
 
 interface ProtocolTabItem {
   id: string
@@ -32,11 +33,9 @@ function getProtocolTvl(protocolId: string): string {
     .filter((p) => p.protocol.id === protocolId)
     .reduce((sum, p) => sum + (p.metrics?.tvlUsd ?? 0), 0)
 
-  if (!total) return '—'
-  if (total >= 1_000_000_000) return `$${(total / 1_000_000_000).toFixed(1)}B`
-  if (total >= 1_000_000) return `$${(total / 1_000_000).toFixed(1)}M`
-  if (total >= 1_000) return `$${(total / 1_000).toFixed(1)}K`
-  return `$${total.toFixed(0)}`
+  // Aggregate exception: 0 here means "no indexed pools / no data", not literally $0.
+  if (total === 0) return '—'
+  return formatUsd(total)
 }
 </script>
 

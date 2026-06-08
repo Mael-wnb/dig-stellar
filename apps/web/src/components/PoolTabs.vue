@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { PROTOCOL_META } from '../data/protocolMeta'
 import type { PoolListItem } from '../types/protocol'
+import { formatUsd } from '../utils/format'
 
 defineProps<{
   pools: PoolListItem[]
@@ -10,14 +11,6 @@ defineProps<{
 const emit = defineEmits<{
   selectPool: [poolId: string]
 }>()
-
-function formatUsdCompact(value?: number | null): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return '—'
-  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`
-  return `$${value.toFixed(0)}`
-}
 
 function getProtocolMeta(protocolId: string) {
   return (
@@ -75,7 +68,7 @@ function getProtocolMeta(protocolId: string) {
               ? 'text-[#D5FF2F]'
               : 'text-[#5E5F5D] group-hover:text-[#E2E6E1]'"
           >
-            {{ formatUsdCompact(pool.metrics?.tvlUsd) }}
+            {{ formatUsd(pool.metrics?.tvlUsd) }}
           </span>
         </div>
       </div>

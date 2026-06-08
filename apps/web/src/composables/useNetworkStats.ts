@@ -1,31 +1,12 @@
 // apps/web/src/composables/useNetworkStats.ts
 import { ref, onMounted } from 'vue'
 import { fetchNetworkStats } from '../api/network'
+import { formatUsd, formatPrice, formatPct, formatCount } from '../utils/format'
 
 export interface NetworkStat {
   title: string
   value: string
   change: string
-}
-
-function fmtUsd(n: number): string {
-  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1)}B`
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`
-  return `$${n.toFixed(4)}`
-}
-
-function fmtCount(n: number): string {
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return `${Math.round(n)}`
-}
-
-function fmtPct(change: number | null): string {
-  if (change === null) return '—'
-  const sign = change >= 0 ? '▲' : '▼'
-  return `${sign} ${Math.abs(change).toFixed(1)}%`
 }
 
 function fmtFeeXlm(value: number): string {
@@ -93,31 +74,31 @@ export function useNetworkStats() {
 
       patch(
         'XLM Price',
-        data.xlmPriceUsd !== null ? `$${data.xlmPriceUsd.toFixed(4)}` : '—',
-        fmtPct(data.xlmPriceChange24hPct)
+        data.xlmPriceUsd !== null ? formatPrice(data.xlmPriceUsd) : '—',
+        formatPct(data.xlmPriceChange24hPct)
       )
 
       patch(
         'Stellar TVL',
-        data.stellarTvlUsd !== null ? fmtUsd(data.stellarTvlUsd) : '—',
+        data.stellarTvlUsd !== null ? formatUsd(data.stellarTvlUsd) : '—',
         data.stellarTvlUsd !== null ? 'live' : '—'
       )
 
       patch(
         'Active Wallets',
-        data.activeWallets !== null ? fmtCount(data.activeWallets) : FALLBACK_ACTIVE_WALLETS.value,
+        data.activeWallets !== null ? formatCount(data.activeWallets) : FALLBACK_ACTIVE_WALLETS.value,
         data.activeWallets !== null ? 'live' : FALLBACK_ACTIVE_WALLETS.change
       )
 
       patch(
         'Stable MCap',
-        data.stableMcapUsd !== null ? fmtUsd(data.stableMcapUsd) : '—',
+        data.stableMcapUsd !== null ? formatUsd(data.stableMcapUsd) : '—',
         data.stableMcapUsd !== null ? 'live' : '—'
       )
 
       patch(
         '24h DEX Vol',
-        data.dexVolume24hUsd !== null ? fmtUsd(data.dexVolume24hUsd) : FALLBACK_DEX_VOLUME.value,
+        data.dexVolume24hUsd !== null ? formatUsd(data.dexVolume24hUsd) : FALLBACK_DEX_VOLUME.value,
         data.dexVolume24hUsd !== null ? 'live' : FALLBACK_DEX_VOLUME.change
       )
 
@@ -125,7 +106,7 @@ export function useNetworkStats() {
 
       patch(
         'USDC Supply',
-        data.usdcSupplyUsd !== null ? fmtUsd(data.usdcSupplyUsd) : FALLBACK_USDC_SUPPLY.value,
+        data.usdcSupplyUsd !== null ? formatUsd(data.usdcSupplyUsd) : FALLBACK_USDC_SUPPLY.value,
         data.usdcSupplyUsd !== null ? 'live' : FALLBACK_USDC_SUPPLY.change
       )
 
