@@ -119,44 +119,44 @@ function reset() {
 </script>
 
 <template>
-  <div class="bg-card border border-border rounded-lg p-4 flex flex-col gap-3">
+  <div class="bg-[#2A2A2A] border border-[#383838] rounded-lg p-4 flex flex-col gap-3">
     <div class="flex items-center justify-between">
-      <span class="text-xs font-semibold text-text">SDEX Swap</span>
-      <span class="text-[10px] text-muted uppercase tracking-widest">Testnet</span>
+      <span class="text-xs font-semibold text-[#e2e6e1]">SDEX Swap</span>
+      <span class="text-[10px] text-[#9a9b99] uppercase tracking-widest">Testnet</span>
     </div>
 
     <!-- PAIR -->
     <div class="flex items-center gap-2 text-xs">
-      <div class="flex-1 bg-bg border border-border rounded-md px-3 py-2 text-muted">
-        From <span class="text-text font-semibold">{{ fromAsset }}</span>
+      <div class="flex-1 bg-[#202020] border border-[#383838] rounded-md px-3 py-2 text-[#9a9b99]">
+        From <span class="text-[#e2e6e1] font-semibold">{{ fromAsset }}</span>
       </div>
-      <span class="text-accent">→</span>
-      <div class="flex-1 bg-bg border border-border rounded-md px-3 py-2 text-muted">
-        To <span class="text-text font-semibold">{{ toAsset }}</span>
+      <span class="text-[#d5ff2f]">→</span>
+      <div class="flex-1 bg-[#202020] border border-[#383838] rounded-md px-3 py-2 text-[#9a9b99]">
+        To <span class="text-[#e2e6e1] font-semibold">{{ toAsset }}</span>
       </div>
     </div>
 
     <!-- AMOUNT -->
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] text-muted">Amount ({{ fromAsset }})</span>
+      <span class="text-[11px] text-[#9a9b99]">Amount ({{ fromAsset }})</span>
       <input
         v-model="amount"
         type="text"
         inputmode="decimal"
         placeholder="0.0"
-        class="bg-bg border border-border rounded-md px-3 py-2 text-sm text-text focus:border-accent outline-none"
+        class="bg-[#202020] border border-[#383838] rounded-md px-3 py-2 text-sm text-[#e2e6e1] focus:border-[#d5ff2f] outline-none"
       />
     </label>
 
     <!-- MIN RECEIVE -->
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] text-muted">Min. receive ({{ toAsset }})</span>
+      <span class="text-[11px] text-[#9a9b99]">Min. receive ({{ toAsset }})</span>
       <input
         v-model="minReceive"
         type="text"
         inputmode="decimal"
         placeholder="0.0"
-        class="bg-bg border border-border rounded-md px-3 py-2 text-sm text-text focus:border-accent outline-none"
+        class="bg-[#202020] border border-[#383838] rounded-md px-3 py-2 text-sm text-[#e2e6e1] focus:border-[#d5ff2f] outline-none"
         @input="onMinReceiveInput"
       />
     </label>
@@ -164,7 +164,7 @@ function reset() {
     <!-- ACTION -->
     <button
       type="button"
-      class="w-full px-4 py-2 rounded-lg border border-accent text-accent text-xs font-semibold tracking-wide transition hover:bg-accent/10 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+      class="w-full px-4 py-2 rounded-lg border border-[#d5ff2f] text-[#d5ff2f] text-xs font-semibold tracking-wide transition hover:bg-[rgba(213,255,47,0.1)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
       :disabled="!canSwap"
       @click="onSwap"
     >
@@ -176,18 +176,18 @@ function reset() {
     <!-- SUCCESS -->
     <div
       v-if="status === 'success'"
-      class="bg-bg border border-accent/30 rounded-md p-3 text-[11px] flex flex-col gap-1"
+      class="bg-[#202020] border border-[rgba(213,255,47,0.3)] rounded-md p-3 text-[11px] flex flex-col gap-1"
     >
-      <span class="text-accent font-semibold">Transaction submitted</span>
-      <span class="text-muted break-all font-mono">{{ txHash }}</span>
+      <span class="text-[#d5ff2f] font-semibold">Transaction submitted</span>
+      <span class="text-[#9a9b99] break-all font-mono">{{ txHash }}</span>
       <a
         :href="`https://stellar.expert/explorer/testnet/tx/${txHash}`"
         target="_blank"
-        class="text-accent hover:underline w-fit"
+        class="text-[#d5ff2f] hover:underline w-fit"
       >
         View on stellar.expert ↗
       </a>
-      <button type="button" class="text-muted hover:text-accent w-fit mt-1" @click="reset">
+      <button type="button" class="text-[#9a9b99] hover:text-[#d5ff2f] w-fit mt-1" @click="reset">
         New swap
       </button>
     </div>
@@ -195,11 +195,11 @@ function reset() {
     <!-- ERROR -->
     <div
       v-else-if="status === 'error'"
-      class="bg-bg border border-red-500/30 rounded-md p-3 text-[11px] flex flex-col gap-1"
+      class="bg-[#202020] border border-[rgba(255,123,123,0.3)] rounded-md p-3 text-[11px] flex flex-col gap-1"
     >
-      <span class="text-red-400 font-semibold">Swap failed</span>
-      <span class="text-muted break-all">{{ errorMessage }}</span>
-      <button type="button" class="text-muted hover:text-accent w-fit mt-1" @click="reset">
+      <span class="text-[#ff7b7b] font-semibold">Swap failed</span>
+      <span class="text-[#9a9b99] break-all">{{ errorMessage }}</span>
+      <button type="button" class="text-[#9a9b99] hover:text-[#d5ff2f] w-fit mt-1" @click="reset">
         Try again
       </button>
     </div>
