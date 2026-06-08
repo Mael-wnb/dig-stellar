@@ -63,6 +63,21 @@ function restoreWalletSession(): void {
   connectedProvider.value =
     storedProvider && storedProvider.trim().length > 0 ? storedProvider : null;
 
+  // Re-align the kit with the restored session. The kit keeps the selected
+  // wallet in memory only (no internal persistence), so after a page reload it
+  // falls back to its constructor default. Replay setWallet so a later
+  // signTransaction targets the wallet the user actually connected with.
+  if (connectedProvider.value) {
+    try {
+      kit.setWallet(connectedProvider.value);
+    } catch (error) {
+      console.warn(
+        "[wallet-session] could not restore wallet provider into kit",
+        error,
+      );
+    }
+  }
+
   console.log("[wallet-session] restore", {
     connectedAddress: connectedAddress.value,
     connectedProvider: connectedProvider.value,
@@ -128,6 +143,16 @@ async function signTransaction(
   if (!connectedAddress.value) {
     throw new Error("No wallet connected.");
   }
+
+  if (!connectedProvider.value) {
+    throw new Error("No wallet provider selected.");
+  }
+
+  // Defensive: force the kit onto the connected wallet right before signing.
+  // The kit's selected wallet lives in memory only and can drift from the
+  // restored session (e.g. after a reload it defaults back to its constructor
+  // wallet), so re-select it here to guarantee the correct provider signs.
+  kit.setWallet(connectedProvider.value);
 
   const { signedTxXdr } = await kit.signTransaction(xdr, {
     networkPassphrase: passphrase,
