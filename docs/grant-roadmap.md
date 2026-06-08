@@ -23,7 +23,7 @@ When the two layers seem to disagree, the criteria win for *obligation*; the int
 | Tranche | # | Deliverable | Date | Budget | Status* |
 |---|---|---|---|---:|---|
 | T1 | 1 | Data Indexing Foundation (Horizon & Soroban) | May 25, 2026 | $12,300 | ~90% |
-| T1 | 2 | Analytics Dashboard MVP | Jun 8, 2026 | $6,140 | ~80% |
+| T1 | 2 | Analytics Dashboard MVP | Jun 8, 2026 | $6,140 | ~88% |
 | T1 | 3 | Smart Transaction Builder (Testnet) | Jun 22, 2026 | $11,070 | ~70% |
 | T2 | 1 | Multi-Wallet Portfolio & "Active Signer" Model | Jul 6, 2026 | $7,380 | ~60% |
 | T2 | 2 | In-App Alerting Engine | Jul 20, 2026 | $8,610 | ~10% |
@@ -112,7 +112,7 @@ How to measure completion:
 Estimated date: June 8, 2026 — Budget: $6,140
 
 ### Internal interpretation & status (living)
-Owner: `apps/web` + `apps/api`. Status: ~80%.
+Owner: `apps/web` + `apps/api`. Status: ~88%.
 
 **Largely met.** A public beta exists; protocol and pool views are real and display TVL / volume / APY
 from the indexed data; Stellar Wallets Kit is integrated (`@creit.tech/stellar-wallets-kit`,
@@ -122,11 +122,18 @@ from the indexed data; Stellar Wallets Kit is integrated (`@creit.tech/stellar-w
 real **Mainnet** data — over-delivery relative to the contract. Worth flagging in the verification doc
 so a reviewer reading the literal text is not surprised.
 
-**Remaining gap:** some global/network stats are still served by `GET /v1/network/stats`, which calls
-external APIs live (CoinGecko, DefiLlama, stellar.expert, Horizon) with no DB persistence or freshness
-— the "centralize behind the API / no direct external fetches for core data" item. Plus a responsive
-pass and stale/loading/error consistency. None of these block the three criteria, but they are the
-polish needed for a credible external beta.
+**Network-stats centralization (done this session).** `GET /v1/network/stats` previously called
+external APIs (CoinGecko, DefiLlama, stellar.expert, Horizon) live on every request, with no
+persistence or freshness — the "core data still fetched externally" item. It now reads from the DB
+table `network_stats_latest` (scope `'global'`), populated periodically by the indexer step
+`73-network-stats-refresh` (wired non-fatally into `job:refresh`). The API does a single SELECT, the
+external providers are hit on the job cadence (~10 min) instead of per request, and `updatedAt`
+reflects the row's real `as_of`. The frontend contract is unchanged.
+
+**Remaining gap:** a responsive pass and stale/loading/error consistency (the polish for a credible
+external beta). Minor: two `network_stats_latest` fields (`activeWallets`, `dexVolume24hUsd`) are
+currently `null` because the stellar.expert summary endpoint returns 404 — a pre-existing source
+issue (already null in the old live-fetch code), not a regression; needs a corrected endpoint.
 
 ---
 
@@ -348,7 +355,7 @@ already existing before then.
 
 ## Strongest current candidates (closest to claim-readiness)
 1. T1-D1 — Data Indexing Foundation (~90%)
-2. T1-D2 — Analytics Dashboard MVP (~80%)
+2. T1-D2 — Analytics Dashboard MVP (~88%, network stats now DB-backed)
 3. T1-D3 — Smart Transaction Builder (~70%, core path proven on Testnet)
 4. T2-D1 — Multi-Wallet Portfolio (~60%)
 
@@ -372,8 +379,8 @@ not missing implementation.
 # Immediate execution priorities
 1. Turn T1-D1 into a clearly evidenced, well-documented deliverable (evidence package; resolve the
    endpoint note).
-2. Close T1-D2 polish: centralize remaining external calls behind the API, responsive pass,
-   stale/loading/error consistency.
+2. Close T1-D2 final polish: responsive pass, stale/loading/error consistency. (Network-stats
+   centralization is done — `/v1/network/stats` is DB-backed via the indexer.)
 3. Package T1-D3 evidence (tx hash + on-chain proof already captured); optionally make one swap fully
    succeed for a cleaner demo, and exercise the Blend deposit pattern end-to-end from the UI.
 4. Keep `current-state.md` and `status-board.md` aligned with reality.

@@ -55,15 +55,21 @@ both live entry points and superseded legacy scripts. (See `docs/repo-structure.
 Working: real dashboard structure, protocol browsing, pool detail views, wallet connection UX,
 multi-wallet portfolio UX, backend-driven data in the important flows, a public beta that can be shown.
 
-Partial / weak: some global/network stats still reach external providers directly via
-`GET /v1/network/stats` (see §2); loading/error/stale states are not yet consistent; responsive
-behavior needs a real pass; some zones still mix real features and "coming soon" placeholders.
+Partial / weak: loading/error/stale states are not yet consistent; responsive behavior needs a real
+pass; some zones still mix real features and "coming soon" placeholders.
+
+Network selection: the wallet network is no longer hard-wired to `VITE_STELLAR_NETWORK`. The
+Mainnet/Testnet toggle (`useNetwork`) is now the single source of truth — the Wallets Kit follows it
+via `kit.setNetwork`, signing uses the current network, and `VITE_STELLAR_NETWORK` is only the initial
+default. The T1-D3 swap widget is gated Testnet-only (disabled + notice on Mainnet) since the Mainnet
+action path is not validated yet (that is T3-D2).
 
 Direction: become a pure UI + composables/state + internal-API-consumer layer. Stop hosting data
-aggregation or calling external analytics providers for core data.
+aggregation or calling external analytics providers for core data. (Core network stats are now served
+by the API from the DB — see §2.)
 
-Priorities: (1) centralize remaining external-facing stats behind the API; (2) responsive pass;
-(3) standardize loading/error/stale; (4) clarify real vs deferred sections.
+Priorities: (1) responsive pass; (2) standardize loading/error/stale; (3) clarify real vs deferred
+sections.
 
 ---
 
@@ -73,18 +79,22 @@ Priorities: (1) centralize remaining external-facing stats behind the API; (2) r
 
 Working: wallet routes (connect, overview, balances, refresh, primary/active/delete), wallet grouping
 by persistent `userId`, protocol/pool routes serving real indexed data via `/v1/*` (raw SQL),
-Prisma client used as the DB connection for raw queries.
+Prisma client used as the DB connection for raw queries. **`GET /v1/network/stats` is now DB-backed**
+(reads `network_stats_latest`, scope `'global'`, populated by the indexer step
+`73-network-stats-refresh` via `job:refresh`) — no more live external fetch per request; `updatedAt`
+reflects the row's real `as_of`.
 
 Partial / weak: health/operational endpoints incomplete; freshness not yet exposed systematically in
-responses; **`GET /v1/network/stats` (`NetworkController`) does no DB access at all** — it calls
-CoinGecko, DefiLlama, stellar.expert, and Horizon live, with no persistence or freshness. That is the
-concrete "core data still fetched externally" item for T1-D2.
+responses across the other routes. On `/v1/network/stats`: two fields (`activeWallets`,
+`dexVolume24hUsd`) currently come back `null` because the stellar.expert summary endpoint returns 404
+— a pre-existing source issue (it was already null in the old live-fetch code), not a regression; a
+correct endpoint needs to be found (minor debt).
 
 Direction: be the single authoritative UI-facing layer for dashboard stats, protocol analytics, wallet
 data, freshness metadata, and (later) alerts and action preparation.
 
-Priorities: (1) move `/v1/network/stats`-type fetches behind a persisted, fresh API surface;
-(2) stabilize the contracts the frontend depends on; (3) add health + freshness visibility.
+Priorities: (1) stabilize the contracts the frontend depends on; (2) add health + freshness visibility;
+(3) fix the stellar.expert endpoint for the two missing network-stats fields.
 
 ---
 
@@ -211,6 +221,11 @@ This was the real T1-D3 gap; the core (build → sign in-wallet → execute on T
 T1-D3 moved from ~15% to ~70%. It still gates T3-D2, but the same builder code targets mainnet —
 only contract addresses and the network differ.
 
+Network decoupling (done): the wallet network now follows the Mainnet/Testnet toggle (`useNetwork`)
+rather than the figés `VITE_STELLAR_NETWORK` env var — the kit re-syncs via `kit.setNetwork` and the
+swap signs on the current network. The swap is gated Testnet-only (button disabled + notice on
+Mainnet, hard guard in `onSwap`) so no real Mainnet swap can fire before T3-D2.
+
 ---
 
 ## 9. Deployment / operations
@@ -240,12 +255,11 @@ postponed indefinitely.
 2. Bridge monitoring
 3. Freshness/stale/retry operationalization + observability
 4. Deployment maturity
-5. Remaining external-provider dependency (`/v1/network/stats`)
-6. Transaction builder breadth: only one pair/action proven; Blend deposit not yet exercised from UI
+5. Transaction builder breadth: only one pair/action proven; Blend deposit not yet exercised from UI
 
 ## 12. Closest tranche-relevant wins
 1. Make T1-D1 explicit and evidenced (evidence package; resolve endpoint note)
-2. Make T1-D2 API-centered (network stats) and visually coherent
+2. T1-D2 close to done: network stats now DB-backed; remaining is responsive pass + stale/loading/error
 3. Package T1-D3 evidence (tx hash + on-chain proof already in hand); optionally a fully-succeeding swap
 4. Formalize the multi-wallet system as groundwork for T2-D1
 
@@ -253,10 +267,12 @@ postponed indefinitely.
 
 ## 13. Current execution priorities
 1. Document current protocol/data coverage explicitly (feeds the T1-D1 evidence package)
-2. Move `/v1/network/stats`-type external calls behind a persisted internal API
-3. Operationalize refresh/freshness behavior (exposure, stale detection, retry/backoff)
-4. Clean responsive/UI consistency enough for serious beta usage
-5. Keep `grant-roadmap.md` and `status-board.md` aligned with reality
+2. Operationalize refresh/freshness behavior (exposure, stale detection, retry/backoff)
+3. Clean responsive/UI consistency enough for serious beta usage (T1-D2 polish)
+4. Keep `grant-roadmap.md` and `status-board.md` aligned with reality
+
+(Done this session: `/v1/network/stats` moved behind the API/DB; wallet network decoupled from the
+env onto the toggle; T1-D3 swap proven end-to-end on Testnet.)
 
 What should not dominate now: over-engineering auth/session, premature abstraction layers, broad
 refactors not tied to a tranche need, or polishing low-value UI before stabilizing data/API boundaries.

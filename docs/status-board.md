@@ -38,7 +38,7 @@ Keep it short, practical, and frequently updated. Keep it aligned with `docs/gra
 | Deliverable | Status | Completion | Confidence | Current evidence | Main remaining gap | Next action |
 |---|---|---:|---|---|---|---|
 | D1 — Data Indexing Foundation (Horizon & Soroban) | Substantially done | 90% | High | Hybrid Horizon+Soroban ingestion live into one Postgres DB; canonical `job:refresh` pipeline (72→71→steps) writing raw SQL v1; **verified DB inspection (Jun 5)**: Blend 3 pools / Aquarius 4 / Soroswap 2, all non-zero TVL (≈$156.7M / $21.0M / $0.57M); synchronous `as_of` within one refresh cycle; served via `/v1/*` | Freshness exposure through the API, retry/backoff standardization, ingestion runbook, evidence package; resolve the `/protocols` vs `/v1` endpoint naming at claim time | Build the T1-D1 evidence package |
-| D2 — Analytics Dashboard MVP | Substantially done | 80% | Medium-High | Public beta live; protocol/pool views show TVL/volume/APY from indexed data; Stellar Wallets Kit integrated; runs on real Mainnet data | `GET /v1/network/stats` still calls external APIs live (CoinGecko/DefiLlama/stellar.expert/Horizon) with no persistence/freshness; responsive pass; stale/loading/error consistency | Centralize network stats behind the API with DB persistence + freshness |
+| D2 — Analytics Dashboard MVP | Substantially done | 88% | High | Public beta live; protocol/pool views show TVL/volume/APY from indexed data; Stellar Wallets Kit integrated; runs on real Mainnet data; **`GET /v1/network/stats` now DB-backed** (reads `network_stats_latest` written by indexer step `73-network-stats-refresh` via `job:refresh`; no live external fetch per request; `updatedAt` = real `as_of`) | Responsive pass; stale/loading/error consistency; two network-stats fields (`activeWallets`, `dexVolume24hUsd`) null due to a stale stellar.expert endpoint (pre-existing, minor) | Responsive + stale/loading/error pass; fix stellar.expert endpoint |
 | D3 — Smart Transaction Builder (Testnet) | Substantially done | 70% | Medium | **End-to-end SDEX swap proven on Testnet from the UI (Jun 8)**: backend `POST /v1/actions/sdex/swap` returns a multi-op XDR (`ChangeTrust` + `PathPaymentStrictSend`); signed in-wallet via Freighter through Stellar Wallets Kit; submitted on-chain (tx `78323ffd…`), `ChangeTrust` op succeeded. `actions/` module in `apps/api` (SDEX + Blend deposit endpoints). Network toggle + `SdexSwapWidget` wired into the production frontend. Backend never touches keys. | Swap op fails on `pathPaymentStrictSendTooFewOffers` (no Testnet SDEX liquidity for the pair — infra, not a code bug); Blend deposit (Soroban, sequential) built but not yet exercised end-to-end from UI; minor: `getAssetBalance` re-bundles `ChangeTrust` even when trustline exists; evidence package | Capture T1-D3 evidence (tx hash + on-chain proof); optionally make one swap fully succeed (provide liquidity or pick a funded pair) |
 
 ---
@@ -77,12 +77,11 @@ Keep it short, practical, and frequently updated. Keep it aligned with `docs/gra
 2. Bridge monitoring
 3. Freshness/stale/retry operationalization + observability
 4. Deployment maturity
-5. Remaining frontend/API external-provider dependency (`/v1/network/stats`)
-6. Transaction builder breadth: only one pair/action proven; Blend deposit not yet exercised from UI
+5. Transaction builder breadth: only one pair/action proven; Blend deposit not yet exercised from UI
 
 ## Best near-term tranche wins
 1. T1-D1 evidence package (closest claim)
-2. T1-D2 API centralization (network stats) + polish
+2. T1-D2 final polish (responsive + stale/loading/error) — network stats now DB-backed
 3. T1-D3 evidence package (tx hash + on-chain proof already in hand)
 4. T2-D1 active-signer model formalization
 
