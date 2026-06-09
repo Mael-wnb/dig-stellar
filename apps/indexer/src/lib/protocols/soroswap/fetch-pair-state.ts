@@ -6,6 +6,7 @@ import {
   simulateContractRead,
 } from '../../../scripts/discovery/00-common';
 import { SoroswapAsset, SoroswapPairState } from './types';
+import { resolveRpcUrl } from '../../rpc-config';
 
 type ContractReadResult = {
   ok: boolean;
@@ -130,7 +131,7 @@ export async function fetchSoroswapPairState(params?: {
   sourceAccount?: string;
   verbose?: boolean;
 }): Promise<SoroswapPairState> {
-  const rpcUrl = params?.rpcUrl ?? process.env.SOROBAN_RPC_URL ?? getEnv('STELLAR_RPC_URL');
+  const rpcUrl = resolveRpcUrl(params?.rpcUrl);
   const horizonUrl = params?.horizonUrl ?? getEnv('HORIZON_URL');
   const sourceAccount =
     params?.sourceAccount ??

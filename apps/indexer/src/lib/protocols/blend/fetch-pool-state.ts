@@ -6,6 +6,7 @@ import { Networks } from '@stellar/stellar-sdk';
 import { PoolMetadata, PoolV2 } from '@blend-capital/blend-sdk';
 import { getEnv, simulateContractRead } from '../../../scripts/discovery/00-common';
 import { BlendPoolState, BlendReserveAsset, BlendReserveRow } from './types';
+import { resolveRpcUrl } from '../../rpc-config';
 
 function scale(raw: string | null | undefined, decimals: number | null | undefined): string | null {
   if (!raw || decimals === null || decimals === undefined || !Number.isFinite(decimals)) {
@@ -138,10 +139,7 @@ export async function fetchBlendPoolState(params?: {
     process.env.ENTITY_SLUG ??
     getEnv('ENTITY_SLUG');
 
-  const rpcUrl =
-    params?.rpcUrl ??
-    process.env.STELLAR_RPC_URL ??
-    getEnv('STELLAR_RPC_URL');
+  const rpcUrl = resolveRpcUrl(params?.rpcUrl);
 
   const horizonUrl =
     params?.horizonUrl ??

@@ -1,6 +1,7 @@
 // apps/indexer/src/scripts/discovery/00-common.ts
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
+import { maskRpcUrl } from "../../lib/rpc-config";
 import {
     xdr,
     scValToNative,
@@ -106,13 +107,14 @@ export async function fetchJson<T = unknown>(
   const text = await res.text();
 
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status} on ${url}\n${text.slice(0, 1500)}`);
+    // Mask the URL (host only) — RPC endpoints may carry an API key in the path.
+    throw new Error(`HTTP ${res.status} on ${maskRpcUrl(url)}\n${text.slice(0, 1500)}`);
   }
 
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new Error(`Invalid JSON from ${url}\n${text.slice(0, 1500)}`);
+    throw new Error(`Invalid JSON from ${maskRpcUrl(url)}\n${text.slice(0, 1500)}`);
   }
 }
 

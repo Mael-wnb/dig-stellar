@@ -6,6 +6,7 @@ import {
   simulateContractRead,
 } from '../../../scripts/discovery/00-common';
 import { AquariusAsset, AquariusPoolState } from './types';
+import { resolveRpcUrl } from '../../rpc-config';
 
 type ContractReadResult = {
   ok: boolean;
@@ -133,7 +134,7 @@ export async function fetchAquariusPoolState(params?: {
   sourceAccount?: string;
   verbose?: boolean;
 }): Promise<AquariusPoolState> {
-  const rpcUrl = params?.rpcUrl ?? process.env.SOROBAN_RPC_URL ?? getEnv('STELLAR_RPC_URL');
+  const rpcUrl = resolveRpcUrl(params?.rpcUrl);
   const horizonUrl = params?.horizonUrl ?? getEnv('HORIZON_URL');
   const sourceAccount =
     params?.sourceAccount ??

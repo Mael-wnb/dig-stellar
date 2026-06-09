@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { spawn } from 'node:child_process';
+import { resolveRpcUrl, maskRpcUrl } from '../../lib/rpc-config';
 
 function runCommand(
   command: string,
@@ -34,10 +35,7 @@ function runCommand(
 }
 
 async function main() {
-  const stellarRpcUrl =
-    process.env.STELLAR_RPC_URL ??
-    process.env.SOROBAN_RPC_URL ??
-    '';
+  const stellarRpcUrl = resolveRpcUrl();
 
   if (!stellarRpcUrl) {
     throw new Error(
@@ -46,7 +44,10 @@ async function main() {
   }
 
   const jobEnv: Record<string, string> = {
+    // Forward a single resolved endpoint under BOTH names so no downstream
+    // step can re-prefer the public (rate-limited) URL.
     STELLAR_RPC_URL: stellarRpcUrl,
+    SOROBAN_RPC_URL: stellarRpcUrl,
     LEDGER_LOOKBACK:
       process.env.LEDGER_LOOKBACK ?? '20000',
     EVENTS_LIMIT:
@@ -60,7 +61,7 @@ async function main() {
   );
 
   console.log({
-    stellarRpcUrl: jobEnv.STELLAR_RPC_URL,
+    stellarRpcUrl: maskRpcUrl(jobEnv.STELLAR_RPC_URL),
     ledgerLookback: jobEnv.LEDGER_LOOKBACK,
     eventsLimit: jobEnv.EVENTS_LIMIT,
     maxEventPages: jobEnv.MAX_EVENT_PAGES,

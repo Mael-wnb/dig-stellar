@@ -9,6 +9,7 @@ import {
   tryExtractEventName,
 } from '../../../scripts/discovery/00-common';
 import { AquariusFetchEventsResult, AquariusRawEvent } from './types';
+import { resolveRpcUrl } from '../../rpc-config';
 
 type RpcEnvelope<T> = {
   jsonrpc: '2.0';
@@ -44,7 +45,7 @@ export async function fetchAquariusPoolEvents(params?: {
   maxPages?: number;
   verbose?: boolean;
 }): Promise<AquariusFetchEventsResult> {
-  const rpcUrl = params?.rpcUrl ?? process.env.SOROBAN_RPC_URL ?? getEnv('STELLAR_RPC_URL');
+  const rpcUrl = resolveRpcUrl(params?.rpcUrl);
   const poolId = params?.poolId ?? process.env.AQUARIUS_POOL_ID ?? getEnv('AQUARIUS_POOL_ID');
   const verbose = params?.verbose ?? (process.env.VERBOSE === '1');
 
