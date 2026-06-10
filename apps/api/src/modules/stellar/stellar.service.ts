@@ -2,6 +2,20 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../db/prisma.service';
 
+// Freshness threshold (T1-D1): how old `as_of` can be before an item is "stale".
+const STALE_THRESHOLD_MS =
+  Number(process.env.STALE_THRESHOLD_MINUTES ?? 30) * 60 * 1000;
+
+// stale = true  -> data older than the threshold
+// stale = false -> data within the threshold
+// stale = null  -> updatedAt unknown (no metrics row / unparseable timestamp)
+function computeStale(updatedAt: unknown): boolean | null {
+  if (updatedAt === null || updatedAt === undefined) return null;
+  const ts = new Date(updatedAt as string | number | Date).getTime();
+  if (!Number.isFinite(ts)) return null;
+  return Date.now() - ts > STALE_THRESHOLD_MS;
+}
+
 function toNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
@@ -138,6 +152,7 @@ export class StellarService {
       avgSupplyApy: toNumber(row.avg_supply_apy),
       avgBorrowApy: toNumber(row.avg_borrow_apy),
       updatedAt: row.as_of,
+      stale: computeStale(row.as_of),
     }));
   }
 
@@ -248,6 +263,7 @@ export class StellarService {
         borrowApy: toNumber(row.weighted_borrow_apy),
       },
       updatedAt: row.as_of,
+      stale: computeStale(row.as_of),
     }));
   }
 
@@ -382,6 +398,7 @@ export class StellarService {
           },
           tokens,
           updatedAt: pool.as_of,
+          stale: computeStale(pool.as_of),
         };
       }
 
@@ -426,6 +443,7 @@ export class StellarService {
         },
         reserves,
         updatedAt: pool.as_of,
+        stale: computeStale(pool.as_of),
       };
     } catch (error) {
       console.error('[StellarService.getPoolDetail] poolSlug=', poolSlug);
