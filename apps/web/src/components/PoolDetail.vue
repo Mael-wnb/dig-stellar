@@ -62,6 +62,9 @@ function poolDescription(pool: PoolDetailData): string {
   if (isLendingPool(pool)) {
     return "This lending pool allows users to supply and borrow assets on Stellar's Soroban smart contract platform. Interest rates adjust dynamically based on utilization.";
   }
+  if (pool.protocol?.id === "stellar-native") {
+    return "This AMM pool provides decentralized token swaps on the Stellar native DEX (classic liquidity pools via Horizon). Liquidity providers earn fees proportional to their share of the pool.";
+  }
   return "This AMM pool provides decentralized token swaps on Stellar's Soroban smart contract platform. Liquidity providers earn fees proportional to their share of the pool.";
 }
 </script>
