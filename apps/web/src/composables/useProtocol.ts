@@ -37,6 +37,14 @@ function getProtocolMeta(protocolId: string) {
   );
 }
 
+// Sort pools by TVL desc. null/0 are treated as 0 (sink to the bottom),
+// real positives rise to the top. Non-mutating.
+function sortPoolsByTvlDesc(list: PoolListItem[]): PoolListItem[] {
+  return [...list].sort(
+    (a, b) => (b.metrics.tvlUsd ?? 0) - (a.metrics.tvlUsd ?? 0),
+  );
+}
+
 /* ──────────────────────────────────────────────── */
 /* MAIN COMPOSABLE */
 /* ──────────────────────────────────────────────── */
@@ -81,7 +89,11 @@ export function useProtocol() {
   );
 
   const protocolPools = computed(() =>
-    pools.value.filter((pool) => pool.protocol.id === selectedProtocolId.value),
+    sortPoolsByTvlDesc(
+      pools.value.filter(
+        (pool) => pool.protocol.id === selectedProtocolId.value,
+      ),
+    ),
   );
 
   const selectedProtocol = computed<ProtocolDisplay | null>(() => {
@@ -106,7 +118,7 @@ export function useProtocol() {
     error.value = null;
 
     try {
-      const data = await fetchPools();
+      const data = sortPoolsByTvlDesc(await fetchPools());
 
       // ✅ IMPORTANT : ne pas recréer les refs (évite flicker)
       pools.value = data;
