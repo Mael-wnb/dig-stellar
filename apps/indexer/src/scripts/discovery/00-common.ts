@@ -92,30 +92,83 @@ export async function loadJson<T = unknown>(filename: string): Promise<T | null>
   }
 }
 
+// Resilience for RPC/HTTP calls: retry on 429 (rate limit) and network errors
+// with exponential backoff + jitter. Non-429 HTTP errors are real failures and
+// are not retried. Up to 4 retries, base delays 1s/2s/4s/8s.
+const RETRYABLE_STATUS = 429;
+const MAX_RETRIES = 4;
+const RETRY_BASE_DELAYS_MS = [1000, 2000, 4000, 8000];
+
+function retryDelayMs(attempt: number): number {
+  // attempt is 0-based; add up to 1s of jitter to avoid thundering herds.
+  return RETRY_BASE_DELAYS_MS[attempt] + Math.floor(Math.random() * 1000);
+}
+
 export async function fetchJson<T = unknown>(
   url: string,
   init?: RequestInit
 ): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      "content-type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+  let lastError: unknown;
 
-  const text = await res.text();
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    let res: Response;
 
-  if (!res.ok) {
-    // Mask the URL (host only) — RPC endpoints may carry an API key in the path.
-    throw new Error(`HTTP ${res.status} on ${maskRpcUrl(url)}\n${text.slice(0, 1500)}`);
+    try {
+      res = await fetch(url, {
+        ...init,
+        headers: {
+          "content-type": "application/json",
+          ...(init?.headers ?? {}),
+        },
+      });
+    } catch (err) {
+      // Network error — retryable.
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt < MAX_RETRIES) {
+        const delay = retryDelayMs(attempt);
+        // Mask the URL (host only) — RPC endpoints may carry an API key in the path.
+        console.warn(
+          `fetchJson network error on ${maskRpcUrl(url)} — retry ${attempt + 1}/${MAX_RETRIES} in ${delay}ms`
+        );
+        await sleep(delay);
+        continue;
+      }
+      throw lastError;
+    }
+
+    const text = await res.text();
+
+    if (!res.ok) {
+      // Mask the URL (host only) — RPC endpoints may carry an API key in the path.
+      const httpError = new Error(`HTTP ${res.status} on ${maskRpcUrl(url)}\n${text.slice(0, 1500)}`);
+
+      // Non-429 HTTP error (real error) — fail immediately, no retry.
+      if (res.status !== RETRYABLE_STATUS) {
+        throw httpError;
+      }
+
+      // 429 Too Many Requests — retryable.
+      lastError = httpError;
+      if (attempt < MAX_RETRIES) {
+        const delay = retryDelayMs(attempt);
+        console.warn(
+          `fetchJson HTTP 429 on ${maskRpcUrl(url)} — retry ${attempt + 1}/${MAX_RETRIES} in ${delay}ms`
+        );
+        await sleep(delay);
+        continue;
+      }
+      throw httpError;
+    }
+
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new Error(`Invalid JSON from ${maskRpcUrl(url)}\n${text.slice(0, 1500)}`);
+    }
   }
 
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    throw new Error(`Invalid JSON from ${maskRpcUrl(url)}\n${text.slice(0, 1500)}`);
-  }
+  // Unreachable in practice (the loop returns or throws), but keeps the type checker happy.
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 export async function rpcCall<T = unknown>(
