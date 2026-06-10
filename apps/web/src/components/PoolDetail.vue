@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PoolDetailData } from "../types/protocol";
-import { formatUsd } from "../utils/format";
+import { formatCount, formatPrice, formatUsd } from "../utils/format";
 
 interface ProtocolDisplay {
   id: string;
@@ -50,6 +50,30 @@ function formatDate(value?: string | null): string {
 
 function isLendingPool(pool: PoolDetailData) {
   return pool.type === "lending_pool";
+}
+
+function isStellarNative(_pool?: PoolDetailData) {
+  return props.protocol?.id === "stellar-native";
+}
+
+// stellar.expert deep link. Native (Horizon classic) pools live under
+// /liquidity-pool/<id>; Soroban contracts (Aquarius/Blend/Soroswap) under
+// /contract/<id>. Returns null when there's no address to link to.
+function explorerUrl(pool: PoolDetailData): string | null {
+  if (!pool.contractAddress) return null;
+  const base = "https://stellar.expert/explorer/public";
+  return isStellarNative(pool)
+    ? `${base}/liquidity-pool/${pool.contractAddress}`
+    : `${base}/contract/${pool.contractAddress}`;
+}
+
+async function copyContract(value?: string | null) {
+  if (!value) return;
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch {
+    // Clipboard API unavailable (insecure context / denied) — fail silently.
+  }
 }
 
 function typeLabel(type?: string | null): string {
@@ -232,6 +256,23 @@ function poolDescription(pool: PoolDetailData): string {
               </div>
             </div>
           </template>
+          <!-- stellar-native (Horizon classic): no Soroban events, so Swaps/Events
+               are always 0 and misleading. Show a single Trades 24h instead. -->
+          <template v-else-if="isStellarNative(pool)">
+            <div class="flex-1 min-w-[140px] p-4 sm:p-6 text-center">
+              <div class="text-[16px] text-[#5E5F5D]">Trades 24h</div>
+              <div
+                class="text-[20px] font-bold text-[#E2E6E1]"
+                style="
+                  font-family:
+                    Clash Display,
+                    sans-serif;
+                "
+              >
+                {{ formatNumber(pool.metrics.trades24h, 0) }}
+              </div>
+            </div>
+          </template>
           <template v-else>
             <div class="flex-1 min-w-[140px] p-4 sm:p-6 border-r border-[#383838] max-sm:border-r-0 max-sm:border-b max-sm:border-[#383838]">
               <div class="text-[16px] text-[#5E5F5D]">Swaps 24h</div>
@@ -307,7 +348,29 @@ function poolDescription(pool: PoolDetailData): string {
           </div>
           <div class="flex justify-between items-center px-3 sm:px-6 bg-[rgba(226,230,225,0.05)] rounded-[4px] flex-1">
             <span class="text-[16px] text-[#5E5F5D]">Contract</span>
-            <span class="text-[14px] font-semibold text-[#E2E6E1]">{{ shortAddress(pool.contractAddress) }}</span>
+            <span class="flex items-center gap-2">
+              <a
+                v-if="explorerUrl(pool)"
+                :href="explorerUrl(pool)!"
+                target="_blank"
+                rel="noopener"
+                class="text-[14px] font-semibold text-[#E2E6E1] hover:text-[#D5FF2F]"
+              >{{ shortAddress(pool.contractAddress) }}</a>
+              <span v-else class="text-[14px] font-semibold text-[#E2E6E1]">{{ shortAddress(pool.contractAddress) }}</span>
+              <button
+                v-if="pool.contractAddress"
+                type="button"
+                title="Copy contract address"
+                aria-label="Copy contract address"
+                class="inline-flex text-[#5E5F5D] hover:text-[#E2E6E1]"
+                @click="copyContract(pool.contractAddress)"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+              </button>
+            </span>
           </div>
           <div class="flex justify-between items-center px-3 sm:px-6 bg-[rgba(226,230,225,0.05)] rounded-[4px] flex-1">
             <span class="text-[16px] text-[#5E5F5D]">Updated</span>
@@ -315,6 +378,35 @@ function poolDescription(pool: PoolDetailData): string {
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- BOTTOM — Reserves (stellar-native AMM) -->
+    <div
+      v-if="isStellarNative(pool) && pool.tokens && pool.tokens.length"
+      class="bg-[#2A2A2A] border border-[#383838] rounded-xl overflow-auto"
+    >
+      <table class="w-full text-[13px] min-w-[480px]">
+        <thead>
+          <tr class="text-[10px] uppercase tracking-wider text-[#838583] border-b border-[#383838]">
+            <th class="px-4 py-2 text-left">Asset</th>
+            <th class="px-4 py-2 text-left">Reserve</th>
+            <th class="px-4 py-2 text-left">Price</th>
+            <th class="px-4 py-2 text-left">Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="(t, i) in pool.tokens || []"
+            :key="t.assetId ?? t.symbol ?? i"
+            class="border-b border-[#383838] hover:bg-[#1f1f1f]"
+          >
+            <td class="px-4 py-2 text-[#E2E6E1]">{{ t.symbol ?? "—" }}</td>
+            <td class="px-4 py-2 text-[#D5FF2F]">{{ formatCount(t.reserve) }}</td>
+            <td class="px-4 py-2">{{ formatPrice(t.priceUsd) }}</td>
+            <td class="px-4 py-2">{{ formatUsd(t.reserveUsd) }}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <!-- BOTTOM — Assets table -->

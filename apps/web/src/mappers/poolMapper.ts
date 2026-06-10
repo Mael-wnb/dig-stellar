@@ -44,6 +44,7 @@ export function mapPoolToDisplay(data: PoolDetailData): PoolDisplay {
       fees24hUsd: n(data.metrics?.fees24hUsd),
       swaps24h: n(data.metrics?.swaps24h),
       events24h: n(data.metrics?.events24h),
+      trades24h: n(data.metrics?.trades24h),
 
       // LENDING
       totalSuppliedUsd: n(data.metrics?.totalSuppliedUsd),
@@ -86,6 +87,13 @@ export function mapPoolToDisplay(data: PoolDetailData): PoolDisplay {
       assetId: t.assetId,
       symbol: t.symbol,
       role: t.role,
+
+      // AMM reserve breakdown (present on pool detail; harmless when absent).
+      name: t.name,
+      decimals: t.decimals ?? null,
+      priceUsd: n(t.priceUsd),
+      reserve: n(t.reserve),
+      reserveUsd: n(t.reserveUsd),
     })),
   }
 }

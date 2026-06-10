@@ -1,6 +1,23 @@
 // apps/api/src/modules/stellar/stellar.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Asset, Networks } from '@stellar/stellar-sdk';
 import { PrismaService } from '../../db/prisma.service';
+
+// Resolve a Horizon reserve asset ("native" or "CODE:ISSUER") to its Stellar
+// Asset Contract (SAC) id. stellar-native pools store reserves in Horizon
+// format inside pool_snapshots.metadata; the `assets` table is keyed by the SAC
+// contract (C…), so we convert here to price each leg. Mirrors the indexer's
+// asset-utils.horizonAssetToSacContractId. Returns null if unparseable.
+function horizonAssetToSacContractId(asset: string): string | null {
+  try {
+    if (asset === 'native') return Asset.native().contractId(Networks.PUBLIC);
+    const [code, issuer] = asset.split(':');
+    if (!code || !issuer) return null;
+    return new Asset(code, issuer).contractId(Networks.PUBLIC);
+  } catch {
+    return null;
+  }
+}
 
 // Freshness threshold (T1-D1): how old `as_of` can be before an item is "stale".
 const STALE_THRESHOLD_MS =
@@ -95,6 +112,7 @@ type PoolDetailRow = {
   total_backstop_credit_usd: unknown;
   weighted_supply_apy: unknown;
   weighted_borrow_apy: unknown;
+  metrics_metadata: unknown;
   as_of: unknown;
 };
 
@@ -290,6 +308,7 @@ export class StellarService {
           pml.total_backstop_credit_usd,
           pml.weighted_supply_apy,
           pml.weighted_borrow_apy,
+          pml.metadata as metrics_metadata,
           pml.as_of
         from entities e
         join venues v on v.id = e.venue_id
@@ -356,27 +375,44 @@ export class StellarService {
       const events24h = eventCounts ? toNumber(eventCounts.events_24h) : null;
       const swaps24h = eventCounts ? toNumber(eventCounts.swaps_24h) : null;
 
+      // stellar-native pools have no Soroban events; their 24h trade count is
+      // computed from Horizon trades by the indexer and stashed in the metrics
+      // row metadata. Other protocols simply won't carry this key (→ null).
+      const isStellarNative = pool.protocol_slug === 'stellar-native';
+      const metricsMeta = (pool.metrics_metadata ?? null) as {
+        trades24h?: unknown;
+      } | null;
+      const trades24h = metricsMeta ? toNumber(metricsMeta.trades24h) : null;
+
       const protocolType = pool.protocol_type;
       const entityType = pool.entity_type;
       const isAmm = protocolType === 'amm' || entityType === 'amm_pool';
 
       if (isAmm) {
-        const tokens = reserveRows.map((row) => {
-          const reserve = toNumber(row.d_supply_scaled);
-          const priceUsd = toNumber(row.price_usd);
-          const reserveUsd =
-            reserve !== null && priceUsd !== null ? reserve * priceUsd : null;
+        // Soroban AMMs (Soroswap/Aquarius) derive their tokens from
+        // reserve_snapshots. stellar-native (Horizon classic) pools don't write
+        // reserve_snapshots — their reserves live in pool_snapshots.metadata —
+        // so resolve those separately and price each leg.
+        const tokens = isStellarNative
+          ? await this.getStellarNativeTokens(pool.entity_id)
+          : reserveRows.map((row) => {
+              const reserve = toNumber(row.d_supply_scaled);
+              const priceUsd = toNumber(row.price_usd);
+              const reserveUsd =
+                reserve !== null && priceUsd !== null
+                  ? reserve * priceUsd
+                  : null;
 
-          return {
-            assetId: row.asset_id,
-            symbol: row.symbol,
-            name: row.name,
-            decimals: toNumber(row.decimals),
-            priceUsd,
-            reserve,
-            reserveUsd,
-          };
-        });
+              return {
+                assetId: row.asset_id,
+                symbol: row.symbol,
+                name: row.name,
+                decimals: toNumber(row.decimals),
+                priceUsd,
+                reserve,
+                reserveUsd,
+              };
+            });
 
         return {
           id: pool.entity_slug,
@@ -395,6 +431,7 @@ export class StellarService {
             fees24hUsd: toNumber(pool.fees_24h_usd) ?? 0,
             events24h,
             swaps24h,
+            trades24h,
           },
           tokens,
           updatedAt: pool.as_of,
@@ -450,5 +487,91 @@ export class StellarService {
       console.error(error);
       throw error;
     }
+  }
+
+  // Build the token/reserve breakdown for a stellar-native (Horizon classic)
+  // pool. Reserves are stored in the latest pool_snapshots.metadata in Horizon
+  // asset format ("native" / "CODE:ISSUER") with human-unit amounts. We resolve
+  // each leg to its SAC contract to look up the asset row + latest USD price,
+  // then return tokens shaped like the Soroban AMM path (assetId/symbol/name/
+  // decimals/priceUsd/reserve/reserveUsd) so the UI mapper stays uniform.
+  private async getStellarNativeTokens(entityId: string) {
+    const snapRows = (await this.prisma.$queryRawUnsafe(
+      `
+      select ps.metadata
+      from pool_snapshots ps
+      where ps.entity_id = $1::uuid
+      order by ps.snapshot_at desc
+      limit 1
+      `,
+      entityId
+    )) as Array<{
+      metadata: { reserves?: Array<{ asset: string; amount: string }> } | null;
+    }>;
+
+    const reserves = snapRows[0]?.metadata?.reserves ?? [];
+    if (!reserves.length) return [];
+
+    const resolved = reserves.map((r) => ({
+      amount: toNumber(r.amount),
+      symbol: r.asset === 'native' ? 'XLM' : r.asset.split(':')[0],
+      contract: horizonAssetToSacContractId(r.asset),
+    }));
+
+    const contracts = resolved
+      .map((r) => r.contract)
+      .filter((c): c is string => c !== null);
+
+    const assetRows = contracts.length
+      ? ((await this.prisma.$queryRawUnsafe(
+          `
+          select
+            a.contract_address,
+            a.id,
+            a.symbol,
+            a.name,
+            a.decimals,
+            (
+              select ap.price_usd
+              from asset_prices ap
+              where ap.asset_id = a.id
+              order by ap.observed_at desc
+              limit 1
+            ) as price_usd
+          from assets a
+          where a.contract_address = any($1::text[])
+          `,
+          contracts
+        )) as Array<{
+          contract_address: string;
+          id: string;
+          symbol: string | null;
+          name: string | null;
+          decimals: unknown;
+          price_usd: unknown;
+        }>)
+      : [];
+
+    const assetByContract = new Map(
+      assetRows.map((a) => [a.contract_address, a])
+    );
+
+    return resolved.map((r) => {
+      const asset = r.contract ? assetByContract.get(r.contract) : undefined;
+      const priceUsd = asset ? toNumber(asset.price_usd) : null;
+      const reserve = r.amount;
+      const reserveUsd =
+        reserve !== null && priceUsd !== null ? reserve * priceUsd : null;
+
+      return {
+        assetId: asset?.id ?? null,
+        symbol: asset?.symbol ?? r.symbol,
+        name: asset?.name ?? null,
+        decimals: asset ? toNumber(asset.decimals) : null,
+        priceUsd,
+        reserve,
+        reserveUsd,
+      };
+    });
   }
 }

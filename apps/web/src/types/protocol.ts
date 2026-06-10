@@ -7,9 +7,16 @@ export interface ProtocolSummary {
   }
   
   export interface PoolTokenSummary {
-    assetId: string
-    symbol: string
-    role: string
+    assetId: string | null
+    symbol: string | null
+    role?: string
+
+    // Populated for AMM pool detail (reserve breakdown). Absent in pool lists.
+    name?: string | null
+    decimals?: number | null
+    priceUsd?: number | null
+    reserve?: number | null
+    reserveUsd?: number | null
   }
   
   export interface PoolMetricsSummary {
@@ -24,6 +31,7 @@ export interface ProtocolSummary {
     borrowApy?: number | null
     swaps24h?: number | null
     events24h?: number | null
+    trades24h?: number | null
   }
   
   export interface PoolListItem {
