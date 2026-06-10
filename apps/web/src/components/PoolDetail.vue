@@ -86,7 +86,7 @@ function poolDescription(pool: PoolDetailData): string {
   if (isLendingPool(pool)) {
     return "This lending pool allows users to supply and borrow assets on Stellar's Soroban smart contract platform. Interest rates adjust dynamically based on utilization.";
   }
-  if (pool.protocol?.id === "stellar-native") {
+  if (props.protocol?.id === "stellar-native") {
     return "This AMM pool provides decentralized token swaps on the Stellar native DEX (classic liquidity pools via Horizon). Liquidity providers earn fees proportional to their share of the pool.";
   }
   return "This AMM pool provides decentralized token swaps on Stellar's Soroban smart contract platform. Liquidity providers earn fees proportional to their share of the pool.";
@@ -167,6 +167,35 @@ function poolDescription(pool: PoolDetailData): string {
                 "
               >
                 —
+              </div>
+            </div>
+          </template>
+          <!-- stellar-native: 2+2 layout → row 1 shows TVL | Volume 24h. -->
+          <template v-else-if="isStellarNative(pool)">
+            <div class="flex-1 min-w-[140px] p-4 sm:p-6 border-r border-[#383838] max-sm:border-r-0 max-sm:border-b max-sm:border-[#383838]">
+              <div class="text-[16px] text-[#5E5F5D]">TVL</div>
+              <div
+                class="text-[20px] font-bold text-[#D5FF2F]"
+                style="
+                  font-family:
+                    Clash Display,
+                    sans-serif;
+                "
+              >
+                {{ formatUsd(pool.metrics.tvlUsd) }}
+              </div>
+            </div>
+            <div class="flex-1 min-w-[140px] p-4 sm:p-6">
+              <div class="text-[16px] text-[#5E5F5D]">Volume 24h</div>
+              <div
+                class="text-[20px] font-bold text-[#E2E6E1]"
+                style="
+                  font-family:
+                    Clash Display,
+                    sans-serif;
+                "
+              >
+                {{ formatUsd(pool.metrics.volume24hUsd) }}
               </div>
             </div>
           </template>
@@ -257,9 +286,22 @@ function poolDescription(pool: PoolDetailData): string {
             </div>
           </template>
           <!-- stellar-native (Horizon classic): no Soroban events, so Swaps/Events
-               are always 0 and misleading. Show a single Trades 24h instead. -->
+               are always 0 and misleading. Row 2 shows Fees 24h | Trades 24h. -->
           <template v-else-if="isStellarNative(pool)">
-            <div class="flex-1 min-w-[140px] p-4 sm:p-6 text-center">
+            <div class="flex-1 min-w-[140px] p-4 sm:p-6 border-r border-[#383838] max-sm:border-r-0 max-sm:border-b max-sm:border-[#383838]">
+              <div class="text-[16px] text-[#5E5F5D]">Fees 24h</div>
+              <div
+                class="text-[20px] font-bold text-[#E2E6E1]"
+                style="
+                  font-family:
+                    Clash Display,
+                    sans-serif;
+                "
+              >
+                {{ formatUsd(pool.metrics.fees24hUsd) }}
+              </div>
+            </div>
+            <div class="flex-1 min-w-[140px] p-4 sm:p-6">
               <div class="text-[16px] text-[#5E5F5D]">Trades 24h</div>
               <div
                 class="text-[20px] font-bold text-[#E2E6E1]"
