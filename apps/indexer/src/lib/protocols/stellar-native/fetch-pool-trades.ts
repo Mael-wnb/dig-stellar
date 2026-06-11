@@ -1,4 +1,5 @@
 // apps/indexer/src/lib/protocols/stellar-native/fetch-pool-trades.ts
+
 import "dotenv/config";
 import { fetchJson, getEnv } from "../../../scripts/discovery/00-common";
 
@@ -31,42 +32,54 @@ type HorizonTradesResponse = {
   _links?: { next?: { href?: string } };
 };
 
-// Stable-asset USD prices we treat as known constants. XLM is priced from the DB.
 const STABLE_USD: Record<string, number> = {
   USDC: 1,
   EURC: 1.16,
 };
 
 const WINDOW_MS = 24 * 60 * 60 * 1000;
-const PAGE_LIMIT = 200; // Horizon max page size
-const MAX_PAGES = 25; // safety cap (~5000 trades) so a hot pool can't run away
+const PAGE_LIMIT = 200;
+const MAX_PAGES = 25;
 
-// USD unit price for one trade leg, or null when we don't know it.
 function legUnitUsd(
   assetType: string,
   assetCode: string | undefined,
   xlmUsd: number | null
 ): number | null {
-  if (assetType === "native") return xlmUsd;
-  if (assetCode && assetCode in STABLE_USD) return STABLE_USD[assetCode];
+  if (assetType === "native") {
+    return xlmUsd;
+  }
+
+  if (assetCode && assetCode in STABLE_USD) {
+    return STABLE_USD[assetCode];
+  }
+
   return null;
 }
 
-// USD value of a single trade: value whichever leg has a known price.
-function tradeUsd(trade: HorizonTrade, xlmUsd: number | null): number | null {
+function tradeUsd(
+  trade: HorizonTrade,
+  xlmUsd: number | null
+): number | null {
   const baseUnit = legUnitUsd(
     trade.base_asset_type,
     trade.base_asset_code,
     xlmUsd
   );
-  if (baseUnit !== null) return Number(trade.base_amount) * baseUnit;
+
+  if (baseUnit !== null) {
+    return Number(trade.base_amount) * baseUnit;
+  }
 
   const counterUnit = legUnitUsd(
     trade.counter_asset_type,
     trade.counter_asset_code,
     xlmUsd
   );
-  if (counterUnit !== null) return Number(trade.counter_amount) * counterUnit;
+
+  if (counterUnit !== null) {
+    return Number(trade.counter_amount) * counterUnit;
+  }
 
   return null;
 }
@@ -77,23 +90,58 @@ export async function fetchPoolTrades(params: {
   xlmUsd: number | null;
 }): Promise<PoolTradeMetrics> {
   const { poolId, feeBp, xlmUsd } = params;
-  const horizonUrl = getEnv("HORIZON_URL", "https://horizon.stellar.org");
+
+  const tradesBaseUrl = getEnv(
+    "HORIZON_TRADES_URL",
+    getEnv("HORIZON_URL", "https://horizon.stellar.org")
+  );
+
+  console.log(
+    `[stellar-native] pool=${poolId} HORIZON_TRADES_URL=${tradesBaseUrl}`
+  );
+
   const cutoff = Date.now() - WINDOW_MS;
 
   let volume24hUsd = 0;
   let trades24h = 0;
 
-  const first = new URL(`/liquidity_pools/${poolId}/trades`, horizonUrl);
+  // IMPORTANT:
+  // Validation Cloud uses:
+  // https://host/v1/API_KEY/...
+  //
+  // Using:
+  //   new URL("/liquidity_pools/...", tradesBaseUrl)
+  // would DROP the /v1/API_KEY prefix.
+  //
+  // Build the URL explicitly instead.
+
+  const first = new URL(
+    `${tradesBaseUrl.replace(/\/$/, "")}/liquidity_pools/${poolId}/trades`
+  );
+
   first.searchParams.set("order", "desc");
   first.searchParams.set("limit", String(PAGE_LIMIT));
+
   let nextUrl: string | null = first.toString();
+
+  console.log(
+    `[stellar-native] first trades url = ${nextUrl}`
+  );
+
+  console.log(
+    `[stellar-native] fetching trades for pool ${poolId} via ${tradesBaseUrl}`
+  );
 
   for (let page = 0; page < MAX_PAGES && nextUrl; page++) {
     let json: HorizonTradesResponse;
+
+    console.log(
+      `[stellar-native] page=${page} url=${nextUrl}`
+    );
+
     try {
       json = await fetchJson<HorizonTradesResponse>(nextUrl);
     } catch (err) {
-      // A failed /trades page must not crash the refresh — keep what we have.
       console.warn(
         `[stellar-native] trades fetch failed for pool ${poolId}: ${
           err instanceof Error ? err.message : String(err)
@@ -103,27 +151,56 @@ export async function fetchPoolTrades(params: {
     }
 
     const records = json?._embedded?.records ?? [];
-    if (records.length === 0) break;
+
+    console.log(
+      `[stellar-native] page=${page} records=${records.length}`
+    );
+
+    if (records.length === 0) {
+      break;
+    }
 
     let reachedOld = false;
+
     for (const trade of records) {
       const t = Date.parse(trade.ledger_close_time);
+
       if (Number.isFinite(t) && t < cutoff) {
-        reachedOld = true; // desc order → everything after is older too
+        reachedOld = true;
         break;
       }
+
       trades24h += 1;
+
       const usd = tradeUsd(trade, xlmUsd);
+
       if (usd !== null && Number.isFinite(usd)) {
         volume24hUsd += usd;
       }
     }
 
-    if (reachedOld) break;
+    if (reachedOld) {
+      break;
+    }
+
     nextUrl = json?._links?.next?.href ?? null;
+
+    console.log(
+      `[stellar-native] next=${nextUrl}`
+    );
   }
 
   const fees24hUsd = volume24hUsd * (feeBp / 10000);
 
-  return { volume24hUsd, fees24hUsd, trades24h };
+  console.log(
+    `[stellar-native] pool=${poolId} trades24h=${trades24h} volume24hUsd=${volume24hUsd.toFixed(
+      2
+    )} fees24hUsd=${fees24hUsd.toFixed(2)}`
+  );
+
+  return {
+    volume24hUsd,
+    fees24hUsd,
+    trades24h,
+  };
 }
