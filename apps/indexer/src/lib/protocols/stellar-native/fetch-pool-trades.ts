@@ -3,12 +3,6 @@
 import "dotenv/config";
 import { fetchJson, getEnv } from "../../../scripts/discovery/00-common";
 
-// Classic SDEX liquidity pools (via Horizon) don't expose 24h volume/fees on the
-// pool record. We derive them from the pool's trade history:
-//   GET /liquidity_pools/<id>/trades?order=desc
-// Each trade has a base leg and a counter leg of equal value, so valuing ONE leg
-// whose USD price we know is enough. Fees = volume * fee_bp / 10000.
-
 export type PoolTradeMetrics = {
   volume24hUsd: number;
   fees24hUsd: number;
