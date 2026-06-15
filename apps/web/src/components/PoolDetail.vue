@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PoolDetailData } from "../types/protocol";
-import { formatCount, formatPrice, formatUsd } from "../utils/format";
+import { displaySymbol, formatCount, formatPrice, formatUsd } from "../utils/format";
 
 interface ProtocolDisplay {
   id: string;
@@ -442,7 +442,7 @@ function poolDescription(pool: PoolDetailData): string {
             :key="t.assetId ?? t.symbol ?? i"
             class="border-b border-[#383838] hover:bg-[#1f1f1f]"
           >
-            <td class="px-4 py-2 text-[#E2E6E1]">{{ t.symbol ?? "—" }}</td>
+            <td class="px-4 py-2 text-[#E2E6E1]">{{ displaySymbol(t.symbol) }}</td>
             <td class="px-4 py-2 text-[#D5FF2F]">{{ formatCount(t.reserve) }}</td>
             <td class="px-4 py-2">{{ formatPrice(t.priceUsd) }}</td>
             <td class="px-4 py-2">{{ formatUsd(t.reserveUsd) }}</td>
@@ -475,7 +475,7 @@ function poolDescription(pool: PoolDetailData): string {
             :key="r.assetId"
             class="border-b border-[#383838] hover:bg-[#1f1f1f]"
           >
-            <td class="px-4 py-2">{{ r.symbol }}</td>
+            <td class="px-4 py-2">{{ displaySymbol(r.symbol) }}</td>
             <td class="px-4 py-2">{{ formatUsd(r.priceUsd) }}</td>
             <td class="px-4 py-2 text-[#D5FF2F]">{{ formatNumber(r.supplied, 4) }}</td>
             <td class="px-4 py-2">{{ formatNumber(r.borrowed, 4) }}</td>

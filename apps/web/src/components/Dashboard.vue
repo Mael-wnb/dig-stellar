@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import logoUrl from '@/assets/dig-logo.svg?url'
+import { displaySymbol } from '../utils/format'
 import {
   StellarWalletsKit,
   WalletNetwork,
@@ -474,7 +475,7 @@ const selectedProtocol = computed(() =>
               :key="row.symbol"
               style="border-bottom: 1px solid #2a2a2a;"
             >
-              <td class="px-4 py-3 font-semibold" style="color: #E2E6E1;">{{ row.symbol }}</td>
+              <td class="px-4 py-3 font-semibold" style="color: #E2E6E1;">{{ displaySymbol(row.symbol) }}</td>
               <td class="px-4 py-3" style="color: #D5FF2F; font-weight: 600;">{{ row.supplied }}</td>
               <td class="px-4 py-3" style="color: #E2E6E1;">{{ row.borrowed }}</td>
               <td class="px-4 py-3" style="color: #888;">{{ row.backstop }}</td>

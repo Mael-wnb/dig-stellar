@@ -1,5 +1,6 @@
 // apps/web/src/composables/ugsewalletbalance.ts
 import { ref } from 'vue'
+import { displaySymbol } from '../utils/format'
 
 export interface TokenBalance {
   symbol: string
@@ -79,7 +80,7 @@ async function fetchWalletBalances(address: string): Promise<WalletBalance> {
 
     // Extraire les symbols présents
     const symbols = rawBalances.map(b =>
-      b.asset_type === 'native' ? 'XLM' : (b.asset_code ?? 'UNKNOWN')
+      displaySymbol(b.asset_type === 'native' ? 'native' : (b.asset_code ?? 'UNKNOWN'))
     )
 
     const prices = await fetchPrices(symbols)
@@ -88,7 +89,7 @@ async function fetchWalletBalances(address: string): Promise<WalletBalance> {
     const tokens: TokenBalance[] = []
 
     for (const b of rawBalances) {
-      const symbol = b.asset_type === 'native' ? 'XLM' : (b.asset_code ?? 'UNKNOWN')
+      const symbol = displaySymbol(b.asset_type === 'native' ? 'native' : (b.asset_code ?? 'UNKNOWN'))
       const amount = parseFloat(b.balance)
       const price  = prices[symbol] ?? 0
       const valueUsd = amount * price

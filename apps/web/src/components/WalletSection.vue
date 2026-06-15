@@ -5,6 +5,7 @@ import { connectWallet as connectWalletApi } from "../api/wallets";
 import { useAppUser } from "../composables/useAppUser";
 import { useWalletSession } from "../composables/useWalletSession";
 import { useWallets } from "../composables/useWallets";
+import { displaySymbol } from "../utils/format";
 import type {
   WalletBalanceItem,
   WalletNotification,
@@ -74,10 +75,11 @@ function shortAddr(address: string): string {
     : address;
 }
 
-function displaySymbol(balance: WalletBalanceItem): string {
-  if (balance.metadata?.assetType === "native") return "XLM";
-  if (balance.symbol?.toLowerCase() === "native") return "XLM";
-  return balance.symbol ?? "Unknown";
+function balanceSymbol(balance: WalletBalanceItem): string {
+  // Horizon flags the native token via assetType; otherwise the symbol may
+  // itself be "native". Route both through the shared display helper.
+  if (balance.metadata?.assetType === "native") return displaySymbol("native");
+  return displaySymbol(balance.symbol ?? "Unknown");
 }
 
 async function openConnectModal(): Promise<void> {
@@ -334,7 +336,7 @@ void _addWalletWithoutSignature
               >
                 <div class="flex items-center gap-2">
                   <span class="font-bold text-[#e2e6e1]">
-                    {{ displaySymbol(balance) }}
+                    {{ balanceSymbol(balance) }}
                   </span>
                   <span class="text-[#9a9b99]">
                     {{ (balance.balance ?? 0).toLocaleString("en-US", { maximumFractionDigits: 4 }) }}

@@ -51,3 +51,26 @@ export function formatCount(n: number | null | undefined): string {
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
   return `${Math.round(n)}`
 }
+
+// Display-only asset symbol. The native Stellar token is technically "native"
+// (Horizon/SDK term) but users know it as "XLM". This maps the display label
+// ONLY — technical identifiers (DB, data keys, price lookups) stay "native".
+export function displaySymbol(s: string | null | undefined): string {
+  return s === 'native' ? 'XLM' : (s ?? DASH)
+}
+
+// Display-only pool name. Names are persisted composites like
+// "native/USDC Native Pool". We map the "native" *symbol* to "XLM" in the
+// leading symbol segment (the "native/USDC" part, before the first space)
+// WITHOUT touching the "Native Pool" suffix.
+export function displayPoolName(name: string | null | undefined): string {
+  if (!name) return DASH
+  const spaceIdx = name.indexOf(' ')
+  const head = spaceIdx === -1 ? name : name.slice(0, spaceIdx)
+  const tail = spaceIdx === -1 ? '' : name.slice(spaceIdx)
+  const mappedHead = head
+    .split('/')
+    .map((sym) => displaySymbol(sym))
+    .join('/')
+  return mappedHead + tail
+}

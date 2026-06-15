@@ -1,5 +1,7 @@
 <!-- src/components/PoolTable.vue -->
 <script setup lang="ts">
+import { displayPoolName } from '../utils/format'
+
 interface Pool {
   name: string
   icon: string
@@ -54,7 +56,7 @@ const emit = defineEmits<{
               >
                 {{ pool.icon }}
               </span>
-              <span class="font-medium text-white">{{ pool.name }}</span>
+              <span class="font-medium text-white">{{ displayPoolName(pool.name) }}</span>
             </div>
           </td>
           <td class="px-4 py-3" style="color: #888;">{{ pool.project }}</td>

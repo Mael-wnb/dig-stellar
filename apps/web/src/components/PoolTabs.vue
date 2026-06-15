@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { PROTOCOL_META } from '../data/protocolMeta'
 import type { PoolListItem } from '../types/protocol'
-import { formatUsd } from '../utils/format'
+import { displayPoolName, formatUsd } from '../utils/format'
 
 defineProps<{
   pools: PoolListItem[]
@@ -52,7 +52,7 @@ function getProtocolMeta(protocolId: string) {
             class="text-[14px] font-semibold truncate"
             :class="pool.id === selectedPoolId ? 'text-[#D5FF2F]' : 'text-[#E2E6E1]'"
           >
-            {{ pool.name }}
+            {{ displayPoolName(pool.name) }}
           </span>
         </div>
       </div>
