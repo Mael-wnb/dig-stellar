@@ -44,10 +44,9 @@ async function main() {
   }
 
   const jobEnv: Record<string, string> = {
-    // Forward a single resolved endpoint under BOTH names so no downstream
-    // step can re-prefer the public (rate-limited) URL.
     STELLAR_RPC_URL: stellarRpcUrl,
     SOROBAN_RPC_URL: stellarRpcUrl,
+    HORIZON_URL: process.env.HORIZON_URL ?? 'https://horizon.stellar.org',
     LEDGER_LOOKBACK:
       process.env.LEDGER_LOOKBACK ?? '20000',
     EVENTS_LIMIT:
