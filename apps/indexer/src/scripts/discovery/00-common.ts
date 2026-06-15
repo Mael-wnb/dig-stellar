@@ -231,11 +231,23 @@ export function tryExtractEventName(decodedTopics: unknown[]): string | null {
   return null;
 }
 
+/**
+ * Join a base URL with a REST path while PRESERVING the base path.
+ *
+ * `new URL("/accounts/X", base)` treats the path as absolute and discards any
+ * path already on `base` — including the `/v1/<key>` segment that Validation
+ * Cloud requires — so the request 404s. Concatenate instead, normalising
+ * slashes so we never emit a double slash.
+ */
+export function joinUrl(baseUrl: string, path: string): string {
+  return `${baseUrl.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+}
+
 export async function getAccountSequence(
     horizonUrl: string,
     address: string
   ): Promise<string> {
-    const url = new URL(`/accounts/${address}`, horizonUrl).toString();
+    const url = joinUrl(horizonUrl, `accounts/${address}`);
     const account = await fetchJson<any>(url);
     return account.sequence;
   }

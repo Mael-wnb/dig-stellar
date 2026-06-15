@@ -1,4 +1,4 @@
-import { getEnv, fetchJson, saveJson, nowIso } from "./00-common";
+import { getEnv, fetchJson, saveJson, nowIso, joinUrl } from "./00-common";
 
 async function main() {
   const horizonUrl = getEnv("HORIZON_URL", "https://horizon.stellar.org");
@@ -6,7 +6,7 @@ async function main() {
   const order = process.env.HORIZON_ORDER ?? "desc";
   const cursor = process.env.HORIZON_CURSOR ?? "";
 
-  const url = new URL("/liquidity_pools", horizonUrl);
+  const url = new URL(joinUrl(horizonUrl, "liquidity_pools"));
   url.searchParams.set("limit", String(limit));
   url.searchParams.set("order", order);
 

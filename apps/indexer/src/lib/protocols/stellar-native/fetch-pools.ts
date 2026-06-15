@@ -1,6 +1,6 @@
 // apps/indexer/src/lib/protocols/stellar-native/fetch-pools.ts
 import "dotenv/config";
-import { fetchJson, getEnv } from "../../../scripts/discovery/00-common";
+import { fetchJson, getEnv, joinUrl } from "../../../scripts/discovery/00-common";
 import { HorizonPool, HorizonPoolsResult } from "./types";
 
 // Horizon's GET /liquidity_pools has NO server-side sort by liquidity: the
@@ -51,7 +51,7 @@ export async function fetchHorizonPools(
   for (const [a, b] of LIQUID_PAIRS) {
     if (byId.size >= limit) break;
 
-    const url = new URL("/liquidity_pools", horizonUrl);
+    const url = new URL(joinUrl(horizonUrl, "liquidity_pools"));
     url.searchParams.set("reserves", `${a},${b}`);
     url.searchParams.set("limit", "5");
 
