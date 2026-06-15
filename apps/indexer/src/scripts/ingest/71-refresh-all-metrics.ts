@@ -50,6 +50,10 @@ async function getPoolsByVenue(
   venueSlug: string,
   entityType: 'amm_pool' | 'lending_pool'
 ): Promise<Array<{ entitySlug: string; contractAddress: string }>> {
+  // Only refresh entities that are still active. Pools whose Soroban contract
+  // has been archived (TTL expired) or delisted return 404 on every state read
+  // and would abort the whole refresh; mark them is_active = false in the DB
+  // and they are skipped here without touching code.
   const res = await client.query(
     `
     select
@@ -60,6 +64,7 @@ async function getPoolsByVenue(
       on v.id = e.venue_id
     where v.slug = $1
       and e.entity_type = $2
+      and e.is_active = true
     order by e.slug asc
     `,
     [venueSlug, entityType]
