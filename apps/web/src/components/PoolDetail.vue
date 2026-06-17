@@ -143,21 +143,8 @@ function poolDescription(pool: PoolDetailData): string {
                 {{ formatUsd(pool.metrics.netLiquidityUsd) }}
               </div>
             </div>
-            <div class="flex-1 min-w-[140px] p-4 sm:p-6 border-r border-[#383838] max-sm:border-r-0 max-sm:border-b max-sm:border-[#383838]">
-              <div class="text-[16px] text-[#5E5F5D]">Volume 24h</div>
-              <div
-                class="text-[20px] font-bold text-[#E2E6E1]"
-                style="
-                  font-family:
-                    Clash Display,
-                    sans-serif;
-                "
-              >
-                {{ formatUsd(pool.metrics.volume24hUsd) }}
-              </div>
-            </div>
             <div class="flex-1 min-w-[140px] p-4 sm:p-6">
-              <div class="text-[16px] text-[#5E5F5D]">Daily Reward</div>
+              <div class="text-[16px] text-[#5E5F5D]">Total Supplied</div>
               <div
                 class="text-[20px] font-bold text-[#E2E6E1]"
                 style="
@@ -166,7 +153,7 @@ function poolDescription(pool: PoolDetailData): string {
                     sans-serif;
                 "
               >
-                —
+                {{ formatUsd(pool.metrics.totalSuppliedUsd) }}
               </div>
             </div>
           </template>
@@ -245,19 +232,6 @@ function poolDescription(pool: PoolDetailData): string {
         <!-- Second metrics row -->
         <div class="flex flex-wrap border-b border-[#383838]">
           <template v-if="isLendingPool(pool)">
-            <div class="flex-1 min-w-[140px] p-4 sm:p-6 border-r border-[#383838] max-sm:border-r-0 max-sm:border-b max-sm:border-[#383838]">
-              <div class="text-[16px] text-[#5E5F5D]">Total Share</div>
-              <div
-                class="text-[20px] font-bold text-[#E2E6E1]"
-                style="
-                  font-family:
-                    Clash Display,
-                    sans-serif;
-                "
-              >
-                {{ formatUsd(pool.metrics.totalSuppliedUsd) }}
-              </div>
-            </div>
             <div class="flex-1 min-w-[140px] p-4 sm:p-6 border-r border-[#383838] max-sm:border-r-0 max-sm:border-b max-sm:border-[#383838]">
               <div class="text-[16px] text-[#5E5F5D]">Supply APY</div>
               <div
