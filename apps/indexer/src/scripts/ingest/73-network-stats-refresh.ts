@@ -240,6 +240,15 @@ async function main(): Promise<void> {
   await client.connect();
 
   try {
+    // "protocols with live aggregated metrics" — count the rows written by
+    // step 70 (70-protocol-persist-metrics), which runs before this step in
+    // 71-refresh-all-metrics. Dynamic so it stays correct as protocols are
+    // added, instead of a hardcoded literal.
+    const protocolCountRes = await client.query(
+      `select count(*)::int as n from protocol_metrics_latest`
+    );
+    const protocolCount = (protocolCountRes.rows[0]?.n as number) ?? 0;
+
     await client.query(
       `
       insert into network_stats_latest (
@@ -282,7 +291,7 @@ async function main(): Promise<void> {
         stellarExpertSummary.dexVolume24hUsd,
         usdcSupply,
         avgTxFeeXlm,
-        3,
+        protocolCount,
         JSON.stringify({ source: '73-network-stats-refresh' }),
       ]
     );
@@ -298,6 +307,7 @@ async function main(): Promise<void> {
       dexVolume24hUsd: stellarExpertSummary.dexVolume24hUsd,
       usdcSupplyUsd: usdcSupply,
       avgTxFeeXlm,
+      protocolCount,
     });
   } finally {
     await client.end();

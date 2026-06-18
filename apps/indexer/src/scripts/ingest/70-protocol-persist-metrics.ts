@@ -115,6 +115,7 @@ async function main() {
     await persistProtocol(client, 'blend');
     await persistProtocol(client, 'soroswap');
     await persistProtocol(client, 'aquarius');
+    await persistProtocol(client, 'stellar-native');
   } finally {
     await client.end();
   }
