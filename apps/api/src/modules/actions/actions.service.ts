@@ -1,6 +1,11 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import {
   rpc,
+  Horizon,
   Account,
   Asset,
   TransactionBuilder,
@@ -13,6 +18,7 @@ import { PoolContractV2, RequestType } from '@blend-capital/blend-sdk';
 import type { SubmitArgs, Request as BlendRequest } from '@blend-capital/blend-sdk';
 import {
   TESTNET_RPC_URL,
+  TESTNET_HORIZON_URL,
   TESTNET_NETWORK_PASSPHRASE,
   TESTNET_BLEND_POOL,
   TESTNET_USDC_CLASSIC,
@@ -61,6 +67,21 @@ export interface SdexSwapResult {
   };
 }
 
+export interface SdexQuoteParams {
+  fromAsset: 'XLM' | 'USDC';
+  toAsset: 'XLM' | 'USDC';
+  amount: string;
+}
+
+export interface SdexQuoteResult {
+  /** Echo of the input send amount (human-readable). */
+  sourceAmount: string;
+  /** Estimated amount received, from Horizon's best direct route. */
+  destAmount: string;
+  /** destAmount / sourceAmount — i.e. how many `toAsset` per 1 `fromAsset`. */
+  rate: number;
+}
+
 // Soroban protocol: InvokeHostFunction must be the only operation in its transaction.
 // When a USDC trustline is missing, changetrustXdr (sequence S+1) must be signed and
 // submitted before xdr (sequence S+2). Simulation footprint/auth are sequence-agnostic.
@@ -84,11 +105,58 @@ function swapAsset(name: 'XLM' | 'USDC'): Asset {
 @Injectable()
 export class ActionsService {
   private readonly rpcServer: rpc.Server;
+  private readonly horizonServer: Horizon.Server;
   private readonly poolContract: PoolContractV2;
 
   constructor() {
     this.rpcServer = new rpc.Server(TESTNET_RPC_URL, { allowHttp: false });
+    this.horizonServer = new Horizon.Server(TESTNET_HORIZON_URL);
     this.poolContract = new PoolContractV2(TESTNET_BLEND_POOL);
+  }
+
+  /**
+   * Live price quote for an SDEX swap, via Horizon /paths/strict-send.
+   *
+   * Uses the SAME assets as buildSdexSwap (swapAsset → TESTNET_USDC_SDEX), so the estimate
+   * reflects the route the swap will actually take. The swap sends with `path: []` (direct,
+   * single-hop only), so we quote only direct routes (records with an empty path). If none
+   * exist, there is no liquidity the swap could use → 422 rather than an optimistic multi-hop
+   * estimate that would later fail op_under_dest_min.
+   */
+  async quoteSdexSwap(params: SdexQuoteParams): Promise<SdexQuoteResult> {
+    const { fromAsset, toAsset, amount } = params;
+    const sendAsset = swapAsset(fromAsset);
+    const destAsset = swapAsset(toAsset);
+
+    let records: Horizon.ServerApi.PaymentPathRecord[];
+    try {
+      const resp = await this.horizonServer
+        .strictSendPaths(sendAsset, amount, [destAsset])
+        .call();
+      records = resp.records;
+    } catch {
+      throw new InternalServerErrorException(
+        'Failed to fetch swap quote from Horizon',
+      );
+    }
+
+    // Direct routes only — match the swap's `path: []`. A multi-hop best price would be
+    // unreachable by the actual transaction.
+    const direct = records.filter((r) => r.path.length === 0);
+    if (direct.length === 0) {
+      throw new UnprocessableEntityException(
+        `No direct liquidity for ${fromAsset}→${toAsset} at this amount on testnet`,
+      );
+    }
+
+    const best = direct.reduce((a, b) =>
+      parseFloat(b.destination_amount) > parseFloat(a.destination_amount) ? b : a,
+    );
+
+    const destAmount = best.destination_amount;
+    const rate = parseFloat(destAmount) / parseFloat(amount);
+
+    return { sourceAmount: amount, destAmount, rate };
   }
 
   async buildBlendDeposit(params: BlendDepositParams): Promise<BlendDepositResult> {

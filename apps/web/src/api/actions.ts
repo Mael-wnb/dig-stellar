@@ -27,3 +27,28 @@ export async function buildSdexSwap(
     body: JSON.stringify(payload),
   });
 }
+
+export type SdexQuoteRequest = {
+  fromAsset: "XLM" | "USDC";
+  toAsset: "XLM" | "USDC";
+  amount: string;
+  network?: "testnet" | "mainnet";
+};
+
+export type SdexQuoteResponse = {
+  /** Echo of the input send amount. */
+  sourceAmount: string;
+  /** Estimated amount received (Horizon best direct route). */
+  destAmount: string;
+  /** destAmount / sourceAmount — how many `toAsset` per 1 `fromAsset`. */
+  rate: number;
+};
+
+export async function quoteSdexSwap(
+  payload: SdexQuoteRequest
+): Promise<SdexQuoteResponse> {
+  return apiFetch<SdexQuoteResponse>("/actions/sdex/quote", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}

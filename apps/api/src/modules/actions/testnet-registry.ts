@@ -1,6 +1,9 @@
 import { Asset } from '@stellar/stellar-sdk';
 
 export const TESTNET_RPC_URL = 'https://soroban-testnet.stellar.org';
+// Horizon (classic) testnet — used to quote SDEX paths (/paths/strict-send).
+// The Soroban RPC above cannot price classic DEX routes; Horizon is the source for that.
+export const TESTNET_HORIZON_URL = 'https://horizon-testnet.stellar.org';
 export const TESTNET_NETWORK_PASSPHRASE = 'Test SDF Network ; September 2015';
 
 export const TESTNET_BLEND_POOL =

@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { buildSdexSwap } from "../api/actions";
+import { buildSdexSwap, quoteSdexSwap } from "../api/actions";
 import { useWalletSession } from "../composables/useWalletSession";
 import { useNetwork, toWalletNetwork } from "../composables/useNetwork";
 
 const TESTNET_RPC_URL = "https://soroban-testnet.stellar.org";
 const MAINNET_RPC_URL = "https://mainnet.sorobanrpc.com";
+
+// Beta-first slippage tolerance for testnet (5%): no configurable selector.
+// minReceive = estimate * (1 - SLIPPAGE) is derived from the live quote.
+const SLIPPAGE = 0.05;
+const QUOTE_DEBOUNCE_MS = 300;
 
 const { connectedAddress, signTransaction } = useWalletSession();
 const { network } = useNetwork();
@@ -21,8 +26,14 @@ const fromAsset = "XLM" as const;
 const toAsset = "USDC" as const;
 
 const amount = ref("");
-const minReceive = ref("");
-const minReceiveEdited = ref(false);
+
+// Live quote state. `estimate` is the expected received amount (toAsset),
+// `rate` is toAsset per 1 fromAsset. minReceive is no longer user-entered.
+type QuoteStatus = "idle" | "loading" | "ok" | "empty" | "error";
+const quoteStatus = ref<QuoteStatus>("idle");
+const estimate = ref<number | null>(null);
+const rate = ref<number | null>(null);
+const quoteError = ref("");
 
 type SwapStatus = "idle" | "loading" | "success" | "error";
 const status = ref<SwapStatus>("idle");
@@ -42,7 +53,7 @@ const canSwap = computed(
     isConnected.value &&
     status.value !== "loading" &&
     parseFloat(amount.value) > 0 &&
-    parseFloat(minReceive.value) > 0,
+    (estimate.value ?? 0) > 0,
 );
 
 /** Formats a number to a Stellar-safe amount (<= 7 decimals, trimmed). */
@@ -51,16 +62,73 @@ function formatAmount(value: number): string {
   return value.toFixed(7).replace(/\.?0+$/, "");
 }
 
-// Auto-fill minReceive = amount * 0.95 until the user edits it manually.
-watch(amount, (next) => {
-  if (minReceiveEdited.value) return;
-  const parsed = parseFloat(next);
-  minReceive.value = isNaN(parsed) ? "" : formatAmount(parsed * 0.95);
-});
+/** minReceive applied to the swap = live estimate minus slippage tolerance. */
+const minReceiveDisplay = computed(() =>
+  estimate.value != null ? formatAmount(estimate.value * (1 - SLIPPAGE)) : "",
+);
 
-function onMinReceiveInput() {
-  minReceiveEdited.value = true;
+/** Pulls a human message out of an apiFetch error (Nest returns JSON in the body). */
+function readApiError(err: unknown, fallback: string): string {
+  if (!(err instanceof Error)) return fallback;
+  try {
+    const parsed = JSON.parse(err.message) as { message?: string };
+    if (typeof parsed.message === "string") return parsed.message;
+  } catch {
+    // not JSON — fall through to the raw message
+  }
+  return err.message || fallback;
 }
+
+// Live quote on amount change (debounced). A 422 from the API (no direct
+// liquidity) is surfaced as a clean "empty" state, not a hard error.
+let quoteTimer: ReturnType<typeof setTimeout> | undefined;
+let quoteSeq = 0;
+
+function clearQuote() {
+  estimate.value = null;
+  rate.value = null;
+  quoteError.value = "";
+  quoteStatus.value = "idle";
+}
+
+watch(amount, (next) => {
+  if (quoteTimer) clearTimeout(quoteTimer);
+  const parsed = parseFloat(next);
+  if (isNaN(parsed) || parsed <= 0 || isMainnet.value) {
+    clearQuote();
+    return;
+  }
+  quoteStatus.value = "loading";
+  quoteError.value = "";
+  const seq = ++quoteSeq;
+  quoteTimer = setTimeout(async () => {
+    try {
+      const quote = await quoteSdexSwap({
+        fromAsset,
+        toAsset,
+        amount: next,
+        network: network.value,
+      });
+      if (seq !== quoteSeq) return; // a newer amount superseded this request
+      estimate.value = parseFloat(quote.destAmount);
+      rate.value = quote.rate;
+      quoteStatus.value = "ok";
+    } catch (err: unknown) {
+      if (seq !== quoteSeq) return;
+      estimate.value = null;
+      rate.value = null;
+      const message = readApiError(err, "Quote failed.");
+      // The API returns 422 with a "No direct liquidity" message for empty routes.
+      if (/liquidity/i.test(message)) {
+        quoteStatus.value = "empty";
+        quoteError.value = "No liquidity for this amount on testnet.";
+      } else {
+        quoteStatus.value = "error";
+        quoteError.value = message;
+      }
+    }
+  }, QUOTE_DEBOUNCE_MS);
+});
 
 async function submitToRpc(signedTxXdr: string): Promise<{
   status?: string;
@@ -93,6 +161,10 @@ async function onSwap() {
   if (isMainnet.value) return;
   if (!canSwap.value || !connectedAddress.value) return;
 
+  // Derive minReceive from the live estimate at submit time, applying slippage.
+  const minReceive = minReceiveDisplay.value;
+  if (!minReceive || parseFloat(minReceive) <= 0) return;
+
   status.value = "loading";
   txHash.value = "";
   errorMessage.value = "";
@@ -104,7 +176,7 @@ async function onSwap() {
       fromAsset,
       toAsset,
       amount: amount.value,
-      minReceive: minReceive.value,
+      minReceive,
       network: network.value,
     });
 
@@ -179,18 +251,38 @@ function reset() {
       />
     </label>
 
-    <!-- MIN RECEIVE -->
-    <label class="flex flex-col gap-1">
-      <span class="text-[11px] text-[#9a9b99]">Min. receive ({{ toAsset }})</span>
-      <input
-        v-model="minReceive"
-        type="text"
-        inputmode="decimal"
-        placeholder="0.0"
-        class="bg-[#202020] border border-[#383838] rounded-md px-3 py-2 text-sm text-[#e2e6e1] focus:border-[#d5ff2f] outline-none"
-        @input="onMinReceiveInput"
-      />
-    </label>
+    <!-- LIVE QUOTE (read-only): rate + min. receive after slippage -->
+    <div
+      v-if="!isMainnet"
+      class="bg-[#202020] border border-[#383838] rounded-md px-3 py-2 text-[11px] flex flex-col gap-1"
+    >
+      <template v-if="quoteStatus === 'loading'">
+        <span class="text-[#9a9b99]">Fetching live price…</span>
+      </template>
+      <template v-else-if="quoteStatus === 'ok' && estimate != null && rate != null">
+        <div class="flex items-center justify-between">
+          <span class="text-[#9a9b99]">Rate</span>
+          <span class="text-[#e2e6e1]">1 {{ fromAsset }} ≈ {{ formatAmount(rate) }} {{ toAsset }}</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-[#9a9b99]">Est. receive</span>
+          <span class="text-[#e2e6e1]">{{ formatAmount(estimate) }} {{ toAsset }}</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-[#9a9b99]">Min. receive ({{ (SLIPPAGE * 100).toFixed(0) }}% slippage)</span>
+          <span class="text-[#d5ff2f] font-semibold">{{ minReceiveDisplay }} {{ toAsset }}</span>
+        </div>
+      </template>
+      <template v-else-if="quoteStatus === 'empty'">
+        <span class="text-[#ff7b7b]">{{ quoteError }}</span>
+      </template>
+      <template v-else-if="quoteStatus === 'error'">
+        <span class="text-[#ff7b7b]">{{ quoteError }}</span>
+      </template>
+      <template v-else>
+        <span class="text-[#9a9b99]">Enter an amount to see the live price.</span>
+      </template>
+    </div>
 
     <!-- ACTION -->
     <button

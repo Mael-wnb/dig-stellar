@@ -24,6 +24,13 @@ interface SdexSwapBody {
   network?: string;
 }
 
+interface SdexQuoteBody {
+  fromAsset: 'XLM' | 'USDC';
+  toAsset: 'XLM' | 'USDC';
+  amount: string;
+  network?: string;
+}
+
 @Controller('v1/actions')
 export class ActionsController {
   constructor(private readonly actionsService: ActionsService) {}
@@ -50,6 +57,33 @@ export class ActionsController {
     }
 
     return this.actionsService.buildBlendDeposit({ address, asset, amount });
+  }
+
+  @Post('sdex/quote')
+  @HttpCode(HttpStatus.OK)
+  async sdexQuote(@Body() body: SdexQuoteBody) {
+    const { fromAsset, toAsset, amount, network } = body;
+
+    if (network && network !== 'testnet') {
+      throw new BadRequestException(
+        'Only testnet is supported at this time. Pass network="testnet" or omit it.',
+      );
+    }
+    if (!fromAsset || !['XLM', 'USDC'].includes(fromAsset)) {
+      throw new BadRequestException('fromAsset must be XLM or USDC');
+    }
+    if (!toAsset || !['XLM', 'USDC'].includes(toAsset)) {
+      throw new BadRequestException('toAsset must be XLM or USDC');
+    }
+    if (fromAsset === toAsset) {
+      throw new BadRequestException('fromAsset and toAsset must differ');
+    }
+    const parsedAmount = parseFloat(amount);
+    if (!amount || isNaN(parsedAmount) || parsedAmount <= 0) {
+      throw new BadRequestException('amount must be a positive numeric string');
+    }
+
+    return this.actionsService.quoteSdexSwap({ fromAsset, toAsset, amount });
   }
 
   @Post('sdex/swap')
