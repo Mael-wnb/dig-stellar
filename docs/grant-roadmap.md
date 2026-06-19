@@ -2,8 +2,8 @@
 
 ## Purpose
 
-This document maps the approved Stellar Community Fund grant (SCF 43, $75k, 3 tranches) to internal
-execution. Each deliverable is recorded in two clearly separated layers:
+This document maps the approved Stellar Community Fund grant (SCF #43, $75k) to internal execution.
+Each deliverable is recorded in two clearly separated layers:
 
 1. **Grant criteria (validated by SCF — verbatim, do not edit).** This is the contract: the exact
    description, completion criteria, date, budget, and KPIs that SCF approved. It is the source of
@@ -18,21 +18,36 @@ When the two layers seem to disagree, the criteria win for *obligation*; the int
 
 ---
 
+## Disbursement structure (SCF #43 — four tranches)
+
+SCF #43 pays in four tranches: **10% / 20% / 30% / 40%**.
+- **Tranche 1 (10%)** — upfront, received on approval. No deliverables to prove.
+- **Tranche 2 (20%)** — review of the **MVP** deliverables (the "T1" group below: D1 indexing,
+  D2 dashboard, D3 builder). **This is the current submission target.**
+- **Tranche 3 (30%)** — review of the testnet/expansion deliverables (the "T2" group).
+- **Tranche 4 (40%)** — mainnet launch (the "T3" group).
+
+The internal **T1 / T2 / T3** labels below are the *deliverable groups* the project was approved with
+(three deliverables each), not the disbursement tranches. The MVP group (T1) is what the 20%
+disbursement is reviewed against.
+
+---
+
 ## Deliverable index
 
-| Tranche | # | Deliverable | Date | Budget | Status* |
+| Group | # | Deliverable | Date | Budget | Status* |
 |---|---|---|---|---:|---|
-| T1 | 1 | Data Indexing Foundation (Horizon & Soroban) | May 25, 2026 | $12,300 | ~90% |
-| T1 | 2 | Analytics Dashboard MVP | Jun 8, 2026 | $6,140 | ~88% |
-| T1 | 3 | Smart Transaction Builder (Testnet) | Jun 22, 2026 | $11,070 | ~70% |
+| T1 | 1 | Data Indexing Foundation (Horizon & Soroban) | May 25, 2026 | $12,300 | Done — 100% |
+| T1 | 2 | Analytics Dashboard MVP | Jun 8, 2026 | $6,140 | Done — 100% |
+| T1 | 3 | Smart Transaction Builder (Testnet) | Jun 22, 2026 | $11,070 | Done — 100% |
 | T2 | 1 | Multi-Wallet Portfolio & "Active Signer" Model | Jul 6, 2026 | $7,380 | ~60% |
 | T2 | 2 | In-App Alerting Engine | Jul 20, 2026 | $8,610 | ~10% |
 | T2 | 3 | Bridge Flow Monitoring | Aug 3, 2026 | $6,140 | ~5% |
-| T3 | 1 | Mainnet Deployment & Freshness Tracking | Aug 10, 2026 | $8,610 | ~40% |
+| T3 | 1 | Mainnet Deployment & Freshness Tracking | Aug 10, 2026 | $8,610 | ~45% |
 | T3 | 2 | Non-Custodial Mainnet Actions | Aug 24, 2026 | $8,610 | ~5% |
 | T3 | 3 | Observability, UI/UX Polish & Reference Handoff | Aug 31, 2026 | $6,140 | ~20% |
 
-Tranche totals: T1 $29,510 · T2 $22,130 · T3 $23,360 · **Total $75,000**.
+Group totals: T1 $29,510 · T2 $22,130 · T3 $23,360 · **Total $75,000**.
 \*Status is a snapshot — `docs/status-board.md` is the live source; treat its values as authoritative.
 
 ---
@@ -70,31 +85,35 @@ How to measure completion:
 Estimated date: May 25, 2026 — Budget: $12,300
 
 ### Internal interpretation & status (living)
-Owner: `apps/indexer` + `apps/api`. Status: ~90%.
+Owner: `apps/indexer` + `apps/api`. Status: **Done — 100%.**
 
-**Met and exceeded.** Hybrid Horizon + Soroban ingestion is live and stores into a unified Postgres
-database. Coverage is broader than the two adapters the criteria require: Blend, Soroswap, and
-Aquarius (Soroban) plus the native Stellar DEX liquidity pools (Horizon).
+**Met and exceeded.** Hybrid Horizon + Soroban ingestion is live in prod and stores into a unified
+Postgres database. Coverage is broader than the two adapters the criteria require: Blend, Soroswap,
+and Aquarius (Soroban) plus the native Stellar DEX liquidity pools (Horizon) — four protocols.
 
-**Verified evidence** (DB inspection, June 5, 2026):
-- Coverage: Blend 3 pools, Aquarius 4, Soroswap 2 — all with non-null, non-zero TVL
-  (Blend ≈ $156.7M, Aquarius ≈ $21.0M, Soroswap ≈ $0.57M).
-- Freshness: synchronous `as_of` across the three Soroban protocols within the same `job:refresh`
-  cycle, refreshed minutes before inspection — concrete proof of an operating cadence.
+**Verified evidence** (prod API/DB inspection, June 18–19, 2026):
+- Coverage: Blend 3 pools (≈$192M), Aquarius 4 (≈$22.7M), stellar-native 9 (≈$6.2M), Soroswap 1
+  active pair (≈$130k) — all aggregated at the protocol level (`protocol_metrics_latest`),
+  `protocolCount` = 4, all with non-null, non-zero TVL.
+- Freshness / cadence: synchronous `as_of` across protocols within one `job:refresh` cycle, observed
+  advancing across consecutive cycles in prod. The indexer runs on a **15-minute cron** on the VPS —
+  inside the criterion's "5 to 15-minute refresh cadence" (a full refresh takes ~12 min on the
+  1-vCPU VPS, so 15 min is the safe conservative interval; `flock` guards against overlap).
 - Canonical pipeline: `job:refresh` → `72-run-refresh-job.ts` → `71-refresh-all-metrics.ts` →
   per-protocol refresh steps, writing the raw SQL v1 tables (`pool_metrics_latest`,
   `protocol_metrics_latest`, `reserve_snapshots`, `normalized_events`, `asset_prices`, …).
+- Resilience: inactive entities (archived Soroban contracts whose reads 404) are soft-disabled
+  (`is_active=false`) and skipped, so a dead pool no longer aborts the whole refresh.
 
-**Endpoint note (resolve at claim time, not a blocker).** The criteria name `/protocols` and
-`/venues/:key/snapshots`. In the current code those are the Prisma `AppController` routes (legacy
-path), while the fresh product pipeline is served under `/v1/*`. This is a deliberate result of
-keeping the original endpoint and adding the newer one under `/v1`. Resolution options for the
-tranche-verification doc: (a) state the actual endpoints serving the cadence, or (b) consolidate the
-routes. Either is fine; just make the claimed endpoint match what serves fresh data.
+**Endpoint note.** The criteria name `/protocols` and `/venues/:key/snapshots`. Those prefix-less
+routes exist (legacy Prisma `AppController`), but the live product pipeline that serves the cadence is
+under `/v1/*` (`/v1/protocols`, `/v1/pools`, `/v1/pools/:slug`). For the submission we cite the actual
+endpoints serving fresh data (`/v1/*`) and note the legacy routes are retained for continuity. The
+cadence requirement is met by the `/v1/*` routes reading `job:refresh` output.
 
-**Remaining gap before claim-readiness:** freshness exposure through the API, retry/backoff
-standardization, ingestion runbook, and the evidence package itself. **DeFindex is out of scope here**
-— it belongs to Tranche 3 Deliverable 1 (which lists DeFindex among the mainnet protocols).
+**Beyond the contract (not required here):** freshness exposure in the API and standardized
+retry/backoff belong to T3-D1; DeFindex belongs to T3-D1. None of these affect the T1-D1 criteria,
+which are fully met.
 
 ---
 
@@ -112,28 +131,29 @@ How to measure completion:
 Estimated date: June 8, 2026 — Budget: $6,140
 
 ### Internal interpretation & status (living)
-Owner: `apps/web` + `apps/api`. Status: ~88%.
+Owner: `apps/web` + `apps/api`. Status: **Done — 100%.**
 
-**Largely met.** A public beta exists; protocol and pool views are real and display TVL / volume / APY
-from the indexed data; Stellar Wallets Kit is integrated (`@creit.tech/stellar-wallets-kit`,
-`@stellar/freighter-api`).
+**Met.** A public beta is live and publicly accessible at `stellar.getdig.ai` (Vercel). Protocol and
+pool views are real and display TVL / volume / APY from the indexed data for all four protocols.
+Stellar Wallets Kit is integrated (`@creit.tech/stellar-wallets-kit`, `@stellar/freighter-api`) for
+wallet connection.
 
-**Testnet vs Mainnet note.** The criteria say "using Testnet data," but the dashboard already runs on
-real **Mainnet** data — over-delivery relative to the contract. Worth flagging in the verification doc
-so a reviewer reading the literal text is not surprised.
+**Testnet vs Mainnet note.** The criteria say "using Testnet data," but the dashboard runs on real
+**Mainnet** data — over-delivery relative to the contract. Worth flagging in the submission so a
+reviewer reading the literal text is not surprised: the indexed metrics are live Mainnet figures, not
+testnet placeholders.
 
-**Network-stats centralization (done this session).** `GET /v1/network/stats` previously called
-external APIs (CoinGecko, DefiLlama, stellar.expert, Horizon) live on every request, with no
-persistence or freshness — the "core data still fetched externally" item. It now reads from the DB
-table `network_stats_latest` (scope `'global'`), populated periodically by the indexer step
-`73-network-stats-refresh` (wired non-fatally into `job:refresh`). The API does a single SELECT, the
-external providers are hit on the job cadence (~10 min) instead of per request, and `updatedAt`
-reflects the row's real `as_of`. The frontend contract is unchanged.
+**Network-stats centralization.** `GET /v1/network/stats` is DB-backed: it reads `network_stats_latest`
+(scope `'global'`), populated by the indexer step `73-network-stats-refresh` (wired non-fatally into
+`job:refresh`). The API does a single SELECT; external providers are hit on the job cadence, not per
+request; `updatedAt` reflects the row's real `as_of`; `protocolCount` is a live count (= 4). Display
+polish landed: native token shown as "XLM", Blend lending panel trimmed to its real metrics, dead
+pools hidden.
 
-**Remaining gap:** a responsive pass and stale/loading/error consistency (the polish for a credible
-external beta). Minor: two `network_stats_latest` fields (`activeWallets`, `dexVolume24hUsd`) are
-currently `null` because the stellar.expert summary endpoint returns 404 — a pre-existing source
-issue (already null in the old live-fetch code), not a regression; needs a corrected endpoint.
+**Beyond the contract (not required here):** a responsive pass and full stale/loading/error
+consistency are external-beta polish, not criteria. Minor: two `network_stats_latest` fields
+(`activeWallets`, `dexVolume24hUsd`) come back `null` from a stale stellar.expert endpoint
+(pre-existing, already null in the old code) — does not affect the three completion criteria.
 
 ---
 
@@ -152,41 +172,40 @@ How to measure completion:
 Estimated date: June 22, 2026 — Budget: $11,070
 
 ### Internal interpretation & status (living)
-Owner: `apps/web` + `apps/api`. Status: ~70%. **The core path is now proven end-to-end.**
+Owner: `apps/web` + `apps/api`. Status: **Done — 100%.** All three criteria met with on-chain proof.
 
-**Met (functionally) on Testnet.** The builder layer exists and the full non-custodial flow works
-from the UI. An `actions/` module in `apps/api` exposes `POST /v1/actions/sdex/swap`: it builds a
-multi-operation XDR bundling `ChangeTrust` + `PathPaymentStrictSend` in one envelope, returned to
-the frontend, signed in-wallet via Stellar Wallets Kit (Freighter), and submitted to the Testnet
-RPC. The backend never touches keys.
+**Met on Testnet, with a fully successful transaction.** The `actions/` module in `apps/api` exposes
+`POST /v1/actions/sdex/swap` (plus `/v1/actions/sdex/quote` and `/v1/actions/blend/deposit`). The swap
+builds a multi-operation XDR bundling `ChangeTrust` + `PathPaymentStrictSend` in one envelope on
+Stellar's native SDEX, returned to the frontend, signed in-wallet via Stellar Wallets Kit (Freighter),
+and submitted to the Testnet RPC. The backend never touches keys.
 
-**Verified evidence** (Jun 8, 2026):
-- Multi-op XDR generated from the UI (`ChangeTrust` + `PathPaymentStrictSend`), source account
-  `GCLSPNUDT5GCKMVOJXNDQ2HALGZQPB2MFY7FTJZ4QGY5QYYYP6SLCF2O`.
-- Signed in Freighter through Stellar Wallets Kit; submitted on Testnet — tx
-  `78323ffd9559322264d1540031de82fcb3f3af0aeabd187879e9426040c78b6c` reached a ledger and the
-  `ChangeTrust` operation succeeded (verifiable on stellar.expert testnet).
-- Maps to the three criteria: (1) multi-op XDR from the UI ✅; (2) executed on Testnet ✅
-  (transaction built, signed, submitted, reached a ledger); (3) signatures exclusively in-wallet
-  via Wallets Kit ✅.
+**Verified evidence — fully successful swap (Jun 19, 2026):**
+- tx `fb10c5b8d86b87bc3408bf0d4e9698f93370a3e788244008ef31f6200a12b8b2` — **Successful** on Testnet
+  (ledger 3171933): swapped 10 XLM → 5.9118862 USDC, min-receive (5.616…) respected. Source account
+  `GCLSPNUDT5GCKMVOJXNDQ2HALGZQPB2MFY7FTJZ4QGY5QYYYP6SLCF2O`. Verifiable on stellar.expert/testnet.
+- Maps to the three criteria: (1) multi-op XDR from the UI ✅; (2) **successfully executed on Testnet**
+  ✅ (status Successful, both operations applied); (3) signatures exclusively in-wallet via Wallets
+  Kit ✅.
+
+**Live quote / auto-slippage.** The widget quotes the price live via `/v1/actions/sdex/quote` (Horizon
+strict-send paths, same issuer as the swap) and derives min-receive with a 5% slippage tolerance
+instead of a manual field. This replaced the original manual min-receive (which assumed a ~1:1 rate
+and caused `pathPaymentStrictSendUnderDestmin` / `TooFewOffers` failures) and is what makes swaps fill
+reliably. The swap also points to Circle's testnet USDC (deep XLM/USDC liquidity) via a swap-only asset
+constant, leaving Blend's USDC untouched.
 
 **Protocol-20 constraint (architectural, decided).** Stellar Protocol 20 forbids mixing
 `InvokeHostFunction` (Soroban) with classic operations in one envelope. The grant's literal
 `ChangeTrust + Deposit` single-XDR example is therefore achievable via the classic SDEX path, not
 Blend. Decision: SDEX swap (`ChangeTrust` + `PathPaymentStrictSend`, one XDR) is the primary
-single-XDR demonstration of the criterion; the Blend deposit is a secondary Soroban pattern using
-two sequential transactions. A `POST /v1/actions/blend/deposit` endpoint exists for that pattern but
-has not yet been exercised end-to-end from the UI.
+single-XDR demonstration of the criterion; the Blend deposit is a secondary Soroban pattern using two
+sequential transactions. A `POST /v1/actions/blend/deposit` endpoint exists for that pattern.
 
-**Remaining gap before claim-readiness:** the swap operation currently fails on
-`pathPaymentStrictSendTooFewOffers` — no SDEX liquidity exists for the pair on Testnet (an
-infrastructure gap, not a code defect: the builder, the in-wallet signature, and on-chain execution
-all work). For a cleaner demo, either provide liquidity on the Testnet SDEX for the pair or use a
-pair with existing Testnet liquidity — optional, not required by the criteria. Minor known bug:
-`getAssetBalance` re-bundles `ChangeTrust` even when the trustline already exists (harmless; fix via
-Horizon `/accounts/:id`). Out of scope for the claim: multi-action menus, mainnet execution (that is
-T3-D2), fee sponsorship. Last item: assemble the T1-D3 evidence package (tx hash + on-chain proof
-are already in hand).
+**Beyond the contract (not required here):** the Blend deposit has not been exercised end-to-end from
+the UI (a secondary Soroban pattern, and mainnet actions are T3-D2); minor known bug `getAssetBalance`
+re-bundles `ChangeTrust` even when the trustline already exists (harmless). Out of scope: multi-action
+menus, mainnet execution (T3-D2), fee sponsorship. None affect the T1-D3 criteria.
 
 ---
 
@@ -217,7 +236,7 @@ the indexer script spawned by `refreshWallet`.
 distinction is not yet formalized (model + UI), and position aggregation beyond wallet balances is
 still thin. Decide whether watch-only is a backend state or a frontend designation, then surface the
 signing context clearly. The first two criteria are close; the third (clear UI distinction) is the
-real work.
+real work. This is the start of the next deliverable group.
 
 ---
 
@@ -281,17 +300,18 @@ How to measure completion:
 Estimated date: August 10, 2026 — Budget: $8,610
 
 ### Internal interpretation & status (living)
-Owner: `apps/web` + `apps/api` + `apps/indexer`. Status: ~40%.
+Owner: `apps/web` + `apps/api` + `apps/indexer`. Status: ~45%.
 
 **Partly real already.** The product runs on real Mainnet data for Blend, Soroswap, Aquarius, and the
-native DEX. **DeFindex lives here**: this criterion is the one that explicitly requires DeFindex
+native DEX, deployed in production (Vercel + VPS + 15-min cron). Inactive sources are soft-disabled and
+excluded. **DeFindex lives here**: this criterion is the one that explicitly requires DeFindex
 coverage, so the scaffolded `run:defindex` / `@defindex/sdk` work must be completed and validated for
 this deliverable (not for T1-D1).
 
 **Remaining gap:** the freshness *system* the criterion describes — staleness surfaced in the UI,
 retries with exponential backoff — is not yet first-class (timestamps exist; stale detection and
-backoff are not standardized). Plus a formalized production topology and health visibility. This is the
-operationalization deliverable; freshness/stale/retry is the spine of it.
+backoff are not standardized). Plus a formalized production topology, health/metrics visibility, and
+DeFindex. This is the operationalization deliverable; freshness/stale/retry is the spine of it.
 
 ---
 
@@ -313,13 +333,15 @@ KPI:
 Estimated date: August 24, 2026 — Budget: $8,610
 
 ### Internal interpretation & status (living)
-Owner: `apps/web` + `apps/api`. Status: ~5%. Depends entirely on T1-D3.
+Owner: `apps/web` + `apps/api`. Status: ~5%. Builds on the proven T1-D3 path.
 
-This is the mainnet extension of the transaction builder. It cannot advance before T1-D3 proves the
-build → simulate → in-wallet-sign path on Testnet. Note the **hard KPIs** (50+ unique mainnet wallets,
-200+ mainnet transactions) — these are adoption metrics, not just functional checks, so the claim
-needs both a working action surface *and* real usage. Sequence: finish T1-D3, validate the action
-surface per protocol, harden security/UX, ship to mainnet with narrow scope first, then drive usage.
+This is the mainnet extension of the transaction builder. T1-D3 has proven the build → quote →
+in-wallet-sign → execute path on Testnet with a successful transaction, so the path is validated; the
+same builder code targets mainnet (only contract addresses and the network differ). Note the **hard
+KPIs** (50+ unique mainnet wallets, 200+ mainnet transactions) — adoption metrics, not just functional
+checks, so the claim needs both a working action surface *and* real usage. Sequence: validate the
+action surface per protocol, harden security/UX, ship to mainnet with narrow scope first, then drive
+usage. (The swap is currently gated Testnet-only by design until this deliverable.)
 
 ---
 
@@ -341,49 +363,46 @@ Owner: all apps. Status: ~20%.
 
 **Partial groundwork.** A `docker-compose.yml` exists (Postgres + Redis) — partial evidence toward the
 "functional Docker compose" criterion, though it is currently the local-dev stack, not a packaged
-reference implementation. Documentation effort has started and the architecture is modular.
+reference implementation. A `/health` endpoint exists (liveness only). Documentation is well underway
+(status-board, current-state, grant-roadmap, runbooks, repo-structure, data-model all maintained) and
+the architecture is modular.
 
-**Remaining gap:** real `/health` and metrics endpoints (RPC latency p50/p95/p99, error rates),
-packaging as an SDF reference implementation with docs, and the final report with adoption metrics
-(which depends on the T3-D2 KPIs). Note: testing/CI dependencies are installed but no suites/pipelines
-exist yet — if any testing evidence is wanted for handoff, it is built here, and must not be cited as
-already existing before then.
+**Remaining gap:** real metrics endpoints (RPC latency p50/p95/p99, error rates), packaging as an SDF
+reference implementation with docs, and the final report with adoption metrics (which depends on the
+T3-D2 KPIs). Note: testing/CI dependencies are installed but no suites/pipelines exist yet — if any
+testing evidence is wanted for handoff, it is built here, and must not be cited as already existing
+before then.
 
 ---
 
 # Cross-deliverable reality check
 
-## Strongest current candidates (closest to claim-readiness)
-1. T1-D1 — Data Indexing Foundation (~90%)
-2. T1-D2 — Analytics Dashboard MVP (~88%, network stats now DB-backed)
-3. T1-D3 — Smart Transaction Builder (~70%, core path proven on Testnet)
-4. T2-D1 — Multi-Wallet Portfolio (~60%)
+## MVP deliverables — claim-ready for the Tranche 2 (20%) submission
+1. T1-D1 — Data Indexing Foundation — **Done.** 4 protocols live in prod, 15-min cadence, `/v1/*`.
+2. T1-D2 — Analytics Dashboard MVP — **Done.** Public beta on real Mainnet data, Wallets Kit, DB-backed stats.
+3. T1-D3 — Smart Transaction Builder — **Done.** Fully successful Testnet swap (tx `fb10c5b8…`), non-custodial.
 
-## Most underdeveloped areas
+## Most underdeveloped areas (next groups)
 1. T2-D2 — Alerting Engine (~10%)
 2. T2-D3 — Bridge Monitoring (~5%)
-3. T3 operational/action layers (T3-D2 now unblocked by the proven T1-D3 path)
+3. T3-D2 — Mainnet Actions (~5%, path validated by T1-D3)
 
 ## Timeline reality (be honest, not optimistic)
-As of June 8, 2026: the T1-D1 estimated date (May 25) has passed with the deliverable not yet
-claimed, and T1-D2 (June 8) is due now. T1-D3 — previously the least mature T1 item — has had its
-core path proven end-to-end on Testnet (build → sign in-wallet → execute), moving it from ~15% to
-~70% well ahead of its June 22 target; what remains there is mostly demo polish (a fully-succeeding
-swap) and evidence packaging, not net-new builder work. Treat the SCF dates as the contractual
-targets, but plan internally against actual maturity: the three T1 deliverables are now all in
-claim-range, so the bottleneck is evidence/packaging discipline (T1-D1 + T1-D2 + T1-D3 packages),
-not missing implementation.
+As of June 19, 2026: all three MVP (T1) deliverables now meet their SCF criteria with concrete,
+verifiable evidence — the indexing foundation and dashboard run in prod, and the transaction builder
+has a fully successful on-chain Testnet swap. The SCF dates (May 25 / Jun 8 / Jun 22) are the
+contractual targets; the deliverables are complete ahead of or around those dates. The bottleneck is
+no longer implementation but **packaging the submission** (deliverable text + links + the ~5-minute
+demo video) for the Tranche 2 (20%) disbursement.
 
 ---
 
 # Immediate execution priorities
-1. Turn T1-D1 into a clearly evidenced, well-documented deliverable (evidence package; resolve the
-   endpoint note).
-2. Close T1-D2 final polish: responsive pass, stale/loading/error consistency. (Network-stats
-   centralization is done — `/v1/network/stats` is DB-backed via the indexer.)
-3. Package T1-D3 evidence (tx hash + on-chain proof already captured); optionally make one swap fully
-   succeed for a cleaner demo, and exercise the Blend deposit pattern end-to-end from the UI.
-4. Keep `current-state.md` and `status-board.md` aligned with reality.
+1. Assemble the SCF Tranche 2 submission: the "Tranche Deliverables" text (D1/D2/D3 with proof), the
+   links (repo, `stellar.getdig.ai`, `/v1/*` endpoints, tx `fb10c5b8…` on stellar.expert/testnet),
+   and the ~5-minute demo video.
+2. Keep `current-state.md` and `status-board.md` aligned with reality.
+3. (Next group) start T2-D1: formalize active-signer vs watch-only.
 
 ---
 
