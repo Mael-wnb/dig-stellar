@@ -16,6 +16,7 @@ import {
   TESTNET_NETWORK_PASSPHRASE,
   TESTNET_BLEND_POOL,
   TESTNET_USDC_CLASSIC,
+  TESTNET_USDC_SDEX,
   ASSET_DECIMALS,
   ASSET_SAC,
 } from './testnet-registry';
@@ -71,9 +72,13 @@ function toI128(amount: string, decimals: number): bigint {
   return BigInt(intStr) * BigInt(10 ** decimals) + BigInt(frac);
 }
 
-/** Maps an asset name to its classic Stellar Asset (XLM = native, USDC = the testnet classic asset). */
-function classicAsset(name: 'XLM' | 'USDC'): Asset {
-  return name === 'XLM' ? Asset.native() : TESTNET_USDC_CLASSIC;
+/**
+ * Maps an asset name to the classic Stellar Asset used by the SDEX swap action.
+ * XLM = native, USDC = Circle's testnet USDC (TESTNET_USDC_SDEX) — chosen because it has
+ * real direct XLM liquidity on testnet. Swap-only: Blend uses TESTNET_USDC_CLASSIC directly.
+ */
+function swapAsset(name: 'XLM' | 'USDC'): Asset {
+  return name === 'XLM' ? Asset.native() : TESTNET_USDC_SDEX;
 }
 
 @Injectable()
@@ -227,8 +232,8 @@ export class ActionsService {
   async buildSdexSwap(params: SdexSwapParams): Promise<SdexSwapResult> {
     const { address, fromAsset, toAsset, amount, minReceive } = params;
 
-    const sendAsset = classicAsset(fromAsset);
-    const destAsset = classicAsset(toAsset);
+    const sendAsset = swapAsset(fromAsset);
+    const destAsset = swapAsset(toAsset);
 
     // Load account for sequence number. The private key never reaches this layer.
     let account: Account;

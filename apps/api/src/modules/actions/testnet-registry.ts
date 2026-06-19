@@ -20,6 +20,17 @@ export const TESTNET_USDC_CLASSIC = new Asset(
   'GATALTGTWIOT6BUDBCZM3Q4OQ4BO2COLOAZ7IYSKPLC2PMSOPPGF5V56',
 );
 
+// USDC used by the SDEX swap action ONLY (not Blend). Circle's canonical testnet USDC.
+// Rationale: the GATALTGT issuer above has no direct XLM venue on testnet (no order book,
+// no {XLM, USDC-GATALTGT} liquidity pool), so a PathPaymentStrictSend with an empty path
+// fails with pathPaymentStrictSendTooFewOffers. Circle's USDC has a deep XLM/USDC AMM pool
+// + order book, making the direct (single-hop) swap reliably fillable. Keep this separate
+// from TESTNET_USDC_CLASSIC so the Blend deposit keeps using its own SAC-backed USDC.
+export const TESTNET_USDC_SDEX = new Asset(
+  'USDC',
+  'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
+);
+
 export const ASSET_DECIMALS: Record<'USDC' | 'XLM', number> = {
   USDC: 7,
   XLM: 7,
