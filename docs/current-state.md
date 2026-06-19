@@ -13,21 +13,21 @@ clarity over optimism — this file improves decision quality, not morale.
 
 ## Overall project state
 
-Dig Stellar is past prototype stage. It already has a live beta frontend, a dedicated backend API, an
-indexer layer, real protocol data ingestion across Horizon and Soroban, real wallet connection, real
-grouped multi-wallet behavior, and DB-backed wallet balance refresh flows.
+Dig Stellar is past prototype stage. It has a live beta frontend on real Mainnet data, a dedicated
+backend API serving as the product façade, an indexer ingesting four protocols across Horizon and
+Soroban on a 15-minute cron, real wallet connection, grouped multi-wallet behavior, DB-backed wallet
+balance refresh, and a non-custodial transaction builder with a **fully successful** SDEX swap proven
+on Testnet.
 
-The project is in a **transition phase**: from "functional beta with real foundations" toward
-"operational, grant-aligned product that is clearly evidenced and tranche-claimable." The challenge is
-no longer to invent the product but to stabilize data flows, tighten the API boundary, surface
-freshness, and align work with the grant contract.
+The three MVP deliverables (internally "T1") now meet their SCF criteria and are claim-ready for the
+**Tranche 2 (20%) disbursement**. The current phase is no longer "invent the product" but "package the
+proven work into the SCF submission" — evidence, demo video, and keeping docs aligned with reality.
 
 ---
 
 ## Data architecture reality (read this first)
 
-Three table families coexist in the same Postgres DB. This is the single most important thing to know,
-and it corrects the older docs:
+Three table families coexist in the same Postgres DB. This is the single most important thing to know:
 
 - **raw SQL v1 — the product pipeline.** `entities`, `venues`, `assets`, `entity_assets`,
   `pool_snapshots`, `reserve_snapshots`, `normalized_events`, `pool_metrics_latest`,
@@ -53,48 +53,51 @@ both live entry points and superseded legacy scripts. (See `docs/repo-structure.
 **Substantially advanced, not fully stabilized.** Vue 3 + Vite + Tailwind.
 
 Working: real dashboard structure, protocol browsing, pool detail views, wallet connection UX,
-multi-wallet portfolio UX, backend-driven data in the important flows, a public beta that can be shown.
+multi-wallet portfolio UX, backend-driven data in the important flows, a public beta on real Mainnet
+data. Display polish landed this session: native token rendered as "XLM" (display-only helpers, DB
+keys untouched), Blend lending panel trimmed to its real metrics (Liquidity, Total Supplied, Supply
+APY, Borrow APY — Volume/Daily Reward removed as structurally empty for lending), dead pools hidden.
+The SDEX swap widget now quotes the price live (via `/v1/actions/sdex/quote`) and derives min-receive
+with auto-slippage instead of a manual field.
 
 Partial / weak: loading/error/stale states are not yet consistent; responsive behavior needs a real
 pass; some zones still mix real features and "coming soon" placeholders.
 
-Network selection: the wallet network is no longer hard-wired to `VITE_STELLAR_NETWORK`. The
-Mainnet/Testnet toggle (`useNetwork`) is now the single source of truth — the Wallets Kit follows it
-via `kit.setNetwork`, signing uses the current network, and `VITE_STELLAR_NETWORK` is only the initial
-default. The T1-D3 swap widget is gated Testnet-only (disabled + notice on Mainnet) since the Mainnet
-action path is not validated yet (that is T3-D2).
+Network selection: the wallet network follows the Mainnet/Testnet toggle (`useNetwork`) as the single
+source of truth — the Wallets Kit follows it via `kit.setNetwork`, signing uses the current network,
+and `VITE_STELLAR_NETWORK` is only the initial default. The swap widget is gated Testnet-only
+(disabled + notice on Mainnet) since the Mainnet action path is T3-D2, not yet validated.
 
-Direction: become a pure UI + composables/state + internal-API-consumer layer. Stop hosting data
-aggregation or calling external analytics providers for core data. (Core network stats are now served
-by the API from the DB — see §2.)
+Direction: a pure UI + composables/state + internal-API-consumer layer. Core network stats are already
+served by the API from the DB (see §2).
 
 Priorities: (1) responsive pass; (2) standardize loading/error/stale; (3) clarify real vs deferred
-sections.
+sections. (These are polish, not T1 criteria.)
 
 ---
 
 ## 2. Backend API — `apps/api`
 
-**Meaningful and structurally central, but not yet the single façade for every surface.** NestJS 11.
+**The product façade. Structurally central and now authoritative for the core surfaces.** NestJS 11.
 
 Working: wallet routes (connect, overview, balances, refresh, primary/active/delete), wallet grouping
-by persistent `userId`, protocol/pool routes serving real indexed data via `/v1/*` (raw SQL),
-Prisma client used as the DB connection for raw queries. **`GET /v1/network/stats` is now DB-backed**
-(reads `network_stats_latest`, scope `'global'`, populated by the indexer step
-`73-network-stats-refresh` via `job:refresh`) — no more live external fetch per request; `updatedAt`
-reflects the row's real `as_of`.
+by persistent `userId`, protocol/pool routes serving real indexed data via `/v1/*` (raw SQL). **`GET
+/v1/network/stats` is DB-backed** (reads `network_stats_latest`, scope `'global'`, populated by the
+indexer step `73-network-stats-refresh` via `job:refresh`) — no live external fetch per request;
+`protocolCount` is now a live count (= 4). The `actions/` module exposes the transaction builder
+(`/v1/actions/sdex/swap`, `/v1/actions/sdex/quote`, `/v1/actions/blend/deposit`). Inactive entities
+are excluded from `/v1/pools` (and 404 on `/v1/pools/:slug`) so dead pools never surface.
 
-Partial / weak: health/operational endpoints incomplete; freshness not yet exposed systematically in
-responses across the other routes. On `/v1/network/stats`: two fields (`activeWallets`,
-`dexVolume24hUsd`) currently come back `null` because the stellar.expert summary endpoint returns 404
-— a pre-existing source issue (it was already null in the old live-fetch code), not a regression; a
-correct endpoint needs to be found (minor debt).
+Partial / weak: health/operational endpoints incomplete; freshness not yet exposed systematically
+across routes. On `/v1/network/stats`: two fields (`activeWallets`, `dexVolume24hUsd`) come back `null`
+because the stellar.expert summary endpoint returns 404 — a pre-existing source issue (already null in
+the old live-fetch code), not a regression; minor debt.
 
-Direction: be the single authoritative UI-facing layer for dashboard stats, protocol analytics, wallet
-data, freshness metadata, and (later) alerts and action preparation.
+Direction: stay the single authoritative UI-facing layer for dashboard stats, protocol analytics,
+wallet data, freshness metadata, and (later) alerts and action preparation.
 
-Priorities: (1) stabilize the contracts the frontend depends on; (2) add health + freshness visibility;
-(3) fix the stellar.expert endpoint for the two missing network-stats fields.
+Priorities: (1) add health + freshness visibility (T3-D1); (2) fix the stellar.expert endpoint for the
+two missing fields; (3) return a clean 400 instead of 500 when an action body is missing (minor).
 
 ---
 
@@ -104,22 +107,26 @@ Priorities: (1) stabilize the contracts the frontend depends on; (2) add health 
 
 Working: Horizon + Soroban ingestion; protocol adapters in `lib/protocols/`; canonical refresh chain
 `job:refresh` → 72 → 71 → per-protocol steps; persistence of asset prices, pool/reserve snapshots,
-pool + protocol metrics; wallet balance snapshot generation; cron-compatible jobs; real writes to
-Postgres consumed by the API.
+pool + protocol metrics (now including stellar-native in the protocol-level aggregation); wallet
+balance snapshot generation; runs on a 15-minute cron on the VPS. Inactive entities (archived Soroban
+contracts whose on-chain reads 404) are soft-disabled (`is_active=false`) and skipped by the refresh
+instead of aborting the whole job. URL construction for Validation Cloud preserves the `/v1/<key>`
+base path (the `joinUrl` helper) — this fixed a cascading refresh failure earlier this session.
 
-Operational protocol coverage (verified in DB, Jun 5, 2026):
+Operational protocol coverage (verified in prod DB / API, Jun 18–19, 2026):
 - Soroban — Blend, Soroswap, Aquarius
 - Horizon — Stellar native DEX liquidity pools
 
 Partial / weak: retry/backoff not standardized; health visibility limited; observability lightweight;
-some adapters under-documented; DeFindex scaffolded (`run:defindex`, `@defindex/sdk`) but **not
-validated** — and it belongs to **T3-D1**, not T1-D1.
+DeFindex scaffolded (`run:defindex`, `@defindex/sdk`) but **not validated** — it belongs to **T3-D1**,
+not the MVP. A full refresh takes ~12 min on the 1-vCPU VPS (network-bound on trade pagination), which
+is why the cron is set conservatively to 15 min.
 
 Direction: move from "collection of ingestion scripts" to a documented ingestion platform with
 predictable refresh behavior and surfaced freshness.
 
-Priorities: (1) document protocol ownership + source mapping; (2) formalize refresh cadence
-expectations; (3) surface freshness; (4) standardize retry/backoff; (5) expand coverage per roadmap.
+Priorities: (1) surface freshness in the API; (2) standardize retry/backoff; (3) validate DeFindex;
+(4) expand coverage per roadmap. (All T3-D1.)
 
 ---
 
@@ -130,38 +137,37 @@ expectations; (3) surface freshness; (4) standardize retry/backoff; (5) expand c
 Working: wallet session UI; address retrieval via wallet connect; backend resolution of a persistent
 grouped `userId`; grouped multi-wallet portfolio; adding secondary wallets; per-wallet balances;
 refresh flow from API to DB-backed snapshots (raw SQL v2); select/refresh/delete/activate/primary
-operations. The user model is no longer hardcoded in the frontend — there is a real "returning user
-with multiple wallets" foundation.
+operations. There is a real "returning user with multiple wallets" foundation.
 
 Weak / not final: auth/session is not a final cryptographic production model; strong
 proof-of-ownership is not the final version; **"active signer" vs "watch-only" is not yet explicit**
 (this is the exact T2-D1 gap); DeFi position aggregation beyond balances is still limited.
 
-Stance: acceptable for beta. Formalize active-signer vs watch-only next; do not over-engineer auth
-before T1 data/dashboard work is closed.
+Stance: acceptable for beta. Formalizing active-signer vs watch-only is the start of the next
+deliverable group (T2-D1).
 
 ---
 
 ## 5. Protocol coverage / analytics reality
 
-**Real, operational, and demonstrable.** Verified by direct DB inspection on June 5, 2026.
+**Real, operational, and demonstrable.** Verified by direct prod API/DB inspection on June 18–19, 2026.
 
 | Protocol | Source | Pools | TVL (verified) | State |
 |---|---|---:|---|---|
-| Blend | Soroban RPC | 3 | ≈ $156.7M | operational |
-| Aquarius | Soroban RPC | 4 | ≈ $21.0M | operational |
-| Soroswap | Soroban RPC | 2 | ≈ $0.57M | operational |
-| Stellar native DEX | Horizon | — | — | operational (liquidity pools indexed) |
+| Blend | Soroban RPC | 3 | ≈ $192M | operational |
+| Aquarius | Soroban RPC | 4 | ≈ $22.7M | operational |
+| Stellar native DEX | Horizon | 9 | ≈ $6.2M | operational (now aggregated at protocol level) |
+| Soroswap | Soroban RPC | 1 active | ≈ $130k | operational (dead native/EURC pair disabled) |
 | Wallet balances | Horizon + Stellar RPC | — | — | operational |
 
-All metric rows had non-null, non-zero TVL and a synchronous `as_of` within one `job:refresh` cycle.
-(Note: an earlier static-code reading suggested Soroswap/Aquarius TVL might be 0 because
-`reserve_snapshots` is Blend-written; the runtime data disproves that — their TVL is populated. The
-exact computation path for Soroswap/Aquarius TVL is worth documenting but is not a defect.)
+All four protocols aggregate at the protocol level (`protocol_metrics_latest`), with a synchronous
+`as_of` within one `job:refresh` cycle, observed advancing across consecutive cycles in prod.
+`protocolCount` = 4. The Soroswap native/EURC pair was archived on-chain (all reads 404); it is
+soft-disabled and excluded from the API and from TVL aggregation, which corrected the inflated
+Soroswap TVL (was ≈$587k including the dead pair, now ≈$130k of live liquidity).
 
-Remaining gaps: DeFindex (T3), protocol source documentation, freshness visibility, operational docs,
-stronger retry/backoff. The implementation largely exists; the remaining work is documentation,
-operationalization, and freshness exposure.
+Remaining gaps: DeFindex (T3), freshness visibility, stronger retry/backoff. The implementation exists;
+remaining work is operationalization and freshness exposure — all later tranches.
 
 ---
 
@@ -169,14 +175,15 @@ operationalization, and freshness exposure.
 
 **Partially operationalized.**
 
-Exists: refresh jobs; persisted timestamps across snapshots/metrics (`snapshot_at`, `as_of`,
-`occurred_at`, `observed_at`); scheduled refresh; a recent synchronous refresh cycle is verifiable.
+Exists: refresh jobs on a 15-min cron; persisted timestamps across snapshots/metrics (`snapshot_at`,
+`as_of`, `occurred_at`, `observed_at`); synchronous refresh cycles verifiable in prod; inactive sources
+soft-disabled and excluded.
 
 Incomplete: freshness metadata is not consistently exposed through the API; stale detection is not
 first-class; retries/backoff are protocol-specific, not standardized; health visibility is limited.
 
-Why it matters: T1-D1 data credibility, the T3-D1 freshness-tracking promise, user trust, and
-debugging. Priorities: (1) expose freshness in API responses; (2) define expected intervals per
+Why it matters: data credibility, the T3-D1 freshness-tracking promise, user trust, debugging.
+Priorities (all T3-D1): (1) expose freshness in API responses; (2) define expected intervals per
 dataset; (3) auto-detect stale sources; (4) standardize retry/backoff; (5) minimal ingestion health
 visibility.
 
@@ -194,88 +201,97 @@ the smallest version of that, not the sub-minute event stream from the architect
 
 ## 8. On-chain actions / transaction builder
 
-**Functionally proven on Testnet, narrow in scope.** The builder layer now exists and the full
-non-custodial path works end-to-end from the UI.
+**Fully proven on Testnet, narrow in scope by design.** The non-custodial path works end-to-end from
+the UI with a successful on-chain transaction.
 
-Working (verified Jun 8, 2026): an `actions/` module in `apps/api` exposes
-`POST /v1/actions/sdex/swap` (and a `POST /v1/actions/blend/deposit` endpoint). The SDEX swap builds
-a multi-operation XDR — `ChangeTrust` (classic) + `PathPaymentStrictSend` (classic) bundled in one
-envelope — which is the literal `ChangeTrust + Deposit`-style multi-op the T1-D3 criterion asks for.
-The frontend has a Mainnet/Testnet toggle and a `SdexSwapWidget` wired into the production frontend;
-the widget calls the API, signs the returned XDR in-wallet via Stellar Wallets Kit (Freighter),
-submits to the Testnet RPC, and surfaces the tx hash. Proven on-chain: tx `78323ffd…` reached a
-Testnet ledger and the `ChangeTrust` operation succeeded. Backend never sees private keys.
+Working (verified Jun 19, 2026): the `actions/` module in `apps/api` exposes `POST /v1/actions/sdex/swap`,
+`POST /v1/actions/sdex/quote`, and `POST /v1/actions/blend/deposit`. The SDEX swap builds a
+multi-operation XDR — `ChangeTrust` (classic) + `PathPaymentStrictSend` (classic) bundled in one
+envelope — the literal `ChangeTrust + Deposit`-style multi-op the T1-D3 criterion asks for, executed on
+Stellar's **native SDEX** (the exchange layer built into the protocol, no third-party contract). The
+widget quotes the price live (Horizon strict-send), derives min-receive with 5% auto-slippage, signs
+the XDR in-wallet via Stellar Wallets Kit (Freighter), and submits to the Testnet RPC. Backend never
+sees private keys.
 
-Architectural fact (important): Stellar Protocol 20 forbids mixing `InvokeHostFunction` (Soroban)
-with classic operations in one envelope. So the grant's literal `ChangeTrust + Deposit` single-XDR
-example is only achievable via classic SDEX, not Blend. Hence the SDEX swap is the primary
-single-XDR demonstration; the Blend deposit is a secondary Soroban pattern (two sequential txs).
+**Proven on-chain — fully successful swap (Jun 19, 2026):**
+tx `fb10c5b8d86b87bc3408bf0d4e9698f93370a3e788244008ef31f6200a12b8b2` — **Successful** on Testnet
+(ledger 3171933): swapped 10 XLM → 5.9118862 USDC, min-receive (5.616…) respected. Source account
+`GCLSPNUDT5GCKMVOJXNDQ2HALGZQPB2MFY7FTJZ4QGY5QYYYP6SLCF2O`. Verifiable on stellar.expert/testnet.
+This satisfies all three T1-D3 criteria: (1) multi-op XDR from the UI; (2) successfully executed on
+Testnet; (3) signatures exclusively in-wallet via Wallets Kit.
 
-Partial / weak: the swap operation currently fails on `pathPaymentStrictSendTooFewOffers` — there is
-no SDEX liquidity for the pair on Testnet (an infrastructure gap, not a code bug; the builder, the
-signature, and the on-chain execution all work). The Blend deposit endpoint exists but has not been
-exercised end-to-end from the UI yet. Minor known bug: `getAssetBalance` re-bundles `ChangeTrust`
-even when the trustline already exists (fix later via Horizon `/accounts/:id`).
+What made it reliable: the swap originally failed `pathPaymentStrictSendTooFewOffers` because the
+configured USDC issuer (GATALTGT, the Blend SAC wrap) has no direct XLM liquidity on Testnet, and the
+manual min-receive assumed a ~1:1 rate. Fix: the swap now points to Circle's testnet USDC (GBBD47…,
+deep XLM/USDC pool) via a swap-only asset constant (Blend's USDC untouched), and min-receive is derived
+from a live quote with slippage instead of a manual guess.
 
-This was the real T1-D3 gap; the core (build → sign in-wallet → execute on Testnet) is now closed.
-T1-D3 moved from ~15% to ~70%. It still gates T3-D2, but the same builder code targets mainnet —
-only contract addresses and the network differ.
+Architectural fact (important): Stellar Protocol 20 forbids mixing `InvokeHostFunction` (Soroban) with
+classic operations in one envelope. So the grant's literal `ChangeTrust + Deposit` single-XDR is only
+achievable via classic SDEX, not Blend. Hence the SDEX swap is the primary single-XDR demonstration of
+the criterion; the Blend deposit is a secondary Soroban pattern (two sequential txs).
 
-Network decoupling (done): the wallet network now follows the Mainnet/Testnet toggle (`useNetwork`)
-rather than the figés `VITE_STELLAR_NETWORK` env var — the kit re-syncs via `kit.setNetwork` and the
-swap signs on the current network. The swap is gated Testnet-only (button disabled + notice on
-Mainnet, hard guard in `onSwap`) so no real Mainnet swap can fire before T3-D2.
+Partial / weak (beyond the T1-D3 criteria): the Blend deposit endpoint exists but has not been
+exercised end-to-end from the UI; minor known bug — `getAssetBalance` re-bundles `ChangeTrust` even
+when the trustline already exists (harmless; fix via Horizon `/accounts/:id`). These are polish / T3-D2
+items, not gaps against the T1-D3 contract.
+
+The builder gates Mainnet-only swaps off (button disabled + notice + hard guard in `onSwap`), so no
+real Mainnet swap can fire before T3-D2. The same builder code targets mainnet — only contract
+addresses and the network differ.
 
 ---
 
 ## 9. Deployment / operations
 
-**Partially real, not yet operationalized.** A public beta exists; local development works
-(`docker compose` → Postgres 16 + Redis 7); app layers are deployable in principle.
+**Real and operational, not yet fully matured.** Public beta live: `apps/web` on Vercel
+(`stellar.getdig.ai`), `apps/api` on a DigitalOcean VPS behind nginx + PM2
+(`stellar-api.getdig.ai`, `/health` ok), `apps/indexer` on a 15-min cron with `flock` guarding against
+overlap. Local dev works (`docker compose` → Postgres 16 + Redis 7).
 
-Incomplete: a standardized target deployment shape; formalized indexer scheduling/cron; mature
-observability; runbooks (being structured now). Likely near-term target: `apps/web` on Vercel,
-`apps/api` on a small VPS, `apps/indexer` + cron in the same controlled environment. Deployment
-discipline now matters — the project is close enough to beta maturity that this can no longer be
-postponed indefinitely.
+Incomplete: deployment is still manual (git pull + build + PM2 restart on the VPS; Vercel auto-deploys
+the front); no CI/CD; mature observability (RPC latency/error metrics) not in place; no exposed
+deployed-commit SHA to prove VPS/Vercel version alignment. Runbooks are maintained.
+
+Near-term: this shape is fine for the beta and the Tranche 2 claim. CI/CD and observability are T3.
 
 ---
 
 ## 10. Strongest right now
-1. Product direction + architectural separation (web / api / indexer)
-2. Live beta
-3. Verified indexing foundation (coverage + freshness)
-4. Backend/API presence and the `/v1` raw-SQL product pipeline
-5. Non-custodial transaction builder: SDEX swap proven end-to-end on Testnet (build → sign → submit)
-6. Grouped multi-wallet portfolio foundation (raw SQL v2)
-7. Real wallet balance snapshot/refresh flows
+1. Horizon + Soroban indexing foundation (4 protocols, verified coverage + freshness, 15-min cron)
+2. Live beta on real Mainnet data
+3. Backend/API as the single product façade (`/v1` raw-SQL pipeline, DB-backed network stats)
+4. Non-custodial transaction builder: SDEX swap **fully successful** on Testnet, with live quote + auto-slippage
+5. Grouped multi-wallet portfolio foundation (raw SQL v2)
+6. Real wallet balance snapshot/refresh flows
+7. Architectural separation (web / api / indexer)
 
 ## 11. Most fragile right now
-1. Alerting engine
-2. Bridge monitoring
-3. Freshness/stale/retry operationalization + observability
-4. Deployment maturity
-5. Transaction builder breadth: only one pair/action proven; Blend deposit not yet exercised from UI
+1. Alerting engine (T2)
+2. Bridge monitoring (T2)
+3. Freshness/stale/retry operationalization + observability (T3)
+4. Deployment maturity / CI-CD (T3)
+5. Transaction builder breadth: SDEX swap proven; Blend deposit not yet exercised from UI
 
 ## 12. Closest tranche-relevant wins
-1. Make T1-D1 explicit and evidenced (evidence package; resolve endpoint note)
-2. T1-D2 close to done: network stats now DB-backed; remaining is responsive pass + stale/loading/error
-3. Package T1-D3 evidence (tx hash + on-chain proof already in hand); optionally a fully-succeeding swap
-4. Formalize the multi-wallet system as groundwork for T2-D1
+1. SCF Tranche 2 (20%) submission — all three MVP deliverables meet their criteria
+2. Demo video covering D1 (live `/v1` data), D2 (live dashboard), D3 (live successful swap)
+3. Formalize active-signer vs watch-only as groundwork for T2-D1
 
 ---
 
 ## 13. Current execution priorities
-1. Document current protocol/data coverage explicitly (feeds the T1-D1 evidence package)
-2. Operationalize refresh/freshness behavior (exposure, stale detection, retry/backoff)
-3. Clean responsive/UI consistency enough for serious beta usage (T1-D2 polish)
-4. Keep `grant-roadmap.md` and `status-board.md` aligned with reality
+1. Assemble the SCF Tranche 2 submission (deliverable text + links + demo video)
+2. Keep `grant-roadmap.md` and `status-board.md` aligned with this reality
+3. (Then, next group) start T2-D1 active-signer vs watch-only
 
-(Done this session: `/v1/network/stats` moved behind the API/DB; wallet network decoupled from the
-env onto the toggle; T1-D3 swap proven end-to-end on Testnet.)
+(Done this session: data cleanup — stellar-native protocol aggregation, dynamic `protocolCount`=4,
+dead Soroswap pair hidden + TVL corrected, "native"→"XLM" display, Blend panel trimmed; cron moved to
+15 min; Validation Cloud `joinUrl` fix resolving a cascading refresh failure; T1-D3 SDEX swap proven
+**fully successful** on Testnet via a live-quote + auto-slippage flow.)
 
 What should not dominate now: over-engineering auth/session, premature abstraction layers, broad
-refactors not tied to a tranche need, or polishing low-value UI before stabilizing data/API boundaries.
+refactors not tied to a tranche need, or polishing low-value UI before the Tranche 2 submission is out.
 
 ---
 
