@@ -176,7 +176,10 @@ export class StellarService {
 
   async getPools(protocol?: string, sort?: string, order?: 'asc' | 'desc') {
     const params: unknown[] = [];
-    const conditions: string[] = [];
+    // Always exclude inactive entities (e.g. archived Soroban contracts whose
+    // on-chain reads 404). Pushed into conditions so it is part of the WHERE,
+    // not concatenated after it.
+    const conditions: string[] = ['e.is_active = true'];
 
     if (protocol) {
       params.push(protocol);
@@ -313,7 +316,7 @@ export class StellarService {
         from entities e
         join venues v on v.id = e.venue_id
         left join pool_metrics_latest pml on pml.entity_id = e.id
-        where e.slug = $1
+        where e.slug = $1 and e.is_active = true
         limit 1
         `,
         poolSlug

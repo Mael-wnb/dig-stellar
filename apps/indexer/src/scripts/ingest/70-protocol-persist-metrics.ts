@@ -11,15 +11,16 @@ async function persistProtocol(
   const poolsRes = await client.query(
     `
     select
-      tvl_usd,
-      volume_24h_usd,
-      fees_24h_usd,
-      total_supplied_usd,
-      total_borrowed_usd,
-      weighted_supply_apy,
-      weighted_borrow_apy
-    from pool_metrics_latest
-    where venue_id = $1
+      pm.tvl_usd,
+      pm.volume_24h_usd,
+      pm.fees_24h_usd,
+      pm.total_supplied_usd,
+      pm.total_borrowed_usd,
+      pm.weighted_supply_apy,
+      pm.weighted_borrow_apy
+    from pool_metrics_latest pm
+    join entities e on e.id = pm.entity_id
+    where pm.venue_id = $1 and e.is_active = true
     `,
     [venue.id]
   );
