@@ -3,6 +3,7 @@ import {
   ALLBRIDGE_BRIDGE_CONTRACT_ID,
   ALLBRIDGE_EVENT_TOKENS_RECEIVED,
   ALLBRIDGE_EVENT_TOKENS_SENT,
+  ALLBRIDGE_SYSTEM_PRECISION,
   ALLBRIDGE_USDC_CONTRACT_ID,
   ALLBRIDGE_USDC_DECIMALS,
   ALLBRIDGE_USDC_SYMBOL,
@@ -84,8 +85,13 @@ export function normalizeAllbridgeBridgeEvents(params: {
 
     const resolved = resolveChain(counterpartyChainId);
 
+    // amount_raw is in mixed precision: inflow (TokensReceived) is in the USDC
+    // SAC's native 7 decimals, outflow (TokensSent) is in Allbridge's 3-decimal
+    // system precision. Pick the divisor accordingly — a single global divisor
+    // would over-scale every outflow by 10^4.
+    const scaleDecimals = isOutflow ? ALLBRIDGE_SYSTEM_PRECISION : ALLBRIDGE_USDC_DECIMALS;
     const amountRaw = getStringField(value, 'amount') ?? '0';
-    const amountScaled = scale(amountRaw, ALLBRIDGE_USDC_DECIMALS);
+    const amountScaled = scale(amountRaw, scaleDecimals);
 
     rows.push({
       direction: isOutflow ? 'outflow' : 'inflow',
@@ -96,7 +102,9 @@ export function normalizeAllbridgeBridgeEvents(params: {
       // Stellar contract, so we do not use it here.
       tokenContractId: ALLBRIDGE_USDC_CONTRACT_ID,
       tokenSymbol: ALLBRIDGE_USDC_SYMBOL,
-      decimals: ALLBRIDGE_USDC_DECIMALS,
+      // Precision of amount_raw for THIS row (7 native on inflow, 3 system on
+      // outflow) — kept self-consistent with the divisor used above.
+      decimals: scaleDecimals,
       amountRaw,
       amountScaled,
       recipient: coerceRecipient(value.recipient),

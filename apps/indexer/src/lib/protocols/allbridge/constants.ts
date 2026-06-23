@@ -14,6 +14,17 @@ export const ALLBRIDGE_USDC_CONTRACT_ID =
 export const ALLBRIDGE_USDC_SYMBOL = 'USDC';
 export const ALLBRIDGE_USDC_DECIMALS = 7;
 
+// Allbridge Core normalizes cross-chain amounts to a common "system precision"
+// of 3 decimals. This matters because the two bridge events carry amounts in
+// DIFFERENT precisions:
+//   - TokensReceived (inflow):  swap_from_v_usd returns native token precision
+//     (amount_from_system_precision is applied on-chain) -> 7 decimals (USDC SAC).
+//   - TokensSent (outflow):     swap_to_v_usd returns the system-precision amount
+//     -> 3 decimals.
+// So amount_raw is in MIXED precision depending on direction, and the scaling
+// divisor must be chosen per-direction (see normalize-bridge-events.ts).
+export const ALLBRIDGE_SYSTEM_PRECISION = 3;
+
 // Classic Circle USDC issuer the Soroban SAC wraps (provenance / metadata only).
 export const ALLBRIDGE_USDC_CLASSIC_ISSUER =
   'USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN';

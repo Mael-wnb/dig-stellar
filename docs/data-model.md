@@ -313,8 +313,8 @@ aggregated **on read** (no pre-computed `*_metrics_latest` table) — volume is 
 | `asset_id` | uuid FK → `assets.id` SET NULL | resolved from `token_contract_id`; nullable |
 | `token_contract_id` | text NOT NULL | always the Stellar USDC SAC |
 | `token_symbol` | text | `USDC` |
-| `amount_raw` | numeric(78,0) NOT NULL | on-chain i128 units, as string |
-| `amount_scaled` | numeric | `amount_raw / 10^7` |
+| `amount_raw` | numeric(78,0) NOT NULL | on-chain i128 units, as string. **Mixed precision by direction:** inflow is in USDC's native 7 decimals, outflow is in Allbridge's 3-decimal system precision |
+| `amount_scaled` | numeric | per-direction: inflow `amount_raw / 10^7` (native USDC), outflow `amount_raw / 10^3` (Allbridge system precision). A single `/10^7` would over-scale every outflow by 10⁴ |
 | `amount_usd` | numeric | via `asset_prices`; USDC falls back to $1 |
 | `recipient` | text | Stellar recipient on inflow; null for foreign-chain byte addresses (stashed in `metadata`) |
 | `nonce` | text | bridge message nonce |

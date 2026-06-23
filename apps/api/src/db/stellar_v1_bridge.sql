@@ -8,8 +8,8 @@ create table if not exists bridge_flows (
   asset_id               uuid references assets(id) on delete set null,
   token_contract_id      text not null,
   token_symbol           text,
-  amount_raw             numeric(78, 0) not null,
-  amount_scaled          numeric,
+  amount_raw             numeric(78, 0) not null,  -- raw on-chain i128; MIXED precision: inflow=7 native USDC decimals, outflow=3 Allbridge system precision
+  amount_scaled          numeric,                  -- amount_raw / 10^7 on inflow, / 10^3 on outflow (per-direction; see allbridge/normalize-bridge-events.ts)
   amount_usd             numeric,
   recipient              text,
   nonce                  text,
