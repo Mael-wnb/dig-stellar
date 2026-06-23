@@ -10,6 +10,7 @@ import HeroBanner from "./HeroBanner.vue";
 import NetworkStats from "./NetworkStats.vue"; // ✅ FIX
 import StellarMetrics from "./StellarMetrics.vue";
 import NetFlowChart from "./NetFlowChart.vue";
+import BridgeFlows from "./BridgeFlows.vue";
 import WalletSection from "./WalletSection.vue";
 import ProtocolTabs from "./ProtocolTabs.vue";
 import PoolTabs from "./PoolTabs.vue";
@@ -203,6 +204,9 @@ const { network } = useNetwork();
 
       <!-- OUTFLOW / INFLOW -->
       <NetFlowChart />
+
+      <!-- BRIDGE FLOWS (Allbridge — incoming bridged USDC by source chain) -->
+      <BridgeFlows />
     </div>
   </div>
 </template>

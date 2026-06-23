@@ -7,9 +7,10 @@ import { NetworkModule } from './modules/network/network.module';
 import { StellarModule } from './modules/stellar/stellar.module';
 import { WalletsModule } from './modules/wallets/wallets.module';
 import { ActionsModule } from './modules/actions/actions.module';
+import { BridgeModule } from './modules/bridge/bridge.module';
 
 @Module({
-  imports: [DbModule, StellarModule, WalletsModule, NetworkModule, ActionsModule],
+  imports: [DbModule, StellarModule, WalletsModule, NetworkModule, ActionsModule, BridgeModule],
   controllers: [AppController],
   providers: [AppService],
 })
