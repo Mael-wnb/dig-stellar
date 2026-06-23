@@ -69,7 +69,7 @@ T1-D3 criteria.
 |---|---|---:|---|---|---|---|
 | D1 — Multi-Wallet Portfolio & "Active Signer" Model | Partial | 60% | Medium | Grouped multi-wallet behavior real (add/remove/refresh/select); backend grouping by persistent `userId`; per-wallet balances; raw SQL v2 tables (`user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions`) | "Active Signer" vs "watch-only" not formalized (model + UI); position aggregation beyond balances is thin | Define + document active-signer vs watch-only semantics |
 | D2 — In-App Alerting Engine | Early | 10% | Low | Product direction exists; some notification-like UI | No rule/preference model, evaluator, storage, or notification lifecycle | Minimal rule model + periodic evaluator over `*_metrics_latest` deltas (one rule family first) |
-| D3 — Bridge Flow Monitoring | Early | 5% | Low | Grant-level intent only | No Allbridge adapter, normalized inflow model, or dashboard slice | Define inflow model + build the Allbridge attribution adapter |
+| D3 — Bridge Flow Monitoring | Partial | 45% | Medium | Allbridge Core adapter live (`apps/indexer/.../allbridge/`): inflow + outflow events via Soroban `getEvents`, per-source-chain attribution (inflow via `receive_tokens` arg parse), `bridge_flows` table + `amount_usd`, wired non-fatal into `job:refresh`, idempotent on rescan. Verified against mainnet (inflow BAS, outflows SOL/POL/CEL/BAS) | No `/v1/bridge/*` API layer or dashboard slice yet (the SCF "dashboard section" criterion) | Build `/v1/bridge/*` (on-read 7d aggregation) + the dashboard "recent bridged flows" section |
 
 ---
 

@@ -220,7 +220,24 @@ async function main() {
     );
 
     console.log(
-      '\n=== 8. Refresh network stats ==='
+      '\n=== 8. Refresh Allbridge bridge flows ==='
+    );
+
+    // Non-fatal: an Allbridge or RPC hiccup must never abort the whole refresh.
+    // Mirrors the Aquarius / network-stats catch-and-log behaviour. Runs after
+    // the price steps so amount_usd can use fresh prices. Single contract, so no
+    // entity discovery query — the step runs unconditionally once per cycle.
+    try {
+      await runTsx(
+        'src/scripts/ingest/run-allbridge-bridge-refresh.ts'
+      );
+    } catch (error) {
+      console.error('Allbridge bridge refresh failed (non-fatal)');
+      console.error(error);
+    }
+
+    console.log(
+      '\n=== 9. Refresh network stats ==='
     );
 
     // Non-fatal: external providers (CoinGecko / DefiLlama / stellar.expert /

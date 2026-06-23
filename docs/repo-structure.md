@@ -162,9 +162,19 @@ job:refresh
               │           Source: Horizon /liquidity_pools (top 50 by desc order)
               │           Writes: entities, entity_assets, pool_snapshots, pool_metrics_latest
               │
-              └── Step 7  70-protocol-persist-metrics.ts
-                          Aggregates pool_metrics_latest → protocol_metrics_latest
-                          Covers: blend, soroswap, aquarius
+              ├── Step 7  70-protocol-persist-metrics.ts
+              │           Aggregates pool_metrics_latest → protocol_metrics_latest
+              │           Covers: blend, soroswap, aquarius
+              │
+              ├── Step 8  run-allbridge-bridge-refresh.ts  (single bridge contract; non-fatal)
+              │           → lib/protocols/allbridge/{fetch-bridge-events, normalize-bridge-events,
+              │                                       persist-bridge-flows}
+              │           Source: Soroban RPC getEvents on the Allbridge Core bridge contract
+              │                   (inflow source chain via the receive_tokens invocation args)
+              │           Writes: bridge_flows
+              │
+              └── Step 9  73-network-stats-refresh.ts  (external providers; non-fatal)
+                          Writes: network_stats_latest
 ```
 
 Pool/entity discovery for steps 3–5 comes from a DB query in 71 (`select from entities join venues where v.slug = $1`), not from env vars. Entities must already exist in the DB (seeded by bootstrap scripts or prior onboarding).
@@ -187,6 +197,8 @@ Three distinct categories of files exist in `apps/indexer/src/scripts/ingest/`.
 | `run-aquarius-pool-refresh.ts` | Step 5 |
 | `run-stellar-native-refresh.ts` | Step 6 |
 | `70-protocol-persist-metrics.ts` | Step 7 |
+| `run-allbridge-bridge-refresh.ts` | Step 8 (Allbridge bridge flows; non-fatal) |
+| `73-network-stats-refresh.ts` | Step 9 (non-fatal) |
 
 ### (b) Active onboarding — referenced in the Soroswap pair onboarding checklist
 
@@ -256,6 +268,7 @@ can operate. The refresh job queries these rows to find which pools to refresh.
 | `blend-upsert-core.ts` | venues + entities + assets for Blend |
 | `soroswap-upsert-core.ts` | venues + entities + assets for Soroswap |
 | `aquarius-upsert-core.ts` | venues + entities + assets for Aquarius |
+| `allbridge-upsert-core.ts` | `allbridge` venue (`venue_type='bridge'`) + USDC asset (no entities — single bridge contract) |
 
 Stellar-native entities are created dynamically by `run-stellar-native-refresh.ts` itself (no bootstrap required).
 
@@ -286,6 +299,7 @@ packages/db/
 | Soroswap | Soroban RPC (`simulateContractRead`) | Soroban RPC (`getEvents`) | `run-soroswap-pair-refresh.ts` |
 | Aquarius | Soroban RPC (`simulateContractRead`) | Soroban RPC (`getEvents`) | `run-aquarius-pool-refresh.ts` |
 | Stellar-native | Horizon REST (`/liquidity_pools`) | — | `run-stellar-native-refresh.ts` |
+| Allbridge (bridge) | — (event-driven) | Soroban RPC (`getEvents` + `getTransaction` for inflow source chain) | `run-allbridge-bridge-refresh.ts` |
 | Asset prices | CoinGecko REST + Soroswap-derived | — | `62-price-reference-assets.ts`, `63-price-soroswap-derived.ts` |
 | Wallet balances | Horizon REST (`/accounts/:id`) | — | `80-stellar-wallet-balance-snapshots.ts` |
 
@@ -347,6 +361,7 @@ pnpm -C apps/web build                      # also runs vue-tsc typecheck
 | Soroswap adapter | `apps/indexer/src/lib/protocols/soroswap/` |
 | Aquarius adapter | `apps/indexer/src/lib/protocols/aquarius/` |
 | Stellar-native adapter | `apps/indexer/src/lib/protocols/stellar-native/` |
+| Allbridge bridge adapter | `apps/indexer/src/lib/protocols/allbridge/` |
 | v1 schema DDL | `apps/api/src/db/stellar_v1.sql` + `stellar_v1_metrics.sql` |
 | v2 schema DDL | `apps/api/src/db/stellar_v2_multiwallet.sql` |
 | Prisma schema (legacy) | `packages/db/prisma/schema.prisma` |

@@ -42,7 +42,7 @@ disbursement is reviewed against.
 | T1 | 3 | Smart Transaction Builder (Testnet) | Jun 22, 2026 | $11,070 | Done — 100% |
 | T2 | 1 | Multi-Wallet Portfolio & "Active Signer" Model | Jul 6, 2026 | $7,380 | ~60% |
 | T2 | 2 | In-App Alerting Engine | Jul 20, 2026 | $8,610 | ~10% |
-| T2 | 3 | Bridge Flow Monitoring | Aug 3, 2026 | $6,140 | ~5% |
+| T2 | 3 | Bridge Flow Monitoring | Aug 3, 2026 | $6,140 | ~45% |
 | T3 | 1 | Mainnet Deployment & Freshness Tracking | Aug 10, 2026 | $8,610 | ~45% |
 | T3 | 2 | Non-Custodial Mainnet Actions | Aug 24, 2026 | $8,610 | ~5% |
 | T3 | 3 | Observability, UI/UX Polish & Reference Handoff | Aug 31, 2026 | $6,140 | ~20% |
@@ -276,12 +276,24 @@ How to measure completion:
 Estimated date: August 3, 2026 — Budget: $6,140
 
 ### Internal interpretation & status (living)
-Owner: `apps/indexer` + `apps/api` + `apps/web`. Status: ~5%. Not meaningfully started.
+Owner: `apps/indexer` + `apps/api` + `apps/web`. Status: ~45%. Indexer layer done; API + UI remain.
 
 The criteria are narrow and explicit: an **Allbridge** attribution adapter and a dashboard section for
 incoming bridged assets. Axelar / Near Intents are not part of this contract — do not expand scope.
-Define the normalized inflow storage model, build the Allbridge adapter, expose a minimal dashboard
-slice.
+
+**Done (indexer + data model):** the Allbridge Core adapter lives in
+`apps/indexer/src/lib/protocols/allbridge/` and is wired (non-fatal) into `job:refresh`. It tracks
+**inflows** (the SCF claim) with per-source-chain attribution and **outflows** (bonus, near-free) via
+Soroban `getEvents` on the bridge contract (`CBQ6GW7Q…`). Inflow attribution reads `source_chain_id`
+from the `receive_tokens` invocation args (the `TokensReceived` event has no source chain). Flows land
+in `bridge_flows` (raw SQL, `stellar_v1_bridge.sql`) with `amount_usd`, deduped on
+`(contract_address, event_id)`. Mono-token (USDC) — the only token Allbridge Core bridges on Stellar.
+Verified against mainnet.
+
+**Remaining:** `/v1/bridge/*` API (on-read 7-day aggregation — no pre-computed metrics table) and the
+dashboard "recent bridged flows" section (the SCF "dashboard section" criterion). Honest constraint to
+carry into the UI copy: Soroban RPC `getEvents` retains ~7 days, so this is a rolling recent-flows view,
+not deep history.
 
 ---
 
@@ -384,8 +396,8 @@ before then.
 
 ## Most underdeveloped areas (next groups)
 1. T2-D2 — Alerting Engine (~10%)
-2. T2-D3 — Bridge Monitoring (~5%)
-3. T3-D2 — Mainnet Actions (~5%, path validated by T1-D3)
+2. T3-D2 — Mainnet Actions (~5%, path validated by T1-D3)
+3. T2-D3 — Bridge Monitoring (~45%; indexer adapter done, `/v1/bridge/*` API + dashboard slice remain)
 
 ## Timeline reality (be honest, not optimistic)
 As of June 19, 2026: all three MVP (T1) deliverables now meet their SCF criteria with concrete,

@@ -10,6 +10,7 @@ Three distinct families of tables coexist in the same Postgres instance.
 | Schema family | Tables | Defined in | Written by | Read by |
 |---|---|---|---|---|
 | **v1 — production pipeline** | `venues`, `entities`, `assets`, `entity_assets`, `normalized_events`, `pool_snapshots`, `reserve_snapshots`, `asset_prices`, `pool_metrics_latest`, `protocol_metrics_latest`, `sync_cursors` | `apps/api/src/db/stellar_v1.sql` + `stellar_v1_metrics.sql` | `job:refresh` pipeline (indexer) | `/v1/protocols`, `/v1/pools`, `/v1/pools/:slug` (StellarController) |
+| **v1 — bridge flows** | `bridge_flows` | `apps/api/src/db/stellar_v1_bridge.sql` | `job:refresh` (Step 8 — `run-allbridge-bridge-refresh.ts`) | `/v1/bridge/*` (planned — on-read aggregation, T2-D3) |
 | **v2 — wallet layer** | `user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions` | `apps/api/src/db/stellar_v2_multiwallet.sql` | wallet refresh script (`80-stellar-wallet-balance-snapshots.ts`) | `/v1/wallets/*` (WalletsController) |
 | **Prisma legacy** | `"Protocol"`, `"Venue"`, `"Snapshot"` | `packages/db/prisma/schema.prisma` + migration `20260312113641_init` | `run:blend`, `run:horizon`, `run:once` | `/protocols`, `/venues`, `/venues/:key/snapshots` (AppController) — **not served under `/v1/`** |
 
@@ -287,6 +288,54 @@ Ingestion state: tracks the last-processed ledger or cursor per data source.
 | `updated_at` | timestamptz | |
 
 Unique constraint: `(source, cursor_key)`.
+
+---
+
+## Schema v1 — Bridge Flows (T2-D3)
+
+Defined in `apps/api/src/db/stellar_v1_bridge.sql` (applied manually, like the other v1 files).
+References v1 `venues` and `assets`.
+
+### `bridge_flows`
+
+One row per Allbridge Core bridge event on Stellar. Tracks **inflows** (other chain → Stellar,
+the SCF claim) and **outflows** (Stellar → other chain, bonus) with per-counterparty-chain
+attribution. Mono-token today (USDC — the only token Allbridge Core bridges on Stellar). Flows are
+aggregated **on read** (no pre-computed `*_metrics_latest` table) — volume is low.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `venue_id` | uuid FK → `venues.id` CASCADE | the `allbridge` venue (`venue_type='bridge'`) |
+| `direction` | text NOT NULL | `'inflow'` \| `'outflow'` |
+| `counterparty_chain_id` | integer | Allbridge internal chain id (source for inflow, destination for outflow) |
+| `counterparty_chain` | text | resolved symbol (`ETH`, `BAS`, `SOL`, …; `Unknown` if attribution failed) |
+| `asset_id` | uuid FK → `assets.id` SET NULL | resolved from `token_contract_id`; nullable |
+| `token_contract_id` | text NOT NULL | always the Stellar USDC SAC |
+| `token_symbol` | text | `USDC` |
+| `amount_raw` | numeric(78,0) NOT NULL | on-chain i128 units, as string |
+| `amount_scaled` | numeric | `amount_raw / 10^7` |
+| `amount_usd` | numeric | via `asset_prices`; USDC falls back to $1 |
+| `recipient` | text | Stellar recipient on inflow; null for foreign-chain byte addresses (stashed in `metadata`) |
+| `nonce` | text | bridge message nonce |
+| `contract_address` | text NOT NULL | the bridge contract id |
+| `event_id` | text NOT NULL | Soroban RPC event id |
+| `tx_hash` | text NOT NULL | |
+| `ledger` | bigint NOT NULL | |
+| `occurred_at` | timestamptz NOT NULL | **freshness** — `ledgerClosedAt` from RPC |
+| `metadata` | jsonb | event name, raw recipient, `receive_token`, `receive_tokens` invocation args |
+| `created_at` | timestamptz | default now() |
+
+Dedup on rescan: unique `(contract_address, event_id)`, upsert `ON CONFLICT DO NOTHING` (events are
+immutable). Indexes: `(occurred_at desc)`, `(direction, counterparty_chain_id, occurred_at desc)`
+(the dashboard query), `(venue_id)`, `(asset_id)`.
+
+**Inflow attribution:** `TokensReceived` events carry no source chain, so the indexer reads
+`source_chain_id` from the `receive_tokens` host-function call args (one extra `getTransaction` per
+inflow). Outflows read `destination_chain_id` directly from the `TokensSent` event.
+
+**Coverage constraint:** Soroban RPC `getEvents` retains ~7 days, so this is a rolling recent-flows
+view, not deep history.
 
 ---
 

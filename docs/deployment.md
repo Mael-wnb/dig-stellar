@@ -17,6 +17,18 @@ Describe the target deployment shape for Dig Stellar beta and how to operate it.
 - run `apps/indexer` on the same VPS or another controlled environment
 - use cron or equivalent scheduler for refresh jobs
 
+### Database schema (manual apply — no migration runner)
+The raw SQL schemas are applied by hand on each environment (local **and** VPS); the DDL is
+idempotent. On the VPS, after `git pull` and **before** the cron runs a new step:
+```bash
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1.sql
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_metrics.sql
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_bridge.sql   # Allbridge bridge flows (T2-D3)
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v2_multiwallet.sql
+# Allbridge needs its venue + USDC asset seeded once before the first refresh:
+pnpm -C apps/indexer tsx src/scripts/bootstrap/allbridge-upsert-core.ts
+```
+
 ---
 
 ## Why this architecture

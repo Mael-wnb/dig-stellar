@@ -73,10 +73,20 @@ re-running is safe.
 ```bash
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1.sql
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_metrics.sql
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_bridge.sql
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v2_multiwallet.sql
 ```
+Manually-applied schemas (local AND VPS): `stellar_v1.sql`, `stellar_v1_metrics.sql`,
+`stellar_v1_bridge.sql` (Allbridge bridge flows — T2-D3), `stellar_v2_multiwallet.sql`.
 Note: when a new table is added to one of these files (e.g. `network_stats_latest` in
-`stellar_v1_metrics.sql`), re-run that file once to create it.
+`stellar_v1_metrics.sql`, or `bridge_flows` in `stellar_v1_bridge.sql`), re-run that file once
+to create it.
+
+After applying `stellar_v1_bridge.sql`, run the Allbridge bootstrap once (creates the
+`allbridge` venue + USDC asset) before the first refresh:
+```bash
+pnpm -C apps/indexer tsx src/scripts/bootstrap/allbridge-upsert-core.ts
+```
 
 ### Useful checks
 ```bash
