@@ -44,6 +44,7 @@ type WalletRow = {
   label: string | null;
   is_primary: boolean;
   is_active: boolean;
+  is_active_signer: boolean;
   metadata: unknown;
   created_at: unknown;
   updated_at: unknown;
@@ -143,6 +144,7 @@ export class WalletsService {
       label: row.label,
       isPrimary: row.is_primary,
       isActive: row.is_active,
+      isActiveSigner: row.is_active_signer,
       metadata: row.metadata,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -160,6 +162,7 @@ export class WalletsService {
         label,
         is_primary,
         is_active,
+        is_active_signer,
         metadata,
         created_at,
         updated_at
@@ -194,6 +197,7 @@ export class WalletsService {
         label,
         is_primary,
         is_active,
+        is_active_signer,
         metadata,
         created_at,
         updated_at
@@ -248,6 +252,7 @@ export class WalletsService {
         label,
         is_primary,
         is_active,
+        is_active_signer,
         metadata,
         created_at,
         updated_at
@@ -283,22 +288,22 @@ export class WalletsService {
     );
   }
 
-  private runWalletBalanceRefreshScript(walletId: string): Promise<void> {
+  private runIndexerWalletScript(
+    scriptRelPath: string,
+    walletId: string,
+    label: string
+  ): Promise<void> {
     const indexerDir = this.resolveIndexerDir();
 
     return new Promise((resolve, reject) => {
-      const child = spawn(
-        'pnpm',
-        ['tsx', 'src/scripts/wallets/80-stellar-wallet-balance-snapshots.ts'],
-        {
-          cwd: indexerDir,
-          env: {
-            ...process.env,
-            WALLET_ID: walletId,
-          },
-          stdio: 'pipe',
-        }
-      );
+      const child = spawn('pnpm', ['tsx', scriptRelPath], {
+        cwd: indexerDir,
+        env: {
+          ...process.env,
+          WALLET_ID: walletId,
+        },
+        stdio: 'pipe',
+      });
 
       let stderr = '';
       let stdout = '';
@@ -324,7 +329,7 @@ export class WalletsService {
         reject(
           new Error(
             [
-              `Wallet refresh script failed with exit code ${code}.`,
+              `${label} script failed with exit code ${code}.`,
               stdout ? `stdout:\n${stdout}` : '',
               stderr ? `stderr:\n${stderr}` : '',
             ]
@@ -334,6 +339,22 @@ export class WalletsService {
         );
       });
     });
+  }
+
+  private runWalletBalanceRefreshScript(walletId: string): Promise<void> {
+    return this.runIndexerWalletScript(
+      'src/scripts/wallets/80-stellar-wallet-balance-snapshots.ts',
+      walletId,
+      'Wallet balance refresh'
+    );
+  }
+
+  private runWalletBlendPositionsScript(walletId: string): Promise<void> {
+    return this.runIndexerWalletScript(
+      'src/scripts/wallets/81-stellar-wallet-blend-positions.ts',
+      walletId,
+      'Wallet Blend positions refresh'
+    );
   }
 
   async connectWallet(params: {
@@ -351,13 +372,19 @@ export class WalletsService {
     });
 
     if (existingWallet) {
+      // Connecting via the Kit proves control of this address → it becomes the
+      // user's active signer (singleton; demotes any previous signer).
+      const promoted = await this.promoteToActiveSigner(
+        existingWallet.user_id,
+        existingWallet.id
+      );
       const overview = await this.getWalletsOverview(existingWallet.user_id);
 
       return {
         connected: true,
         createdUser: false,
         createdWallet: false,
-        wallet: this.mapWallet(existingWallet),
+        wallet: this.mapWallet(promoted),
         ...overview,
       };
     }
@@ -371,13 +398,16 @@ export class WalletsService {
       label,
     });
 
+    // A freshly connected wallet is the active signer for its new user.
+    const promoted = await this.promoteToActiveSigner(newUserId, createdWallet.id);
+
     const overview = await this.getWalletsOverview(newUserId);
 
     return {
       connected: true,
       createdUser: true,
       createdWallet: true,
-      wallet: this.mapWallet(createdWallet),
+      wallet: this.mapWallet(promoted),
       ...overview,
     };
   }
@@ -403,6 +433,7 @@ export class WalletsService {
         label,
         is_primary,
         is_active,
+        is_active_signer,
         metadata,
         created_at,
         updated_at
@@ -434,6 +465,7 @@ export class WalletsService {
           label,
           is_primary,
           is_active,
+          is_active_signer,
           metadata,
           created_at,
           updated_at
@@ -474,6 +506,7 @@ export class WalletsService {
         label,
         is_primary,
         is_active,
+        is_active_signer,
         metadata,
         created_at,
         updated_at
@@ -534,6 +567,7 @@ export class WalletsService {
         label,
         is_primary,
         is_active,
+        is_active_signer,
         metadata,
         created_at,
         updated_at
@@ -688,6 +722,18 @@ export class WalletsService {
       );
     }
 
+    // Blend positions + health factor refresh — NON-FATAL. A Blend/RPC hiccup
+    // must not break the balance refresh; one "refresh" updates balances and,
+    // best-effort, DeFi positions. (T2-D1 Gap B.)
+    try {
+      await this.runWalletBlendPositionsScript(walletId);
+    } catch (error) {
+      console.error(
+        '[wallets] Blend positions refresh failed (non-fatal):',
+        error instanceof Error ? error.message : error
+      );
+    }
+
     const refreshedBalances = await this.getWalletBalances({
       userId,
       walletId,
@@ -737,6 +783,7 @@ export class WalletsService {
         label,
         is_primary,
         is_active,
+        is_active_signer,
         metadata,
         created_at,
         updated_at
@@ -748,6 +795,72 @@ export class WalletsService {
     return {
       updated: true,
       wallet: this.mapWallet(updated[0]),
+    };
+  }
+
+  // Singleton promotion of one wallet to the user's active signer. Mirrors the
+  // two-step pattern of setPrimaryWallet, but the singleton is also DB-enforced
+  // by user_wallets_one_signer_per_user. A signer is always kept active
+  // (is_active = true) — you cannot have a paused signer. Orthogonal to
+  // is_primary: promoting a signer must NOT touch the primary designation.
+  private async promoteToActiveSigner(
+    userId: string,
+    walletId: string
+  ): Promise<WalletRow> {
+    await this.prisma.$executeRawUnsafe(
+      `
+      update user_wallets
+      set
+        is_active_signer = false,
+        updated_at = now()
+      where user_id = $1::uuid
+        and is_active_signer = true
+        and id <> $2::uuid
+      `,
+      userId,
+      walletId
+    );
+
+    const updated = (await this.prisma.$queryRawUnsafe(
+      `
+      update user_wallets
+      set
+        is_active_signer = true,
+        is_active = true,
+        updated_at = now()
+      where id = $1::uuid
+        and user_id = $2::uuid
+      returning
+        id,
+        user_id,
+        chain,
+        address,
+        label,
+        is_primary,
+        is_active,
+        is_active_signer,
+        metadata,
+        created_at,
+        updated_at
+      `,
+      walletId,
+      userId
+    )) as WalletRow[];
+
+    return updated[0];
+  }
+
+  async setActiveSigner(params: { userId?: string; walletId?: string }) {
+    const userId = this.normalizeUserId(params.userId);
+    const walletId = this.normalizeWalletId(params.walletId);
+
+    await this.getWalletOrThrow(walletId, userId);
+
+    const updated = await this.promoteToActiveSigner(userId, walletId);
+
+    return {
+      updated: true,
+      wallet: this.mapWallet(updated),
     };
   }
 
@@ -816,6 +929,7 @@ export class WalletsService {
         label,
         is_primary,
         is_active,
+        is_active_signer,
         metadata,
         created_at,
         updated_at

@@ -11,7 +11,7 @@ Three distinct families of tables coexist in the same Postgres instance.
 |---|---|---|---|---|
 | **v1 — production pipeline** | `venues`, `entities`, `assets`, `entity_assets`, `normalized_events`, `pool_snapshots`, `reserve_snapshots`, `asset_prices`, `pool_metrics_latest`, `protocol_metrics_latest`, `sync_cursors` | `apps/api/src/db/stellar_v1.sql` + `stellar_v1_metrics.sql` | `job:refresh` pipeline (indexer) | `/v1/protocols`, `/v1/pools`, `/v1/pools/:slug` (StellarController) |
 | **v1 — bridge flows** | `bridge_flows` | `apps/api/src/db/stellar_v1_bridge.sql` | `job:refresh` (Step 8 — `run-allbridge-bridge-refresh.ts`) | `/v1/bridge/*` (planned — on-read aggregation, T2-D3) |
-| **v2 — wallet layer** | `user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions` | `apps/api/src/db/stellar_v2_multiwallet.sql` | wallet refresh script (`80-stellar-wallet-balance-snapshots.ts`) | `/v1/wallets/*` (WalletsController) |
+| **v2 — wallet layer** | `user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions`, `wallet_pool_health` | `apps/api/src/db/stellar_v2_multiwallet.sql` | wallet refresh scripts (`80-stellar-wallet-balance-snapshots.ts`, `81-stellar-wallet-blend-positions.ts`) | `/v1/wallets/*` (WalletsController) |
 | **Prisma legacy** | `"Protocol"`, `"Venue"`, `"Snapshot"` | `packages/db/prisma/schema.prisma` + migration `20260312113641_init` | `run:blend`, `run:horizon`, `run:once` | `/protocols`, `/venues`, `/venues/:key/snapshots` (AppController) — **not served under `/v1/`** |
 
 The v1 and v2 schemas are applied manually via the SQL files (no Prisma migration).
@@ -355,13 +355,16 @@ One row per wallet address tracked in the system. `user_id` is a UUID minted cli
 | `chain` | varchar(64) NOT NULL | e.g. `stellar` |
 | `address` | varchar(128) NOT NULL | Stellar public key |
 | `label` | varchar(128) | Optional display label |
-| `is_primary` | boolean | First wallet for a user is auto-primary |
-| `is_active` | boolean | |
+| `is_primary` | boolean | Showcase/default wallet. First wallet for a user is auto-primary. App-maintained singleton. |
+| `is_active` | boolean | Refresh gate — the indexer only snapshots active wallets. Default true on every insert path. |
+| `is_active_signer` | boolean NOT NULL default false | **T2-D1.** Active-signer designation: the single wallet that can sign actions (singleton per user). Default false = watch-only, so every tracked wallet is watch-only until promoted. Orthogonal to `is_primary` and `is_active` — never merged. Connecting a wallet via the Wallets Kit promotes it (singleton; demotes the previous). |
 | `metadata` | jsonb | |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
 
 Unique constraint: `(user_id, chain, address)`.
+Partial unique index `user_wallets_one_signer_per_user` on `(user_id) where is_active_signer` —
+DB-enforces the active-signer singleton (stronger than the app-maintained `is_primary`).
 Indexes: `user_id`, `(user_id, chain)`, `(chain, address)`.
 
 ### `wallet_balance_snapshots`
@@ -393,6 +396,11 @@ spawned on-demand by `POST /v1/wallets/:walletId/refresh`.
 ### `wallet_protocol_positions`
 
 DeFi positions held by a wallet within a tracked entity. Linked to v1 `venues` and `entities`.
+**Populated for Blend** (T2-D1 Gap B) by `81-stellar-wallet-blend-positions.ts`: one `supply` row
+(collateral + non-collateral supply; `metadata.collateralEnabled` flags whether it backs borrows)
+and/or one `borrow` row per reserve the wallet holds. `position_type` ∈ `supply` / `borrow`.
+Amounts are in underlying-asset units (the Blend SDK's Float helpers, decimal-scaled via b/dRate);
+`amount_raw` = `amount_scaled × 10^decimals`. Soroswap/Aquarius LP positions are not yet resolved.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -412,6 +420,38 @@ DeFi positions held by a wallet within a tracked entity. Linked to v1 `venues` a
 | `created_at` | timestamptz | |
 
 Indexes: `user_wallet_id`, `snapshot_at DESC`, `(user_wallet_id, snapshot_at DESC)`, `venue_id`, `entity_id`, `position_type`.
+
+---
+
+### `wallet_pool_health`
+
+Per-(wallet, pool) Blend risk summary (T2-D1 Gap B). The **health factor is first-class** here
+because D2's alert evaluator queries it flat — a queried value must be a column, not jsonb. This is
+the pool-level rollup; the per-asset supply/borrow rows live in `wallet_protocol_positions`
+(mirrors the v1 `reserve_snapshots` per-asset vs `pool_metrics_latest` per-pool split).
+Snapshot-based, so D2 can read both the current HF and the previous one for delta detection.
+Written by `81-stellar-wallet-blend-positions.ts`. Values come from the Blend SDK's
+`PositionsEstimate` (never hand-rolled), denominated in USD via the pool's Reflector oracle.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `user_wallet_id` | uuid FK → `user_wallets.id` CASCADE | |
+| `venue_id` | uuid FK → `venues.id` SET NULL | Blend venue |
+| `entity_id` | uuid FK → `entities.id` SET NULL | the specific pool |
+| `health_factor` | numeric | `effective_collateral / effective_liabilities`. **NULL = no debt** (no liabilities → ratio undefined, not liquidatable); D2 treats NULL as "no health alert applicable". Otherwise HF > 1 healthy, HF ≤ 1 liquidatable |
+| `total_collateral_usd` | numeric | effective collateral (after collateral factors) |
+| `total_debt_usd` | numeric | effective liabilities (after liability factors); `0` when no debt |
+| `borrow_limit_usd` | numeric | remaining borrow capacity (nullable) |
+| `net_apy` | numeric | optional, nullable |
+| `positions_count` | integer | # of asset positions backing this row |
+| `snapshot_at` | timestamptz NOT NULL | **Freshness field** |
+| `metadata` | jsonb | poolSlug, raw supplied/borrowed USD, borrowLimit ratio |
+| `created_at` | timestamptz | |
+
+Indexes: `user_wallet_id`, `snapshot_at DESC`, `(user_wallet_id, snapshot_at DESC)`, and a partial
+index on `health_factor WHERE health_factor IS NOT NULL` (D2's "wallets at risk" scan).
+A wallet with **no** Blend position in a pool gets **no row** for that pool (empty rows are not written).
 
 ---
 
@@ -452,4 +492,5 @@ tables of schema v1, despite the conceptual similarity of their names.
 | `protocol_metrics_latest` | `as_of` | `nowIso()` at write time |
 | `wallet_balance_snapshots` | `snapshot_at` | Write time |
 | `wallet_protocol_positions` | `snapshot_at` | Write time |
+| `wallet_pool_health` | `snapshot_at` | Write time |
 | `"Snapshot"` (Prisma legacy) | `ts` | Write time |

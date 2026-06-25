@@ -139,12 +139,25 @@ grouped `userId`; grouped multi-wallet portfolio; adding secondary wallets; per-
 refresh flow from API to DB-backed snapshots (raw SQL v2); select/refresh/delete/activate/primary
 operations. There is a real "returning user with multiple wallets" foundation.
 
-Weak / not final: auth/session is not a final cryptographic production model; strong
-proof-of-ownership is not the final version; **"active signer" vs "watch-only" is not yet explicit**
-(this is the exact T2-D1 gap); DeFi position aggregation beyond balances is still limited.
+**Active signer vs watch-only — now formalized (T2-D1 Gap A).** `user_wallets.is_active_signer`
+(boolean, DB-enforced singleton per user via the partial unique index
+`user_wallets_one_signer_per_user`) is the persisted **designation**; actual signing capability is
+the **live** half (`connectedAddress` from the Wallets Kit). The two reconcile as a hybrid: a
+signing context is live iff the connected address equals the active-signer wallet's address.
+Connecting a wallet via the Kit promotes it to active signer (singleton — demotes the previous),
+which keeps the T1-D3 swap valid. Add-by-address stays `is_active_signer=false` = watch-only:
+fully monitored, never signable. The signing guardrail in the swap widget blocks build/sign unless
+the connected address is the active signer. The three axes — `is_active_signer` (sign),
+`is_primary` (showcase/default), `is_active` (refresh gate) — are orthogonal and never merged.
 
-Stance: acceptable for beta. Formalizing active-signer vs watch-only is the start of the next
-deliverable group (T2-D1).
+Weak / not final: auth/session is not a final cryptographic production model; strong
+proof-of-ownership is **deliberately deferred** — connecting a wallet via the Kit is the beta
+"proof" you control a signer (no cryptographic challenge yet). DeFi **position aggregation** beyond
+balances is still limited — that is T2-D1 Gap B (the Blend position resolver + health factor),
+tracked separately.
+
+Stance: acceptable for beta. Gap A (active-signer model + UI distinction + signing guardrail) is
+**done**; Gap B (position aggregation) is the remaining T2-D1 work.
 
 ---
 

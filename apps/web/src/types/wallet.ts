@@ -19,6 +19,7 @@ export interface WalletItem {
   label: string;
   isPrimary: boolean;
   isActive: boolean;
+  isActiveSigner: boolean;
   chain: string;
   totalPortfolioUsd?: number;
   balances?: WalletBalanceItem[];

@@ -6,12 +6,15 @@ import {
   fetchWalletBalances,
   fetchWalletOverview,
   refreshWallet,
+  setActiveSigner,
   setPrimaryWallet,
   setWalletActive,
 } from "../api/wallets";
 import type { WalletItem } from "../types/wallet";
+import { useActiveSigner } from "./useActiveSigner";
 
 export function useWallets(userIdRef: { value: string | null }) {
+  const { setActiveSignerAddress } = useActiveSigner();
   const wallets = ref<WalletItem[]>([]);
   const selectedWallet = ref<WalletItem | null>(null);
   const overviewLoading = ref(true);
@@ -37,6 +40,13 @@ export function useWallets(userIdRef: { value: string | null }) {
     return !!walletId && actionLoadingWalletId.value === walletId;
   }
 
+  // Keep the shared active-signer address aligned with the current list. The
+  // signer designation is a singleton (at most one isActiveSigner per user).
+  function syncActiveSigner(): void {
+    const signer = wallets.value.find((wallet) => wallet.isActiveSigner);
+    setActiveSignerAddress(signer?.address ?? null);
+  }
+
   async function loadOverview(): Promise<void> {
     const userId = userIdRef.value?.trim();
 
@@ -59,6 +69,8 @@ export function useWallets(userIdRef: { value: string | null }) {
         balances: wallet.balances ?? [],
         loading: false,
       }));
+
+      syncActiveSigner();
 
       await Promise.all(wallets.value.map((wallet) => loadWalletBalances(wallet.id)));
 
@@ -165,6 +177,27 @@ export function useWallets(userIdRef: { value: string | null }) {
     }
   }
 
+  async function setSigner(wallet: WalletItem): Promise<void> {
+    const userId = requireUserId();
+    error.value = "";
+    actionLoadingWalletId.value = wallet.id;
+
+    try {
+      await setActiveSigner(wallet.id, userId);
+      await loadOverview();
+
+      if (selectedWallet.value?.id === wallet.id) {
+        selectedWallet.value =
+          wallets.value.find((item) => item.id === wallet.id) ?? null;
+      }
+    } catch (err) {
+      error.value =
+        err instanceof Error ? err.message : "Failed to set active signer.";
+    } finally {
+      actionLoadingWalletId.value = null;
+    }
+  }
+
   async function toggleActive(wallet: WalletItem): Promise<void> {
     const userId = requireUserId();
     error.value = "";
@@ -217,6 +250,8 @@ export function useWallets(userIdRef: { value: string | null }) {
       loading: false,
     }));
 
+    syncActiveSigner();
+
     if (selectedWallet.value) {
       const updatedSelectedWallet = wallets.value.find(
         (wallet) => wallet.id === selectedWallet.value?.id
@@ -236,6 +271,7 @@ export function useWallets(userIdRef: { value: string | null }) {
     error.value = "";
     overviewLoading.value = false;
     actionLoadingWalletId.value = null;
+    setActiveSignerAddress(null);
   }
 
   return {
@@ -251,6 +287,7 @@ export function useWallets(userIdRef: { value: string | null }) {
     addWallet,
     refreshOneWallet,
     setPrimary,
+    setSigner,
     toggleActive,
     removeWallet,
     hydrateFromConnect,

@@ -24,7 +24,7 @@ idempotent. On the VPS, after `git pull` and **before** the cron runs a new step
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1.sql
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_metrics.sql
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_bridge.sql   # Allbridge bridge flows (T2-D3)
-psql "$DATABASE_URL" -f apps/api/src/db/stellar_v2_multiwallet.sql
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v2_multiwallet.sql   # incl. T2-D1 is_active_signer column + singleton index, + Gap B wallet_pool_health table
 # Allbridge needs its venue + USDC asset seeded once before the first refresh:
 pnpm -C apps/indexer tsx src/scripts/bootstrap/allbridge-upsert-core.ts
 ```

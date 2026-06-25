@@ -78,9 +78,12 @@ psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stella
 ```
 Manually-applied schemas (local AND VPS): `stellar_v1.sql`, `stellar_v1_metrics.sql`,
 `stellar_v1_bridge.sql` (Allbridge bridge flows — T2-D3), `stellar_v2_multiwallet.sql`.
-Note: when a new table is added to one of these files (e.g. `network_stats_latest` in
-`stellar_v1_metrics.sql`, or `bridge_flows` in `stellar_v1_bridge.sql`), re-run that file once
-to create it.
+Note: when a new table **or column** is added to one of these files (e.g. `network_stats_latest`
+in `stellar_v1_metrics.sql`, `bridge_flows` in `stellar_v1_bridge.sql`, or the T2-D1
+`is_active_signer` column + `user_wallets_one_signer_per_user` index, or the T2-D1 Gap B
+`wallet_pool_health` table in `stellar_v2_multiwallet.sql`),
+re-run that file once — the statements are idempotent (`add column if not exists`,
+`create … if not exists`), so re-applying on local AND VPS is safe.
 
 After applying `stellar_v1_bridge.sql`, run the Allbridge bootstrap once (creates the
 `allbridge` venue + USDC asset) before the first refresh:

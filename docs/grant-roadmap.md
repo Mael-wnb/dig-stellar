@@ -40,7 +40,7 @@ disbursement is reviewed against.
 | T1 | 1 | Data Indexing Foundation (Horizon & Soroban) | May 25, 2026 | $12,300 | Done — 100% |
 | T1 | 2 | Analytics Dashboard MVP | Jun 8, 2026 | $6,140 | Done — 100% |
 | T1 | 3 | Smart Transaction Builder (Testnet) | Jun 22, 2026 | $11,070 | Done — 100% |
-| T2 | 1 | Multi-Wallet Portfolio & "Active Signer" Model | Jul 6, 2026 | $7,380 | ~60% |
+| T2 | 1 | Multi-Wallet Portfolio & "Active Signer" Model | Jul 6, 2026 | $7,380 | ~82% |
 | T2 | 2 | In-App Alerting Engine | Jul 20, 2026 | $8,610 | ~10% |
 | T2 | 3 | Bridge Flow Monitoring | Aug 3, 2026 | $6,140 | ~45% |
 | T3 | 1 | Mainnet Deployment & Freshness Tracking | Aug 10, 2026 | $8,610 | ~45% |
@@ -225,18 +225,37 @@ How to measure completion:
 Estimated date: July 6, 2026 — Budget: $7,380
 
 ### Internal interpretation & status (living)
-Owner: `apps/web` + `apps/api` (+ `apps/indexer` as position depth grows). Status: ~60%.
+Owner: `apps/web` + `apps/api` (+ `apps/indexer` as position depth grows). Status: ~75%.
 
 **Foundations in place.** Grouped multi-wallet behavior is real: add/remove/refresh/select flows,
 backend grouping by a persistent `userId`, wallet overview and per-wallet balances. Backed by the raw
 SQL v2 tables (`user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions`), refreshed via
 the indexer script spawned by `refreshWallet`.
 
-**Remaining gap, mapped to the exact criteria:** the explicit **"Active Signer" vs "watch-only"**
-distinction is not yet formalized (model + UI), and position aggregation beyond wallet balances is
-still thin. Decide whether watch-only is a backend state or a frontend designation, then surface the
-signing context clearly. The first two criteria are close; the third (clear UI distinction) is the
-real work. This is the start of the next deliverable group.
+**Gap A — done (criteria 1 + 3).** The **"Active Signer" vs "watch-only"** distinction is now
+formalized as a backend state + UI. Backend: `user_wallets.is_active_signer` is a DB-enforced
+singleton per user (partial unique index `user_wallets_one_signer_per_user`); `PATCH
+/v1/wallets/:walletId/signer` transfers it; connecting a wallet via the Wallets Kit promotes it
+(demoting the previous), so the connected wallet is always the signer (keeps T1-D3 valid); add-by-
+address stays watch-only. Designation is persisted; signing **capability** is the live Kit
+connection — the hybrid. UI: two explicit add-paths ("Connect signer wallet" vs "Add watch-only
+address"), per-wallet badges (Active Signer · connected / · not connected, vs Watch-only), and a
+signing guardrail that blocks build/sign unless the connected address is the active signer. No
+cryptographic proof-of-ownership (deferred): Kit connection is the beta proof.
+
+**Gap B part 1 — done (criterion 2, data layer).** The position resolver is built — beta-first
+**Blend only**: `lib/protocols/blend/{fetch-user-positions,resolve-user-health}` +
+`81-stellar-wallet-blend-positions.ts` resolve every tracked wallet's Blend position (signer +
+watch-only), writing per-asset supply/borrow → `wallet_protocol_positions` and a first-class
+**health factor** per pool → the new `wallet_pool_health` table (NOT `metadata` jsonb — HF is a
+column D2 will query). HF comes from the Blend SDK's `PositionsEstimate` (no hand-rolled
+collateral/liability math); NULL = no debt. Wired non-fatal into `refreshWallet`; validated on
+mainnet. The health factor is the data D2's first alert family consumes, so this resolver bridges
+D1 → D2.
+
+**Gap B part 2 — remaining (criterion 2, surfacing).** Positions now persist but aren't exposed.
+Aggregation across tracked addresses becomes *visible* via `GET /v1/wallets/:id/positions` +
+a portfolio UI slice (supplied / borrowed / health factor per wallet). That closes D1 end-to-end.
 
 ---
 

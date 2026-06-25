@@ -18,6 +18,10 @@ type SetPrimaryBody = {
   userId?: string;
 };
 
+type SetSignerBody = {
+  userId?: string;
+};
+
 type SetActiveBody = {
   userId?: string;
   isActive?: boolean;
@@ -93,6 +97,18 @@ export class WalletsController {
     @Body() body?: SetPrimaryBody
   ) {
     return this.walletsService.setPrimaryWallet({
+      walletId,
+      userId: queryUserId ?? body?.userId,
+    });
+  }
+
+  @Patch(':walletId/signer')
+  setActiveSigner(
+    @Param('walletId') walletId: string,
+    @Query('userId') queryUserId?: string,
+    @Body() body?: SetSignerBody
+  ) {
+    return this.walletsService.setActiveSigner({
       walletId,
       userId: queryUserId ?? body?.userId,
     });

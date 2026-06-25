@@ -51,9 +51,13 @@ apps/api/src/
     │                               entity_assets, assets, protocol_metrics_latest)
     ├── wallets/
     │   ├── wallets.controller.ts   GET/POST/PATCH/DELETE /v1/wallets/*
+    │   │                           PATCH /v1/wallets/:walletId/{primary,active,signer}
+    │   │                           (signer = T2-D1 active-signer designation, singleton)
     │   └── wallets.service.ts      Reads/writes: raw SQL v2 (user_wallets,
-    │                               wallet_balance_snapshots, wallet_protocol_positions)
-    │                               On refresh: spawns indexer script 80-stellar-wallet-balance-snapshots.ts
+    │                               wallet_balance_snapshots, wallet_protocol_positions,
+    │                               wallet_pool_health)
+    │                               On refresh: spawns 80-stellar-wallet-balance-snapshots.ts,
+    │                               then (non-fatal) 81-stellar-wallet-blend-positions.ts
     └── network/
         ├── network.controller.ts   GET /v1/network/stats
         └── network.service.ts      NO database access — fetches external APIs live:
@@ -113,10 +117,13 @@ apps/indexer/src/
 │           └── types.ts
 │
 └── scripts/
-    ├── discovery/       Exploration and onboarding scripts (numbered 01–73)
+    ├── discovery/       Exploration and onboarding scripts (numbered 01–75;
+    │                    75-blend-user-position-probe.ts de-risks the Gap B resolver)
     ├── bootstrap/       One-time setup scripts (upsert venue/entity/asset seed data)
     ├── shared/          db.ts, lookup.ts, prices.ts, pricing.ts, pricing-config.ts, scaling.ts
     ├── wallets/         80-stellar-wallet-balance-snapshots.ts (wallet balance refresh)
+    │                    81-stellar-wallet-blend-positions.ts (Blend supply/borrow + health factor;
+    │                    → lib/protocols/blend/{fetch-user-positions, resolve-user-health})
     └── ingest/          Executable refresh scripts (see classification below)
 ```
 

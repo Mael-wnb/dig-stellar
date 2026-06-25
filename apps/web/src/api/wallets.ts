@@ -65,6 +65,19 @@ export async function setPrimaryWallet(
   );
 }
 
+export async function setActiveSigner(
+  walletId: string,
+  userId: string
+): Promise<{ updated: boolean; wallet: WalletItem }> {
+  const query = new URLSearchParams({ userId }).toString();
+  return apiFetch<{ updated: boolean; wallet: WalletItem }>(
+    `/wallets/${walletId}/signer?${query}`,
+    {
+      method: "PATCH",
+    }
+  );
+}
+
 export async function setWalletActive(
   walletId: string,
   userId: string,

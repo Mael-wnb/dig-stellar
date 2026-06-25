@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { buildSdexSwap, quoteSdexSwap } from "../api/actions";
 import { useWalletSession } from "../composables/useWalletSession";
+import { useActiveSigner } from "../composables/useActiveSigner";
 import { useNetwork, toWalletNetwork } from "../composables/useNetwork";
 
 const TESTNET_RPC_URL = "https://soroban-testnet.stellar.org";
@@ -13,6 +14,7 @@ const SLIPPAGE = 0.05;
 const QUOTE_DEBOUNCE_MS = 300;
 
 const { connectedAddress, signTransaction } = useWalletSession();
+const { activeSignerAddress } = useActiveSigner();
 const { network } = useNetwork();
 
 // RPC endpoint follows the toggle so the submit target stays consistent with
@@ -42,6 +44,28 @@ const errorMessage = ref("");
 
 const isConnected = computed(() => !!connectedAddress.value);
 
+// Signing guardrail: only the LIVE active signer may sign — the Kit must be
+// connected to the wallet designated as active signer. A connected watch-only
+// wallet (or no connection) is blocked. In the normal flow connecting a wallet
+// promotes it to signer, so this stays satisfied for the proven testnet swap.
+const isActiveSignerConnected = computed(
+  () =>
+    !!connectedAddress.value &&
+    !!activeSignerAddress.value &&
+    connectedAddress.value.toLowerCase() ===
+      activeSignerAddress.value.toLowerCase(),
+);
+
+const signerBlockReason = computed<string | null>(() => {
+  if (!connectedAddress.value) {
+    return "Connect your active-signer wallet to sign.";
+  }
+  if (!isActiveSignerConnected.value) {
+    return "You're connected with a watch-only wallet. Connect your active signer to sign.";
+  }
+  return null;
+});
+
 // Swap is Testnet-only for this beta: the Mainnet backend / liquidity path is
 // not validated yet. The rest of the decoupling (kit follows the toggle,
 // dynamic RPC, passphrase fallback) stays in place for later.
@@ -51,6 +75,7 @@ const canSwap = computed(
   () =>
     !isMainnet.value &&
     isConnected.value &&
+    isActiveSignerConnected.value &&
     status.value !== "loading" &&
     parseFloat(amount.value) > 0 &&
     (estimate.value ?? 0) > 0,
@@ -159,6 +184,15 @@ async function onSwap() {
   // Hard guard: never attempt a real Mainnet swap in this beta, even if the
   // button somehow got enabled.
   if (isMainnet.value) return;
+
+  // Defensive signing guardrail: never build/sign unless the connected wallet is
+  // the designated active signer (close the previously-absent check).
+  if (signerBlockReason.value) {
+    errorMessage.value = signerBlockReason.value;
+    status.value = "error";
+    return;
+  }
+
   if (!canSwap.value || !connectedAddress.value) return;
 
   // Derive minReceive from the live estimate at submit time, applying slippage.
@@ -228,6 +262,14 @@ function reset() {
       Switch the network toggle to Testnet to swap.
     </div>
 
+    <!-- SIGNER GUARDRAIL: connected but not the active signer (watch-only) -->
+    <div
+      v-if="!isMainnet && isConnected && signerBlockReason"
+      class="bg-[#202020] border border-[rgba(255,184,107,0.4)] rounded-md p-3 text-[11px] text-[#ffb86b]"
+    >
+      {{ signerBlockReason }}
+    </div>
+
     <!-- PAIR -->
     <div class="flex items-center gap-2 text-xs">
       <div class="flex-1 bg-[#202020] border border-[#383838] rounded-md px-3 py-2 text-[#9a9b99]">
@@ -294,6 +336,7 @@ function reset() {
       <template v-if="isMainnet">Swap is Testnet-only in this beta</template>
       <template v-else-if="status === 'loading'">Swapping…</template>
       <template v-else-if="!isConnected">Connect wallet first</template>
+      <template v-else-if="!isActiveSignerConnected">Connect your active signer</template>
       <template v-else>Swap</template>
     </button>
 
