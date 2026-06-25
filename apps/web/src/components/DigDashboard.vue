@@ -5,6 +5,7 @@ import { useNetworkStats } from "../composables/useNetworkStats";
 import { useNetwork } from "../composables/useNetwork";
 
 import DashboardHeader from "./DashboardHeader.vue";
+import NetworkToggle from "./NetworkToggle.vue";
 import SdexSwapWidget from "./SdexSwapWidget.vue";
 import HeroBanner from "./HeroBanner.vue";
 import NetworkStats from "./NetworkStats.vue"; // ✅ FIX
@@ -73,21 +74,37 @@ const { network } = useNetwork();
         <WalletSection :notifications="NOTIFICATIONS" />
       </section>
 
-      <!-- TESTNET ACTIONS -->
-      <section v-if="network === 'testnet'" class="flex flex-col gap-3">
-        <div class="flex items-center justify-between">
-          <span
-            class="text-[11px] font-bold uppercase tracking-[0.14em] text-accent"
-          >
-            Testnet Actions
-          </span>
+      <!-- TESTNET ACTIONS — section header (incl. network selector) is always
+           visible; only the swap widget itself is gated to Testnet. The network
+           selector scopes signing only, NOT the Mainnet portfolio above. -->
+      <section class="flex flex-col gap-3">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div class="flex flex-col">
+            <span
+              class="text-[11px] font-bold uppercase tracking-[0.14em] text-accent"
+            >
+              Testnet Actions
+            </span>
 
-          <span class="text-[11px] text-muted">
-            Non-custodial transaction builder
-          </span>
+            <span class="text-[11px] text-muted">
+              Non-custodial transaction builder — the network selector applies to
+              signing only
+            </span>
+          </div>
+
+          <NetworkToggle />
         </div>
 
-        <SdexSwapWidget />
+        <SdexSwapWidget v-if="network === 'testnet'" />
+
+        <div
+          v-else
+          class="bg-[#2A2A2A] border border-[rgba(213,255,47,0.3)] rounded-lg p-3 text-[11px] text-[#9a9b99]"
+        >
+          Switch the selector to
+          <span class="text-[#d5ff2f] font-semibold">Testnet</span> to access the
+          swap builder. Your portfolio above stays on Mainnet.
+        </div>
       </section>
 
       <!-- PROTOCOL -->

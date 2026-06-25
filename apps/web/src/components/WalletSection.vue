@@ -21,6 +21,7 @@ const { userId, setUserId, restoreUser, clearUser } = useAppUser();
 const {
   isConnecting,
   connectWallet,
+  connectedAddress,
   restoreWalletSession,
   disconnectWallet,
 } = useWalletSession();
@@ -36,6 +37,7 @@ const {
   addWallet,
   refreshOneWallet,
   setPrimary,
+  setSigner,
   removeWallet,
   hydrateFromConnect,
   clearWallets,
@@ -45,8 +47,10 @@ const {
 
 const connectError = ref("");
 const showAddModal = ref(false);
+// Two add-paths share one modal: "signer" (address proven via the Kit, promoted
+// to the user's active signer) vs "watch-only" (address typed in, never signs).
+const addMode = ref<"signer" | "watch-only">("signer");
 const pendingAddress = ref("");
-const pendingWalletProviderId = ref<string | null>(null);
 const newLabel = ref("");
 const addLoading = ref(false);
 
@@ -59,15 +63,6 @@ function fmtUsd(value: number | null | undefined): string {
     maximumFractionDigits: 2,
   })}`;
 }
-
-// function getWalletXlmBalance(wallet: WalletItem): number {
-//   const nativeBalance = wallet.balances?.find((balance) => {
-//     if (balance.metadata?.assetType === "native") return true;
-//     return balance.symbol?.toLowerCase() === "native";
-//   });
-
-//   return nativeBalance?.balance ?? 0;
-// }
 
 function shortAddr(address: string): string {
   return address.length > 14
@@ -82,6 +77,19 @@ function balanceSymbol(balance: WalletBalanceItem): string {
   return displaySymbol(balance.symbol ?? "Unknown");
 }
 
+// The active signer is "live" (capable of signing) only when the Kit is
+// currently connected to its address. Designated-but-not-connected is an honest
+// hybrid state we surface explicitly.
+function isSignerConnected(wallet: WalletItem): boolean {
+  return (
+    wallet.isActiveSigner &&
+    !!connectedAddress.value &&
+    connectedAddress.value.toLowerCase() === wallet.address.toLowerCase()
+  );
+}
+
+// Path 1 — "Connect signer wallet": connecting via the Kit proves control of the
+// address, so the connected wallet becomes (or stays) the active signer.
 async function openConnectModal(): Promise<void> {
   connectError.value = "";
 
@@ -92,20 +100,8 @@ async function openConnectModal(): Promise<void> {
       throw new Error("No wallet address returned.");
     }
 
-    pendingAddress.value = sessionResult.address;
-    pendingWalletProviderId.value = sessionResult.providerId;
-
-    const alreadyPresent = wallets.value.find(
-      (wallet) =>
-        wallet.address.toLowerCase() === sessionResult.address.toLowerCase()
-    );
-
-    if (alreadyPresent) {
-      selectedWallet.value = alreadyPresent;
-      showAddModal.value = false;
-      return;
-    }
-
+    // Brand-new user: the connect endpoint creates the user + wallet and
+    // designates it the active signer server-side.
     if (!userId.value) {
       const connectResponse = await connectWalletApi({
         chain: "stellar",
@@ -114,24 +110,36 @@ async function openConnectModal(): Promise<void> {
       });
 
       setUserId(connectResponse.userId);
-      hydrateFromConnect({
-        wallets: connectResponse.wallets,
-      });
+      hydrateFromConnect({ wallets: connectResponse.wallets });
+      await loadOverview();
 
-      const linkedWallet = connectResponse.wallets.find(
+      const linkedWallet = wallets.value.find(
         (wallet) =>
           wallet.address.toLowerCase() === sessionResult.address.toLowerCase()
       );
-
-      if (linkedWallet) {
-        selectedWallet.value = linkedWallet;
-      }
-
-      await loadOverview();
-      showAddModal.value = false;
+      if (linkedWallet) selectedWallet.value = linkedWallet;
       return;
     }
 
+    // Existing user, address already tracked: promote it to the active signer.
+    const alreadyPresent = wallets.value.find(
+      (wallet) =>
+        wallet.address.toLowerCase() === sessionResult.address.toLowerCase()
+    );
+
+    if (alreadyPresent) {
+      selectedWallet.value = alreadyPresent;
+      if (!alreadyPresent.isActiveSigner) {
+        await setSigner(alreadyPresent);
+        selectedWallet.value =
+          wallets.value.find((w) => w.id === alreadyPresent.id) ?? null;
+      }
+      return;
+    }
+
+    // Existing user, new connected address: confirm a label, then add + promote.
+    addMode.value = "signer";
+    pendingAddress.value = sessionResult.address;
     newLabel.value = "";
     showAddModal.value = true;
   } catch (err: unknown) {
@@ -140,32 +148,54 @@ async function openConnectModal(): Promise<void> {
   }
 }
 
-async function _addWalletWithoutSignature(): Promise<void> {
-    if (!pendingAddress.value) return;
+// Path 2 — "Add watch-only address": no Kit, no signing. Requires an existing
+// user (connect a signer first), since watch-only wallets attach to that user.
+function openWatchOnlyModal(): void {
+  connectError.value = "";
+  addMode.value = "watch-only";
+  pendingAddress.value = "";
+  newLabel.value = "";
+  showAddModal.value = true;
+}
+
+async function confirmAdd(): Promise<void> {
+  const address = pendingAddress.value.trim();
+  if (!address) {
+    connectError.value = "A Stellar address is required.";
+    return;
+  }
 
   addLoading.value = true;
   connectError.value = "";
 
   try {
     const alreadyPresent = wallets.value.find(
-      (wallet) =>
-        wallet.address.toLowerCase() === pendingAddress.value.toLowerCase()
+      (wallet) => wallet.address.toLowerCase() === address.toLowerCase()
     );
 
     if (alreadyPresent) {
       selectedWallet.value = alreadyPresent;
+      if (addMode.value === "signer" && !alreadyPresent.isActiveSigner) {
+        await setSigner(alreadyPresent);
+      }
       closeAddModal();
       return;
     }
 
-    await addWallet({
-      address: pendingAddress.value,
+    const created = await addWallet({
+      address,
       label: newLabel.value,
     });
 
+    // Signer path: the wallet was just created watch-only by default — promote
+    // it to the active signer (singleton; demotes any previous signer).
+    if (addMode.value === "signer") {
+      await setSigner(created);
+    }
+
     closeAddModal();
   } catch (err: unknown) {
-    console.error("[wallet] addWalletWithoutSignature failed", err);
+    console.error("[wallet] confirmAdd failed", err);
     connectError.value =
       err instanceof Error ? err.message : "Failed to add wallet.";
   } finally {
@@ -190,8 +220,8 @@ async function handleDeleteWallet(wallet: WalletItem): Promise<void> {
 
 function closeAddModal(): void {
   showAddModal.value = false;
+  addMode.value = "signer";
   pendingAddress.value = "";
-  pendingWalletProviderId.value = null;
   newLabel.value = "";
   connectError.value = "";
 }
@@ -212,7 +242,6 @@ onMounted(() => {
   restoreWalletSession();
   restoreUser();
 });
-void _addWalletWithoutSignature
 </script>
 
 <template>
@@ -223,7 +252,16 @@ void _addWalletWithoutSignature
 
       <!-- BALANCE -->
       <div class="flex flex-col gap-1">
-        <p class="text-[12px] text-[#9a9b99]">Multi-Wallet Amount</p>
+        <div class="flex items-center gap-2 flex-wrap">
+          <p class="text-[12px] text-[#9a9b99]">Multi-Wallet Amount</p>
+
+          <span
+            class="px-2 py-[1px] text-[9px] font-bold rounded-full border border-[rgba(213,255,47,0.3)] text-[#d5ff2f] bg-[rgba(213,255,47,0.08)] cursor-help"
+            title="Displayed balances are Mainnet. The network selector applies to signing (Testnet swap) only."
+          >
+            Mainnet holdings
+          </span>
+        </div>
 
         <p v-if="overviewLoading" class="text-[2rem] font-bold text-white leading-[1.1] tracking-[-0.03em]">
           —
@@ -259,6 +297,24 @@ void _addWalletWithoutSignature
             <div class="flex items-center gap-2 flex-wrap">
               <span class="text-[12px] font-bold text-[#e2e6e1] whitespace-nowrap">
                 {{ wallet.label || "Unnamed wallet" }}
+              </span>
+
+              <!-- ROLE: active signer (with live-connection state) vs watch-only -->
+              <span
+                v-if="wallet.isActiveSigner"
+                class="px-2 py-[2px] text-[10px] font-bold rounded-full border"
+                :class="isSignerConnected(wallet)
+                  ? 'border-[rgba(213,255,47,0.5)] text-[#d5ff2f] bg-[rgba(213,255,47,0.12)]'
+                  : 'border-[rgba(213,255,47,0.25)] text-[#a9c437] bg-[rgba(213,255,47,0.05)]'"
+              >
+                {{ isSignerConnected(wallet) ? "Active Signer · connected" : "Active Signer · not connected" }}
+              </span>
+
+              <span
+                v-else
+                class="px-2 py-[2px] text-[10px] font-bold rounded-full border border-[rgba(154,155,153,0.3)] text-[#9a9b99] bg-[rgba(154,155,153,0.08)]"
+              >
+                Watch-only
               </span>
 
               <span
@@ -304,6 +360,20 @@ void _addWalletWithoutSignature
         <!-- DETAIL -->
         <transition name="slide">
           <div v-if="selectedWallet" class="flex flex-col gap-[10px]">
+
+            <!-- Signing context: only the connected active signer can sign. -->
+            <p
+              v-if="selectedWallet.isActiveSigner"
+              class="text-[11px]"
+              :class="isSignerConnected(selectedWallet) ? 'text-[#d5ff2f]' : 'text-[#a9c437]'"
+            >
+              {{ isSignerConnected(selectedWallet)
+                ? "This is your active signing wallet (connected)."
+                : "Designated signer — connect this wallet to sign." }}
+            </p>
+            <p v-else class="text-[11px] text-[#9a9b99]">
+              Watch-only — monitored, but cannot sign actions.
+            </p>
 
             <div class="flex flex-wrap gap-[6px]">
 
@@ -357,17 +427,36 @@ void _addWalletWithoutSignature
           </div>
         </transition>
 
-        <!-- ADD BUTTON -->
-        <button
-          class="flex items-center gap-2 w-full border border-dashed border-[rgba(213,255,47,0.3)] rounded-[8px] px-3 py-[10px] text-[#d5ff2f] text-[12px] font-semibold font-mono hover:border-[#d5ff2f] hover:bg-[rgba(213,255,47,0.05)]"
-          :disabled="isConnecting"
-          @click="openConnectModal"
-        >
-          <span class="w-[18px] h-[18px] flex items-center justify-center text-[14px] bg-[rgba(213,255,47,0.12)] border border-[rgba(213,255,47,0.3)] rounded">
-            +
-          </span>
-          {{ isConnecting ? "Opening wallet…" : "Add Stellar Wallet" }}
-        </button>
+        <!-- CONNECT ERROR -->
+        <p v-if="connectError && !showAddModal" class="text-[11px] text-[#ff7b7b]">
+          {{ connectError }}
+        </p>
+
+        <!-- ADD PATHS: distinct signer vs watch-only -->
+        <div class="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
+          <button
+            class="flex items-center justify-center gap-2 border border-dashed border-[rgba(213,255,47,0.3)] rounded-[8px] px-3 py-[10px] text-[#d5ff2f] text-[12px] font-semibold font-mono hover:border-[#d5ff2f] hover:bg-[rgba(213,255,47,0.05)] disabled:opacity-50"
+            :disabled="isConnecting"
+            @click="openConnectModal"
+          >
+            <span class="w-[18px] h-[18px] flex items-center justify-center text-[14px] bg-[rgba(213,255,47,0.12)] border border-[rgba(213,255,47,0.3)] rounded">
+              +
+            </span>
+            {{ isConnecting ? "Opening wallet…" : "Connect signer wallet" }}
+          </button>
+
+          <button
+            class="flex items-center justify-center gap-2 border border-dashed border-[#3a3a3a] rounded-[8px] px-3 py-[10px] text-[#9a9b99] text-[12px] font-semibold font-mono hover:border-[#9a9b99] hover:bg-[rgba(255,255,255,0.03)] disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="!userId"
+            :title="!userId ? 'Connect a signer wallet first' : 'Add a watch-only address'"
+            @click="openWatchOnlyModal"
+          >
+            <span class="w-[18px] h-[18px] flex items-center justify-center text-[12px] bg-[#202020] border border-[#3a3a3a] rounded">
+              👁
+            </span>
+            Add watch-only address
+          </button>
+        </div>
 
       </div>
     </div>
@@ -422,6 +511,72 @@ void _addWalletWithoutSignature
         </div>
       </div>
 
+    </div>
+
+    <!-- ADD MODAL (shared by both add-paths) -->
+    <div
+      v-if="showAddModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      @click.self="closeAddModal"
+    >
+      <div class="w-full max-w-[380px] bg-[#2A2A2A] border border-[#383838] rounded-[12px] p-4 flex flex-col gap-3">
+
+        <div class="flex items-center justify-between">
+          <span class="text-[13px] font-bold text-[#e2e6e1]">
+            {{ addMode === "signer" ? "Add signing wallet" : "Add watch-only address" }}
+          </span>
+          <button class="text-[#9a9b99] hover:text-white text-[14px]" @click="closeAddModal">✕</button>
+        </div>
+
+        <p class="text-[11px] text-[#9a9b99]">
+          <template v-if="addMode === 'signer'">
+            This wallet becomes your
+            <span class="text-[#d5ff2f] font-semibold">active signer</span> — the
+            only wallet that can sign actions.
+          </template>
+          <template v-else>
+            Fully monitored, but
+            <span class="text-[#ffb86b] font-semibold">watch-only</span>: it can
+            never sign.
+          </template>
+        </p>
+
+        <label class="flex flex-col gap-1">
+          <span class="text-[11px] text-[#9a9b99]">Stellar address</span>
+          <input
+            v-model="pendingAddress"
+            type="text"
+            :readonly="addMode === 'signer'"
+            placeholder="G…"
+            class="bg-[#202020] border border-[#383838] rounded-md px-3 py-2 text-[12px] font-mono text-[#e2e6e1] focus:border-[#d5ff2f] outline-none read-only:opacity-60"
+          />
+        </label>
+
+        <label class="flex flex-col gap-1">
+          <span class="text-[11px] text-[#9a9b99]">Label (optional)</span>
+          <input
+            v-model="newLabel"
+            type="text"
+            placeholder="e.g. Main wallet"
+            class="bg-[#202020] border border-[#383838] rounded-md px-3 py-2 text-[12px] text-[#e2e6e1] focus:border-[#d5ff2f] outline-none"
+          />
+        </label>
+
+        <p v-if="connectError" class="text-[11px] text-[#ff7b7b]">{{ connectError }}</p>
+
+        <div class="flex gap-2 justify-end">
+          <button class="mini-btn" :disabled="addLoading" @click="closeAddModal">
+            Cancel
+          </button>
+          <button
+            class="mini-btn border-[#d5ff2f] text-[#d5ff2f]"
+            :disabled="addLoading || !pendingAddress.trim()"
+            @click="confirmAdd"
+          >
+            {{ addLoading ? "Adding…" : addMode === "signer" ? "Add signer" : "Add watch-only" }}
+          </button>
+        </div>
+      </div>
     </div>
 
   </div>

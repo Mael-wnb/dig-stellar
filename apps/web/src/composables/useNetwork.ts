@@ -27,19 +27,22 @@ function restoreNetwork(): void {
 
   if (typeof window === "undefined") return;
 
-  const stored = window.localStorage.getItem(STORAGE_NETWORK_KEY);
-  network.value =
-    stored === "testnet" || stored === "mainnet" ? stored : ENV_DEFAULT_NETWORK;
+  // The global network toggle was removed: the portfolio is always Mainnet and
+  // the network selector now scopes ONLY the Testnet swap (signing). Boot
+  // therefore always starts from the env default (Mainnet) and purges any legacy
+  // persisted value, so an old `dig_stellar_network=testnet` can no longer trap
+  // the portfolio in a testnet state on reload.
+  window.localStorage.removeItem(STORAGE_NETWORK_KEY);
+  network.value = ENV_DEFAULT_NETWORK;
 
   console.log("[network] restoreNetwork", { network: network.value });
 }
 
 function setNetwork(next: StellarNetwork): void {
+  // Session-scoped only (module-level ref). Intentionally NOT persisted: a reload
+  // must return to the Mainnet default so a swap-time network choice cannot
+  // silently outlive its session and mislead the Mainnet portfolio.
   network.value = next;
-
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(STORAGE_NETWORK_KEY, next);
-  }
 
   console.log("[network] setNetwork", { network: next });
 }
