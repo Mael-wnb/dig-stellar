@@ -31,6 +31,7 @@ const {
   selectedWallet,
   overviewLoading,
   error: _error,
+  defi,
   totalPortfolioUsd,
   isBusy,
   loadOverview,
@@ -68,6 +69,29 @@ function shortAddr(address: string): string {
   return address.length > 14
     ? `${address.slice(0, 6)}…${address.slice(-6)}`
     : address;
+}
+
+// Health-factor presentation (Gap B). null = no debt (collateral-only, not at
+// risk). Thresholds mirror the hand-off brief: ≥1.5 healthy, 1.2–1.5 caution,
+// <1.2 at risk. The raw value is always shown next to the cue so it can be
+// compared directly to Blend's own UI.
+function hfDisplay(hf: number | null): {
+  label: string;
+  color: string;
+  value: string;
+} {
+  if (hf === null || !Number.isFinite(hf)) {
+    return { label: "No borrow", color: "#9a9b99", value: "—" };
+  }
+  const value = `HF ${hf.toFixed(2)}`;
+  if (hf >= 1.5) return { label: "Healthy", color: "#6ee7a8", value };
+  if (hf >= 1.2) return { label: "Caution", color: "#ffb86b", value };
+  return { label: "At risk", color: "#ff7b7b", value };
+}
+
+// A wallet has DeFi exposure if any pool carries a position.
+function hasDefi(wallet: WalletItem): boolean {
+  return !!wallet.pools && wallet.pools.length > 0;
 }
 
 function balanceSymbol(balance: WalletBalanceItem): string {
@@ -277,6 +301,57 @@ onMounted(() => {
         </p>
       </div>
 
+      <!-- CONSOLIDATED DEFI (Blend) — across all tracked wallets -->
+      <div class="bg-[#202020] border border-[#383838] rounded-[8px] px-3 py-[10px] flex flex-col gap-[8px]">
+        <div class="flex items-center gap-2 flex-wrap">
+          <p class="text-[12px] text-[#9a9b99]">DeFi positions</p>
+          <span
+            class="px-2 py-[1px] text-[9px] font-bold rounded-full border border-[rgba(213,255,47,0.3)] text-[#d5ff2f] bg-[rgba(213,255,47,0.08)]"
+          >
+            Blend
+          </span>
+        </div>
+
+        <div v-if="defi.poolHealth.length" class="flex flex-col gap-[8px]">
+          <div class="grid grid-cols-3 gap-2">
+            <div class="flex flex-col">
+              <span class="text-[10px] text-[#9a9b99]">Supplied</span>
+              <span class="text-[14px] font-bold text-[#e2e6e1]">{{ fmtUsd(defi.totalSuppliedUsd) }}</span>
+            </div>
+            <div class="flex flex-col">
+              <span class="text-[10px] text-[#9a9b99]">Borrowed</span>
+              <span class="text-[14px] font-bold text-[#ffb86b]">{{ fmtUsd(defi.totalBorrowedUsd) }}</span>
+            </div>
+            <div class="flex flex-col">
+              <span class="text-[10px] text-[#9a9b99]">Net DeFi</span>
+              <span class="text-[14px] font-bold text-[#d5ff2f]">{{ fmtUsd(defi.netDefiUsd) }}</span>
+            </div>
+          </div>
+
+          <!-- consolidated per-pool health across all wallets, riskiest first -->
+          <div class="flex flex-col gap-[4px]">
+            <div
+              v-for="(pool, idx) in defi.poolHealth"
+              :key="`${pool.walletId}-${pool.poolSlug}-${idx}`"
+              class="flex items-center justify-between gap-2 text-[11px] border-b border-[#222] last:border-none py-[3px]"
+            >
+              <span class="text-[#9a9b99] truncate">
+                {{ pool.label || shortAddr(pool.address) }} ·
+                <span class="text-[#e2e6e1]">{{ pool.poolName || pool.poolSlug || "Pool" }}</span>
+              </span>
+              <span class="font-bold whitespace-nowrap" :style="{ color: hfDisplay(pool.healthFactor).color }">
+                {{ hfDisplay(pool.healthFactor).label }}
+                <span class="text-[#9a9b99] font-normal">({{ hfDisplay(pool.healthFactor).value }})</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <p v-else class="text-[11px] text-[#9a9b99]">
+          No Blend positions across your tracked wallets.
+        </p>
+      </div>
+
       <!-- WALLET LIST -->
       <div class="flex flex-col gap-[6px]">
 
@@ -422,6 +497,67 @@ onMounted(() => {
 
             <div v-else class="text-[12px] text-[#9a9b99] bg-[#161616] border border-[#383838] rounded-[8px] p-3">
               No balances found for this wallet.
+            </div>
+
+            <!-- PER-WALLET DEFI (Blend): supplied / borrowed + health factor per pool -->
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] text-[#9a9b99]">Blend positions</span>
+              <span v-if="selectedWallet.positionsLoading" class="text-[11px] text-[#d5ff2f]">…</span>
+            </div>
+
+            <div
+              v-if="hasDefi(selectedWallet)"
+              class="flex flex-col gap-[8px]"
+            >
+              <div
+                v-for="(pool, pIdx) in selectedWallet.pools"
+                :key="`${pool.poolSlug}-${pIdx}`"
+                class="bg-[#161616] border border-[#383838] rounded-[8px] px-3 py-2 flex flex-col gap-[6px]"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-[12px] font-bold text-[#e2e6e1] truncate">
+                    {{ pool.poolName || pool.poolSlug || "Pool" }}
+                  </span>
+                  <span class="text-[11px] font-bold whitespace-nowrap" :style="{ color: hfDisplay(pool.healthFactor).color }">
+                    {{ hfDisplay(pool.healthFactor).label }}
+                    <span class="text-[#9a9b99] font-normal">{{ hfDisplay(pool.healthFactor).value }}</span>
+                  </span>
+                </div>
+
+                <div
+                  v-for="(position, posIdx) in pool.positions"
+                  :key="`${pool.poolSlug}-${position.positionType}-${position.assetSymbol}-${posIdx}`"
+                  class="flex justify-between items-center text-[12px] border-b border-[#222] last:border-none py-1"
+                >
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span
+                      class="px-[6px] py-[1px] text-[9px] font-bold rounded-full border whitespace-nowrap"
+                      :class="position.positionType === 'borrow'
+                        ? 'border-[rgba(255,184,107,0.35)] text-[#ffb86b] bg-[rgba(255,184,107,0.08)]'
+                        : 'border-[rgba(110,231,168,0.35)] text-[#6ee7a8] bg-[rgba(110,231,168,0.08)]'"
+                    >
+                      {{ position.positionType === "borrow" ? "Borrow" : "Supply" }}
+                    </span>
+                    <span class="font-bold text-[#e2e6e1]">{{ displaySymbol(position.assetSymbol ?? "?") }}</span>
+                    <span class="text-[#9a9b99] truncate">
+                      {{ (position.amountScaled ?? 0).toLocaleString("en-US", { maximumFractionDigits: 4 }) }}
+                    </span>
+                  </div>
+                  <span
+                    class="font-semibold whitespace-nowrap"
+                    :class="position.positionType === 'borrow' ? 'text-[#ffb86b]' : 'text-[#d5ff2f]'"
+                  >
+                    {{ fmtUsd(position.amountUsd) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              v-else
+              class="text-[12px] text-[#9a9b99] bg-[#161616] border border-[#383838] rounded-[8px] p-3"
+            >
+              No Blend positions for this wallet.
             </div>
 
           </div>

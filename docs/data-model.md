@@ -401,6 +401,9 @@ DeFi positions held by a wallet within a tracked entity. Linked to v1 `venues` a
 and/or one `borrow` row per reserve the wallet holds. `position_type` ∈ `supply` / `borrow`.
 Amounts are in underlying-asset units (the Blend SDK's Float helpers, decimal-scaled via b/dRate);
 `amount_raw` = `amount_scaled × 10^decimals`. Soroswap/Aquarius LP positions are not yet resolved.
+**Read by** `GET /v1/wallets/:walletId/positions` and the `defi` block of `GET /v1/wallets/overview`
+(Gap B part 2) — both filter to the wallet's **latest `snapshot_at`** so repaid/exited positions
+don't linger (snapshot tables don't tombstone closed rows).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -432,6 +435,9 @@ the pool-level rollup; the per-asset supply/borrow rows live in `wallet_protocol
 Snapshot-based, so D2 can read both the current HF and the previous one for delta detection.
 Written by `81-stellar-wallet-blend-positions.ts`. Values come from the Blend SDK's
 `PositionsEstimate` (never hand-rolled), denominated in USD via the pool's Reflector oracle.
+**Read by** `GET /v1/wallets/:walletId/positions` (per-pool HF) and the `defi.poolHealth` block of
+`GET /v1/wallets/overview` (consolidated risk across all tracked wallets) — filtered to each
+wallet's latest `snapshot_at`.
 
 | Column | Type | Notes |
 |---|---|---|

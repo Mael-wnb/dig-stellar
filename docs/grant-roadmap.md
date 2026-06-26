@@ -40,7 +40,7 @@ disbursement is reviewed against.
 | T1 | 1 | Data Indexing Foundation (Horizon & Soroban) | May 25, 2026 | $12,300 | Done — 100% |
 | T1 | 2 | Analytics Dashboard MVP | Jun 8, 2026 | $6,140 | Done — 100% |
 | T1 | 3 | Smart Transaction Builder (Testnet) | Jun 22, 2026 | $11,070 | Done — 100% |
-| T2 | 1 | Multi-Wallet Portfolio & "Active Signer" Model | Jul 6, 2026 | $7,380 | ~82% |
+| T2 | 1 | Multi-Wallet Portfolio & "Active Signer" Model | Jul 6, 2026 | $7,380 | ~95% |
 | T2 | 2 | In-App Alerting Engine | Jul 20, 2026 | $8,610 | ~10% |
 | T2 | 3 | Bridge Flow Monitoring | Aug 3, 2026 | $6,140 | ~45% |
 | T3 | 1 | Mainnet Deployment & Freshness Tracking | Aug 10, 2026 | $8,610 | ~45% |
@@ -253,9 +253,14 @@ collateral/liability math); NULL = no debt. Wired non-fatal into `refreshWallet`
 mainnet. The health factor is the data D2's first alert family consumes, so this resolver bridges
 D1 → D2.
 
-**Gap B part 2 — remaining (criterion 2, surfacing).** Positions now persist but aren't exposed.
-Aggregation across tracked addresses becomes *visible* via `GET /v1/wallets/:id/positions` +
-a portfolio UI slice (supplied / borrowed / health factor per wallet). That closes D1 end-to-end.
+**Gap B part 2 — done (criterion 2, surfacing).** Aggregation across tracked addresses is now
+*visible*: `GET /v1/wallets/:id/positions` (per-pool supplied/borrowed + HF) and a `defi` block on
+`GET /v1/wallets/overview` (Σ supplied / Σ borrowed / net + consolidated per-(wallet,pool) health,
+riskiest first), both reading each wallet's **latest snapshot** so repaid/exited positions don't
+linger. The portfolio UI shows a consolidated "DeFi positions (Blend)" header + per-wallet
+supplied/borrowed/health-factor with colour-coded risk states. `total_portfolio_usd` (liquid)
+stays distinct from supplied/borrowed. **This closes T2-D1 criterion 2 and, with Gap A, D1 end to
+end** (Blend-only; final visual HF cross-check vs blend.capital recommended; VPS applies v2 at deploy).
 
 ---
 

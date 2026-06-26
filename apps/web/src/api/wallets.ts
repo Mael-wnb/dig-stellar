@@ -9,6 +9,7 @@ import type {
   WalletBalancesResponse,
   WalletItem,
   WalletOverviewResponse,
+  WalletPositionsResponse,
 } from "../types/wallet";
 
 export async function connectWallet(
@@ -31,6 +32,14 @@ export async function fetchWalletBalances(
 ): Promise<WalletBalancesResponse> {
   const query = new URLSearchParams({ userId }).toString();
   return apiFetch<WalletBalancesResponse>(`/wallets/${walletId}/balances?${query}`);
+}
+
+export async function fetchWalletPositions(
+  walletId: string,
+  userId: string
+): Promise<WalletPositionsResponse> {
+  const query = new URLSearchParams({ userId }).toString();
+  return apiFetch<WalletPositionsResponse>(`/wallets/${walletId}/positions?${query}`);
 }
 
 export async function createWallet(

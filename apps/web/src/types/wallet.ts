@@ -23,7 +23,56 @@ export interface WalletItem {
   chain: string;
   totalPortfolioUsd?: number;
   balances?: WalletBalanceItem[];
+  pools?: WalletPositionPool[]; // Blend DeFi positions (Gap B part 2)
+  positionsLoading?: boolean;
   loading?: boolean;
+}
+
+// T2-D1 Gap B part 2 — Blend DeFi positions + health.
+export interface WalletPoolHealthSummary {
+  walletId: string;
+  address: string;
+  label: string | null;
+  poolSlug: string | null;
+  poolName: string | null;
+  healthFactor: number | null; // null = no debt (not at risk)
+  totalCollateralUsd: number;
+  totalDebtUsd: number;
+}
+
+export interface WalletDefiSummary {
+  totalSuppliedUsd: number;
+  totalBorrowedUsd: number;
+  netDefiUsd: number;
+  poolHealth: WalletPoolHealthSummary[];
+}
+
+export interface WalletPositionItem {
+  positionType: "supply" | "borrow" | string;
+  assetSymbol: string | null;
+  amountScaled: number;
+  amountUsd: number | null;
+  collateralEnabled?: boolean;
+}
+
+export interface WalletPositionPool {
+  venueSlug: string | null;
+  poolSlug: string | null;
+  poolName: string | null;
+  healthFactor: number | null; // null = no debt
+  totalCollateralUsd: number;
+  totalDebtUsd: number;
+  borrowLimitUsd: number | null;
+  netApy: number | null;
+  positionsCount: number | null;
+  snapshotAt: string | null;
+  positions: WalletPositionItem[];
+}
+
+export interface WalletPositionsResponse {
+  walletId: string;
+  address: string;
+  pools: WalletPositionPool[];
 }
 
 export interface WalletOverviewResponse {
@@ -35,6 +84,7 @@ export interface WalletOverviewResponse {
     totalTrackedPositions: number;
     totalPortfolioUsd: number;
   };
+  defi?: WalletDefiSummary;
   byChain?: Array<{
     chain: string;
     totalWallets: number;

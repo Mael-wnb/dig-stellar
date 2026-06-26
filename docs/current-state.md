@@ -150,14 +150,26 @@ fully monitored, never signable. The signing guardrail in the swap widget blocks
 the connected address is the active signer. The three axes — `is_active_signer` (sign),
 `is_primary` (showcase/default), `is_active` (refresh gate) — are orthogonal and never merged.
 
+**DeFi position aggregation — now live (T2-D1 Gap B).** The portfolio aggregates Blend positions and
+health across all tracked wallets (signer + watch-only). Part 1 resolves and persists per-asset
+supply/borrow (`wallet_protocol_positions`) + a per-pool health factor (`wallet_pool_health`) via
+`refreshWallet`. Part 2 surfaces it: `GET /v1/wallets/:id/positions` (per-pool supplied/borrowed +
+HF) and a `defi` block on `GET /v1/wallets/overview` (Σ supplied / Σ borrowed / net + per-(wallet,pool)
+health, riskiest first). All reads filter to each wallet's **latest snapshot** so repaid/exited
+positions don't linger. The UI shows a consolidated "DeFi positions (Blend)" header plus per-wallet
+supplied/borrowed/HF with colour-coded health states; `total_portfolio_usd` (liquid balances) stays
+distinct from supplied/borrowed — they are not folded into one number. Health factors come from the
+Blend SDK's `PositionsEstimate` (USD via the pool's Reflector oracle), internally consistent
+(collateral/debt); a final visual cross-check against blend.capital's UI is recommended.
+
 Weak / not final: auth/session is not a final cryptographic production model; strong
 proof-of-ownership is **deliberately deferred** — connecting a wallet via the Kit is the beta
-"proof" you control a signer (no cryptographic challenge yet). DeFi **position aggregation** beyond
-balances is still limited — that is T2-D1 Gap B (the Blend position resolver + health factor),
-tracked separately.
+"proof" you control a signer (no cryptographic challenge yet). Position aggregation is **Blend-only**
+(Soroswap/Aquarius LP positions are post-beta).
 
-Stance: acceptable for beta. Gap A (active-signer model + UI distinction + signing guardrail) is
-**done**; Gap B (position aggregation) is the remaining T2-D1 work.
+Stance: acceptable for beta. Gap A (active-signer model + UI distinction + signing guardrail) and
+Gap B (position aggregation + health factor, resolver → API → UI) are **both done** — T2-D1 is
+substantially complete (live on local; VPS applies the v2 schema at deploy).
 
 ---
 

@@ -5,13 +5,21 @@ import {
   deleteWallet,
   fetchWalletBalances,
   fetchWalletOverview,
+  fetchWalletPositions,
   refreshWallet,
   setActiveSigner,
   setPrimaryWallet,
   setWalletActive,
 } from "../api/wallets";
-import type { WalletItem } from "../types/wallet";
+import type { WalletDefiSummary, WalletItem } from "../types/wallet";
 import { useActiveSigner } from "./useActiveSigner";
+
+const EMPTY_DEFI: WalletDefiSummary = {
+  totalSuppliedUsd: 0,
+  totalBorrowedUsd: 0,
+  netDefiUsd: 0,
+  poolHealth: [],
+};
 
 export function useWallets(userIdRef: { value: string | null }) {
   const { setActiveSignerAddress } = useActiveSigner();
@@ -20,6 +28,8 @@ export function useWallets(userIdRef: { value: string | null }) {
   const overviewLoading = ref(true);
   const actionLoadingWalletId = ref<string | null>(null);
   const error = ref("");
+  // Consolidated Blend DeFi view across all the user's wallets (from /overview).
+  const defi = ref<WalletDefiSummary>({ ...EMPTY_DEFI });
 
   const totalPortfolioUsd = computed(() =>
     wallets.value.reduce(
@@ -53,6 +63,7 @@ export function useWallets(userIdRef: { value: string | null }) {
     if (!userId) {
       wallets.value = [];
       selectedWallet.value = null;
+      defi.value = { ...EMPTY_DEFI };
       overviewLoading.value = false;
       return;
     }
@@ -67,12 +78,18 @@ export function useWallets(userIdRef: { value: string | null }) {
         ...wallet,
         totalPortfolioUsd: wallet.totalPortfolioUsd ?? 0,
         balances: wallet.balances ?? [],
+        pools: wallet.pools ?? [],
         loading: false,
       }));
 
+      defi.value = data.defi ?? { ...EMPTY_DEFI };
+
       syncActiveSigner();
 
-      await Promise.all(wallets.value.map((wallet) => loadWalletBalances(wallet.id)));
+      await Promise.all([
+        ...wallets.value.map((wallet) => loadWalletBalances(wallet.id)),
+        ...wallets.value.map((wallet) => loadWalletPositions(wallet.id)),
+      ]);
 
       if (selectedWallet.value) {
         const updatedSelectedWallet = wallets.value.find(
@@ -103,6 +120,23 @@ export function useWallets(userIdRef: { value: string | null }) {
       console.error(`Failed to fetch balances for ${walletId}`, err);
     } finally {
       wallet.loading = false;
+    }
+  }
+
+  async function loadWalletPositions(walletId: string): Promise<void> {
+    const userId = requireUserId();
+    const wallet = wallets.value.find((item) => item.id === walletId);
+    if (!wallet) return;
+
+    wallet.positionsLoading = true;
+
+    try {
+      const data = await fetchWalletPositions(walletId, userId);
+      wallet.pools = data.pools;
+    } catch (err) {
+      console.error(`Failed to fetch positions for ${walletId}`, err);
+    } finally {
+      wallet.positionsLoading = false;
     }
   }
 
@@ -140,8 +174,13 @@ export function useWallets(userIdRef: { value: string | null }) {
     actionLoadingWalletId.value = wallet.id;
 
     try {
+      // refreshWallet also re-resolves Blend positions (non-fatal) server-side,
+      // so re-fetch balances AND positions to reflect the new snapshot.
       await refreshWallet(wallet.id, userId);
-      await loadWalletBalances(wallet.id);
+      await Promise.all([
+        loadWalletBalances(wallet.id),
+        loadWalletPositions(wallet.id),
+      ]);
 
       if (selectedWallet.value?.id === wallet.id) {
         const updatedWallet =
@@ -247,6 +286,7 @@ export function useWallets(userIdRef: { value: string | null }) {
       ...wallet,
       totalPortfolioUsd: wallet.totalPortfolioUsd ?? 0,
       balances: wallet.balances ?? [],
+      pools: wallet.pools ?? [],
       loading: false,
     }));
 
@@ -268,6 +308,7 @@ export function useWallets(userIdRef: { value: string | null }) {
   function clearWallets(): void {
     wallets.value = [];
     selectedWallet.value = null;
+    defi.value = { ...EMPTY_DEFI };
     error.value = "";
     overviewLoading.value = false;
     actionLoadingWalletId.value = null;
@@ -280,10 +321,12 @@ export function useWallets(userIdRef: { value: string | null }) {
     overviewLoading,
     actionLoadingWalletId,
     error,
+    defi,
     totalPortfolioUsd,
     isBusy,
     loadOverview,
     loadWalletBalances,
+    loadWalletPositions,
     addWallet,
     refreshOneWallet,
     setPrimary,

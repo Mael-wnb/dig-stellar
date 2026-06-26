@@ -78,6 +78,17 @@ export class WalletsController {
     });
   }
 
+  @Get(':walletId/positions')
+  getWalletPositions(
+    @Param('walletId') walletId: string,
+    @Query('userId') userId?: string
+  ) {
+    return this.walletsService.getWalletPositions({
+      walletId,
+      userId,
+    });
+  }
+
   @Post(':walletId/refresh')
   refreshWallet(
     @Param('walletId') walletId: string,

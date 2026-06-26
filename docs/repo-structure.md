@@ -53,6 +53,8 @@ apps/api/src/
     │   ├── wallets.controller.ts   GET/POST/PATCH/DELETE /v1/wallets/*
     │   │                           PATCH /v1/wallets/:walletId/{primary,active,signer}
     │   │                           (signer = T2-D1 active-signer designation, singleton)
+    │   │                           GET /v1/wallets/:walletId/positions (Blend supply/borrow + HF)
+    │   │                           GET /v1/wallets/overview now includes a `defi` block
     │   └── wallets.service.ts      Reads/writes: raw SQL v2 (user_wallets,
     │                               wallet_balance_snapshots, wallet_protocol_positions,
     │                               wallet_pool_health)
@@ -72,7 +74,7 @@ apps/api/src/
 | `/protocols`, `/venues`, `/venues/:key/snapshots` | AppController | **Prisma ORM** — `"Protocol"`, `"Venue"`, `"Snapshot"` |
 | `/v1/protocols` | StellarController | **Raw SQL v1** — `venues`, `protocol_metrics_latest` |
 | `/v1/pools`, `/v1/pools/:slug` | StellarController | **Raw SQL v1** — `entities`, `venues`, `pool_metrics_latest`, `reserve_snapshots`, `asset_prices`, `normalized_events`, `entity_assets`, `assets` |
-| `/v1/wallets/*` | WalletsController | **Raw SQL v2** — `user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions` |
+| `/v1/wallets/*` | WalletsController | **Raw SQL v2** — `user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions`, `wallet_pool_health` (the latter two via `/:id/positions` + the overview `defi` block) |
 | `/v1/network/stats` | NetworkController | **No DB** — external HTTP only |
 
 ---
