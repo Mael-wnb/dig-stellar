@@ -274,7 +274,7 @@ can operate. The refresh job queries these rows to find which pools to refresh.
 
 | File | Writes |
 |---|---|
-| `blend-upsert-core.ts` | venues + entities + assets for Blend |
+| `blend-upsert-core.ts` | Blend venue + the **fixed** pool entity/assets (from a discovery registry). Additional Blend pools (orbit, etherfuse, yieldblox) are seeded by running `run-blend-pool-refresh.ts` once with their contract id — it upserts the entity + reserves on-chain. See runbooks "Onboarding an additional Blend pool". |
 | `soroswap-upsert-core.ts` | venues + entities + assets for Soroswap |
 | `aquarius-upsert-core.ts` | venues + entities + assets for Aquarius |
 | `allbridge-upsert-core.ts` | `allbridge` venue (`venue_type='bridge'`) + USDC asset (no entities — single bridge contract) |

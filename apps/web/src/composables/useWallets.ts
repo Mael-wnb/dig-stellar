@@ -140,6 +140,23 @@ export function useWallets(userIdRef: { value: string | null }) {
     }
   }
 
+  // Re-fetch ONLY the consolidated Blend DeFi block from /overview, without
+  // re-mapping the wallet list, re-fetching every wallet's balances/positions,
+  // or toggling the page-level overviewLoading flag. Used after a single-wallet
+  // refresh so the consolidated header reflects the new snapshot, while keeping
+  // the per-wallet re-fetch (balances/positions) as the only granular reload.
+  async function loadDefiSummary(): Promise<void> {
+    const userId = userIdRef.value?.trim();
+    if (!userId) return;
+
+    try {
+      const data = await fetchWalletOverview(userId);
+      defi.value = data.defi ?? { ...EMPTY_DEFI };
+    } catch (err) {
+      console.error("Failed to refresh consolidated DeFi summary", err);
+    }
+  }
+
   async function addWallet(params: {
     address: string;
     label?: string;
@@ -175,11 +192,15 @@ export function useWallets(userIdRef: { value: string | null }) {
 
     try {
       // refreshWallet also re-resolves Blend positions (non-fatal) server-side,
-      // so re-fetch balances AND positions to reflect the new snapshot.
+      // so AFTER it returns re-fetch this wallet's balances + positions, plus the
+      // consolidated DeFi block (/overview) so the shared header reflects the new
+      // state too — otherwise it stays stale until a full page reload. The server
+      // refresh is awaited first; only then do the re-fetches read the new snapshot.
       await refreshWallet(wallet.id, userId);
       await Promise.all([
         loadWalletBalances(wallet.id),
         loadWalletPositions(wallet.id),
+        loadDefiSummary(),
       ]);
 
       if (selectedWallet.value?.id === wallet.id) {

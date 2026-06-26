@@ -179,7 +179,7 @@ substantially complete (live on local; VPS applies the v2 schema at deploy).
 
 | Protocol | Source | Pools | TVL (verified) | State |
 |---|---|---:|---|---|
-| Blend | Soroban RPC | 3 | ≈ $192M | operational |
+| Blend | Soroban RPC | 4 | ≈ $166M | operational (fixed, orbit, etherfuse, yieldblox; Forex excluded — frozen oracle) |
 | Aquarius | Soroban RPC | 4 | ≈ $22.7M | operational |
 | Stellar native DEX | Horizon | 9 | ≈ $6.2M | operational (now aggregated at protocol level) |
 | Soroswap | Soroban RPC | 1 active | ≈ $130k | operational (dead native/EURC pair disabled) |
@@ -190,6 +190,15 @@ All four protocols aggregate at the protocol level (`protocol_metrics_latest`), 
 `protocolCount` = 4. The Soroswap native/EURC pair was archived on-chain (all reads 404); it is
 soft-disabled and excluded from the API and from TVL aggregation, which corrected the inflated
 Soroswap TVL (was ≈$587k including the dead pair, now ≈$130k of live liquidity).
+
+**Blend pool coverage (updated June 26, 2026):** YieldBlox (`CCCCIQSD…`, ≈$2.9M, 8 reserves) added as
+a 4th active Blend entity so positions on it resolve (test wallet `GCSQXZ…` supplies on YieldBlox; the
+resolver/refresh are entity-driven, so the seed was the only change — no resolver/health code touched).
+Its two previously-unpriced reserves (AQUA, USDGLO) were added to the pricing config (CoinGecko
+`aquarius` / `glo-dollar`). The **Forex** pool is deliberately **excluded** — its on-chain oracle is
+frozen (Blend UI: "oracle currently experiencing issues"), which would yield garbage HF / break refresh;
+revisit when it recovers. `BLEND_POOL_ID` in the indexer `.env` is a discovery/probe default only — the
+indexed perimeter is the Blend entities in the DB, not that var.
 
 Remaining gaps: DeFindex (T3), freshness visibility, stronger retry/backoff. The implementation exists;
 remaining work is operationalization and freshness exposure — all later tranches.

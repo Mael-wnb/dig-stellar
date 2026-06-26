@@ -58,6 +58,28 @@ pnpm -C apps/indexer tsx src/scripts/bootstrap/soroswap-upsert-core.ts
 pnpm -C apps/indexer tsx src/scripts/bootstrap/aquarius-upsert-core.ts
 ```
 
+### Onboarding an additional Blend pool (the actual seed path)
+
+`blend-upsert-core.ts` only seeds the **fixed** pool (from a generated discovery registry).
+The other Blend entities (orbit, etherfuse, **yieldblox**) are seeded by running the pool refresh
+**once** with the pool's contract id — `persistBlendPoolState` upserts the entity (`is_active = true`)
+plus its reserves/assets read on-chain. After that, `71-refresh-all-metrics` discovers it by DB query
+(`entities join venues where v.slug='blend' and is_active`) and keeps it fresh with no further action.
+
+```bash
+# Seed YieldBlox (idempotent — re-running just refreshes it)
+ENTITY_SLUG=blend-yieldblox-pool \
+BLEND_POOL_ID=CCCCIQSDILITHMM7PBSLVDT5MISSY7R26MNZXCX4H7J5JQ5FPIYOGYFS \
+  pnpm -C apps/indexer exec tsx src/scripts/ingest/run-blend-pool-refresh.ts
+```
+
+The known active Blend pools are catalogued in `apps/indexer/src/config/stellar-targets.json`
+(documentation only — no code reads it). **Forex** is listed there as `status: excluded` (frozen
+oracle) and must never be seeded as active. After seeding, confirm any new reserve assets are priced
+(`PRICING_RULES_BY_SYMBOL` in `scripts/shared/pricing-config.ts`); unpriced reserves show null/0 USD
+but the health factor stays correct (it comes from Blend's on-chain Reflector oracle, not the price
+pipeline). `BLEND_POOL_ID` in `.env` is only a default for the discovery/probe scripts (75/76).
+
 ---
 
 ## Database

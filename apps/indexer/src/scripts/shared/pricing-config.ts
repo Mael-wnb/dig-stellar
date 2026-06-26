@@ -16,4 +16,7 @@ export const PRICING_RULES_BY_SYMBOL: Record<string, PricingRule> = {
   CETES: { kind: 'coingecko', id: 'cetes', fallbackEnvVar: 'MANUAL_CETES_USD' },
   TESOURO: { kind: 'coingecko', id: 'etherfuse-tesouro', fallbackEnvVar: 'MANUAL_TESOURO_USD' },
   oUSD: { kind: 'stable', priceUsd: 1 },
+  // YieldBlox (blend-yieldblox-pool) reserve assets not already covered above.
+  AQUA: { kind: 'coingecko', id: 'aquarius', fallbackEnvVar: 'MANUAL_AQUA_USD' },
+  USDGLO: { kind: 'coingecko', id: 'glo-dollar', fallbackEnvVar: 'MANUAL_USDGLO_USD' },
 };

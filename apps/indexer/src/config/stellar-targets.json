@@ -15,7 +15,7 @@
       "input_b": null,
       "label": "Orbit Pool",
       "priority": "high",
-      "status": "todo"
+      "status": "api_ready"
     },
     {
       "protocol": "blend",
@@ -24,7 +24,26 @@
       "input_b": null,
       "label": "Etherfuse Pool",
       "priority": "medium",
-      "status": "todo"
+      "status": "api_ready"
+    },
+    {
+      "protocol": "blend",
+      "input_type": "pool_id",
+      "input_a": "CCCCIQSDILITHMM7PBSLVDT5MISSY7R26MNZXCX4H7J5JQ5FPIYOGYFS",
+      "input_b": null,
+      "label": "YieldBlox Pool",
+      "priority": "high",
+      "status": "api_ready"
+    },
+    {
+      "protocol": "blend",
+      "input_type": "pool_id",
+      "input_a": null,
+      "input_b": null,
+      "label": "Forex Pool",
+      "priority": "low",
+      "status": "excluded",
+      "note": "Oracle frozen (Blend UI: 'This pool's oracle is currently experiencing issues'). Not indexed: no readable prices would produce garbage HF / break refresh. Pool contract id intentionally omitted until needed; revisit when the oracle recovers."
     },
     {
       "protocol": "aquarius",
