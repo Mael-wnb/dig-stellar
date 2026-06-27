@@ -43,7 +43,7 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
 - Biggest current risk: none blocking the claim; remaining items are operational polish
   (freshness UI, health endpoints) that belong to later tranches
 - Main execution goal: package the proven MVP work into the SCF Tranche 2 submission
-- Last updated: 2026-06-19
+- Last updated: 2026-06-27
 
 ---
 
@@ -69,7 +69,7 @@ T1-D3 criteria.
 |---|---|---:|---|---|---|---|
 | D1 — Multi-Wallet Portfolio & "Active Signer" Model | Substantially done | 95% | High | **Gap A done (criteria 1 + 3):** active-signer vs watch-only formalized — `user_wallets.is_active_signer` (DB-enforced singleton), `PATCH /v1/wallets/:id/signer`, Kit-connect auto-promotes, watch-only add-path, UI badges + signing guardrail. **Gap B done (criterion 2 — full stack):** Part 1 resolver (`lib/protocols/blend/{fetch-user-positions,resolve-user-health}` + `81-…`) writes per-asset supply/borrow → `wallet_protocol_positions` + per-pool `health_factor` → `wallet_pool_health` (SDK `PositionsEstimate`, NULL = no debt), non-fatal in `refreshWallet`. Part 2 surfaces it: `GET /v1/wallets/:id/positions` + a `defi` block on `/overview` (Σ supplied/borrowed/net + per-(wallet,pool) health, riskiest first, **latest-snapshot filter** so closed positions don't linger), plus the UI portfolio slice (consolidated "DeFi positions (Blend)" header + per-wallet supplied/borrowed/HF with colour states). Validated on mainnet (borrower HF 1.11/1.32 = collateral/debt; phantom-snapshot + empty cases confirmed; `apps/web build` green). Plus prior: grouped multi-wallet, per-wallet balances, raw SQL v2 | Blend-only (Soroswap/Aquarius LP positions post-beta); final visual HF cross-check vs blend.capital UI recommended; VPS applies v2 schema at deploy | D1 essentially complete — HF now feeds D2's first alert family. **Jun 26:** YieldBlox indexed as a 4th active Blend pool, closing the position-coverage gap — the resolver is entity-driven, so positions now resolve across all active pools. Test wallets re-resolved clean: `GCSQXZ…` YieldBlox supply ≈$1014 (HF null, no debt); `GAZXV3PH…` shows both legs — fixed-pool (supply ≈$50.9k / borrow EURC ≈$28.9k, HF ≈1.33) + yieldblox (supply native ≈$26.8k / borrow USDC ≈$15.0k, HF ≈1.27). Visual blend.capital UI cross-check on `GAZXV3PH…` still recommended before D2 builds liquidation alerts. Optional polish: cryptographic proof-of-ownership (deferred), non-Blend positions |
 | D2 — In-App Alerting Engine | Early | 10% | Low | Product direction exists; some notification-like UI | No rule/preference model, evaluator, storage, or notification lifecycle | Minimal rule model + periodic evaluator over `*_metrics_latest` deltas (one rule family first) |
-| D3 — Bridge Flow Monitoring | Partial | 45% | Medium | Allbridge Core adapter live (`apps/indexer/.../allbridge/`): inflow + outflow events via Soroban `getEvents`, per-source-chain attribution (inflow via `receive_tokens` arg parse), `bridge_flows` table + `amount_usd`, wired non-fatal into `job:refresh`, idempotent on rescan. Verified against mainnet (inflow BAS, outflows SOL/POL/CEL/BAS) | No `/v1/bridge/*` API layer or dashboard slice yet (the SCF "dashboard section" criterion) | Build `/v1/bridge/*` (on-read 7d aggregation) + the dashboard "recent bridged flows" section |
+| D3 — Bridge Flow Monitoring | Substantially done | 85% | High | **Both SCF criteria met in code (commit `13223ed`), functional locally.** (1) Allbridge Core adapter live (`apps/indexer/.../allbridge/`): inflow + outflow events via Soroban `getEvents`, per-source-chain attribution (inflow via `receive_tokens` arg parse), `bridge_flows` table + `amount_usd`, wired non-fatal into `job:refresh`, idempotent on rescan; verified against mainnet (inflow BAS, outflows SOL/POL/CEL/BAS). (2) API `GET /v1/bridge/summary` (24h/7d/30d window — inflow/outflow by source chain + net) + `GET /v1/bridge/flows` (recent feed) via `apps/api/src/modules/bridge/`, on-read aggregation (no metrics table). (3) Dashboard "recent bridged flows" section: `BridgeFlows.vue` (inflow-by-chain bars headline + outflow + net + relative-time recent feed), wired into `DigDashboard.vue` | VPS deploy only: apply `stellar_v1_bridge.sql` + run the `allbridge-upsert-core.ts` bootstrap once on the VPS so prod populates `bridge_flows`. Honest constraint to keep in UI copy: Soroban `getEvents` retains ~7 days → recent-flows view, not deep history | Deploy to the VPS (schema + bootstrap), then capture the live bridge section in the demo video |
 
 ---
 
@@ -94,15 +94,15 @@ T1-D3 criteria.
 
 ## Weakest areas right now
 1. Alerting engine (T2)
-2. Bridge monitoring (T2)
-3. Freshness/stale/retry operationalization + observability (T3)
-4. Deployment maturity / CI-CD (still manual VPS deploy)
-5. Transaction builder breadth: SDEX swap proven; Blend deposit not yet exercised from UI
+2. Freshness/stale/retry operationalization + observability (T3)
+3. Deployment maturity / CI-CD (still manual VPS deploy)
+4. Transaction builder breadth: SDEX swap proven; Blend deposit not yet exercised from UI
 
 ## Best near-term tranche wins
 1. SCF Tranche 2 (20%) submission — all three MVP deliverables claim-ready
 2. Demo video covering the three MVP deliverables in one walkthrough
 3. T2-D1 active-signer model formalization (start of the next deliverable group)
+4. T2-D3 bridge monitoring — code complete (both criteria); close the last ~15% by deploying the bridge schema + Allbridge bootstrap to the VPS
 
 ---
 
