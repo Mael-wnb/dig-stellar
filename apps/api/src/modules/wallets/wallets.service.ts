@@ -895,6 +895,7 @@ export class WalletsService {
     };
     type Pool = {
       venueSlug: string | null;
+      entityId: string | null; // pool entity id (nullable in wallet_pool_health)
       poolSlug: string | null;
       poolName: string | null;
       healthFactor: number | null;
@@ -916,6 +917,7 @@ export class WalletsService {
     for (const h of healthRows) {
       poolMap.set(keyOf(h.entity_id, h.venue_id), {
         venueSlug: h.venue_slug,
+        entityId: h.entity_id,
         poolSlug: h.pool_slug,
         poolName: h.pool_name,
         healthFactor: toNumber(h.health_factor),
@@ -935,6 +937,7 @@ export class WalletsService {
       if (!pool) {
         pool = {
           venueSlug: null,
+          entityId: p.entity_id,
           poolSlug: null,
           poolName: null,
           healthFactor: null,
