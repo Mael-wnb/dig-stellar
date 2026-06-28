@@ -80,6 +80,25 @@ oracle) and must never be seeded as active. After seeding, confirm any new reser
 but the health factor stays correct (it comes from Blend's on-chain Reflector oracle, not the price
 pipeline). `BLEND_POOL_ID` in `.env` is only a default for the discovery/probe scripts (75/76).
 
+### Wallet alert sweep (D2) — periodic evaluator
+
+The alerting engine runs as a periodic sweep (no broker, no in-process scheduler): one OS-cron
+entry calls the orchestrator, which refreshes every active wallet's `wallet_pool_health` (script 81,
+no `WALLET_ID` → all wallets) and then runs the pure evaluator (script 83, in `apps/api`), which
+writes `notifications` on each fire/resolve edge.
+```bash
+# Canonical entry point (82 → 81 → 83):
+pnpm -C apps/indexer job:wallet-alert
+```
+Example crontab (VPS) — every 15 min, offset from `job:refresh` so they don't collide.
+End-to-end alert latency ≈ this interval + the web's notification poll (~30–60s):
+```cron
+# m         h  dom mon dow  command
+  7,22,37,52 *  *   *   *    cd /srv/dig-stellar && pnpm -C apps/indexer job:wallet-alert >> /var/log/dig/wallet-alert.log 2>&1
+```
+Prereq: `stellar_v3_alerting.sql` applied. A non-zero exit from the health refresh (81) aborts the
+evaluator (83) for that run and logs — stale/half-written health rows are never evaluated.
+
 ---
 
 ## Database
@@ -97,9 +116,11 @@ psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stella
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_metrics.sql
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_bridge.sql
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v2_multiwallet.sql
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v3_alerting.sql   # D2 alerting: alert_rules, alert_rule_state, notifications (depends on v1 entities + v2 user_wallets)
 ```
 Manually-applied schemas (local AND VPS): `stellar_v1.sql`, `stellar_v1_metrics.sql`,
-`stellar_v1_bridge.sql` (Allbridge bridge flows — T2-D3), `stellar_v2_multiwallet.sql`.
+`stellar_v1_bridge.sql` (Allbridge bridge flows — T2-D3), `stellar_v2_multiwallet.sql`,
+`stellar_v3_alerting.sql` (D2 alerting — must be applied AFTER v1 + v2).
 Note: when a new table **or column** is added to one of these files (e.g. `network_stats_latest`
 in `stellar_v1_metrics.sql`, `bridge_flows` in `stellar_v1_bridge.sql`, or the T2-D1
 `is_active_signer` column + `user_wallets_one_signer_per_user` index, or the T2-D1 Gap B

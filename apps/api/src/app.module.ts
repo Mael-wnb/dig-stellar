@@ -8,9 +8,10 @@ import { StellarModule } from './modules/stellar/stellar.module';
 import { WalletsModule } from './modules/wallets/wallets.module';
 import { ActionsModule } from './modules/actions/actions.module';
 import { BridgeModule } from './modules/bridge/bridge.module';
+import { AlertsModule } from './modules/alerts/alerts.module';
 
 @Module({
-  imports: [DbModule, StellarModule, WalletsModule, NetworkModule, ActionsModule, BridgeModule],
+  imports: [DbModule, StellarModule, WalletsModule, NetworkModule, ActionsModule, BridgeModule, AlertsModule],
   controllers: [AppController],
   providers: [AppService],
 })
