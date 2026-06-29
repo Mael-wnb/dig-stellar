@@ -21,4 +21,11 @@ export class BridgeController {
     const parsedLimit = limit !== undefined ? Number(limit) : undefined;
     return this.bridgeService.getFlows(direction, parsedLimit);
   }
+
+  // Daily net-flow series (gap-filled, UTC day buckets) for the last N days.
+  @Get('series')
+  getSeries(@Query('days') days?: string) {
+    const parsedDays = days !== undefined ? Number(days) : undefined;
+    return this.bridgeService.getDailyNetSeries(parsedDays);
+  }
 }
