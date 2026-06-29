@@ -19,9 +19,11 @@ Soroban on a 15-minute cron, real wallet connection, grouped multi-wallet behavi
 balance refresh, and a non-custodial transaction builder with a **fully successful** SDEX swap proven
 on Testnet.
 
-The three MVP deliverables (internally "T1") now meet their SCF criteria and are claim-ready for the
-**Tranche 2 (20%) disbursement**. The current phase is no longer "invent the product" but "package the
-proven work into the SCF submission" — evidence, demo video, and keeping docs aligned with reality.
+The three MVP deliverables (internally "T1") meet their SCF criteria and have been **submitted** for
+the **Tranche 2 (20%) disbursement** — claim-ready and now **awaiting SCF validation** (not yet
+validated, approved, or paid). The current phase is no longer T1 packaging but **T2 execution**:
+T2-D1 portfolio/active-signer (substantially done), T2-D2 in-app alerting (built, awaiting internal
+validation), T2-D3 bridge monitoring (code-complete, VPS deploy pending).
 
 ---
 
@@ -225,11 +227,22 @@ visibility.
 
 ## 7. Notifications / alerting
 
-**Pre-foundation.** Some notification-like UI exists, and product direction anticipates alerts. What
-does not yet exist in a claimable way: persistent user alert rules, an evaluation engine, a
-notification lifecycle, a rule-to-event pipeline. Do not treat this as "almost there." For T2-D2 the
-contract only requires rule storage + evaluation against the snapshot DB + in-app notifications — build
-the smallest version of that, not the sub-minute event stream from the architecture doc.
+**Built (T2-D2), awaiting internal validation.** The in-app alerting engine exists end to end and is
+functional locally; it is not yet SCF-claim-ready (pending internal validation/demo + VPS deploy). The
+as-built is deliberately the minimal shape the T2-D2 criteria require — **not** the sub-minute event
+stream from the architecture doc:
+- **Rule storage:** `alert_rules` + `alert_rule_state` + `notifications` (`stellar_v3_alerting.sql`,
+  depends on v1 entities + v2 `user_wallets`), managed via `GET/POST /v1/alert-rules`.
+- **Evaluation:** a periodic **OS-cron sweep** (scripts `82`→`81`→`83`, `job:wallet-alert`) — no
+  broker, no in-process scheduler — evaluating rules against the wallet/pool snapshot DB (first rule
+  family: health-factor risk, consuming T2-D1's `wallet_pool_health`) and writing a `notifications`
+  row on each fire/resolve edge.
+- **In-app delivery:** `GET /v1/notifications` → a web notification **bell** + **Alerts page** via
+  HTTP polling.
+
+This matches the verbatim criterion (rules evaluated against the snapshot DB → in-app notifications).
+Remaining before an SCF claim: internal validation/demo and the VPS deploy (apply
+`stellar_v3_alerting.sql` + schedule the `job:wallet-alert` cron; see `docs/runbooks.md`).
 
 ---
 
@@ -301,11 +314,11 @@ Near-term: this shape is fine for the beta and the Tranche 2 claim. CI/CD and ob
 7. Architectural separation (web / api / indexer)
 
 ## 11. Most fragile right now
-1. Alerting engine (T2)
-2. Bridge monitoring (T2)
-3. Freshness/stale/retry operationalization + observability (T3)
-4. Deployment maturity / CI-CD (T3)
-5. Transaction builder breadth: SDEX swap proven; Blend deposit not yet exercised from UI
+1. Bridge monitoring (T2) — code-complete, not yet live on the VPS
+2. Freshness/stale/retry operationalization + observability (T3)
+3. Deployment maturity / CI-CD (T3)
+4. Transaction builder breadth: SDEX swap proven; Blend deposit not yet exercised from UI
+5. Alerting engine (T2) — built, not yet internally validated or deployed to VPS
 
 ## 12. Closest tranche-relevant wins
 1. SCF Tranche 2 (20%) submission — all three MVP deliverables meet their criteria
@@ -315,9 +328,10 @@ Near-term: this shape is fine for the beta and the Tranche 2 claim. CI/CD and ob
 ---
 
 ## 13. Current execution priorities
-1. Assemble the SCF Tranche 2 submission (deliverable text + links + demo video)
-2. Keep `grant-roadmap.md` and `status-board.md` aligned with this reality
-3. (Then, next group) start T2-D1 active-signer vs watch-only
+1. T1 (MVP) is submitted — **awaiting SCF validation**; no further T1 build work pending review
+2. T2 execution: internal validation/demo of T2-D2 in-app alerting; T2-D1 final HF cross-check vs
+   blend.capital; T2-D3 VPS deploy (bridge schema + Allbridge bootstrap)
+3. Keep `grant-roadmap.md` and `status-board.md` aligned with this reality
 
 (Done this session: data cleanup — stellar-native protocol aggregation, dynamic `protocolCount`=4,
 dead Soroswap pair hidden + TVL corrected, "native"→"XLM" display, Blend panel trimmed; cron moved to

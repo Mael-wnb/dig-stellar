@@ -41,7 +41,7 @@ disbursement is reviewed against.
 | T1 | 2 | Analytics Dashboard MVP | Jun 8, 2026 | $6,140 | Done — 100% |
 | T1 | 3 | Smart Transaction Builder (Testnet) | Jun 22, 2026 | $11,070 | Done — 100% |
 | T2 | 1 | Multi-Wallet Portfolio & "Active Signer" Model | Jul 6, 2026 | $7,380 | ~95% |
-| T2 | 2 | In-App Alerting Engine | Jul 20, 2026 | $8,610 | ~10% |
+| T2 | 2 | In-App Alerting Engine | Jul 20, 2026 | $8,610 | Built — awaiting internal validation (~80%) |
 | T2 | 3 | Bridge Flow Monitoring | Aug 3, 2026 | $6,140 | ~85% |
 | T3 | 1 | Mainnet Deployment & Freshness Tracking | Aug 10, 2026 | $8,610 | ~45% |
 | T3 | 2 | Non-Custodial Mainnet Actions | Aug 24, 2026 | $8,610 | ~5% |
@@ -277,14 +277,26 @@ How to measure completion:
 Estimated date: July 20, 2026 — Budget: $8,610
 
 ### Internal interpretation & status (living)
-Owner: `apps/api` + `apps/web` (+ scheduled evaluation). Status: ~10%.
+Owner: `apps/api` + `apps/web` (+ scheduled evaluation). Status: **Built — awaiting internal
+validation (~80%).** Both completion criteria are met in code, functional locally; not yet
+SCF-claim-ready (pending internal validation/demo + VPS deploy).
 
-**Scope discipline.** The criteria require only rule storage, **evaluation against the snapshot
-database**, and in-app notifications. The architecture doc envisions a sub-minute event-stream
-evaluator — that is a fine long-term direction but **must not** become a precondition for this claim.
-Build the smallest version that meets the two criteria: a persisted rule/preference model, a periodic
-evaluator over `pool_metrics_latest` / `protocol_metrics_latest` deltas, and an in-app notification
-slice. Start with one rule family (e.g. APY delta or health-factor threshold).
+**Built to the criteria (smallest version that meets them).** The as-built is deliberately the
+minimal shape the two criteria require — not the architecture doc's sub-minute event-stream evaluator
+(that remains a long-term direction and was correctly kept out of scope):
+- **Rule storage:** `alert_rules` + `alert_rule_state` + `notifications` in `stellar_v3_alerting.sql`
+  (depends on v1 entities + v2 `user_wallets`); managed via `GET/POST /v1/alert-rules`.
+- **Evaluation against the snapshot DB:** a periodic **OS-cron sweep** (scripts `82`→`81`→`83`,
+  `job:wallet-alert`) — no broker, no in-process scheduler — evaluating rules (first family:
+  health-factor risk, consuming T2-D1's `wallet_pool_health`) and writing a `notifications` row on
+  each fire/resolve edge.
+- **In-app notifications:** `GET /v1/notifications` feeding a web notification **bell** + **Alerts
+  page** via HTTP polling.
+
+This satisfies the verbatim criterion (rules evaluated against the snapshot database → in-app
+notifications) **pending internal validation** — not yet bumped to an SCF claim status. Remaining:
+internal validation/demo, and the VPS deploy (apply `stellar_v3_alerting.sql` + schedule the
+`job:wallet-alert` cron; see `docs/runbooks.md`).
 
 ---
 
@@ -428,9 +440,11 @@ before then.
 3. T1-D3 — Smart Transaction Builder — **Done.** Fully successful Testnet swap (tx `fb10c5b8…`), non-custodial.
 
 ## Most underdeveloped areas (next groups)
-1. T2-D2 — Alerting Engine (~10%)
-2. T3-D2 — Mainnet Actions (~5%, path validated by T1-D3)
+1. T3-D2 — Mainnet Actions (~5%, path validated by T1-D3)
 
+> T2-D2 — Alerting Engine is no longer in this list: built (~80%, both criteria met in code),
+> awaiting internal validation/demo + the VPS deploy (apply `stellar_v3_alerting.sql` + schedule the
+> `job:wallet-alert` cron).
 > T2-D3 — Bridge Monitoring is no longer in this list: code-complete (~85%, both criteria), only the
 > VPS deploy (bridge schema + Allbridge bootstrap) remains.
 

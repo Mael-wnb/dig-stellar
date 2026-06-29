@@ -37,13 +37,17 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
 
 ## Global status
 
-- Current phase: Tranche 2 (20%) submission prep — MVP deliverables claim-ready
-- Current focus: evidence package + demo video for the three MVP (T1) deliverables
-- Closest tranche-critical targets: all three T1 deliverables now meet their SCF criteria
-- Biggest current risk: none blocking the claim; remaining items are operational polish
-  (freshness UI, health endpoints) that belong to later tranches
-- Main execution goal: package the proven MVP work into the SCF Tranche 2 submission
-- Last updated: 2026-06-27
+- Current phase: T1 (MVP) submitted & claim-ready — **awaiting SCF validation** (not yet
+  validated, approved, or paid). Active build work has moved to the Tranche 2 ("T2") group.
+- Current focus: T2 — T2-D1 portfolio/active-signer (substantially done), T2-D2 in-app
+  alerting (built, awaiting internal validation), T2-D3 bridge monitoring (VPS deploy pending)
+- Closest tranche-critical targets: all three T1 deliverables meet their SCF criteria and are
+  submitted; the Tranche 2 (20%) disbursement is pending the foundation's review
+- Biggest current risk: none blocking the T1 claim — the T1 outcome is now in SCF's hands;
+  remaining T2 items are internal validation + VPS deploy, not new build
+- Main execution goal: carry T2 to claim-readiness (D1 final HF cross-check, D2 internal
+  validation/demo, D3 VPS deploy)
+- Last updated: 2026-06-29
 
 ---
 
@@ -68,7 +72,7 @@ T1-D3 criteria.
 | Deliverable | Status | Completion | Confidence | Current evidence | Main remaining gap | Next action |
 |---|---|---:|---|---|---|---|
 | D1 — Multi-Wallet Portfolio & "Active Signer" Model | Substantially done | 95% | High | **Gap A done (criteria 1 + 3):** active-signer vs watch-only formalized — `user_wallets.is_active_signer` (DB-enforced singleton), `PATCH /v1/wallets/:id/signer`, Kit-connect auto-promotes, watch-only add-path, UI badges + signing guardrail. **Gap B done (criterion 2 — full stack):** Part 1 resolver (`lib/protocols/blend/{fetch-user-positions,resolve-user-health}` + `81-…`) writes per-asset supply/borrow → `wallet_protocol_positions` + per-pool `health_factor` → `wallet_pool_health` (SDK `PositionsEstimate`, NULL = no debt), non-fatal in `refreshWallet`. Part 2 surfaces it: `GET /v1/wallets/:id/positions` + a `defi` block on `/overview` (Σ supplied/borrowed/net + per-(wallet,pool) health, riskiest first, **latest-snapshot filter** so closed positions don't linger), plus the UI portfolio slice (consolidated "DeFi positions (Blend)" header + per-wallet supplied/borrowed/HF with colour states). Validated on mainnet (borrower HF 1.11/1.32 = collateral/debt; phantom-snapshot + empty cases confirmed; `apps/web build` green). Plus prior: grouped multi-wallet, per-wallet balances, raw SQL v2 | Blend-only (Soroswap/Aquarius LP positions post-beta); final visual HF cross-check vs blend.capital UI recommended; VPS applies v2 schema at deploy | D1 essentially complete — HF now feeds D2's first alert family. **Jun 26:** YieldBlox indexed as a 4th active Blend pool, closing the position-coverage gap — the resolver is entity-driven, so positions now resolve across all active pools. Test wallets re-resolved clean: `GCSQXZ…` YieldBlox supply ≈$1014 (HF null, no debt); `GAZXV3PH…` shows both legs — fixed-pool (supply ≈$50.9k / borrow EURC ≈$28.9k, HF ≈1.33) + yieldblox (supply native ≈$26.8k / borrow USDC ≈$15.0k, HF ≈1.27). Visual blend.capital UI cross-check on `GAZXV3PH…` still recommended before D2 builds liquidation alerts. Optional polish: cryptographic proof-of-ownership (deferred), non-Blend positions |
-| D2 — In-App Alerting Engine | Early | 10% | Low | Product direction exists; some notification-like UI | No rule/preference model, evaluator, storage, or notification lifecycle | Minimal rule model + periodic evaluator over `*_metrics_latest` deltas (one rule family first) |
+| D2 — In-App Alerting Engine | Built — awaiting internal validation | 80% | Medium | **Both SCF criteria met in code, functional locally.** Rule storage + periodic evaluation over the snapshot DB + in-app notifications: as-built is a periodic **OS-cron sweep** (scripts `82`→`81`→`83`, `job:wallet-alert`) — no broker, no in-process scheduler — writing a `notifications` row on each fire/resolve edge; tables `alert_rules` / `alert_rule_state` / `notifications` (`stellar_v3_alerting.sql`, depends on v1 entities + v2 `user_wallets`); endpoints `GET/POST /v1/alert-rules` + `GET /v1/notifications`; web notification **bell** + **Alerts page** (HTTP polling); first rule family = health-factor risk (consumes T2-D1's `wallet_pool_health`). Matches the verbatim criterion (rules evaluated against the snapshot DB → in-app notifications). | SCF-claim-readiness pending internal validation / demo; not yet exercised on the VPS (apply `stellar_v3_alerting.sql` + schedule the `job:wallet-alert` cron — see `docs/runbooks.md`) | Internal validation pass + demo capture; deploy schema + cron to the VPS |
 | D3 — Bridge Flow Monitoring | Substantially done | 85% | High | **Both SCF criteria met in code (commit `13223ed`), functional locally.** (1) Allbridge Core adapter live (`apps/indexer/.../allbridge/`): inflow + outflow events via Soroban `getEvents`, per-source-chain attribution (inflow via `receive_tokens` arg parse), `bridge_flows` table + `amount_usd`, wired non-fatal into `job:refresh`, idempotent on rescan; verified against mainnet (inflow BAS, outflows SOL/POL/CEL/BAS). (2) API `GET /v1/bridge/summary` (24h/7d/30d window — inflow/outflow by source chain + net) + `GET /v1/bridge/flows` (recent feed) via `apps/api/src/modules/bridge/`, on-read aggregation (no metrics table). (3) Dashboard "recent bridged flows" section: `BridgeFlows.vue` (inflow-by-chain bars headline + outflow + net + relative-time recent feed), wired into `DigDashboard.vue` | VPS deploy only: apply `stellar_v1_bridge.sql` + run the `allbridge-upsert-core.ts` bootstrap once on the VPS so prod populates `bridge_flows`. Honest constraint to keep in UI copy: Soroban `getEvents` retains ~7 days → recent-flows view, not deep history | Deploy to the VPS (schema + bootstrap), then capture the live bridge section in the demo video |
 
 ---
@@ -93,10 +97,10 @@ T1-D3 criteria.
 7. Clear separation between web, api, and indexer
 
 ## Weakest areas right now
-1. Alerting engine (T2)
-2. Freshness/stale/retry operationalization + observability (T3)
-3. Deployment maturity / CI-CD (still manual VPS deploy)
-4. Transaction builder breadth: SDEX swap proven; Blend deposit not yet exercised from UI
+1. Freshness/stale/retry operationalization + observability (T3)
+2. Deployment maturity / CI-CD (still manual VPS deploy)
+3. Transaction builder breadth: SDEX swap proven; Blend deposit not yet exercised from UI
+4. Alerting engine (T2) — built, not yet internally validated or deployed to VPS
 
 ## Best near-term tranche wins
 1. SCF Tranche 2 (20%) submission — all three MVP deliverables claim-ready
