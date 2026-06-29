@@ -32,7 +32,14 @@ Canonical entry points (verified against the code):
 - Product API routes: `apps/api/src/.../StellarController` (`/v1/*`), `WalletsController` (`/v1/wallets/*`)
 - Ingestion orchestration: `apps/indexer/src/scripts/ingest/72-run-refresh-job.ts` (`job:refresh`)
 - Ingestion logic: `apps/indexer/src/lib/protocols/<protocol>/` (fetch / normalize / persist)
-- Raw SQL schema: `apps/api/src/db/stellar_v1*.sql` (v1) and `stellar_v2_multiwallet.sql` (v2)
+- Alerting evaluator: `apps/indexer/src/scripts/82-run-wallet-alert-job.ts` (`job:wallet-alert`,
+  OS-cron) spawns `wallets/81-stellar-wallet-blend-positions.ts` (refresh `wallet_pool_health`) →
+  then the api evaluator `apps/api/src/scripts/83-evaluate-alerts.ts` (also `job:alerts`; pure
+  `modules/alerts/evaluate.ts` + `AlertsRepository`). A non-zero exit from 81 aborts the run.
+- Alerting API: `/v1/alert-rules` + `/v1/notifications` (`apps/api/src/modules/alerts/`)
+- Raw SQL schema: `apps/api/src/db/stellar_v1*.sql` (v1), `stellar_v2_multiwallet.sql` (v2), and
+  `stellar_v3_alerting.sql` (v3 alerting: `alert_rules` / `alert_rule_state` / `notifications` —
+  depends on v1 `entities` + v2 `user_wallets`)
 - Legacy (not served to the product): `apps/api/src/app.controller.ts` (`AppController`),
   `apps/indexer/src/run-blend.ts`, `run-horizon.ts`, `run-once.ts`, and `packages/db/prisma/schema.prisma`
 
@@ -68,8 +75,13 @@ Three table families coexist in the **same** Postgres DB:
   `asset_prices` (snake_case). Schema in `apps/api/src/db/stellar_v1*.sql`. **This is the product
   data pipeline.** Written by `job:refresh` (`72-run-refresh-job.ts` → `71-refresh-all-metrics.ts`
   → per-protocol refresh steps). Read by `/v1/*` (`StellarController`).
-- **raw SQL v2** — `user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions`.
-  Schema in `stellar_v2_multiwallet.sql`. Read by `/v1/wallets/*` (`WalletsController`).
+- **raw SQL v2** — `user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions`,
+  `wallet_pool_health`. Schema in `stellar_v2_multiwallet.sql`. Read by `/v1/wallets/*` (`WalletsController`).
+- **raw SQL v3 — alerting** — `alert_rules`, `alert_rule_state`, `notifications`. Schema in
+  `stellar_v3_alerting.sql` (depends on v1 `entities` + v2 `user_wallets`). Written by the evaluator
+  (`83-evaluate-alerts.ts`) on a periodic OS-cron sweep (`job:wallet-alert`); read by
+  `/v1/alert-rules` + `/v1/notifications` (`apps/api/src/modules/alerts/`). Health-factor is the
+  first rule family, consuming v2's `wallet_pool_health`.
 - **Prisma models** — `Protocol`, `Venue`, `Snapshot` (PascalCase). **Legacy / parallel, NOT served
   to the product.** Written by `run:blend` / `run:horizon` / `run:once`; read only by the
   prefix-less `/protocols`, `/venues`, `/snapshots` routes (`AppController`). Elsewhere the Prisma
@@ -120,6 +132,8 @@ pnpm -C apps/indexer run:horizon
 pnpm -C apps/indexer run:defindex   # scaffolded, not validated — see note below
 pnpm -C apps/indexer job:refresh    # global refresh orchestration
                                     #   -> src/scripts/ingest/72-run-refresh-job.ts
+pnpm -C apps/indexer job:wallet-alert  # alerting sweep (OS-cron): 82 -> 81 health -> api 83-evaluate-alerts
+                                    #   -> src/scripts/82-run-wallet-alert-job.ts
 
 # API (apps/api — NestJS 11)
 pnpm -C apps/api start:dev          # nest start --watch
@@ -184,14 +198,17 @@ increments.
 
 ## Current priorities (keep aligned with `docs/status-board.md`)
 
-The board is the live source of truth; treat the percentages there as authoritative.
+`docs/status-board.md` is the live source of truth for status — do not hard-code percentages here
+(they re-stale). Read the board.
 
-1. **T1-D1 — Data Indexing Foundation (~90%)** — formalize Horizon vs Soroban source ownership,
-   freshness expectations, retry/backoff, runbook, evidence package. (DeFindex is out of scope here.)
-2. **T1-D2 — Analytics Dashboard MVP (~80%)** — centralize remaining frontend external calls
-   behind the API, responsive pass, stale/loading/error consistency.
-3. **T1-D3 — Smart Transaction Builder, testnet (~15%)** — define ONE narrow reference action
-   end-to-end (build → simulate → wallet-side sign). This is the real gap.
+- **T1 (MVP) — submitted & awaiting SCF validation.** No further T1 build work is pending review.
+- **Active work is the T2 group:**
+  1. **T2-D1 — Multi-Wallet Portfolio & "Active Signer"** — substantially done (final HF cross-check
+     vs blend.capital remaining).
+  2. **T2-D2 — In-App Alerting Engine** — built (backend + frontend), awaiting internal validation /
+     demo + VPS deploy. As-built: periodic OS-cron sweep (`job:wallet-alert`) → in-app notifications;
+     see the v3 alerting family above and `docs/runbooks.md`.
+  3. **T2-D3 — Bridge Flow Monitoring** — code-complete, VPS deploy pending.
 
 Operational maturity (freshness visibility, health endpoints, deployment discipline) now lags
 implementation — treat it as first-class, not "later."
@@ -202,9 +219,10 @@ implementation — treat it as first-class, not "later."
   the adapter is not validated. Do not treat it as part of the T1-D1 evidence, and do not "finish"
   it unless explicitly asked — T1-D1 coverage is Blend, Soroswap, Aquarius (Soroban) + Stellar-native
   DEX (Horizon).
-- **Tests / CI** are **intentionally deferred (likely T3).** Dependencies are installed (Jest in api)
-  but no test suites or CI pipelines are written yet. Do not add a test/CI build-out as a side effect
-  of an unrelated task, and do not cite testing as existing evidence.
+- **Tests / CI** are **largely deferred (likely T3).** The one exception: the T2-D2 alerting evaluator
+  has unit specs (`modules/alerts/evaluate.spec.ts`, `alerts.ownership.spec.ts`). Beyond those there
+  are no broad suites and no CI pipeline. Do not add a test/CI build-out as a side effect of an
+  unrelated task, and do not cite testing (beyond those alerting specs) as existing evidence.
 
 ---
 
