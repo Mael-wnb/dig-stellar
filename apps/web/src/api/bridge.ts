@@ -44,6 +44,19 @@ export type BridgeFlowsResponse = {
   flows: BridgeFlow[]
 }
 
+export type BridgeSeriesPoint = {
+  day: string // 'YYYY-MM-DD' (UTC)
+  inflowUsd: number
+  outflowUsd: number
+  netUsd: number
+}
+
+export type BridgeSeriesResponse = {
+  days: number
+  series: BridgeSeriesPoint[]
+  updatedAt: string
+}
+
 export async function fetchBridgeSummary(
   window: BridgeWindow = '7d'
 ): Promise<BridgeSummaryResponse> {
@@ -58,4 +71,11 @@ export async function fetchBridgeFlows(
   if (options.limit) params.set('limit', String(options.limit))
   const qs = params.toString()
   return apiFetch<BridgeFlowsResponse>(`/bridge/flows${qs ? `?${qs}` : ''}`)
+}
+
+export async function fetchBridgeSeries(
+  options: { days?: number } = {}
+): Promise<BridgeSeriesResponse> {
+  const days = options.days ?? 7
+  return apiFetch<BridgeSeriesResponse>(`/bridge/series?days=${days}`)
 }

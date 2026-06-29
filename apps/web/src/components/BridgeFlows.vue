@@ -74,7 +74,7 @@ function txLink(hash: string): string {
 // happen here over a COPY of the fetched array. The source `flows` ref is never
 // mutated. Reveal grows as the user scrolls the fixed-height body — capped at
 // the fetched slice (≤100); we never refetch.
-const PAGE_SIZE = 20
+const PAGE_SIZE = 10
 
 type SortKey = 'direction' | 'amount' | 'time' | 'chain'
 type SortDir = 'asc' | 'desc'
@@ -370,7 +370,7 @@ const lastFlowLabel = computed(() => {
           <!-- SCROLL BODY: fixed height (~20 rows), reveals +20 on scroll-to-bottom -->
           <div
             ref="tableBody"
-            class="max-h-[680px] overflow-y-auto"
+            class="max-h-[340px] overflow-y-auto"
             @scroll="onTableScroll"
           >
             <!-- ROWS: whole row stays clickable to the tx explorer -->
