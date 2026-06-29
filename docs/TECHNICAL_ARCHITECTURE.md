@@ -520,6 +520,13 @@ Stellar transaction failures are surfaced with the specific `TransactionResult` 
 
 ## 9. Alerting
 
+> **As-built diverges from this section.** The shipped T2-D2 engine is a periodic OS-cron
+> sweep (`job:wallet-alert`, scripts 82→81→83) + an HTTP-polling notification feed —
+> tables `alert_rules` / `alert_rule_state` / `notifications` — not the WebSocket-push
+> event-stream design with `AlertRule`/`Alert` entities described below. The text below
+> remains the long-term vision; for the current implementation see `docs/runbooks.md` and
+> `docs/alerting/`.
+
 Alerting architecture aligns with the tiered pipeline: real-time rules run against the event stream, periodic rules run against snapshot deltas.
 
 ### 9.1 Rule Categories and Latency Targets
