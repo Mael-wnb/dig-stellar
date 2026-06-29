@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import DigDashboard from './components/DigDashboard.vue'
+import AlertsView from './components/AlertsView.vue'
+import { useView } from './composables/useView'
+
+const { view } = useView()
 </script>
 
 <template>
   <div class="layout">
 
     <div class="content">
-      <DigDashboard />
+      <DigDashboard v-if="view === 'dashboard'" />
+      <AlertsView v-else />
     </div>
 
   </div>

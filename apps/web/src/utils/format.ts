@@ -59,6 +59,23 @@ export function displaySymbol(s: string | null | undefined): string {
   return s === 'native' ? 'XLM' : (s ?? DASH)
 }
 
+// Relative "time ago" label for feeds (e.g. "3h ago"). Single source of truth —
+// mirrors the original inline helper in BridgeFlows.vue.
+export function relativeTime(iso: string | null | undefined): string {
+  if (!iso) return DASH
+  const then = new Date(iso).getTime()
+  if (!Number.isFinite(then)) return DASH
+  const diffMs = Date.now() - then
+  const sec = Math.max(0, Math.round(diffMs / 1000))
+  if (sec < 60) return `${sec}s ago`
+  const min = Math.round(sec / 60)
+  if (min < 60) return `${min}m ago`
+  const hr = Math.round(min / 60)
+  if (hr < 24) return `${hr}h ago`
+  const day = Math.round(hr / 24)
+  return `${day}d ago`
+}
+
 // Display-only pool name. Names are persisted composites like
 // "native/USDC Native Pool". We map the "native" *symbol* to "XLM" in the
 // leading symbol segment (the "native/USDC" part, before the first space)

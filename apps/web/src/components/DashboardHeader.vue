@@ -3,12 +3,15 @@ import { computed, onMounted } from "vue";
 import { connectWallet as connectWalletApi } from "../api/wallets";
 import { useAppUser } from "../composables/useAppUser";
 import { useWalletSession } from "../composables/useWalletSession";
+import { useView } from "../composables/useView";
+import NotificationsBell from "./NotificationsBell.vue";
 
 import digLogotype from "../assets/icons/dig-logotype.svg";
 import stellarBadge from "../assets/icons/stellar-badge.svg";
 import iconWallet from "../assets/icons/icon-wallet.svg";
 
 const { setUserId, restoreUser, clearUser } = useAppUser();
+const { setView } = useView();
 
 const {
   connectedAddress,
@@ -98,7 +101,9 @@ onMounted(() => {
   <header class="header">
     <!-- LEFT: Logo + chain selector -->
     <div class="header-left">
-      <img :src="digLogotype" alt="DIG" class="logotype" />
+      <button type="button" class="logo-btn" aria-label="Dashboard" @click="setView('dashboard')">
+        <img :src="digLogotype" alt="DIG" class="logotype" />
+      </button>
 
       <div class="chain-selectors">
         <div class="chain-item">
@@ -128,6 +133,12 @@ onMounted(() => {
       >
         Grant ↗
       </a>
+
+      <button type="button" class="header-link" @click="setView('alerts')">
+        Alerts
+      </button>
+
+      <NotificationsBell />
 
       <div class="action-separator" />
 
@@ -172,6 +183,15 @@ onMounted(() => {
   display: flex;
   align-items: center;
   align-self: stretch;
+}
+
+.logo-btn {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
 }
 
 .logotype {
@@ -233,6 +253,8 @@ onMounted(() => {
   border-radius: 4px;
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
+  line-height: normal;
   transition:
     background 0.15s,
     border-color 0.15s;

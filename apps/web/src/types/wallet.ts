@@ -57,6 +57,7 @@ export interface WalletPositionItem {
 
 export interface WalletPositionPool {
   venueSlug: string | null;
+  entityId: string | null; // pool entity id (null = not targetable)
   poolSlug: string | null;
   poolName: string | null;
   healthFactor: number | null; // null = no debt
