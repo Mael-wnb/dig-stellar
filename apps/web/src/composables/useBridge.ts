@@ -8,7 +8,10 @@ import {
   type BridgeWindow,
 } from '../api/bridge'
 
-const RECENT_FLOWS_LIMIT = 20
+// Larger slice so the recent-flows table can sort/page client-side (the API has
+// no sort/cursor — only direction + limit ≤200). Still window-independent: this
+// is a "recent feed", not a window-scoped aggregate.
+const RECENT_FLOWS_LIMIT = 100
 
 export function useBridge() {
   const summary = ref<BridgeSummaryResponse | null>(null)
