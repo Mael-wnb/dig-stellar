@@ -1,51 +1,58 @@
-# Dig — Stellar DeFi Intelligence & Execution Gateway — Technical Architecture
+# Dig — Stellar Real-Yield Intelligence & Execution Gateway — Technical Architecture
 
-This document is the technical architecture for Dig's accelerator-scope product: an
-intelligence and execution gateway for Stellar DeFi. It is self-contained — it restates the
-foundational layers it depends on — and Stellar-specific throughout. For the full reference
-implementation of the underlying indexing and analytics infrastructure (delivered under SCF 43),
-see the repository's main `docs/TECHNICAL_ARCHITECTURE.md`; this document focuses on the new
-layers and, for the integration track, on exactly how each Stellar building block is integrated.
+This document is the technical architecture for Dig's accelerator-scope product: a real-yield
+intelligence and execution gateway for Stellar DeFi. It is self-contained and Stellar-specific
+throughout, and for the integration track it details exactly how each Stellar building block is
+integrated. The underlying indexing and analytics infrastructure (delivered under SCF 43) is
+documented in the repository's main `docs/TECHNICAL_ARCHITECTURE.md`; this document restates what
+it depends on and focuses on the new layers.
+
+A reviewer-oriented FAQ anticipating the most likely Stellar-specific questions is in §15.
 
 ---
 
 ## 1. Objectives
 
-Dig is building the simplest gateway to Stellar DeFi. Where existing tools stop at read-only
-analytics, this product closes the loop from information to action:
+Dig is building the simplest way for a crypto user to discover and act on Stellar's real-yield
+economy. Stellar's center of gravity is real-world assets and real yield — tokenized treasuries,
+money-market funds, and RWA-collateralized lending now represent the majority of on-chain value on
+the network — and that is where this product focuses.
 
-- **Discover** — continuously analyze the Stellar DeFi ecosystem and surface the most relevant
-  yield and liquidity opportunities, ranked and explained.
-- **Onboard** — let any user, crypto-native or not, enter with minimal friction (email / social
-  login, or an existing wallet) and hold a self-custodial Stellar account.
-- **Act** — execute the on-chain action behind an opportunity in one click, with the transaction
-  built server-side and signed exclusively in the user's wallet.
-- **Bring capital in** — move native USDC and other stablecoins from external chains into Stellar
-  and deploy directly into an opportunity.
+- **Discover** — surface and rank the ecosystem's real-yield and RWA opportunities, explained.
+- **Onboard** — give every user a Stellar-native, passkey-based smart wallet: biometric signing,
+  no seed phrase, and account sponsorship so a user with no XLM is operational immediately.
+- **Act** — execute the on-chain action behind an opportunity in one click, on web and mobile,
+  with the transaction signed exclusively in the user's wallet.
+- **Bring capital in** — move native USDC from other chains into Stellar (CCTP) and let users
+  on-ramp from fiat through a partner, then deploy directly into an opportunity.
 
-The product is non-custodial by construction: the backend stores only public addresses and user
-preferences, and never holds private keys or signs on a user's behalf.
+The product is non-custodial by construction: the backend stores only public addresses and
+preferences, and never holds a private key or signs on a user's behalf.
+
+> Fiat onboarding is in scope through a third-party provider (a SEP-24 anchor or an on-ramp
+> widget): the regulatory burden (KYC, AML, licensing) is carried by the provider, and Dig
+> integrates as a client. Becoming an anchor ourselves is explicitly excluded. Coverage is
+> therefore provider-dependent by region, which the product communicates honestly.
 
 ---
 
 ## 2. Relationship to the Existing Infrastructure
 
-This scope is an extension of Dig's existing Stellar work, built in the same monorepo. The
-following layers already exist and are reused as the foundation — they are not rebuilt here:
+This scope extends Dig's existing Stellar work, in the same monorepo. The following already exist
+and are reused as the foundation, not rebuilt:
 
-- **Hybrid indexing pipeline** — a Horizon + Soroban RPC ingestion pipeline normalizing
-  protocol data into a unified Postgres store, with a canonical refresh job producing latest
-  per-pool and per-protocol metrics, reserve snapshots, and asset prices.
-- **Protocol analytics API** — internal endpoints serving TVL, volume, and APY for the
-  integrated protocols (Blend, Aquarius, Soroswap) plus the native Stellar DEX.
-- **Grouped multi-wallet portfolio** — persistent grouping of multiple tracked addresses per
-  user, with balance snapshots and per-wallet refresh.
-- **Non-custodial transaction builder** — server-side construction of multi-operation XDR
-  envelopes (e.g., `ChangeTrust` + a swap/deposit), client-side validation, and in-wallet
-  signing via Stellar Wallets Kit, proven end-to-end on Testnet.
+- **Hybrid indexing pipeline** — Horizon + Soroban RPC ingestion normalizing protocol data into a
+  unified Postgres store, with a canonical refresh job producing latest per-pool / per-protocol
+  metrics, reserve snapshots, and asset prices.
+- **Protocol analytics API** — internal endpoints serving live Mainnet metrics for the integrated
+  protocols.
+- **Grouped multi-wallet portfolio** — persistent per-user grouping of tracked addresses with
+  balance snapshots.
+- **Non-custodial transaction builder** — server-side construction of multi-operation XDR, client-
+  side validation, and in-wallet signing via Stellar Wallets Kit, proven end-to-end on Testnet.
 
-The new layers below — intelligence/ranking, frictionless onboarding, one-click execution,
-cross-chain onboarding, notifications, and mobile monitoring — are built on top of these.
+The new layers — real-yield/RWA intelligence, passkey onboarding with sponsorship, one-click
+execution, cross-chain onboarding, notifications, and mobile execution — build on these.
 
 ---
 
@@ -53,74 +60,65 @@ cross-chain onboarding, notifications, and mobile monitoring — are built on to
 
 ```mermaid
 flowchart TB
-  U[User] --> UI[Dig Web App]
-  U --> Mobile[Mobile Monitoring App - Capacitor, read-only]
+  U[User] --> Web[Dig Web App]
+  U --> Mobile[Mobile App - passkey execution]
 
-  %% Onboarding
-  UI --> Onboard[Onboarding Layer]
-  Onboard --> Privy[Privy - email/social/passkey embedded wallet]
-  Onboard --> WK[Stellar Wallets Kit - Freighter / xBull / others]
+  %% Identity
+  subgraph Identity[Identity & Onboarding]
+    Passkey[Passkey Smart Wallet - passkey-kit / secp256r1]
+    WK[Stellar Wallets Kit / Freighter]
+    Privy[Privy - multi-chain source wallet]
+  end
+  Web --> Identity
+  Mobile --> Passkey
+
+  %% Sponsorship
+  Identity --> Sponsor[Account Sponsorship - Launchtube fees + sponsored reserves]
 
   %% API
-  UI --> API[Dig API - Gateway / BFF]
+  Web --> API[Dig API - Gateway / BFF]
   Mobile --> API
   API --> DB[(Postgres - unified store)]
-  API --> Cache[Redis - hot data + rate limits]
+  API --> Cache[Redis]
 
   %% Intelligence
-  subgraph Intel[Intelligence Layer]
-    Score[Opportunity scoring + ranking]
+  subgraph Intel[Real-Yield Intelligence]
+    Score[Scoring + ranking]
     OppAPI[Opportunities endpoint]
   end
   DB --> Score --> OppAPI --> API
 
-  %% Indexing foundation (existing)
-  subgraph Index[Indexing Foundation - existing SCF 43]
-    RPC[Stellar RPC - Soroban + classic]
-    HZ[Horizon - SDEX, liquidity pools, accounts]
-    Refresh[Refresh job -> normalized metrics]
-  end
-  RPC --> Refresh --> DB
-  HZ --> Refresh
-
-  %% Opportunity sources
+  %% Sources - real-yield first
   subgraph Sources[Opportunity Sources]
-    Blend[Blend - lending]
-    Aqua[Aquarius - AMM]
-    Soro[Soroswap - AMM]
-    DeFindex[DeFindex - vaults]
+    RWA[RWA / real-yield - BENJI, Ondo USDY, Etherfuse]
+    RWALend[RWA lending - Templar]
+    Lend[Lending - Blend]
+    AMM[AMM - Soroswap, Aquarius, DeFindex]
   end
-  Sources --> Refresh
+  Sources --> Refresh[Indexing pipeline] --> DB
 
   %% Execution
-  subgraph Exec[Execution Layer - non-custodial]
-    Build[Transaction Builder - XDR + simulateTransaction]
-    Validate[Client-side XDR validation + txrep]
+  subgraph Exec[Execution - non-custodial]
+    Build[Builder - XDR + simulateTransaction]
+    Submit[Submit via Launchtube / RPC]
   end
-  OppAPI --> Build --> UI
-  UI --> Validate --> Privy
-  UI --> Validate --> WK
-  Privy --> Sign[User signs] --> Submit[Submit to Stellar RPC]
-  WK --> Sign
+  OppAPI --> Build --> Web
+  Build --> Mobile
+  Passkey --> Submit
+  WK --> Submit
 
   %% Cross-chain
   subgraph XChain[Cross-Chain Onboarding]
-    CCTP[Circle CCTP - native USDC burn/mint + Hooks]
-    Allbridge[Allbridge Core - stablecoin pools + SDK]
+    CCTP[Circle CCTP - native USDC]
   end
-  UI --> XChain --> Submit
+  Privy --> CCTP --> Submit
 
   %% Notifications
-  subgraph Notif[Notification Layer]
-    Rules[Rule evaluator over metric deltas]
-    Notifier[Notifier abstraction]
-  end
-  DB --> Rules --> Notifier
-  Notifier --> InApp[In-app / WebSocket]
+  DB --> Rules[Rule evaluator] --> Notifier[Notifier]
+  Notifier --> InApp[In-app]
   Notifier --> TG[Telegram]
   Notifier --> DC[Discord]
-  Notifier --> Push[Mobile push - APNs / FCM]
-  Push --> Mobile
+  Notifier --> Push[APNs / FCM] --> Mobile
 
   Submit --> Net[Stellar Network]
 ```
@@ -129,325 +127,356 @@ flowchart TB
 
 ## 4. Core Design Principles
 
-- **Non-custodial by construction.** The backend stores only public addresses and preferences.
-  Every action is a proposal: an XDR built server-side, validated client-side, and signed in the
-  user's wallet. The backend never sees a private key and never submits an unapproved transaction.
-- **On-chain as source of truth.** Any metric that drives an opportunity ranking or an alert is
-  derivable from on-chain state (Soroban contract reads, Horizon, Reflector oracle prices).
-  Off-chain SDKs/APIs are used for metadata and convenience, never as the authoritative source.
-- **Reuse over reinvention.** The intelligence and action layers sit on top of the existing
-  indexing pipeline, transaction builder, and multi-wallet model rather than duplicating them.
-- **Standards-first execution.** Transaction handoff uses Stellar Wallets Kit and SEP-7 URIs;
-  human-readable summaries use SEP-11 txrep. No custom signing flows where a Stellar standard
-  exists.
-- **Explicit about ledger semantics.** The design accounts for ~5-second ledger close, deterministic
-  finality (no reorgs), Soroban resource fees and storage TTL/archival, and the Protocol 20
-  constraint on mixing classic and Soroban operations in a single envelope (see §7).
+- **Non-custodial by construction.** Every action is a proposal: an XDR built server-side,
+  validated client-side, signed in the user's wallet. With passkey smart wallets the signing key
+  never leaves the device's secure hardware. The backend never sees a key and never submits an
+  unapproved transaction. Account sponsorship does not equal custody (see §13).
+- **Real-yield first.** The opportunity model treats RWA and real yield as the primary category,
+  reflecting where Stellar's value and SDF's roadmap actually are.
+- **Stellar-native identity.** Onboarding defaults to passkey smart wallets (secp256r1 / Protocol
+  21), the identity primitive Stellar built for mainstream UX, rather than a generic EOA layer.
+- **On-chain as source of truth.** Any metric driving a ranking or alert is derivable from on-chain
+  state (Soroban reads, Horizon, Reflector oracle prices).
+- **Reuse over reinvention.** Built on the existing indexing pipeline, transaction builder, and
+  multi-wallet model.
+- **Explicit about ledger semantics.** ~5s ledger close, deterministic finality (no reorgs),
+  Soroban resource fees and storage TTL/archival, and the Protocol 20 constraint on mixing classic
+  and Soroban operations in one envelope (see §7).
 
 ---
 
 ## 5. Stellar Building Blocks — Integration Plan
 
-This is the heart of the integration. Each building block is listed with what it provides and the
-concrete Stellar read/write path Dig uses to integrate it. Two families: **opportunity sources**
-that feed the intelligence layer, and **execution & onboarding rails** that enable action.
+Two families: **opportunity sources** that feed the intelligence layer (real-yield / RWA first),
+and **identity, execution & onboarding rails** that enable action.
 
-### 5.1 Opportunity Sources
+### 5.1 Opportunity Sources (real-yield / RWA first-class)
 
-| Source | Type | Read path | Signals extracted |
+| Source | Category | Read path | Signals |
 |---|---|---|---|
-| **Blend** | Lending | Soroban RPC: pool `get_reserve(asset)`, `get_positions(user)`; events `supply/withdraw/borrow/repay/liquidate` | Supply/borrow APY, utilization, health-factor risk, liquidity depth |
-| **Aquarius** | AMM (+ rewards) | Soroban contract reads (`get_info`, `get_reserves`) and classic `/liquidity_pools` via Horizon; rewards contract for AQUA emissions | Pool TVL, volume, effective APR incl. emissions |
-| **Soroswap** | AMM | Soroban RPC: Factory enumeration, Pair `get_reserves()`, `getEvents` for swaps; Router quotes via `simulateTransaction` | Pool TVL, 24h volume, implied fee APR |
-| **DeFindex** | Yield vaults | Soroban RPC: vault `total_assets()`, `total_supply()`, `balance_of(user)`, plus underlying strategy reads | Share-to-asset ratio over time → vault APY; underlying exposure |
+| **Tokenized treasuries / MMFs** (e.g., Franklin Templeton BENJI, Ondo USDY) | RWA real-yield | Issued Stellar assets / SAC; balances and transfers via Horizon + Soroban; yield from issuer reference data reconciled with on-chain state | Real APY, issuer/counterparty profile, redemption terms, transfer restrictions |
+| **Etherfuse Stablebonds** (e.g., CETES, USTRY) | RWA real-yield | Stablebond assets on Stellar, read via trustline/SAC state and DEX/market data | Sovereign-bond yield, jurisdiction, liquidity |
+| **Templar** | RWA-collateralized lending | Soroban contract reads on lending markets backed by freely-transferable RWAs | Borrow/supply rates, RWA collateral composition, utilization |
+| **Blend** | Lending | Soroban: `get_reserve`, `get_positions`; lending events | Supply/borrow APY, utilization, health-factor risk |
+| **Soroswap / Aquarius / DeFindex** | AMM / vaults (secondary) | Soroban reads + `getEvents`; classic `/liquidity_pools` for Aquarius | Pool TVL, volume, fee/emission APR, vault share-ratio APY |
 
-> Extensibility: the opportunity model is built to accommodate tokenized real-world-asset (RWA)
-> yield sources (e.g., Etherfuse Stablebonds, issued natively on Stellar and tradable via trustline
-> + DEX) as an additional low-risk yield category, where feasible.
+USD values are computed at ingest using Reflector oracle prices. The intelligence layer (§9)
+ranks across categories with real-yield surfaced first.
 
-All sources are read through the existing indexing pipeline; integrating a new source means adding
-an adapter that normalizes its state into the unified `Venue` / `Entity` / `Snapshot` / metrics
-schema. No source provides authoritative pricing — USD values are computed at ingest using
-Reflector oracle prices.
-
-### 5.2 Execution & Onboarding Rails
+### 5.2 Identity, Execution & Onboarding Rails
 
 | Rail | Provides | Integration path |
 |---|---|---|
-| **Stellar Wallets Kit + Freighter** | In-wallet signing for crypto-native users | Already integrated; the kit follows the runtime network toggle and signs XDR built by the API |
-| **Privy** | Email / social / passkey onboarding → self-custodial embedded wallet on Stellar | Privy SDK provisions a Stellar account (EOA); the user signs proposals through Privy; keys are secured via TEE + key-splitting and never fully held by any party (see §6) |
-| **Circle CCTP** | Native USDC cross-chain transfer (burn-and-mint, no wrapped assets) | Orchestrate burn on the source chain, await Circle attestation, submit mint on Stellar; CCTP hooks chain the on-destination deposit (see §8) |
-| **Allbridge Core** | Cross-chain stablecoin swaps across many chains, incl. non-USDC | REST API / JS SDK; a single source-chain transaction transfers value to Stellar, with automatic trustline setup; can itself route USDC via CCTP (see §8) |
+| **Passkey smart wallets** (passkey-kit) | Primary Stellar identity: biometric signing, no seed, account abstraction | factory + wallet contracts from passkey-kit; secp256r1 verification on-chain (CAP-51); see §6 |
+| **Launchtube** | Soroban transaction submission with fee + sequence handling | Submission path for passkey-wallet transactions; the basis of fee sponsorship (§6) |
+| **Sponsored reserves (CAP-33)** | Account reserve coverage for users with no XLM | Dig sponsors the account reserve so a new user is operational immediately (§6) |
+| **Stellar Wallets Kit + Freighter** | In-wallet signing for crypto-native users | Already integrated; signs builder-produced XDR |
+| **Privy** | Multi-chain source wallet (EVM / Solana / Stellar) | Used specifically to hold the source-chain wallet in the CCTP flow (§8) |
+| **Circle CCTP** | Native USDC cross-chain transfer (burn-and-mint) | Burn on source, Circle attestation, mint on Stellar, route into an opportunity (§8) |
+| **Fiat on-ramp** (SEP-24 anchor / third-party widget) | Fiat → USDC onto the user's Stellar wallet | Dig integrates as a client (SEP-24 hosted flow, or a provider widget); KYC/AML/licensing carried by the provider (§8) |
+
+> **Allbridge Core** is tracked as a stretch extension for broader stablecoin / source-chain
+> coverage; it is not a core deliverable in this scope.
 
 ---
 
-## 6. Onboarding & Wallet Layer
+## 6. Identity & Onboarding — Passkey Smart Wallets
 
-Onboarding is the top of the funnel and the main friction point for mainstream adoption. The layer
-supports two modes side by side, both non-custodial, unified under the existing grouped
-multi-wallet model.
+Onboarding is the top of the funnel and the main adoption barrier. The default path is a
+Stellar-native passkey smart wallet; Wallets Kit remains for crypto-native users.
 
-**Crypto-native mode.** The user connects an existing wallet (e.g., Freighter) through Stellar
-Wallets Kit. Signing happens in the user's wallet; nothing changes from the existing flow.
+### 6.1 Passkey smart wallet
 
-**Frictionless mode (Privy).** A new user authenticates with email, social login, or a passkey and
-is provisioned a self-custodial Stellar account through Privy — no browser extension, no seed
-phrase. The private key is secured through a combination of Trusted Execution Environments and
-secret-sharing such that no single system, including Privy and including Dig, ever holds the
-complete key; the user can export it at any time. The account is an externally-owned account (EOA)
-on Stellar.
+A passkey smart wallet is a Soroban **contract account** whose authorization is a WebAuthn passkey
+signature verified on-chain. The key material is generated and held inside the device's secure
+hardware (Secure Enclave / TPM) and is never exposed to the user, the browser, or Dig's backend.
 
-Both wallet types are tracked together in the consolidated portfolio (the existing
-`user_wallets` model, extended with a provider/source qualifier). A watch-only address remains
-read-only and can never be moved into a signing context without an explicit wallet connection.
+- **Cryptography.** Protocol 21 (CAP-51) enables native secp256r1 verification in Soroban, so a
+  contract can verify a WebAuthn/passkey signature on-chain (`secp256r1_verify`).
+- **Contracts.** Dig uses passkey-kit's factory and wallet contracts rather than authoring its own
+  Soroban contracts. A factory deploys and initializes each user's wallet contract atomically.
+- **Authorization.** For each action, the WebAuthn challenge is derived from the transaction's
+  simulation (binding the biometric signature to the exact transaction), attached as a Soroban
+  authorization entry, and verified by the wallet contract's `__check_auth`.
+- **Account abstraction.** The model supports multiple signers, policy signers, and recovery. The
+  initial scope targets single-passkey wallets with a recovery path; richer policy signing is a
+  natural extension.
 
-**Multi-chain synergy with cross-chain onboarding.** Privy provisions wallets across EVM, Solana,
-and Stellar from a single user identity. This is what makes the cross-chain onboarding flow (§8)
-usable in one app session: the same Privy-managed identity can authorize the source-chain transfer
-and the Stellar-side receipt, without the user juggling separate wallets per chain.
+### 6.2 Account sponsorship (users with no XLM)
+
+A web2-onboarded user holds no XLM and can neither pay fees nor meet the account reserve. Both are
+sponsored:
+
+- **Fees.** Soroban transactions are submitted through **Launchtube**, which handles inclusion and
+  resource fees and sequence numbering — fee abstraction without Dig holding user keys.
+- **Reserve.** Dig sponsors the account's base/subentry reserve via **sponsored reserves (CAP-33)**,
+  so account creation and trustlines do not require the user to fund anything.
+
+Sponsorship is an economic commitment, not a custodial one: a sponsor covers a reserve and may
+reclaim it, but cannot move the user's funds (see §13). The cost is a recoverable XLM reserve
+provisioned per onboarded account plus negligible per-transaction fees.
+
+### 6.3 Wallet model
+
+All wallet types are tracked together in the consolidated portfolio (the existing `user_wallets`
+model with a provider qualifier). A watch-only address stays read-only and cannot enter a signing
+context without an explicit connection.
+
+```mermaid
+flowchart LR
+  New[New user] -->|biometric| PK[Create passkey smart wallet - passkey-kit factory]
+  PK --> Sponsor[Sponsor reserve - CAP-33]
+  Action[User action] --> Sim[Simulate tx]
+  Sim --> Chal[WebAuthn challenge from simulation]
+  Chal --> Sign[Biometric signature - Secure Enclave]
+  Sign --> Auth[Soroban auth entry -> __check_auth secp256r1_verify]
+  Auth --> LT[Submit via Launchtube - fees handled]
+  LT --> Net[Stellar Network]
+```
 
 ---
 
 ## 7. Execution Model
 
-### 7.1 One-Click Action from an Opportunity
+### 7.1 One-click action from an opportunity
 
-Each opportunity carries enough metadata for the transaction builder to construct the underlying
-action. The flow:
-
-1. The user selects an opportunity and a source account (a connected or Privy-provisioned wallet).
-2. The API builds the transaction proposal server-side from current indexed state plus a live
-   `loadAccount` for sequence number, bundling any required prerequisite (e.g., a missing
-   `ChangeTrust`) where the protocol allows it in one envelope.
-3. For Soroban actions, the proposal is preflighted via `simulateTransaction`; the returned
-   footprint, resource fees, and auth entries are attached, and `restore_footprint` is bundled if a
-   persistent entry's TTL has expired.
-4. The frontend re-decodes the XDR, validates it matches the declared intent, and renders a SEP-11
+1. The user selects an opportunity and source account (passkey wallet or connected wallet).
+2. The API builds the proposal server-side from indexed state plus a live account read, bundling
+   prerequisites (e.g., a missing `ChangeTrust`) where the protocol allows it in one envelope.
+3. Soroban actions are preflighted via `simulateTransaction`; footprint, resource fees, and auth
+   entries are attached, with `restore_footprint` bundled if a persistent entry's TTL has expired.
+4. The frontend re-decodes and validates the XDR against the declared intent and shows a SEP-11
    txrep summary plus fee breakdown.
-5. The user signs in-wallet (Wallets Kit or Privy). The frontend submits to Stellar RPC
-   `sendTransaction` and polls `getTransaction`.
-6. On success, the portfolio updates optimistically; the authoritative update follows from the
-   indexing layer.
+5. The user signs — biometrically for a passkey wallet (§6), or in-wallet via Wallets Kit — and the
+   transaction is submitted (Launchtube for passkey-wallet Soroban transactions, RPC otherwise).
+6. On success, the portfolio updates optimistically; the authoritative update follows from indexing.
 
-### 7.2 Protocol 20 Constraint (decided)
+### 7.2 Protocol 20 constraint (decided)
 
-Stellar Protocol 20 forbids mixing `InvokeHostFunction` (Soroban) with classic operations in a
-single transaction envelope. This shapes how "one-click" maps to on-chain actions:
+Protocol 20 forbids mixing `InvokeHostFunction` (Soroban) with classic operations in one envelope:
 
-- **Classic actions (e.g., an SDEX swap)** can be a single multi-operation XDR — for example
-  `ChangeTrust` + `PathPaymentStrictSend` in one envelope. This is the canonical single-XDR
-  bundling demonstration.
-- **Soroban actions (e.g., a Blend or DeFindex deposit)** cannot be bundled with a classic
-  `ChangeTrust` in the same envelope. Where a trustline prerequisite exists, it is handled as a
-  separate preceding transaction, then the `InvokeHostFunction` deposit follows. The one-click UX
-  abstracts this as a guided sequence; the non-custodial guarantee holds for every step.
+- **Classic actions (e.g., an SDEX swap)** are a single multi-operation XDR (e.g., `ChangeTrust` +
+  `PathPaymentStrictSend`).
+- **Soroban actions (e.g., a Blend/Templar/DeFindex deposit)** are authorized through the contract
+  account. Any classic prerequisite (e.g., a trustline) is a preceding transaction; the one-click
+  UX abstracts this as a guided sequence, and the non-custodial guarantee holds at every step.
 
-### 7.3 Fees and Authorization
-
-Classic inclusion fees default conservatively per operation. Soroban resource fees are derived from
-`simulateTransaction.minResourceFee` plus a safety margin. Cross-contract auth chains (e.g., a vault
-authorizing an underlying strategy) are taken from the full auth array returned by simulation rather
-than constructed manually.
+For passkey smart wallets, the wallet contract's `__check_auth` authorizes the Soroban invocation,
+which is a cleaner authorization model for contract-account-driven actions than raw EOA signing.
 
 ---
 
-## 8. Cross-Chain Onboarding
+## 8. Capital Onboarding — Crypto & Fiat
 
-Bringing external capital into Stellar is served by two complementary rails. They are presented as
-one capability with two paths, not two competing bridges.
+Users bring capital into Stellar through two paths that converge on the same destination: USDC on
+the user's Stellar wallet, ready to deploy into an opportunity.
 
-### 8.1 Circle CCTP — native USDC
+### 8.1 Crypto — Circle CCTP
 
-CCTP moves **native** USDC across chains by burning on the source chain and minting on the
-destination, with no wrapped assets and no third-party liquidity pool. On Stellar it is implemented
-through Soroban contracts. CCTP also supports hooks: metadata attached to a transfer can trigger an
-action on the destination chain when the USDC is minted.
+Native USDC is brought into Stellar via **Circle CCTP**: burn on the source chain, Circle
+attestation, mint on Stellar, then route the minted USDC into an opportunity through the execution
+layer. CCTP is burn-and-mint with no wrapped assets and no third-party liquidity pool.
 
-Dig's flow:
-
-1. The user initiates a burn of USDC on the source chain (signed with their source-chain wallet —
-   the same Privy identity where applicable).
-2. Circle issues an attestation for the burn.
-3. The attestation is submitted on Stellar to mint native USDC to the user's Stellar account.
-4. Where applicable, a CCTP hook (or a follow-up Stellar transaction) routes the minted USDC into a
-   surfaced opportunity through the execution layer (§7).
-
-### 8.2 Allbridge Core — broader stablecoin coverage
-
-Allbridge Core provides cross-chain stablecoin swaps across many EVM and non-EVM chains, including
-Stellar, via a liquidity-pool model with a REST API and JS SDK. A single source-chain transaction
-moves value to Stellar; the integration handles trustline setup automatically and can deliver a
-small amount of the destination gas token. Allbridge can itself route USDC through CCTP, so the two
-rails compose rather than conflict.
-
-### 8.3 Rail selection
-
-| Need | Rail |
-|---|---|
-| Native USDC, slippage-free, from a CCTP-supported chain | CCTP |
-| Non-USDC stablecoins, or chains / assets outside CCTP coverage | Allbridge Core |
+**Privy's role.** Privy provisions a multi-chain wallet (EVM / Solana / Stellar) from one user
+identity, so the source-chain burn and the Stellar-side receipt happen under a single session. This
+is the specific, bounded reason Privy is in the stack — not as the Stellar identity layer, which is
+the passkey smart wallet (§6).
 
 ```mermaid
 flowchart LR
-  Src[Source chain wallet - USDC / stablecoin] --> Choice{Rail}
-  Choice -->|native USDC| CCTP[CCTP burn -> attestation -> mint on Stellar]
-  Choice -->|other stablecoin / chain| AB[Allbridge Core transfer]
-  CCTP --> StellarAcct[USDC on Stellar account]
-  AB --> StellarAcct
-  StellarAcct --> Exec[Execution layer - deploy into opportunity]
+  Src[Source-chain USDC - Privy multi-chain wallet] --> Burn[CCTP burn]
+  Burn --> Att[Circle attestation]
+  Att --> Mint[Mint native USDC on Stellar]
+  Mint --> Exec[Execution layer -> deploy into opportunity]
 ```
+
+Allbridge Core (broader stablecoin / source-chain coverage) is a stretch extension, not budgeted
+as a core deliverable.
+
+### 8.2 Fiat — partner on-ramp
+
+For users without crypto elsewhere, fiat onboarding is provided by consuming a third-party
+provider rather than building one. Two integration shapes are supported by the ecosystem: a SEP-24
+hosted deposit flow against a Stellar anchor (the user completes payment and KYC in the anchor's
+hosted webview; Dig implements only the SEP-10 + SEP-24 client and does not handle KYC), or an
+on-ramp widget/API (e.g., a provider supporting Stellar USDC) that delivers USDC to the user's
+Stellar address. In both cases the provider carries KYC, AML, and licensing; Dig is a client.
+
+The delivered USDC lands on the user's passkey smart wallet (§6) and flows into the same execution
+path as crypto-onboarded capital. Two honest constraints are carried into the UI: coverage is
+provider-dependent by region, and going live with some providers requires a partner onboarding
+step (e.g., wallet-domain allowlisting / KYB), which is a lead-time dependency rather than a
+code dependency. Provider selection is de-risked by a discovery spike before commitment.
 
 ---
 
-## 9. Intelligence Layer
+## 9. Real-Yield Intelligence Layer
 
-The intelligence layer turns normalized protocol data into ranked, explained opportunities. It runs
-over the data already produced by the indexing pipeline rather than calling protocols live.
+The intelligence layer turns normalized data into ranked, explained opportunities, with real-yield
+and RWA first. It runs over indexed data rather than calling protocols live.
 
-**Inputs.** Latest per-pool and per-protocol metrics, reserve snapshots, normalized events, and
-asset prices from the unified store.
+**Inputs.** Latest per-source metrics, snapshots, normalized events, asset prices, plus adapters
+for the real-yield sources (§5.1).
 
-**Scoring.** For each candidate opportunity the engine computes:
+**Scoring.** Per opportunity:
 
-- a **yield estimate** (supply/borrow APY for lending, fee + emission APR for AMMs, share-ratio
-  growth for vaults),
-- one or more **risk signals** (utilization and health-factor pressure for lending, liquidity depth
-  and concentration for AMMs, underlying-strategy exposure for vaults, asset volatility from price
-  history),
-- a **composite ranking score** combining yield, risk, and ecosystem relevance.
+- a **yield estimate** — real APY for treasuries/MMFs and RWA lending, supply APY for native
+  lending, fee/emission APR for AMMs, share-ratio growth for vaults;
+- **risk signals** — issuer/counterparty and redemption terms and transfer restrictions for RWAs,
+  utilization and health-factor pressure for lending, liquidity depth for AMMs, asset volatility;
+- a **composite ranking** combining yield, risk, and relevance, surfacing real-yield first.
 
-**Output.** Ranked opportunities are served through a dedicated internal endpoint
-(e.g., `/v1/opportunities`) consumed by the discovery UI, the notification evaluator, and the
-mobile app. Each opportunity exposes its metrics, its risk signals, and a plain-language
-explanation, plus the metadata the execution layer needs to build the underlying action.
+**Output.** Served via an internal endpoint (e.g., `/v1/opportunities`) consumed by the discovery
+UI, the notification evaluator, the execution layer (which gets the metadata to build the action),
+and the mobile app. Each opportunity exposes its metrics, risk signals, and a plain-language
+explanation.
 
-The scoring methodology — not infrastructure ownership — is the differentiating layer.
+**Execution-readiness flag.** Some RWAs carry KYC or authorization-flag constraints. Opportunities
+are surfaced for discovery regardless; the one-click execution path targets freely-transferable
+assets first (e.g., the RWAs already usable as collateral in Stellar lending), with restricted
+assets shown as discovery-only until their flow is supported.
 
 ---
 
 ## 10. Notification Layer
 
-Alerting reuses the snapshot-delta approach the architecture already anticipates, kept deliberately
-minimal: a persisted rule model, a periodic evaluator, and a channel-agnostic delivery abstraction.
+A minimal, channel-agnostic alerting layer:
 
-- **Rule model.** Users configure thresholds and preferences (e.g., APY drop beyond a threshold,
-  health-factor risk, a new high-ranked opportunity), stored server-side.
-- **Evaluator.** A periodic job evaluates rules against metric deltas in the latest per-pool /
-  per-protocol tables and generates notifications.
-- **Notifier abstraction.** A single `Notifier` interface fans out to channels: in-app (WebSocket /
-  queued for offline sessions), Telegram, Discord, and mobile push. New channels are added behind
-  the same interface without touching the evaluator.
-
-```mermaid
-flowchart LR
-  DB[(metrics deltas)] --> Eval[Rule evaluator]
-  Rules[(user rules)] --> Eval
-  Eval --> Notifier[Notifier interface]
-  Notifier --> InApp[In-app / WebSocket]
-  Notifier --> TG[Telegram bot]
-  Notifier --> DC[Discord]
-  Notifier --> Push[APNs / FCM push]
-```
+- **Rule model.** Users configure thresholds/preferences (APY shift, health-factor risk, a new
+  high-ranked real-yield opportunity), stored server-side.
+- **Evaluator.** A periodic job evaluates rules against metric deltas and generates notifications.
+- **Notifier abstraction.** One interface fans out to in-app (WebSocket / queued for offline),
+  Telegram, Discord, and mobile push (APNs / FCM). New channels need no evaluator change.
 
 ---
 
-## 11. Mobile Architecture
+## 11. Mobile Architecture — Execution Surface
 
-The mobile app is a monitoring surface, read-only by design. It is built by packaging the existing
-web application as a native shell with **Capacitor**, reusing the Vue codebase rather than building
-a separate native codebase.
+The mobile app is a true execution surface, not read-only — which is the point of pairing it with
+passkey wallets: biometric signing is the natural mobile experience, and on-device DeFi execution
+is largely absent on Stellar today.
 
-- **Read path.** Consumes the existing read APIs (portfolio, positions, opportunities). No signing
-  or execution in the app — those remain in the web flow, which keeps the mobile app free of in-app
-  key handling and out of the strictest app-store crypto-execution review paths.
-- **Push.** Native push via APNs (iOS) and FCM (Android), delivered through the same `Notifier`
-  abstraction as the other channels (§10).
-- **Distribution.** Published to the App Store and Play Store as a real installable app, with native
-  push and biometric unlock to satisfy minimum-native-functionality expectations.
-
-A dedicated React Native client remains a possible future direction if a richer, execution-capable
-mobile experience is warranted; it is explicitly out of scope here.
+- **Signing.** Actions are signed on-device with passkey biometrics (Face ID / Touch ID), the same
+  secure-hardware key model as web (§6); no key handling in app code.
+- **Build path.** Packaged over the existing web app with Capacitor; if WebAuthn/passkey support in
+  the Capacitor webview proves limiting for on-device signing, the client moves to React Native
+  with the passkey SDK. This decision is validated during a discovery spike before committing.
+- **Read + push.** Consumes the existing read APIs for monitoring and discovery; native push via
+  APNs / FCM through the same `Notifier` abstraction (§10).
+- **App-store posture.** Non-custodial DeFi execution (the user signs their own transactions) is an
+  accepted pattern on the App Store and Play Store; the app does not host in-app exchange trading or
+  crypto purchases that would trigger the restricted review paths.
 
 ---
 
 ## 12. Data Model Additions
 
-The new layers extend the existing unified store, following the same conventions (snake_case raw
-SQL, `*_latest` upsert pattern, explicit freshness columns). Representative additions:
+Extends the existing unified store, following its conventions (snake_case raw SQL, `*_latest`
+upsert pattern, explicit freshness columns). Representative additions:
 
 ```
-opportunities_latest          -- ranked output of the intelligence engine (one row per opportunity)
-  id, venue_id, entity_id
-  opportunity_type            -- lending_supply, amm_lp, vault_deposit, rwa_yield, ...
+opportunities_latest          -- ranked output of the intelligence engine
+  id, source_ref, category    -- category: rwa_real_yield, rwa_lending, lending, amm, vault
   yield_estimate_apy
   risk_score
   ranking_score
-  explanation                 -- plain-language summary
+  execution_status            -- executable | discovery_only (KYC / authorization-gated)
+  explanation
   as_of                       -- freshness field
-  metadata                    -- signal breakdown, source attribution
+  metadata                    -- signal breakdown, issuer/redemption info, source attribution
 
 alert_rules                   -- user-defined alert configuration
-  id, user_id
-  scope, scope_ref            -- protocol / venue / wallet / global
-  metric, operator, threshold, window, cooldown, severity
+  id, user_id, scope, scope_ref, metric, operator, threshold, window, cooldown, severity
 
 alerts                        -- generated notifications
   id, rule_id, triggered_at, context, acknowledged_at, delivered_channels
 
-bridge_transfers              -- in-flight / completed cross-chain onboarding transfers
-  id, user_id
-  rail                        -- cctp | allbridge
-  source_chain, source_tx
-  dest_account                -- Stellar G-address
-  asset, amount
-  status, created_at, updated_at
+bridge_transfers              -- in-flight / completed cross-chain onboarding
+  id, user_id, rail, source_chain, source_tx, dest_account, asset, amount, status, timestamps
 ```
 
-The Privy onboarding does not require a new table: a provisioned wallet is recorded in the existing
-`user_wallets` model with a provider qualifier in metadata. Soroban i128 balances continue to be
-stored as strings with USD values computed at ingest.
+Passkey wallets and sponsorship require no separate identity table: a provisioned wallet is recorded
+in `user_wallets` with a provider qualifier (`passkey` / `wallets_kit` / `privy`) and sponsorship
+state in metadata. Soroban i128 balances remain stored as strings with USD computed at ingest.
 
 ---
 
 ## 13. Security & Non-Custodial Model
 
-The non-custodial model protects against key theft but not against a user signing something they
-did not intend; the design addresses both.
-
 | Threat | Mitigation |
 |---|---|
-| Backend crafts a malicious XDR | Client-side operation-by-operation decoding; SEP-11 txrep shown before signing; user-configurable spend limits enforced client-side |
-| Compromised frontend (XSS) | Strict CSP, no third-party scripts in signing flows, subresource integrity |
-| Cross-chain transfer routed to a wrong destination | Destination Stellar address is bound to the authenticated user; bridge proposals are validated client-side like any other action |
-| Privy account compromise | Self-custodial key model (TEE + secret-sharing, no full key held anywhere); user-exportable; standard session hardening |
-| Stale / poisoned indexed data drives a bad action | On-chain re-read at build time; freshness surfaced in UI; anomaly checks on metric jumps |
+| Backend crafts a malicious proposal | Client-side operation-by-operation decoding; SEP-11 txrep before signing; client-enforced spend limits |
+| Passkey key extraction | Key generated and held in device secure hardware; never exposed to backend, browser, or user |
+| Frontend compromise (XSS) | Strict CSP, no third-party scripts in signing flows, subresource integrity |
+| Sponsorship abused as control | Sponsored reserves and Launchtube fee handling do not grant signing rights; a sponsor can reclaim a reserve but cannot move user funds |
+| Lost passkey | Recovery via a configured recovery/policy signer; the centralization trade-offs of any backend-assisted recovery are documented and minimized |
+| Cross-chain transfer mis-routed | Destination Stellar address bound to the authenticated user; bridge proposals validated client-side like any action |
+| Stale / poisoned data drives a bad action | On-chain re-read at build time; freshness surfaced in UI; anomaly checks on metric jumps |
 
-**Key invariants.** The backend never stores private keys or secret seeds. Every XDR sent for
-signing is structurally validated client-side against the declared intent. No watch-only address is
-usable for signing without an explicit wallet connection. Logs exclude private data and raw account
-addresses beyond hashed identifiers.
+**Key invariants.** The backend never stores private keys or seeds. Every transaction sent for
+signing is validated client-side against declared intent. Sponsorship never confers the ability to
+sign or move funds. No watch-only address is usable for signing without an explicit connection.
 
 ---
 
 ## 14. Deployment & Operations
 
-The product extends the existing deployment shape: the web app on a CDN/Vercel, the API on a
-controllable server runtime, and the indexer/jobs (refresh, intelligence scoring, alert evaluation)
-on a scheduled runtime. For Mainnet, a paid Stellar RPC provider with a failover endpoint is used,
-abstracted behind the RPC client.
-
-Operational maturity is treated as first-class: per-source data-freshness state is surfaced in the
-UI, failing sources are retried with exponential backoff, and backend observability (a `/health`
-endpoint, RPC latency metrics, and error rates) is in place before the mainnet launch.
+The product extends the existing deployment shape: web on a CDN/Vercel, API on a controllable
+runtime, and jobs (refresh, intelligence scoring, alert evaluation) on a scheduler. For Mainnet, a
+paid Stellar RPC provider with failover is used behind an abstracted client, and Launchtube is used
+for passkey-wallet transaction submission. Per-source freshness is surfaced in the UI, failing
+sources retry with exponential backoff, and backend observability (`/health`, RPC latency metrics,
+error rates) is in place before mainnet launch.
 
 ---
 
-## 15. Scope Boundaries
+## 15. Anticipated Reviewer Questions
 
-**In scope:** opportunity detection/ranking, discovery UI, frictionless onboarding (Privy) alongside
-Wallets Kit, one-click non-custodial execution, cross-chain onboarding via CCTP and Allbridge,
-multi-channel notifications, and a read-only mobile monitoring app, culminating in a Mainnet launch.
+**Why passkey smart wallets rather than a generic EOA wallet layer (e.g., Privy) as the Stellar
+identity?** Passkey smart wallets are Stellar's native answer to mainstream onboarding: secp256r1
+verification is built into the protocol (CAP-51 / Protocol 21), they bring biometric signing and
+account abstraction, and the ecosystem provides the contracts (passkey-kit) and a submission/fee
+path (Launchtube). A generic EOA layer gives raw Ed25519 signing with no abstraction and leaves fee
+and reserve sponsorship entirely to the app. Privy is retained, but for a specific bounded role: the
+multi-chain source wallet in the CCTP flow (§8).
 
-**Out of scope (for this scope):** running our own Soroban strategy contracts or a proprietary
-vault; execution from the mobile app; a separate native mobile codebase; fee-sponsorship
-experiments; and cross-chain rails beyond CCTP and Allbridge.
+**How do web2-onboarded users with no XLM transact?** Fees are handled by Launchtube; the account
+reserve is covered by sponsored reserves (CAP-33). The cost is a recoverable XLM reserve provisioned
+per account plus negligible per-transaction fees, and sponsorship confers no control over funds.
+
+**How is the Protocol 20 classic/Soroban constraint handled in one-click flows?** Classic actions
+are a single multi-operation XDR; Soroban actions are authorized via the smart-wallet contract's
+`__check_auth`, with any classic prerequisite handled as a preceding transaction in a guided
+sequence (§7.2).
+
+**RWAs often carry KYC or authorization flags — how does execution work?** Opportunities are
+surfaced for discovery regardless; one-click execution targets freely-transferable assets first
+(e.g., RWAs already usable as collateral in Stellar lending), with restricted assets marked
+discovery-only until their flow is supported (§9).
+
+**Is the model still non-custodial given sponsorship and Launchtube?** Yes. The signing key lives in
+device secure hardware; the backend never holds it. Sponsorship and fee handling cover costs but
+grant no signing authority and cannot move user funds (§13).
+
+**What about passkey recovery?** Recovery uses a configured recovery/policy signer; any
+backend-assisted recovery path is treated as a documented, minimized trade-off rather than a hidden
+assumption.
+
+**How do you offer fiat onboarding without becoming a regulated money transmitter?** Dig consumes a
+third-party provider — a SEP-24 anchor or an on-ramp widget — that carries KYC, AML, and licensing;
+Dig integrates as a client and never custodies fiat or operates payment rails. Becoming an anchor
+is explicitly out of scope. The trade-off is provider-dependent geographic coverage, communicated
+honestly rather than overstated as universal access.
+
+---
+
+## 16. Scope Boundaries
+
+**In scope:** real-yield/RWA opportunity detection and ranking, discovery UI, passkey smart-wallet
+onboarding with account sponsorship, one-click non-custodial execution on web and mobile,
+capital onboarding via crypto (CCTP) and fiat (partner on-ramp), multi-channel notifications, and a
+Mainnet launch.
+
+**Out of scope (this scope):** becoming a fiat anchor / money transmitter (Dig only consumes a
+provider); authoring our own Soroban strategy/vault contracts; Allbridge (stretch); broader
+account-abstraction policy signing beyond initial recovery; and cross-chain crypto rails beyond CCTP.
