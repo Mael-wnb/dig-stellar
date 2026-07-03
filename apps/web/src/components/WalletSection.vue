@@ -452,19 +452,19 @@ onMounted(() => {
 
             <div class="flex flex-wrap gap-[6px]">
 
-              <button class="mini-btn" :disabled="isBusy(selectedWallet.id)" @click="refreshOneWallet(selectedWallet)">
+              <button class="px-3 py-1.5 rounded-md border border-[#383838] text-xs text-[#9a9b99] hover:text-[#e2e6e1] hover:border-[#4b4c4b] disabled:opacity-50 transition-colors" :disabled="isBusy(selectedWallet.id)" @click="refreshOneWallet(selectedWallet)">
                 {{ isBusy(selectedWallet.id) ? "Refreshing…" : "Refresh" }}
               </button>
 
-              <button class="mini-btn" :disabled="isBusy(selectedWallet.id) || selectedWallet.isPrimary" @click="setPrimary(selectedWallet)">
+              <button class="px-3 py-1.5 rounded-md border border-[#383838] text-xs text-[#9a9b99] hover:text-[#e2e6e1] hover:border-[#4b4c4b] disabled:opacity-50 transition-colors" :disabled="isBusy(selectedWallet.id) || selectedWallet.isPrimary" @click="setPrimary(selectedWallet)">
                 Set primary
               </button>
 
-              <button class="mini-btn" :disabled="isBusy(selectedWallet.id)" @click="toggleActive(selectedWallet)">
+              <button class="px-3 py-1.5 rounded-md border border-[#383838] text-xs text-[#9a9b99] hover:text-[#e2e6e1] hover:border-[#4b4c4b] disabled:opacity-50 transition-colors" :disabled="isBusy(selectedWallet.id)" @click="toggleActive(selectedWallet)">
                 {{ selectedWallet.isActive ? "Deactivate" : "Activate" }}
               </button>
 
-              <button class="mini-btn text-[#ff7b7b] border-[rgba(255,123,123,0.35)]" :disabled="isBusy(selectedWallet.id)" @click="handleDeleteWallet(selectedWallet)">
+              <button class="px-3 py-1.5 rounded-md border border-[rgba(255,123,123,0.35)] text-xs text-[#ff7b7b] hover:text-[#ff8f8f] hover:border-[#ff7b7b] disabled:opacity-50 transition-colors" :disabled="isBusy(selectedWallet.id)" @click="handleDeleteWallet(selectedWallet)">
                 Delete
               </button>
 
@@ -701,11 +701,11 @@ onMounted(() => {
         <p v-if="connectError" class="text-[11px] text-[#ff7b7b]">{{ connectError }}</p>
 
         <div class="flex gap-2 justify-end">
-          <button class="mini-btn" :disabled="addLoading" @click="closeAddModal">
+          <button class="px-4 py-2 rounded-md border border-[#383838] text-sm text-[#9a9b99] hover:text-[#e2e6e1] hover:border-[#4b4c4b] disabled:opacity-50 transition-colors" :disabled="addLoading" @click="closeAddModal">
             Cancel
           </button>
           <button
-            class="mini-btn border-[#d5ff2f] text-[#d5ff2f]"
+            class="px-4 py-2 rounded-md bg-[#d5ff2f] text-[#1a1f0e] text-sm font-semibold hover:bg-[#c2eb20] disabled:opacity-50 transition-colors"
             :disabled="addLoading || !pendingAddress.trim()"
             @click="confirmAdd"
           >
