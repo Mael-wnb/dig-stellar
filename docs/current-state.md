@@ -244,6 +244,10 @@ stream from the architecture doc:
   The builder shows the full vision but gates creation to the one evaluated family — **wallet ·
   health-factor** — marking every other metric "soon" and disabling create, so nothing implies an
   alert that won't fire. (This supersedes the earlier `AlertRuleForm`/`AlertRulesList` scaffold.)
+  The same shared data is also surfaced as a compact **dashboard Alerts panel** (`WalletAlertsPanel.vue`,
+  in the multi-wallet right column) — recent notifications + "New alert rule" + "View all ›" to the
+  full page — which replaced the old mock "Notifications / On-chain actions — Coming soon" placeholder
+  (real on-chain actions remain T3-D2, out of scope here).
 
 This matches the verbatim criterion (rules evaluated against the snapshot DB → in-app notifications).
 Remaining before an SCF claim: internal validation/demo and the VPS deploy (apply
