@@ -10,7 +10,6 @@ import SdexSwapWidget from "./SdexSwapWidget.vue";
 import HeroBanner from "./HeroBanner.vue";
 import NetworkStats from "./NetworkStats.vue"; // ✅ FIX
 import StellarMetrics from "./StellarMetrics.vue";
-import NetFlowChart from "./NetFlowChart.vue";
 import BridgeSection from "./bridge/BridgeSection.vue";
 import WalletSection from "./WalletSection.vue";
 import ProtocolTabs from "./ProtocolTabs.vue";
@@ -237,9 +236,6 @@ const {
       </section>
       <!-- STELLAR METRICS -->
       <StellarMetrics />
-
-      <!-- OUTFLOW / INFLOW -->
-      <NetFlowChart />
 
       <!-- BRIDGE (Allbridge USDC → Stellar): full Paul-DA section — chart + per-chain
            routes (click-to-scope) + recent-flows feed, on real /v1/bridge/* data. -->
