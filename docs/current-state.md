@@ -238,7 +238,12 @@ stream from the architecture doc:
   family: health-factor risk, consuming T2-D1's `wallet_pool_health`) and writing a `notifications`
   row on each fire/resolve edge.
 - **In-app delivery:** `GET /v1/notifications` → a web notification **bell** + **Alerts page** via
-  HTTP polling.
+  HTTP polling. The Alerts page is now the approved design (`AlertsView.vue` — Activity feed + Your
+  alert rules — with the 4-step `AlertRuleModal.vue` builder), reconciled to the real contract in
+  `composables/useAlerts.ts` (a thin view-model adapter over `useAlertRules` + `useNotifications`).
+  The builder shows the full vision but gates creation to the one evaluated family — **wallet ·
+  health-factor** — marking every other metric "soon" and disabling create, so nothing implies an
+  alert that won't fire. (This supersedes the earlier `AlertRuleForm`/`AlertRulesList` scaffold.)
 
 This matches the verbatim criterion (rules evaluated against the snapshot DB → in-app notifications).
 Remaining before an SCF claim: internal validation/demo and the VPS deploy (apply
