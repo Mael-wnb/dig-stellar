@@ -11,6 +11,7 @@ import NetworkStats from "./NetworkStats.vue"; // ✅ FIX
 import StellarMetrics from "./StellarMetrics.vue";
 import NetFlowChart from "./NetFlowChart.vue";
 import BridgeFlows from "./BridgeFlows.vue";
+import BridgeFlowChart from "./BridgeFlowChart.vue";
 import WalletSection from "./WalletSection.vue";
 import ProtocolTabs from "./ProtocolTabs.vue";
 import PoolTabs from "./PoolTabs.vue";
@@ -221,8 +222,12 @@ const { network } = useNetwork();
       <!-- OUTFLOW / INFLOW -->
       <NetFlowChart />
 
-      <!-- BRIDGE FLOWS (Allbridge — incoming bridged USDC by source chain) -->
-      <BridgeFlows />
+      <!-- BRIDGE (Allbridge USDC): by-source-chain summary + inflow/outflow time series.
+           Side-by-side on wide screens, stacked below xl. -->
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        <BridgeFlows />
+        <BridgeFlowChart />
+      </div>
     </div>
   </div>
 </template>
