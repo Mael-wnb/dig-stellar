@@ -41,7 +41,7 @@ disbursement is reviewed against.
 | T1 | 2 | Analytics Dashboard MVP | Jun 8, 2026 | $6,140 | Done — 100% |
 | T1 | 3 | Smart Transaction Builder (Testnet) | Jun 22, 2026 | $11,070 | Done — 100% |
 | T2 | 1 | Multi-Wallet Portfolio & "Active Signer" Model | Jul 6, 2026 | $7,380 | ~95% |
-| T2 | 2 | In-App Alerting Engine | Jul 20, 2026 | $8,610 | Built — awaiting internal validation (~80%) |
+| T2 | 2 | In-App Alerting Engine | Jul 20, 2026 | $8,610 | Substantially done — verified end-to-end in dev (~90%) |
 | T2 | 3 | Bridge Flow Monitoring | Aug 3, 2026 | $6,140 | ~85% |
 | T3 | 1 | Mainnet Deployment & Freshness Tracking | Aug 10, 2026 | $8,610 | ~45% |
 | T3 | 2 | Non-Custodial Mainnet Actions | Aug 24, 2026 | $8,610 | ~5% |
@@ -277,9 +277,9 @@ How to measure completion:
 Estimated date: July 20, 2026 — Budget: $8,610
 
 ### Internal interpretation & status (living)
-Owner: `apps/api` + `apps/web` (+ scheduled evaluation). Status: **Built — awaiting internal
-validation (~80%).** Both completion criteria are met in code, functional locally; not yet
-SCF-claim-ready (pending internal validation/demo + VPS deploy).
+Owner: `apps/api` + `apps/web` (+ scheduled evaluation). Status: **Substantially done — verified
+end-to-end in dev (~90%).** Both completion criteria are met and verified against the live API in
+dev; remaining before an SCF claim is the VPS deploy + demo capture.
 
 **Built to the criteria (smallest version that meets them).** The as-built is deliberately the
 minimal shape the two criteria require — not the architecture doc's sub-minute event-stream evaluator
@@ -290,13 +290,17 @@ minimal shape the two criteria require — not the architecture doc's sub-minute
   `job:wallet-alert`) — no broker, no in-process scheduler — evaluating rules (first family:
   health-factor risk, consuming T2-D1's `wallet_pool_health`) and writing a `notifications` row on
   each fire/resolve edge.
-- **In-app notifications:** `GET /v1/notifications` feeding a web notification **bell** + **Alerts
-  page** via HTTP polling.
+- **In-app notifications:** `GET /v1/notifications` feeding a web notification **bell** + full
+  **Alerts page** (`AlertsView` + 4-step `AlertRuleModal`) + a compact dashboard **`WalletAlertsPanel`**
+  — all on the shared `useAlerts` state, via HTTP polling.
 
-This satisfies the verbatim criterion (rules evaluated against the snapshot database → in-app
-notifications) **pending internal validation** — not yet bumped to an SCF claim status. Remaining:
-internal validation/demo, and the VPS deploy (apply `stellar_v3_alerting.sql` + schedule the
-`job:wallet-alert` cron; see `docs/runbooks.md`).
+**Verified in dev:** the contract was validated against the live API (`/v1/alert-rules`,
+`/v1/notifications`); the create round-trip was confirmed (a rule was created via the UI); and the
+fire path was proven with real `alert_fired` notifications from the evaluator on live Blend health
+factors (YieldBlox 1.274 < 1.5, Fixed 1.353 < 1.85). This satisfies the verbatim criterion (rules
+evaluated against the snapshot database → in-app notifications). Remaining: the VPS deploy (apply
+`stellar_v3_alerting.sql` + schedule the `job:wallet-alert` cron; see `docs/runbooks.md`) + demo
+capture; optional polish: derive notification severity from `payload` rather than `kind`.
 
 ---
 
@@ -442,9 +446,9 @@ before then.
 ## Most underdeveloped areas (next groups)
 1. T3-D2 — Mainnet Actions (~5%, path validated by T1-D3)
 
-> T2-D2 — Alerting Engine is no longer in this list: built (~80%, both criteria met in code),
-> awaiting internal validation/demo + the VPS deploy (apply `stellar_v3_alerting.sql` + schedule the
-> `job:wallet-alert` cron).
+> T2-D2 — Alerting Engine is no longer in this list: substantially done (~90%, both criteria met and
+> verified end-to-end in dev), only the VPS deploy (apply `stellar_v3_alerting.sql` + schedule the
+> `job:wallet-alert` cron) + demo capture remain.
 > T2-D3 — Bridge Monitoring is no longer in this list: code-complete (~85%, both criteria), only the
 > VPS deploy (bridge schema + Allbridge bootstrap) remains.
 
