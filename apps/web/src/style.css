@@ -38,3 +38,8 @@ body {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 0.8; }
 }
+
+/* ALERTS (T2-D2) — entrance animations used by AlertsView + AlertRuleModal */
+@keyframes digFade    { from { opacity: 0; transform: translateY(8px); }              to { opacity: 1; transform: translateY(0); } }
+@keyframes digSheet   { from { opacity: 0; transform: translateY(24px) scale(.98); }  to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes digOverlay { from { opacity: 0; }                                          to { opacity: 1; } }
