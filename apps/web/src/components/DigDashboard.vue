@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { NOTIFICATIONS } from "../data/protocols";
 import { useProtocol } from "../composables/useProtocol";
 import { useNetworkStats } from "../composables/useNetworkStats";
 import { useNetwork } from "../composables/useNetwork";
@@ -71,7 +70,7 @@ const { network } = useNetwork();
           </span>
         </div>
 
-        <WalletSection :notifications="NOTIFICATIONS" />
+        <WalletSection />
       </section>
 
       <!-- TESTNET ACTIONS — section header (incl. network selector) is always

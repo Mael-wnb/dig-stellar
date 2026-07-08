@@ -5,16 +5,15 @@ import { connectWallet as connectWalletApi } from "../api/wallets";
 import { useAppUser } from "../composables/useAppUser";
 import { useWalletSession } from "../composables/useWalletSession";
 import { useWallets } from "../composables/useWallets";
+import { useView } from "../composables/useView";
 import { displaySymbol } from "../utils/format";
 import type {
   WalletBalanceItem,
-  WalletNotification,
   WalletItem,
 } from "../types/wallet";
+import WalletAlertsPanel from "./WalletAlertsPanel.vue";
 
-defineProps<{
-  notifications: WalletNotification[];
-}>();
+const { setView } = useView();
 
 const { userId, setUserId, restoreUser, clearUser } = useAppUser();
 
@@ -597,57 +596,8 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- RIGHT CARD (UNCHANGED VISU) -->
-    <div class="bg-[#2A2A2A] border border-[#383838] rounded-[12px] p-4 flex flex-col gap-[14px] relative overflow-hidden">
-
-      <p class="text-[12px] text-[#9a9b99]">Notifications</p>
-
-      <div class="flex flex-col">
-        <div
-          v-for="(notification, index) in notifications"
-          :key="index"
-          class="flex justify-between items-center py-[9px] border-b border-[#383838]"
-        >
-          <span class="text-[12px] text-[#9a9b99]">
-            <strong class="text-[#e2e6e1]">{{ notification.wallet }}</strong> :
-            {{ notification.protocol }} ›
-          </span>
-
-          <span class="text-[12px] font-bold" :style="{ color: notification.color }">
-            {{ notification.status }}
-          </span>
-        </div>
-      </div>
-
-      <div class="flex flex-col gap-2 mt-1">
-
-        <button class="text-[12px] font-bold text-[#d5ff2f] bg-[#373b26] border border-[#d5ff2f] rounded px-3 py-[7px] w-fit">
-          Rebalance Wallet 1
-        </button>
-
-        <button class="text-[12px] font-bold text-white bg-[#222] border border-[#3a3a3a] rounded px-3 py-[7px] w-fit">
-          Claim Wallet 2
-        </button>
-
-        <button class="text-[12px] text-[#d5ff2f]">
-          See all notifications
-        </button>
-
-      </div>
-
-      <!-- OVERLAY -->
-      <div class="absolute inset-0 bg-[rgba(14,14,14,0.35)] backdrop-blur-[1.5px] flex items-center justify-center pointer-events-none rounded-[15px]">
-
-        <div class="flex items-center gap-2 bg-[#1a1a1a] border border-[#3a3a3a] rounded-full px-[18px] py-2 text-[15px] font-semibold text-[#9a9b99] tracking-[0.06em]">
-
-          <span class="w-[6px] h-[6px] bg-[#d5ff2f] rounded-full animate-pulse"></span>
-
-          On-chain actions — Coming soon
-
-        </div>
-      </div>
-
-    </div>
+    <!-- RIGHT CARD — real Alerts panel (shared data with the header bell + full Alerts page) -->
+    <WalletAlertsPanel @view-all="setView('alerts')" />
 
     <!-- ADD MODAL (shared by both add-paths) -->
     <div
