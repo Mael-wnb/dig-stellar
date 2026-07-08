@@ -2,6 +2,7 @@
 import { useProtocol } from "../composables/useProtocol";
 import { useNetworkStats } from "../composables/useNetworkStats";
 import { useNetwork } from "../composables/useNetwork";
+import { useBridge } from "../composables/useBridge";
 
 import DashboardHeader from "./DashboardHeader.vue";
 import NetworkToggle from "./NetworkToggle.vue";
@@ -10,8 +11,7 @@ import HeroBanner from "./HeroBanner.vue";
 import NetworkStats from "./NetworkStats.vue"; // ✅ FIX
 import StellarMetrics from "./StellarMetrics.vue";
 import NetFlowChart from "./NetFlowChart.vue";
-import BridgeFlows from "./BridgeFlows.vue";
-import BridgeFlowChart from "./BridgeFlowChart.vue";
+import BridgeSection from "./bridge/BridgeSection.vue";
 import WalletSection from "./WalletSection.vue";
 import ProtocolTabs from "./ProtocolTabs.vue";
 import PoolTabs from "./PoolTabs.vue";
@@ -37,6 +37,25 @@ const {
 
 const { stats } = useNetworkStats();
 const { network } = useNetwork();
+
+const {
+  window: bridgeWindow,
+  totals: bridgeTotals,
+  buckets: bridgeBuckets,
+  routes: bridgeRoutes,
+  flows: bridgeFlows,
+  chainScope: bridgeChainScope,
+  routeSort: bridgeRouteSort,
+  flowSort: bridgeFlowSort,
+  loading: bridgeLoading,
+  error: bridgeError,
+  setWindow: setBridgeWindow,
+  setChainScope: setBridgeChainScope,
+  clearScope: clearBridgeScope,
+  sortRoutes: sortBridgeRoutes,
+  sortFlows: sortBridgeFlows,
+  load: loadBridge,
+} = useBridge();
 </script>
 
 <template>
@@ -222,12 +241,26 @@ const { network } = useNetwork();
       <!-- OUTFLOW / INFLOW -->
       <NetFlowChart />
 
-      <!-- BRIDGE (Allbridge USDC): by-source-chain summary + inflow/outflow time series.
-           Side-by-side on wide screens, stacked below xl. -->
-      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-        <BridgeFlows />
-        <BridgeFlowChart />
-      </div>
+      <!-- BRIDGE (Allbridge USDC → Stellar): full Paul-DA section — chart + per-chain
+           routes (click-to-scope) + recent-flows feed, on real /v1/bridge/* data. -->
+      <BridgeSection
+        :window="bridgeWindow"
+        :totals="bridgeTotals"
+        :buckets="bridgeBuckets"
+        :routes="bridgeRoutes"
+        :flows="bridgeFlows"
+        :chain-scope="bridgeChainScope"
+        :route-sort="bridgeRouteSort"
+        :flow-sort="bridgeFlowSort"
+        :loading="bridgeLoading"
+        :error="bridgeError"
+        @update:window="setBridgeWindow"
+        @scope="setBridgeChainScope"
+        @clearScope="clearBridgeScope"
+        @sortRoutes="sortBridgeRoutes"
+        @sortFlows="sortBridgeFlows"
+        @retry="loadBridge"
+      />
     </div>
   </div>
 </template>
