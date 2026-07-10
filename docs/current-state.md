@@ -21,9 +21,12 @@ on Testnet.
 
 The three MVP deliverables (internally "T1") meet their SCF criteria and have been **submitted** for
 the **Tranche 2 (20%) disbursement** — claim-ready and now **awaiting SCF validation** (not yet
-validated, approved, or paid). The current phase is no longer T1 packaging but **T2 execution**:
-T2-D1 portfolio/active-signer (substantially done), T2-D2 in-app alerting (built, awaiting internal
-validation), T2-D3 bridge monitoring (code-complete, VPS deploy pending).
+validated, approved, or paid). The **T2 deliverable group is now essentially complete and live in
+prod**, and is being packaged for the **Tranche 3 (30%)** submission: T2-D1 portfolio/active-signer
+(substantially done; one visual HF cross-check vs blend.capital remaining), T2-D2 in-app alerting
+(**live in prod on the VPS** — schema + cron running, real `alert_fired` notifications in prod),
+T2-D3 bridge monitoring (**live in prod** — schema applied + Allbridge bootstrap run, `bridge_flows`
+populated). The remaining T2 work is demo capture, not build or deploy.
 
 ---
 
@@ -227,8 +230,9 @@ visibility.
 
 ## 7. Notifications / alerting
 
-**Built (T2-D2), awaiting internal validation.** The in-app alerting engine exists end to end and is
-functional locally; it is not yet SCF-claim-ready (pending internal validation/demo + VPS deploy). The
+**Live in prod (T2-D2).** The in-app alerting engine runs end to end on the VPS —
+`stellar_v3_alerting.sql` applied and the `job:wallet-alert` cron scheduled — with **real
+`alert_fired` notifications in the prod DB**. Only demo capture remains before an SCF claim. The
 as-built is deliberately the minimal shape the T2-D2 criteria require — **not** the sub-minute event
 stream from the architecture doc:
 - **Rule storage:** `alert_rules` + `alert_rule_state` + `notifications` (`stellar_v3_alerting.sql`,
@@ -250,8 +254,8 @@ stream from the architecture doc:
   (real on-chain actions remain T3-D2, out of scope here).
 
 This matches the verbatim criterion (rules evaluated against the snapshot DB → in-app notifications).
-Remaining before an SCF claim: internal validation/demo and the VPS deploy (apply
-`stellar_v3_alerting.sql` + schedule the `job:wallet-alert` cron; see `docs/runbooks.md`).
+Deploy is done (schema + cron live on the VPS, real `alert_fired` rows in prod); the only remaining
+item before an SCF claim is the demo capture.
 
 ---
 
@@ -323,11 +327,11 @@ Near-term: this shape is fine for the beta and the Tranche 2 claim. CI/CD and ob
 7. Architectural separation (web / api / indexer)
 
 ## 11. Most fragile right now
-1. Bridge monitoring (T2) — code-complete, not yet live on the VPS
-2. Freshness/stale/retry operationalization + observability (T3)
-3. Deployment maturity / CI-CD (T3)
-4. Transaction builder breadth: SDEX swap proven; Blend deposit not yet exercised from UI
-5. Alerting engine (T2) — built, not yet internally validated or deployed to VPS
+1. Freshness/stale/retry operationalization + observability (T3)
+2. Deployment maturity / CI-CD (T3)
+3. Transaction builder breadth: SDEX swap proven; Blend deposit not yet exercised from UI
+4. T2 submission packaging — the three T2 deliverables are live in prod; demo capture (plus D1's
+   visual HF cross-check vs blend.capital) is the last non-build gap
 
 ## 12. Closest tranche-relevant wins
 1. SCF Tranche 2 (20%) submission — all three MVP deliverables meet their criteria
@@ -338,9 +342,11 @@ Near-term: this shape is fine for the beta and the Tranche 2 claim. CI/CD and ob
 
 ## 13. Current execution priorities
 1. T1 (MVP) is submitted — **awaiting SCF validation**; no further T1 build work pending review
-2. T2 execution: internal validation/demo of T2-D2 in-app alerting; T2-D1 final HF cross-check vs
-   blend.capital; T2-D3 VPS deploy (bridge schema + Allbridge bootstrap)
-3. Keep `grant-roadmap.md` and `status-board.md` aligned with this reality
+2. Package the **T2 (Tranche 3) submission**: the three T2 deliverables are live in prod — capture the
+   demo (portfolio/active-signer, live alerting with a real `alert_fired`, live bridge section) and
+   assemble the evidence links
+3. Close T2-D1's one open item: the visual HF cross-check vs the blend.capital UI
+4. Keep `grant-roadmap.md` and `status-board.md` aligned with this reality
 
 (Done this session: data cleanup — stellar-native protocol aggregation, dynamic `protocolCount`=4,
 dead Soroswap pair hidden + TVL corrected, "native"→"XLM" display, Blend panel trimmed; cron moved to

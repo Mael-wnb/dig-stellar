@@ -41,8 +41,8 @@ disbursement is reviewed against.
 | T1 | 2 | Analytics Dashboard MVP | Jun 8, 2026 | $6,140 | Done — 100% |
 | T1 | 3 | Smart Transaction Builder (Testnet) | Jun 22, 2026 | $11,070 | Done — 100% |
 | T2 | 1 | Multi-Wallet Portfolio & "Active Signer" Model | Jul 6, 2026 | $7,380 | ~95% |
-| T2 | 2 | In-App Alerting Engine | Jul 20, 2026 | $8,610 | Substantially done — verified end-to-end in dev (~90%) |
-| T2 | 3 | Bridge Flow Monitoring | Aug 3, 2026 | $6,140 | ~85% |
+| T2 | 2 | In-App Alerting Engine | Jul 20, 2026 | $8,610 | Substantially done — live in prod (~95%) |
+| T2 | 3 | Bridge Flow Monitoring | Aug 3, 2026 | $6,140 | Substantially done — live in prod (~95%) |
 | T3 | 1 | Mainnet Deployment & Freshness Tracking | Aug 10, 2026 | $8,610 | ~45% |
 | T3 | 2 | Non-Custodial Mainnet Actions | Aug 24, 2026 | $8,610 | ~5% |
 | T3 | 3 | Observability, UI/UX Polish & Reference Handoff | Aug 31, 2026 | $6,140 | ~20% |
@@ -225,7 +225,9 @@ How to measure completion:
 Estimated date: July 6, 2026 — Budget: $7,380
 
 ### Internal interpretation & status (living)
-Owner: `apps/web` + `apps/api` (+ `apps/indexer` as position depth grows). Status: ~75%.
+Owner: `apps/web` + `apps/api` (+ `apps/indexer` as position depth grows). Status: **~95% —
+substantially done.** Both Gaps (A: active-signer/watch-only; B: position + health aggregation)
+are done and live; the one open item is the visual HF cross-check vs the blend.capital UI.
 
 **Foundations in place.** Grouped multi-wallet behavior is real: add/remove/refresh/select flows,
 backend grouping by a persistent `userId`, wallet overview and per-wallet balances. Backed by the raw
@@ -260,7 +262,8 @@ riskiest first), both reading each wallet's **latest snapshot** so repaid/exited
 linger. The portfolio UI shows a consolidated "DeFi positions (Blend)" header + per-wallet
 supplied/borrowed/health-factor with colour-coded risk states. `total_portfolio_usd` (liquid)
 stays distinct from supplied/borrowed. **This closes T2-D1 criterion 2 and, with Gap A, D1 end to
-end** (Blend-only; final visual HF cross-check vs blend.capital recommended; VPS applies v2 at deploy).
+end** (Blend-only; the one open item is the final visual HF cross-check vs the blend.capital UI; the
+v2 schema is now live in prod — D2's live alerting consumes `wallet_pool_health` there).
 
 ---
 
@@ -277,9 +280,9 @@ How to measure completion:
 Estimated date: July 20, 2026 — Budget: $8,610
 
 ### Internal interpretation & status (living)
-Owner: `apps/api` + `apps/web` (+ scheduled evaluation). Status: **Substantially done — verified
-end-to-end in dev (~90%).** Both completion criteria are met and verified against the live API in
-dev; remaining before an SCF claim is the VPS deploy + demo capture.
+Owner: `apps/api` + `apps/web` (+ scheduled evaluation). Status: **Substantially done — live in
+prod (~95%).** Both completion criteria are met and verified end-to-end **live in prod on the VPS**;
+the only remaining item before an SCF claim is the demo capture.
 
 **Built to the criteria (smallest version that meets them).** The as-built is deliberately the
 minimal shape the two criteria require — not the architecture doc's sub-minute event-stream evaluator
@@ -294,13 +297,13 @@ minimal shape the two criteria require — not the architecture doc's sub-minute
   **Alerts page** (`AlertsView` + 4-step `AlertRuleModal`) + a compact dashboard **`WalletAlertsPanel`**
   — all on the shared `useAlerts` state, via HTTP polling.
 
-**Verified in dev:** the contract was validated against the live API (`/v1/alert-rules`,
-`/v1/notifications`); the create round-trip was confirmed (a rule was created via the UI); and the
-fire path was proven with real `alert_fired` notifications from the evaluator on live Blend health
-factors (YieldBlox 1.274 < 1.5, Fixed 1.353 < 1.85). This satisfies the verbatim criterion (rules
-evaluated against the snapshot database → in-app notifications). Remaining: the VPS deploy (apply
-`stellar_v3_alerting.sql` + schedule the `job:wallet-alert` cron; see `docs/runbooks.md`) + demo
-capture; optional polish: derive notification severity from `payload` rather than `kind`.
+**Verified live in prod:** `stellar_v3_alerting.sql` is applied on the VPS and the
+`job:wallet-alert` cron is scheduled (the 82→81→83 sweep); the contract was validated against the
+live API (`/v1/alert-rules`, `/v1/notifications`); the create round-trip was confirmed; and the fire
+path is proven by **real `alert_fired` notifications in the prod DB** from the evaluator on live
+Blend health factors (YieldBlox 1.274 < 1.5, Fixed 1.353 < 1.85). This satisfies the verbatim
+criterion (rules evaluated against the snapshot database → in-app notifications). Remaining: **demo
+capture** only; optional polish: derive notification severity from `payload` rather than `kind`.
 
 ---
 
@@ -316,9 +319,9 @@ How to measure completion:
 Estimated date: August 3, 2026 — Budget: $6,140
 
 ### Internal interpretation & status (living)
-Owner: `apps/indexer` + `apps/api` + `apps/web`. Status: ~85% — substantially done. Both SCF criteria
-(Allbridge attribution adapter + dashboard section) are implemented and functional locally (commit
-`13223ed`); only the VPS deploy remains.
+Owner: `apps/indexer` + `apps/api` + `apps/web`. Status: **~95% — substantially done, live in prod.**
+Both SCF criteria (Allbridge attribution adapter + dashboard section) are implemented and now running
+in prod on the VPS; the only remaining item is the demo capture.
 
 The criteria are narrow and explicit: an **Allbridge** attribution adapter and a dashboard section for
 incoming bridged assets. Axelar / Near Intents are not part of this contract — do not expand scope.
@@ -333,16 +336,19 @@ in `bridge_flows` (raw SQL, `stellar_v1_bridge.sql`) with `amount_usd`, deduped 
 Verified against mainnet.
 
 **Done (API + UI):** `/v1/bridge/*` is live in `apps/api/src/modules/bridge/` — `GET /v1/bridge/summary`
-(24h/7d/30d window, inflow/outflow by source chain + net) and `GET /v1/bridge/flows` (recent feed), with
-on-read aggregation (no pre-computed metrics table). The dashboard "recent bridged flows" section is
-`apps/web/src/components/BridgeFlows.vue` (inflow-by-chain bars as the headline, plus outflow, net, and a
-relative-time recent feed), wired into `DigDashboard.vue`. This satisfies the SCF "dashboard section"
-criterion. Functional locally against mainnet data.
+(24h/7d/30d window, inflow/outflow by source chain + net), `GET /v1/bridge/flows` (recent feed) and
+`GET /v1/bridge/series` (gap-filled daily net-flow buckets), with on-read aggregation (no pre-computed
+metrics table). The dashboard bridge section is now the **full Paul-DA card** in
+`apps/web/src/components/bridge/` — `BridgeSection` + `BridgeChart` (inflow/outflow + cumulative-net
+line, 24h/7d/30d) + `BridgeRoutesTable` (per-chain, click-to-scope, sortable) + `BridgeFlowsFeed`
+(recent `chain → Stellar` flows, capped ~10 with internal scroll) on the extended `useBridge` — wired
+into `DigDashboard.vue`. This satisfies the SCF "dashboard section" criterion.
 
-**Remaining (~15% — VPS deploy only):** apply `stellar_v1_bridge.sql` and run the
-`allbridge-upsert-core.ts` bootstrap once on the VPS so production populates `bridge_flows` and the live
-dashboard section renders real flows. Honest constraint to carry into the UI copy: Soroban RPC
-`getEvents` retains ~7 days, so this is a rolling recent-flows view, not deep history.
+**Deployed (live in prod):** `stellar_v1_bridge.sql` is applied on the VPS and the
+`allbridge-upsert-core.ts` bootstrap has been run, so production `bridge_flows` is populated and the live
+dashboard section renders real flows. Remaining (~5%): **demo capture** only. Honest constraint carried
+into the UI copy: Soroban RPC `getEvents` retains ~7 days, so this is a rolling recent-flows view, not
+deep history.
 
 ---
 
@@ -446,11 +452,12 @@ before then.
 ## Most underdeveloped areas (next groups)
 1. T3-D2 — Mainnet Actions (~5%, path validated by T1-D3)
 
-> T2-D2 — Alerting Engine is no longer in this list: substantially done (~90%, both criteria met and
-> verified end-to-end in dev), only the VPS deploy (apply `stellar_v3_alerting.sql` + schedule the
-> `job:wallet-alert` cron) + demo capture remain.
-> T2-D3 — Bridge Monitoring is no longer in this list: code-complete (~85%, both criteria), only the
-> VPS deploy (bridge schema + Allbridge bootstrap) remains.
+> T2-D2 — Alerting Engine is no longer in this list: substantially done (~95%, both criteria met and
+> verified end-to-end **live in prod** — schema + `job:wallet-alert` cron running, real `alert_fired`
+> notifications in prod); only demo capture remains.
+> T2-D3 — Bridge Monitoring is no longer in this list: substantially done (~95%, both criteria) and
+> **live in prod** — `stellar_v1_bridge.sql` applied + Allbridge bootstrap run, `bridge_flows`
+> populated; only demo capture remains.
 
 ## Timeline reality (be honest, not optimistic)
 As of June 19, 2026: all three MVP (T1) deliverables now meet their SCF criteria with concrete,
