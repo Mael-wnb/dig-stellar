@@ -42,7 +42,8 @@ const arrow = (key: string, sort: { key: string; dir: string }) => (sort.key ===
               :style="{ textAlign: al, color: sort.key === k ? '#E2E6E1' : '#5E5F5D' }"
               @click="emit('sort', k)">{{ label }}{{ arrow(k, sort) }}</button>
     </div>
-    <!-- rows -->
+    <!-- rows: capped to ~10 with internal scroll; the header above stays pinned -->
+    <div class="max-h-[500px] overflow-y-auto">
     <div v-for="f in flows" :key="f.id"
          class="grid items-center px-2 py-[11px] border-b border-[#2C2C29]"
          style="grid-template-columns:1.8fr 1fr 0.9fr 1fr 0.9fr 0.9fr;">
@@ -68,5 +69,6 @@ const arrow = (key: string, sort: { key: string; dir: string }) => (sort.key ===
       </span>
     </div>
     <p v-if="!flows.length" class="text-[12.5px] text-[#5E5F5D] py-6 text-center">No flows in this window.</p>
+    </div>
   </div>
 </template>
