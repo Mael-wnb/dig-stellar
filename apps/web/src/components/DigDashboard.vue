@@ -7,6 +7,7 @@ import { useBridge } from "../composables/useBridge";
 import DashboardHeader from "./DashboardHeader.vue";
 import NetworkToggle from "./NetworkToggle.vue";
 import SdexSwapWidget from "./SdexSwapWidget.vue";
+import BlendDepositCard from "./BlendDepositCard.vue";
 import HeroBanner from "./HeroBanner.vue";
 import NetworkStats from "./NetworkStats.vue"; // ✅ FIX
 import StellarMetrics from "./StellarMetrics.vue";
@@ -113,7 +114,10 @@ const {
           <NetworkToggle />
         </div>
 
-        <SdexSwapWidget v-if="network === 'testnet'" />
+        <template v-if="network === 'testnet'">
+          <SdexSwapWidget />
+          <BlendDepositCard />
+        </template>
 
         <div
           v-else

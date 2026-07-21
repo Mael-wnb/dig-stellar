@@ -63,3 +63,43 @@ export async function quoteSdexSwap(
     body: JSON.stringify(payload),
   });
 }
+
+// --- Blend deposit (Testnet) ----------------------------------------------
+
+export type BlendDepositRequest = {
+  address: string;
+  asset: "XLM" | "USDC";
+  amount: string;
+  network?: "testnet" | "mainnet";
+};
+
+export type BlendDepositResponse = {
+  /** The Soroban deposit (InvokeHostFunction) XDR to sign. Empty when simulation failed. */
+  xdr: string;
+  /**
+   * Present only when the user lacks the USDC trustline. A classic ChangeTrust tx
+   * that MUST be signed + submitted before the deposit (Soroban forbids mixing
+   * InvokeHostFunction with classic ops in one envelope).
+   */
+  changetrustXdr?: string;
+  operations: string[];
+  simulation: {
+    success: boolean;
+    resourceFee: string;
+    error?: string;
+  };
+  fee: {
+    inclusion: number;
+    resource: number;
+    total: number;
+  };
+};
+
+export async function buildBlendDeposit(
+  payload: BlendDepositRequest
+): Promise<BlendDepositResponse> {
+  return apiFetch<BlendDepositResponse>("/actions/blend/deposit", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
