@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { TransactionBuilder, FeeBumpTransaction } from "@stellar/stellar-sdk";
 import type { Asset } from "@stellar/stellar-sdk";
 import { buildBlendDeposit } from "../api/actions";
@@ -9,6 +9,7 @@ import { useNetwork, toWalletNetwork } from "../composables/useNetwork";
 import { TESTNET_BLEND_POOL } from "../config/testnetBlendPools";
 
 const TESTNET_RPC_URL = "https://soroban-testnet.stellar.org";
+const TESTNET_HORIZON_URL = "https://horizon-testnet.stellar.org";
 // The classic asset the Blend deposit trustline must point at (SAC-backed USDC).
 const BLEND_USDC_ISSUER = "GATALTGTWIOT6BUDBCZM3Q4OQ4BO2COLOAZ7IYSKPLC2PMSOPPGF5V56";
 
@@ -17,11 +18,60 @@ const { activeSignerAddress } = useActiveSigner();
 const { network } = useNetwork();
 
 const pool = TESTNET_BLEND_POOL;
+// XLM is the default/primary path: native, no trustline, funded by friendbot →
+// zero-prerequisite and proven. USDC is secondary and cannot be obtained in-app
+// (see usdcUnavailable below).
 const asset = ref<"XLM" | "USDC">("XLM");
 const amount = ref("");
 
 const selectedAssetNote = computed(
   () => pool.assets.find((a) => a.code === asset.value)?.note ?? "",
+);
+
+// --- Testnet balances (Horizon /accounts/:id) -----------------------------
+const balances = ref<Record<string, string>>({});
+
+async function loadBalances() {
+  balances.value = {};
+  const addr = connectedAddress.value;
+  if (!addr || network.value !== "testnet") return;
+  try {
+    const res = await fetch(`${TESTNET_HORIZON_URL}/accounts/${addr}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const map: Record<string, string> = {};
+    for (const b of data.balances ?? []) {
+      if (b.asset_type === "native") map["XLM"] = b.balance;
+      else if (b.asset_code && b.asset_issuer) {
+        map[`${b.asset_code}:${b.asset_issuer}`] = b.balance;
+      }
+    }
+    balances.value = map;
+  } catch {
+    // leave empty (shown as 0)
+  }
+}
+
+onMounted(loadBalances);
+watch(connectedAddress, loadBalances);
+
+const xlmBalance = computed(() => parseFloat(balances.value["XLM"] ?? "0") || 0);
+const usdcBalance = computed(
+  () => parseFloat(balances.value[`USDC:${BLEND_USDC_ISSUER}`] ?? "0") || 0,
+);
+const selectedBalance = computed(() =>
+  asset.value === "XLM" ? xlmBalance.value : usdcBalance.value,
+);
+
+/**
+ * The Blend reserve USDC (SAC CAQCFV… / classic USDC:GATALTGT…) cannot be acquired
+ * in-app: no permissionless faucet (its SAC admin is the issuer account — minting
+ * needs that secret, e.g. blend-utils), and testnet SDEX only has dust liquidity
+ * for it (~0.001 USDC for 50 XLM). So when USDC is selected without a balance, the
+ * deposit is a dead end — steer the user to XLM, the working path.
+ */
+const usdcUnavailable = computed(
+  () => asset.value === "USDC" && usdcBalance.value <= 0,
 );
 
 type DepositStatus = "idle" | "building" | "step1" | "step2" | "success" | "error";
@@ -59,6 +109,7 @@ const canDeposit = computed(
     isConnected.value &&
     isActiveSignerConnected.value &&
     !isBusy.value &&
+    !usdcUnavailable.value &&
     parseFloat(amount.value) > 0,
 );
 
@@ -220,6 +271,7 @@ async function onDeposit() {
 
     txHash.value = hash;
     status.value = "success";
+    loadBalances(); // reflect the new balances
   } catch (err: unknown) {
     errorMessage.value = readApiError(err, "Deposit failed.");
     status.value = "error";
@@ -261,13 +313,13 @@ function reset() {
         <span class="font-mono">{{ pool.contractId.slice(0, 6) }}…{{ pool.contractId.slice(-4) }}</span>
       </div>
 
-      <!-- ASSET -->
+      <!-- ASSET (XLM is the recommended, zero-prerequisite path) -->
       <div class="flex gap-2">
         <button
           v-for="a in pool.assets"
           :key="a.code"
           type="button"
-          class="flex-1 px-3 py-2 rounded-md border text-xs font-semibold transition"
+          class="flex-1 px-3 py-2 rounded-md border text-xs font-semibold transition flex items-center justify-center gap-1"
           :class="
             asset === a.code
               ? 'border-[#d5ff2f] text-[#d5ff2f] bg-[rgba(213,255,47,0.08)]'
@@ -276,20 +328,50 @@ function reset() {
           @click="asset = a.code"
         >
           {{ a.code }}
+          <span
+            v-if="a.code === 'XLM'"
+            class="text-[8px] uppercase tracking-wider text-[#d5ff2f] border border-[rgba(213,255,47,0.4)] rounded px-1"
+          >
+            Recommended
+          </span>
         </button>
       </div>
-      <p v-if="selectedAssetNote" class="text-[10px] text-[#9a9b99] -mt-1">{{ selectedAssetNote }}</p>
 
-      <!-- Honest USDC caveat: this is the SAC-backed testnet USDC, a DIFFERENT
-           asset than the Circle USDC the swap yields, so the swap can't provide it. -->
+      <div class="text-[11px] text-[#9a9b99] flex items-center justify-between -mt-1">
+        <span>{{ selectedAssetNote }}</span>
+        <span>Balance: {{ selectedBalance.toLocaleString(undefined, { maximumFractionDigits: 4 }) }} {{ asset }}</span>
+      </div>
+
+      <!-- USDC dead-end: cannot be acquired in-app (no faucet, no SDEX liquidity).
+           Steer the user to XLM, the working path. -->
       <div
-        v-if="asset === 'USDC'"
+        v-if="usdcUnavailable"
+        class="bg-[#202020] border border-[rgba(255,184,107,0.4)] rounded-md p-2 text-[10px] text-[#ffb86b] flex flex-col gap-2"
+      >
+        <span>
+          You hold 0 of this SAC-backed testnet USDC (issuer GATALTGT…) and it
+          <span class="font-semibold">can't be obtained in-app</span>: no permissionless
+          faucet (minting needs the issuer admin), and testnet SDEX has only dust
+          liquidity for it. It's also a different asset than the Circle USDC our swap
+          produces. Use XLM for a working deposit, or acquire this USDC out-of-band first.
+        </span>
+        <button
+          type="button"
+          class="self-start px-2 py-1 rounded border border-[#d5ff2f] text-[#d5ff2f] hover:bg-[rgba(213,255,47,0.1)] transition"
+          @click="asset = 'XLM'"
+        >
+          Use XLM instead
+        </button>
+      </div>
+
+      <!-- USDC held: honest note about the 2-step first-time flow. -->
+      <div
+        v-else-if="asset === 'USDC'"
         class="bg-[#202020] border border-[rgba(255,184,107,0.4)] rounded-md p-2 text-[10px] text-[#ffb86b]"
       >
-        You must already hold this SAC-backed testnet USDC (issuer GATALTGT…). It is a
+        This is the SAC-backed testnet USDC (issuer GATALTGT…), a
         <span class="font-semibold">different asset</span> than the Circle USDC our swap
-        produces — the swap can't provide it. First-time deposits sign a trustline
-        (step 1/2), then the deposit (step 2/2).
+        produces. First-time deposits sign a trustline (step 1/2), then the deposit (step 2/2).
       </div>
 
       <!-- AMOUNT -->
@@ -315,6 +397,7 @@ function reset() {
         <template v-else-if="isBusy">{{ stepLabel }}…</template>
         <template v-else-if="!isConnected">Connect wallet first</template>
         <template v-else-if="!isActiveSignerConnected">Connect your active signer</template>
+        <template v-else-if="usdcUnavailable">No testnet USDC — use XLM</template>
         <template v-else>Deposit {{ asset }} to Blend</template>
       </button>
 

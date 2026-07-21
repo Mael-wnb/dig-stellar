@@ -335,6 +335,15 @@ guardrails throughout (testnet-only, active-signer-only, light client-side XDR c
 stays single-step. Live on-chain landing is the manual Freighter step; simulation + the 2-step ordering
 are proven on testnet.
 
+USDC acquisition path (checked Jul 21, 2026): there is **no in-app way to obtain this reserve USDC**.
+It is the SAC (`CAQCFV…`) of classic `USDC:GATALTGT` whose admin is the issuer account, so minting needs
+that secret (Blend's `blend-utils` scripts) — not a permissionless faucet; and testnet SDEX has only
+dust liquidity for it (~0.001 USDC for 50 XLM), failing the swap-vetting bar. So the deposit card makes
+**XLM the default/primary (recommended, zero-prereq) path**, shows the connected address's live testnet
+balances, and when USDC is selected with a 0 balance it blocks with an honest "can't be obtained in-app —
+use XLM" message (the user must acquire that USDC out-of-band to demo the USDC 2-step). XLM deposit
+sim on a fresh friendbot account: OK (~0.061 XLM resource fee).
+
 Minor known bug (still open, USDC path only): `getAssetBalance` re-bundles `ChangeTrust` even when the
 trustline already exists (harmless; fix via Horizon `/accounts/:id`). Polish / T3-D2 item, not a gap
 against the T1-D3 contract.
