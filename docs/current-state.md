@@ -291,10 +291,40 @@ classic operations in one envelope. So the grant's literal `ChangeTrust + Deposi
 achievable via classic SDEX, not Blend. Hence the SDEX swap is the primary single-XDR demonstration of
 the criterion; the Blend deposit is a secondary Soroban pattern (two sequential txs).
 
-Partial / weak (beyond the T1-D3 criteria): the Blend deposit endpoint exists but has not been
-exercised end-to-end from the UI; minor known bug — `getAssetBalance` re-bundles `ChangeTrust` even
-when the trustline already exists (harmless; fix via Horizon `/accounts/:id`). These are polish / T3-D2
-items, not gaps against the T1-D3 contract.
+**Generalized to multiple vetted SDEX pairs (Jul 21, 2026 — T3-D2 groundwork, still Testnet-only):**
+the single hardcoded XLM→USDC widget is now a config-driven list. `sdex/swap` + `sdex/quote` accept an
+explicit `{ code, issuer }` asset descriptor (legacy `'XLM'`/`'USDC'` strings still resolve for rollout
+safety); the frontend drives rows from `apps/web/src/config/testnetSwapPairs.ts` — a **front-only**
+config (no DB testnet entities, so prod TVL/`protocolCount` do not move). Pairs are vetted against
+Horizon testnet `/paths/strict-send` (the same oracle `/quote` uses), each required to fill a small
+strict-send at 5% slippage:
+
+- **XLM → USDC** (`GBBD47…`, Circle) — deepest testnet book (8 levels). Flagship / proven path.
+- **XLM → yXLM** (`GC63WR…`) — direct route, ~1:0.95.
+- **XLM → AQUA** (`GC63WR…`) — direct route, fills (small unit output at current testnet price).
+- Excluded as a negative check: **XLM → EURC** (`GDKH3M…`) has an XLM offer but returns 0 fillable
+  strict-send records; meme AMM tokens omitted for demo credibility.
+
+The security gate `validateSwapXdr` (previously present but **unwired**) is now enforced before every
+signature: the returned XDR is validated against an intent derived from user input (source/destination =
+user, exact asset code+issuer, sendAmount, destMin ≥ accepted). It was extended with an opt-in
+`allowTrustlineFor` so a first-time swap's leading `ChangeTrust` (for the exact dest asset only) is
+permitted — a `ChangeTrust` for any other asset, or any other extra op, is still rejected. (Live 2-pair
+Freighter proof + tx hashes: pending the manual signing pass.)
+
+Blend deposit — now exercised from the UI (Jul 21, 2026): a testnet-gated "Blend Deposit" card drives
+the previously-never-UI-exercised `POST /v1/actions/blend/deposit`. Reality-checked against
+soroban-testnet: supplying **XLM** collateral to pool `CCEBVDYM…` **simulates OK** (~0.06 XLM resource
+fee) — native, no trustline, friendbot-funded → the reliably demoable path. **USDC** supply needs the
+SAC-backed testnet USDC (`GATALTGT…`, a *different* asset than the Circle USDC the swap yields), so a
+fresh account fails simulation (`Contract #13`); surfaced honestly, not hidden. The card implements the
+honest 2-step flow (classic `ChangeTrust` 1/2 → Soroban deposit 2/2, XLM skips to a single step) with
+Soroban confirmation polling and the same guardrails (testnet-only, active-signer-only, light
+client-side XDR check). Live on-chain landing is the manual Freighter step; simulation is proven.
+
+Minor known bug (still open, USDC path only): `getAssetBalance` re-bundles `ChangeTrust` even when the
+trustline already exists (harmless; fix via Horizon `/accounts/:id`). Polish / T3-D2 item, not a gap
+against the T1-D3 contract.
 
 The builder gates Mainnet-only swaps off (button disabled + notice + hard guard in `onSwap`), so no
 real Mainnet swap can fire before T3-D2. The same builder code targets mainnet — only contract
