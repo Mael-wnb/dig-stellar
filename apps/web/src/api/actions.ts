@@ -77,11 +77,16 @@ export type BlendDepositResponse = {
   /** The Soroban deposit (InvokeHostFunction) XDR to sign. Empty when simulation failed. */
   xdr: string;
   /**
-   * Present only when the user lacks the USDC trustline. A classic ChangeTrust tx
-   * that MUST be signed + submitted before the deposit (Soroban forbids mixing
-   * InvokeHostFunction with classic ops in one envelope).
+   * Present when the user lacks the classic USDC trustline. Sign + confirm this
+   * ChangeTrust ON-CHAIN, then re-request the deposit build (which can only be
+   * simulated once the trustline exists).
    */
   changetrustXdr?: string;
+  /**
+   * True when the response carries ONLY the ChangeTrust step (`xdr` is empty): the
+   * deposit couldn't be simulated because the classic trustline is missing.
+   */
+  trustlineRequired?: boolean;
   operations: string[];
   simulation: {
     success: boolean;

@@ -160,15 +160,50 @@ async function onDeposit() {
   errorMessage.value = "";
   stepLabel.value = "";
 
+  const address = connectedAddress.value;
+  const passphrase = toWalletNetwork(network.value);
+
   try {
-    const built = await buildBlendDeposit({
-      address: connectedAddress.value,
+    let built = await buildBlendDeposit({
+      address,
       asset: asset.value,
       amount: amount.value,
       network: network.value,
     });
 
-    if (!built.simulation.success) {
+    // Step 1/2 — the deposit CANNOT be simulated until the classic USDC trustline
+    // exists (the SAC transfer would trap with Contract #13). So when the backend
+    // reports one is required, it returns ONLY the ChangeTrust: sign it, confirm it
+    // ON-CHAIN, then re-request the build — which can now simulate the deposit.
+    const twoStep = built.trustlineRequired === true;
+    if (twoStep) {
+      if (!built.changetrustXdr) {
+        throw new Error("Trustline required but no ChangeTrust was returned.");
+      }
+      status.value = "step1";
+      stepLabel.value = "1/2 Approve trustline";
+      assertOwnTx(built.changetrustXdr, passphrase, "trustline");
+      const ct = await signTransaction(built.changetrustXdr, passphrase);
+      await submitAndConfirm(ct.signedTxXdr);
+
+      // Re-build now that the trustline is on-chain. Refuse to proceed if the
+      // deposit still isn't buildable (trustline not yet visible, or no USDC held).
+      status.value = "building";
+      stepLabel.value = "";
+      built = await buildBlendDeposit({
+        address,
+        asset: asset.value,
+        amount: amount.value,
+        network: network.value,
+      });
+      if (built.trustlineRequired) {
+        throw new Error(
+          "Trustline not visible yet — give it a few seconds and try again.",
+        );
+      }
+    }
+
+    if (!built.simulation.success || !built.xdr) {
       errorMessage.value =
         built.simulation.error ||
         "Deposit simulation failed. Ensure the account holds this asset on testnet.";
@@ -176,24 +211,12 @@ async function onDeposit() {
       return;
     }
 
-    const passphrase = toWalletNetwork(network.value);
-    const twoStep = !!built.changetrustXdr;
-
-    // Step 1/2 — establish the USDC trustline (classic), if the deposit needs it.
-    if (built.changetrustXdr) {
-      status.value = "step1";
-      stepLabel.value = "1/2 Approve trustline";
-      assertOwnTx(built.changetrustXdr, passphrase, "trustline");
-      const { signedTxXdr } = await signTransaction(built.changetrustXdr, passphrase);
-      await submitAndConfirm(signedTxXdr);
-    }
-
     // Step (2/2 or 1/1) — the Soroban deposit itself.
     status.value = "step2";
     stepLabel.value = twoStep ? "2/2 Sign deposit" : "Sign deposit";
     assertOwnTx(built.xdr, passphrase, "deposit");
-    const { signedTxXdr } = await signTransaction(built.xdr, passphrase);
-    const hash = await submitAndConfirm(signedTxXdr);
+    const dep = await signTransaction(built.xdr, passphrase);
+    const hash = await submitAndConfirm(dep.signedTxXdr);
 
     txHash.value = hash;
     status.value = "success";
@@ -256,6 +279,18 @@ function reset() {
         </button>
       </div>
       <p v-if="selectedAssetNote" class="text-[10px] text-[#9a9b99] -mt-1">{{ selectedAssetNote }}</p>
+
+      <!-- Honest USDC caveat: this is the SAC-backed testnet USDC, a DIFFERENT
+           asset than the Circle USDC the swap yields, so the swap can't provide it. -->
+      <div
+        v-if="asset === 'USDC'"
+        class="bg-[#202020] border border-[rgba(255,184,107,0.4)] rounded-md p-2 text-[10px] text-[#ffb86b]"
+      >
+        You must already hold this SAC-backed testnet USDC (issuer GATALTGT…). It is a
+        <span class="font-semibold">different asset</span> than the Circle USDC our swap
+        produces — the swap can't provide it. First-time deposits sign a trustline
+        (step 1/2), then the deposit (step 2/2).
+      </div>
 
       <!-- AMOUNT -->
       <label class="flex flex-col gap-1">

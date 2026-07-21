@@ -34,9 +34,20 @@ export interface BlendDepositParams {
 }
 
 export interface BlendDepositResult {
+  /** The Soroban deposit XDR. EMPTY when a trustline is still required (see below). */
   xdr: string;
-  /** Present when the user lacks the USDC trustline. Submit this tx first, then resubmit the deposit. */
+  /**
+   * Present when the user lacks the classic USDC trustline the SAC deposit needs.
+   * The client MUST sign + confirm this ChangeTrust ON-CHAIN, then re-request the
+   * deposit build (which can only be simulated once the trustline exists).
+   */
   changetrustXdr?: string;
+  /**
+   * True when the response carries ONLY the ChangeTrust step: the deposit could not
+   * be simulated because the classic trustline is missing (the SAC transfer would
+   * trap with Contract #13). `xdr` is empty; establish the trustline first.
+   */
+  trustlineRequired?: boolean;
   operations: string[];
   simulation: {
     success: boolean;
@@ -202,17 +213,44 @@ export class ActionsService {
     // Save sequence before any TransactionBuilder.build() call increments it.
     const seqBeforeBuild = account.sequenceNumber();
 
-    // Check USDC trustline via RPC. XLM is native — no trustline needed.
-    let hasTrustline = true;
+    // Trustline gate (USDC only; XLM is native and needs no trustline).
+    //
+    // The Blend USDC reserve is the SAC (TESTNET_USDC_SAC / CAQCFV…) wrapping the
+    // CLASSIC asset USDC:GATALTGT. Supplying it moves the classic balance, so the
+    // account MUST hold a classic trustline to USDC:GATALTGT first — otherwise the
+    // SAC transfer traps with Contract #13 ("trustline entry is missing"). We cannot
+    // even SIMULATE the deposit until that trustline exists (proven on testnet).
+    //
+    // So when the trustline is absent we return ONLY the ChangeTrust step and stop:
+    // the client signs + confirms it on-chain, then re-requests this build (which can
+    // now be simulated). This is what makes the 2-step honest — the deposit is never
+    // built, signed, or submitted while the trustline is missing.
     if (asset === 'USDC') {
-      try {
-        const balanceResp = await this.rpcServer.getAssetBalance(
-          address,
-          TESTNET_USDC_CLASSIC,
-        );
-        hasTrustline = balanceResp.balanceEntry !== undefined;
-      } catch {
-        hasTrustline = false;
+      const hasTrustline = await this.hasClassicTrustline(
+        address,
+        TESTNET_USDC_CLASSIC,
+      );
+      if (!hasTrustline) {
+        const ctTx = new TransactionBuilder(
+          new Account(address, seqBeforeBuild),
+          { fee: BASE_FEE, networkPassphrase: TESTNET_NETWORK_PASSPHRASE },
+        )
+          .addOperation(Operation.changeTrust({ asset: TESTNET_USDC_CLASSIC }))
+          .setTimeout(300)
+          .build();
+        const inclusionFee = parseInt(BASE_FEE, 10);
+        return {
+          xdr: '',
+          changetrustXdr: ctTx.toEnvelope().toXDR('base64'),
+          trustlineRequired: true,
+          operations: ['change_trust:USDC'],
+          simulation: {
+            success: false,
+            resourceFee: '0',
+            error: 'USDC trustline required before deposit',
+          },
+          fee: { inclusion: inclusionFee, resource: 0, total: inclusionFee },
+        };
       }
     }
 
@@ -262,13 +300,11 @@ export class ActionsService {
     const paddedResourceFee = Math.ceil(minResourceFee * 1.2);
     const totalFee = inclusionFee + paddedResourceFee;
 
-    // Rebuild deposit tx with padded fee and apply simulation (auth + soroban data).
-    // If ChangeTrust is needed first (seq S+1), deposit goes at seq S+2.
-    // Otherwise deposit goes at seq S+1 (same sequence as simulation).
-    const depositAccountSeq = hasTrustline
-      ? seqBeforeBuild
-      : String(BigInt(seqBeforeBuild) + 1n);
-    const accountForDeposit = new Account(address, depositAccountSeq);
+    // Rebuild the deposit tx with the padded fee and apply the simulation
+    // (auth + soroban data). The trustline (for USDC) is guaranteed to exist by the
+    // gate above, so this is a single InvokeHostFunction tx at sequence S — no
+    // bundled ChangeTrust (Soroban forbids mixing classic ops with it anyway).
+    const accountForDeposit = new Account(address, seqBeforeBuild);
     const txForDeposit = new TransactionBuilder(accountForDeposit, {
       fee: totalFee.toString(),
       networkPassphrase: TESTNET_NETWORK_PASSPHRASE,
@@ -280,28 +316,10 @@ export class ActionsService {
     const finalTx = rpc.assembleTransaction(txForDeposit, simResult).build();
     const depositXdr = finalTx.toEnvelope().toXDR('base64');
 
-    const operations: string[] = [`blend_supply_collateral:${asset}`];
-
-    // Build a separate ChangeTrust tx when the user has no USDC trustline.
-    // (Soroban protocol prohibits mixing InvokeHostFunction with classic ops in one tx.)
-    let changetrustXdr: string | undefined;
-    if (!hasTrustline) {
-      const accountForChangeTrust = new Account(address, seqBeforeBuild);
-      const ctTx = new TransactionBuilder(accountForChangeTrust, {
-        fee: BASE_FEE,
-        networkPassphrase: TESTNET_NETWORK_PASSPHRASE,
-      })
-        .addOperation(Operation.changeTrust({ asset: TESTNET_USDC_CLASSIC }))
-        .setTimeout(300)
-        .build();
-      changetrustXdr = ctTx.toEnvelope().toXDR('base64');
-      operations.unshift(`change_trust:${asset}`);
-    }
-
     return {
       xdr: depositXdr,
-      ...(changetrustXdr !== undefined ? { changetrustXdr } : {}),
-      operations,
+      trustlineRequired: false,
+      operations: [`blend_supply_collateral:${asset}`],
       simulation: {
         success: true,
         resourceFee: simResult.minResourceFee,
@@ -312,6 +330,30 @@ export class ActionsService {
         total: totalFee,
       },
     };
+  }
+
+  /**
+   * Classic-trustline check via Horizon — the source of truth for what Contract #13
+   * ("trustline entry is missing") tests. `rpc.getAssetBalance` throws on a missing
+   * trustline, which is easy to mis-handle; Horizon's balances list is unambiguous.
+   * Returns false if the account can't be loaded (treated as "needs a trustline").
+   */
+  private async hasClassicTrustline(
+    address: string,
+    asset: Asset,
+  ): Promise<boolean> {
+    try {
+      const account = await this.horizonServer.loadAccount(address);
+      return account.balances.some(
+        (b) =>
+          'asset_code' in b &&
+          b.asset_code === asset.getCode() &&
+          'asset_issuer' in b &&
+          b.asset_issuer === asset.getIssuer(),
+      );
+    } catch {
+      return false;
+    }
   }
 
   /**
