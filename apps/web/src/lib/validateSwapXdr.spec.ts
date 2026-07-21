@@ -205,6 +205,97 @@ describe('validateSwapXdr — violations', () => {
   })
 })
 
+// --- Optional trustline op (first-time swap into a new asset) --------------
+
+/** Builds a 2-op tx: ChangeTrust(asset) then the standard PathPaymentStrictSend. */
+function buildSwapWithTrustlineXdr(trustAsset: Asset): string {
+  const account = new Account(USER, '100')
+  return new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: PASSPHRASE })
+    .addOperation(Operation.changeTrust({ asset: trustAsset }))
+    .addOperation(
+      Operation.pathPaymentStrictSend({
+        sendAsset: Asset.native(),
+        sendAmount: '10.5',
+        destination: USER,
+        destAsset: USDC,
+        destMin: '9.5',
+        path: [],
+      }),
+    )
+    .setTimeout(300)
+    .build()
+    .toXDR()
+}
+
+describe('validateSwapXdr — optional trustline op', () => {
+  it('accepts a leading ChangeTrust for the dest asset when allowTrustlineFor is set', () => {
+    const xdr = buildSwapWithTrustlineXdr(USDC)
+    const intent: SwapIntent = {
+      ...baseIntent,
+      allowTrustlineFor: { code: 'USDC', issuer: USDC_ISSUER },
+    }
+    expect(validateSwapXdr(xdr, intent)).toEqual({ ok: true })
+  })
+
+  it('still rejects the extra op when allowTrustlineFor is NOT set', () => {
+    const xdr = buildSwapWithTrustlineXdr(USDC)
+    const result = validateSwapXdr(xdr, baseIntent)
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(
+        result.violations.some((v) => v.includes('expected exactly 1 operation, found 2')),
+      ).toBe(true)
+    }
+  })
+
+  it('rejects a ChangeTrust for a DIFFERENT asset than the dest asset', () => {
+    // Permit only USDC trustlines, but the tx trusts the evil-issuer look-alike.
+    const xdr = buildSwapWithTrustlineXdr(EVIL_USDC)
+    const intent: SwapIntent = {
+      ...baseIntent,
+      allowTrustlineFor: { code: 'USDC', issuer: USDC_ISSUER },
+    }
+    const result = validateSwapXdr(xdr, intent)
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.violations.some((v) => v.includes('changeTrust asset mismatch'))).toBe(true)
+    }
+  })
+
+  it('rejects a non-trustline extra op even when allowTrustlineFor is set', () => {
+    // A hidden payment op sneaks in alongside the swap; the trustline exception
+    // must not widen to arbitrary ops.
+    const account = new Account(USER, '100')
+    const xdr = new TransactionBuilder(account, {
+      fee: BASE_FEE,
+      networkPassphrase: PASSPHRASE,
+    })
+      .addOperation(Operation.payment({ destination: OTHER, asset: USDC, amount: '1' }))
+      .addOperation(
+        Operation.pathPaymentStrictSend({
+          sendAsset: Asset.native(),
+          sendAmount: '10.5',
+          destination: USER,
+          destAsset: USDC,
+          destMin: '9.5',
+          path: [],
+        }),
+      )
+      .setTimeout(300)
+      .build()
+      .toXDR()
+    const intent: SwapIntent = {
+      ...baseIntent,
+      allowTrustlineFor: { code: 'USDC', issuer: USDC_ISSUER },
+    }
+    const result = validateSwapXdr(xdr, intent)
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.violations.some((v) => v.includes('unexpected operation'))).toBe(true)
+    }
+  })
+})
+
 // Sanity: Keypair import proves the SDK surface used to mint fixtures is present
 // (kept minimal — no signing happens in the pure validator).
 describe('fixtures', () => {

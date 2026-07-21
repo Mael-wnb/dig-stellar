@@ -1,10 +1,21 @@
 // src/api/actions.ts
 import { apiFetch } from "./client";
 
+/**
+ * An SDEX asset for the swap/quote endpoints. Either a legacy code string
+ * ("XLM"/"USDC", USDC resolving server-side to the vetted Circle testnet issuer)
+ * or an explicit { code, issuer } — the multi-pair widget always sends the latter
+ * so the exact (code, issuer) is pinned end-to-end and client-validated before signing.
+ */
+export type SdexAssetRef =
+  | "XLM"
+  | "USDC"
+  | { code: string; issuer?: string };
+
 export type SdexSwapRequest = {
   address: string;
-  fromAsset: "XLM" | "USDC";
-  toAsset: "XLM" | "USDC";
+  fromAsset: SdexAssetRef;
+  toAsset: SdexAssetRef;
   amount: string;
   minReceive: string;
   network?: "testnet" | "mainnet";
@@ -29,8 +40,8 @@ export async function buildSdexSwap(
 }
 
 export type SdexQuoteRequest = {
-  fromAsset: "XLM" | "USDC";
-  toAsset: "XLM" | "USDC";
+  fromAsset: SdexAssetRef;
+  toAsset: SdexAssetRef;
   amount: string;
   network?: "testnet" | "mainnet";
 };

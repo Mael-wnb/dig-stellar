@@ -6,7 +6,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ActionsService } from './actions.service';
+import { ActionsService, type AssetRef } from './actions.service';
 
 interface BlendDepositBody {
   address: string;
@@ -15,20 +15,67 @@ interface BlendDepositBody {
   network?: string;
 }
 
+/**
+ * An SDEX asset as the client sends it. Two accepted shapes:
+ *   - legacy string: 'XLM' | 'USDC' (USDC resolves to the vetted Circle testnet issuer)
+ *   - explicit ref:  { code, issuer? } (issuer required for anything but XLM)
+ * The explicit form is what the multi-pair Testnet Actions widget sends.
+ */
+type AssetField = string | { code?: string; issuer?: string };
+
 interface SdexSwapBody {
   address: string;
-  fromAsset: 'XLM' | 'USDC';
-  toAsset: 'XLM' | 'USDC';
+  fromAsset: AssetField;
+  toAsset: AssetField;
   amount: string;
   minReceive: string;
   network?: string;
 }
 
 interface SdexQuoteBody {
-  fromAsset: 'XLM' | 'USDC';
-  toAsset: 'XLM' | 'USDC';
+  fromAsset: AssetField;
+  toAsset: AssetField;
   amount: string;
   network?: string;
+}
+
+const STELLAR_PUBKEY_RE = /^G[A-Z2-7]{55}$/;
+const ASSET_CODE_RE = /^[A-Za-z0-9]{1,12}$/;
+
+/**
+ * Normalizes a client-supplied asset field to a canonical AssetRef and validates
+ * its shape. XLM/native carries no issuer; any other asset requires a well-formed
+ * Stellar issuer. The legacy 'USDC' string is passed through issuer-less so the
+ * service maps it to the vetted testnet issuer (backward compatibility).
+ */
+function normalizeAssetField(field: AssetField, label: string): AssetRef {
+  if (typeof field === 'string') {
+    if (field === 'XLM') return { code: 'XLM' };
+    if (field === 'USDC') return { code: 'USDC' }; // service supplies the vetted issuer
+    throw new BadRequestException(`${label}: unknown asset "${field}"`);
+  }
+  if (!field || typeof field !== 'object' || typeof field.code !== 'string') {
+    throw new BadRequestException(`${label} must be "XLM"/"USDC" or { code, issuer }`);
+  }
+  const code = field.code;
+  if (code === 'XLM' || code === 'native') return { code: 'XLM' };
+  if (!ASSET_CODE_RE.test(code)) {
+    throw new BadRequestException(`${label}: invalid asset code "${code}"`);
+  }
+  if (typeof field.issuer !== 'string' || !STELLAR_PUBKEY_RE.test(field.issuer)) {
+    throw new BadRequestException(
+      `${label}: a valid Stellar issuer is required for ${code}`,
+    );
+  }
+  return { code, issuer: field.issuer };
+}
+
+/** Same-asset check on the canonical refs (native XLM has no issuer to compare). */
+function sameAsset(a: AssetRef, b: AssetRef): boolean {
+  const na = a.code === 'XLM' || a.code === 'native';
+  const nb = b.code === 'XLM' || b.code === 'native';
+  if (na || nb) return na && nb;
+  return a.code === b.code && a.issuer === b.issuer;
 }
 
 @Controller('v1/actions')
@@ -69,13 +116,9 @@ export class ActionsController {
         'Only testnet is supported at this time. Pass network="testnet" or omit it.',
       );
     }
-    if (!fromAsset || !['XLM', 'USDC'].includes(fromAsset)) {
-      throw new BadRequestException('fromAsset must be XLM or USDC');
-    }
-    if (!toAsset || !['XLM', 'USDC'].includes(toAsset)) {
-      throw new BadRequestException('toAsset must be XLM or USDC');
-    }
-    if (fromAsset === toAsset) {
+    const from = normalizeAssetField(fromAsset, 'fromAsset');
+    const to = normalizeAssetField(toAsset, 'toAsset');
+    if (sameAsset(from, to)) {
       throw new BadRequestException('fromAsset and toAsset must differ');
     }
     const parsedAmount = parseFloat(amount);
@@ -83,7 +126,7 @@ export class ActionsController {
       throw new BadRequestException('amount must be a positive numeric string');
     }
 
-    return this.actionsService.quoteSdexSwap({ fromAsset, toAsset, amount });
+    return this.actionsService.quoteSdexSwap({ fromAsset: from, toAsset: to, amount });
   }
 
   @Post('sdex/swap')
@@ -99,13 +142,9 @@ export class ActionsController {
     if (!address || typeof address !== 'string') {
       throw new BadRequestException('address is required');
     }
-    if (!fromAsset || !['XLM', 'USDC'].includes(fromAsset)) {
-      throw new BadRequestException('fromAsset must be XLM or USDC');
-    }
-    if (!toAsset || !['XLM', 'USDC'].includes(toAsset)) {
-      throw new BadRequestException('toAsset must be XLM or USDC');
-    }
-    if (fromAsset === toAsset) {
+    const from = normalizeAssetField(fromAsset, 'fromAsset');
+    const to = normalizeAssetField(toAsset, 'toAsset');
+    if (sameAsset(from, to)) {
       throw new BadRequestException('fromAsset and toAsset must differ');
     }
     const parsedAmount = parseFloat(amount);
@@ -119,8 +158,8 @@ export class ActionsController {
 
     return this.actionsService.buildSdexSwap({
       address,
-      fromAsset,
-      toAsset,
+      fromAsset: from,
+      toAsset: to,
       amount,
       minReceive,
     });

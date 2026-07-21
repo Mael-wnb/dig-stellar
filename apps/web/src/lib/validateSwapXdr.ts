@@ -45,6 +45,15 @@ export type SwapIntent = {
   destMin: string
   /** The network passphrase the user believes they are on. */
   networkPassphrase: string
+  /**
+   * When set, a SINGLE leading ChangeTrust op establishing this asset's trustline
+   * is permitted alongside the swap. First-time swaps into a not-yet-trusted asset
+   * need it (the backend bundles ChangeTrust + PathPaymentStrictSend in one classic
+   * tx). The op is only accepted if its `line` asset matches this id exactly and its
+   * source is unset/the user — a ChangeTrust for any OTHER asset is still rejected.
+   * Omit it (the default) to keep the strict single-op contract.
+   */
+  allowTrustlineFor?: AssetId
 }
 
 export type ValidationResult =
@@ -91,6 +100,22 @@ function decodedAssetLabel(asset: Asset): string {
 }
 
 /**
+ * True when a decoded ChangeTrust op establishes a trustline for exactly `id`.
+ * Rejects native (you never trust native), liquidity-pool trustlines (no getCode),
+ * and any code/issuer mismatch. Does NOT constrain the limit: a positive limit is
+ * the norm and a wrong limit cannot credit a foreign account or change the asset.
+ */
+function changeTrustMatches(op: Operation.ChangeTrust, id: AssetId): boolean {
+  if (id === 'native') return false
+  const line = op.line as Asset
+  if (typeof line?.getCode !== 'function' || typeof line?.isNative !== 'function') {
+    return false // LiquidityPoolAsset or unexpected shape
+  }
+  if (line.isNative()) return false
+  return line.getCode() === id.code && line.getIssuer() === id.issuer
+}
+
+/**
  * Validates that `xdr` is exactly the swap described by `intent`. Collects ALL
  * violations rather than stopping at the first, so the UI can surface everything
  * that is wrong at once. Only unrecoverable failures (unparseable XDR, fee-bump
@@ -132,13 +157,8 @@ export function validateSwapXdr(xdr: string, intent: SwapIntent): ValidationResu
     )
   }
 
-  // Exactly one operation, and it must be a PathPaymentStrictSend. More than one
-  // op (e.g. a hidden changeTrust / setOptions / extra payment) is a violation.
+  // The swap op itself is always required.
   const ops = tx.operations
-  if (ops.length !== 1) {
-    violations.push(`expected exactly 1 operation, found ${ops.length}`)
-  }
-
   const swapOp = ops.find((o) => o.type === 'pathPaymentStrictSend') as
     | Operation.PathPaymentStrictSend
     | undefined
@@ -147,6 +167,42 @@ export function validateSwapXdr(xdr: string, intent: SwapIntent): ValidationResu
     const seen = ops.map((o) => o.type).join(', ') || 'none'
     violations.push(`no pathPaymentStrictSend operation (found: ${seen})`)
     return { ok: false, violations }
+  }
+
+  // Operation-set policy. By default the swap must be the SOLE op — a hidden extra
+  // op (changeTrust / setOptions / payment) is an injection and is rejected. The
+  // ONLY exception is an explicitly-permitted trustline setup for the dest asset
+  // (allowTrustlineFor), needed for a first-time swap into a not-yet-trusted asset.
+  const extraOps = ops.filter((o) => o !== swapOp)
+  if (intent.allowTrustlineFor) {
+    for (const op of extraOps) {
+      if (op.type !== 'changeTrust') {
+        violations.push(
+          `unexpected operation "${op.type}": only a ${assetLabel(intent.allowTrustlineFor)} trustline may accompany the swap`,
+        )
+        continue
+      }
+      if (!changeTrustMatches(op, intent.allowTrustlineFor)) {
+        const line = op.line as Asset
+        const got =
+          typeof line?.getCode === 'function' && typeof line?.isNative === 'function'
+            ? decodedAssetLabel(line)
+            : 'non-asset trustline (e.g. liquidity pool)'
+        violations.push(
+          `changeTrust asset mismatch: expected ${assetLabel(intent.allowTrustlineFor)}, got ${got}`,
+        )
+      }
+      if (op.source !== undefined && op.source !== intent.sourceAccount) {
+        violations.push(
+          `changeTrust source mismatch: expected inherited/${intent.sourceAccount}, got ${op.source}`,
+        )
+      }
+    }
+    if (extraOps.length > 1) {
+      violations.push(`expected at most 1 trustline operation, found ${extraOps.length}`)
+    }
+  } else if (ops.length !== 1) {
+    violations.push(`expected exactly 1 operation, found ${ops.length}`)
   }
 
   // An op-level source would let the payment draw from a different account than

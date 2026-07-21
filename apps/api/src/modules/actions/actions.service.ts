@@ -50,10 +50,20 @@ export interface BlendDepositResult {
   };
 }
 
+/**
+ * A classic SDEX asset in canonical form. `code: 'XLM'` (or 'native') means the
+ * native asset and carries no issuer; anything else requires a classic issuer.
+ * The controller validates the shape before this reaches the service.
+ */
+export interface AssetRef {
+  code: string;
+  issuer?: string;
+}
+
 export interface SdexSwapParams {
   address: string;
-  fromAsset: 'XLM' | 'USDC';
-  toAsset: 'XLM' | 'USDC';
+  fromAsset: AssetRef;
+  toAsset: AssetRef;
   amount: string;
   minReceive: string;
 }
@@ -68,8 +78,8 @@ export interface SdexSwapResult {
 }
 
 export interface SdexQuoteParams {
-  fromAsset: 'XLM' | 'USDC';
-  toAsset: 'XLM' | 'USDC';
+  fromAsset: AssetRef;
+  toAsset: AssetRef;
   amount: string;
 }
 
@@ -93,13 +103,25 @@ function toI128(amount: string, decimals: number): bigint {
   return BigInt(intStr) * BigInt(10 ** decimals) + BigInt(frac);
 }
 
+/** True for the native-asset ref ('XLM' or 'native'). */
+function isNativeRef(ref: AssetRef): boolean {
+  return ref.code === 'XLM' || ref.code === 'native';
+}
+
 /**
- * Maps an asset name to the classic Stellar Asset used by the SDEX swap action.
- * XLM = native, USDC = Circle's testnet USDC (TESTNET_USDC_SDEX) — chosen because it has
- * real direct XLM liquidity on testnet. Swap-only: Blend uses TESTNET_USDC_CLASSIC directly.
+ * Resolves a canonical AssetRef to a classic Stellar Asset used by the SDEX swap.
+ * Native XLM maps to Asset.native(). The legacy issuer-less 'USDC' resolves to
+ * Circle's vetted testnet USDC (TESTNET_USDC_SDEX) for backward compatibility with
+ * the pre-multi-pair frontend; any other asset uses its explicit (code, issuer).
+ * Blend uses TESTNET_USDC_CLASSIC directly and does not go through here.
  */
-function swapAsset(name: 'XLM' | 'USDC'): Asset {
-  return name === 'XLM' ? Asset.native() : TESTNET_USDC_SDEX;
+function resolveAsset(ref: AssetRef): Asset {
+  if (isNativeRef(ref)) return Asset.native();
+  if (ref.code === 'USDC' && !ref.issuer) return TESTNET_USDC_SDEX;
+  if (!ref.issuer) {
+    throw new UnprocessableEntityException(`issuer required for asset ${ref.code}`);
+  }
+  return new Asset(ref.code, ref.issuer);
 }
 
 @Injectable()
@@ -125,8 +147,10 @@ export class ActionsService {
    */
   async quoteSdexSwap(params: SdexQuoteParams): Promise<SdexQuoteResult> {
     const { fromAsset, toAsset, amount } = params;
-    const sendAsset = swapAsset(fromAsset);
-    const destAsset = swapAsset(toAsset);
+    const sendAsset = resolveAsset(fromAsset);
+    const destAsset = resolveAsset(toAsset);
+    const fromLabel = fromAsset.code;
+    const toLabel = toAsset.code;
 
     let records: Horizon.ServerApi.PaymentPathRecord[];
     try {
@@ -145,7 +169,7 @@ export class ActionsService {
     const direct = records.filter((r) => r.path.length === 0);
     if (direct.length === 0) {
       throw new UnprocessableEntityException(
-        `No direct liquidity for ${fromAsset}→${toAsset} at this amount on testnet`,
+        `No direct liquidity for ${fromLabel}→${toLabel} at this amount on testnet`,
       );
     }
 
@@ -300,8 +324,10 @@ export class ActionsService {
   async buildSdexSwap(params: SdexSwapParams): Promise<SdexSwapResult> {
     const { address, fromAsset, toAsset, amount, minReceive } = params;
 
-    const sendAsset = swapAsset(fromAsset);
-    const destAsset = swapAsset(toAsset);
+    const sendAsset = resolveAsset(fromAsset);
+    const destAsset = resolveAsset(toAsset);
+    const fromLabel = fromAsset.code;
+    const toLabel = toAsset.code;
 
     // Load account for sequence number. The private key never reaches this layer.
     let account: Account;
@@ -315,7 +341,7 @@ export class ActionsService {
 
     // Check destination trustline. XLM (native) never needs one.
     let needsTrustline = false;
-    if (toAsset !== 'XLM') {
+    if (!isNativeRef(toAsset)) {
       try {
         const balanceResp = await this.rpcServer.getAssetBalance(address, destAsset);
         needsTrustline = balanceResp.balanceEntry === undefined;
@@ -334,7 +360,7 @@ export class ActionsService {
     // ChangeTrust must precede the path payment so the destination asset can be received.
     if (needsTrustline) {
       builder.addOperation(Operation.changeTrust({ asset: destAsset }));
-      operations.push(`change_trust:${toAsset}`);
+      operations.push(`change_trust:${toLabel}`);
     }
 
     builder.addOperation(
@@ -347,7 +373,7 @@ export class ActionsService {
         path: [],
       }),
     );
-    operations.push(`path_payment_strict_send:${fromAsset}→${toAsset}`);
+    operations.push(`path_payment_strict_send:${fromLabel}→${toLabel}`);
 
     const tx = builder.setTimeout(300).build();
 
