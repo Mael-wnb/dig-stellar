@@ -41,6 +41,12 @@ export interface TestnetSwapPair {
   note?: string;
 }
 
+/** An asset that can appear in the From/To selectors. XLM carries no issuer. */
+export interface TestnetSwapAsset {
+  code: string;
+  issuer?: string;
+}
+
 export const TESTNET_SWAP_PAIRS: TestnetSwapPair[] = [
   {
     id: "xlm-usdc",
@@ -65,3 +71,28 @@ export const TESTNET_SWAP_PAIRS: TestnetSwapPair[] = [
     note: "Direct route; small unit output at current testnet price.",
   },
 ];
+
+/**
+ * The asset universe for the swap widget's From/To selectors: native XLM plus every
+ * distinct vetted target. Derived from TESTNET_SWAP_PAIRS so there is one source of
+ * truth. NB: only XLM→target directions are known-fillable (per discovery — most
+ * target→XLM books are empty); the reverse directions are still selectable and
+ * surface the quote's clean "no liquidity for this direction" state.
+ */
+export const TESTNET_SWAP_ASSETS: TestnetSwapAsset[] = (() => {
+  const seen = new Set<string>(["XLM"]);
+  const list: TestnetSwapAsset[] = [{ code: "XLM" }];
+  for (const p of TESTNET_SWAP_PAIRS) {
+    const key = `${p.to.code}:${p.to.issuer}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      list.push({ code: p.to.code, issuer: p.to.issuer });
+    }
+  }
+  return list;
+})();
+
+/** Stable key for an asset ('XLM' for native, else 'CODE:ISSUER'). */
+export function swapAssetKey(a: TestnetSwapAsset): string {
+  return a.code === "XLM" ? "XLM" : `${a.code}:${a.issuer}`;
+}

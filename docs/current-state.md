@@ -295,9 +295,13 @@ the criterion; the Blend deposit is a secondary Soroban pattern (two sequential 
 the single hardcoded XLM→USDC widget is now a config-driven list. `sdex/swap` + `sdex/quote` accept an
 explicit `{ code, issuer }` asset descriptor (legacy `'XLM'`/`'USDC'` strings still resolve for rollout
 safety); the frontend drives rows from `apps/web/src/config/testnetSwapPairs.ts` — a **front-only**
-config (no DB testnet entities, so prod TVL/`protocolCount` do not move). Pairs are vetted against
-Horizon testnet `/paths/strict-send` (the same oracle `/quote` uses), each required to fill a small
-strict-send at 5% slippage:
+config (no DB testnet entities, so prod TVL/`protocolCount` do not move). The UI is a single
+Uniswap-style widget — From/To asset selectors (XLM + the vetted targets), an invert arrow, the
+connected address's live testnet balances (Horizon `/accounts/:id`) beside each selector with a MAX
+helper, live quote + 5% min-receive. Directions with no fillable path (most target→XLM books are empty)
+surface the quote's clean "No liquidity for this direction on testnet" state, never a raw error. Pairs
+are vetted against Horizon testnet `/paths/strict-send` (the same oracle `/quote` uses), each required
+to fill a small strict-send at 5% slippage:
 
 - **XLM → USDC** (`GBBD47…`, Circle) — deepest testnet book (8 levels). Flagship / proven path.
 - **XLM → yXLM** (`GC63WR…`) — direct route, ~1:0.95.
@@ -316,11 +320,20 @@ Blend deposit — now exercised from the UI (Jul 21, 2026): a testnet-gated "Ble
 the previously-never-UI-exercised `POST /v1/actions/blend/deposit`. Reality-checked against
 soroban-testnet: supplying **XLM** collateral to pool `CCEBVDYM…` **simulates OK** (~0.06 XLM resource
 fee) — native, no trustline, friendbot-funded → the reliably demoable path. **USDC** supply needs the
-SAC-backed testnet USDC (`GATALTGT…`, a *different* asset than the Circle USDC the swap yields), so a
-fresh account fails simulation (`Contract #13`); surfaced honestly, not hidden. The card implements the
-honest 2-step flow (classic `ChangeTrust` 1/2 → Soroban deposit 2/2, XLM skips to a single step) with
-Soroban confirmation polling and the same guardrails (testnet-only, active-signer-only, light
-client-side XDR check). Live on-chain landing is the manual Freighter step; simulation is proven.
+SAC-backed testnet USDC (`GATALTGT…`, a *different* asset than the Circle USDC the swap yields — the
+card says so, and the swap cannot provide it).
+
+The USDC 2-step is now **correct** (fixed Jul 21, 2026 after an on-chain `Contract #13` "trustline entry
+is missing"): the Soroban deposit **cannot be simulated** until the classic `USDC:GATALTGT` trustline
+exists, so a single build-then-2-sign is impossible. The endpoint detects the trustline via Horizon
+balances (the source of truth #13 tests, not `rpc.getAssetBalance` which throws on a missing one); when
+absent it returns **only** the ChangeTrust (`trustlineRequired: true`, empty deposit XDR) — the deposit
+is never built/signed/submitted without the trustline. The card signs + **confirms the ChangeTrust
+on-chain** (polls `getTransaction`), then **re-requests** the build (now simulatable) before signing the
+deposit. A funded account with no USDC now gets an honest `#10` balance error, not a `#13`. Same
+guardrails throughout (testnet-only, active-signer-only, light client-side XDR check). XLM deposit
+stays single-step. Live on-chain landing is the manual Freighter step; simulation + the 2-step ordering
+are proven on testnet.
 
 Minor known bug (still open, USDC path only): `getAssetBalance` re-bundles `ChangeTrust` even when the
 trustline already exists (harmless; fix via Horizon `/accounts/:id`). Polish / T3-D2 item, not a gap
