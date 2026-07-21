@@ -143,3 +143,4 @@ vite.config.ts.timestamp-*
 apps/indexer/tmp/
 apps/indexer/src/scripts/discovery/qa-reconcile.ts
 .claude/
+.DS_Store
