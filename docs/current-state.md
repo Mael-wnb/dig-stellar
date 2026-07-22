@@ -21,12 +21,13 @@ on Testnet.
 
 The three MVP deliverables (internally "T1") meet their SCF criteria and have been **submitted** for
 the **Tranche 2 (20%) disbursement** — claim-ready and now **awaiting SCF validation** (not yet
-validated, approved, or paid). The **T2 deliverable group is now essentially complete and live in
-prod**, and is being packaged for the **Tranche 3 (30%)** submission: T2-D1 portfolio/active-signer
-(substantially done; one visual HF cross-check vs blend.capital remaining), T2-D2 in-app alerting
-(**live in prod on the VPS** — schema + cron running, real `alert_fired` notifications in prod),
-T2-D3 bridge monitoring (**live in prod** — schema applied + Allbridge bootstrap run, `bridge_flows`
-populated). The remaining T2 work is demo capture, not build or deploy.
+validated, approved, or paid). The **T2 deliverable group is complete and live in prod**, and its
+**Tranche 3 (30%) disbursement submission is filed** — **Submitted for disbursement review — awaiting
+SCF validation** (submission ≠ acceptance): T2-D1 portfolio/active-signer (**done** — the visual HF
+cross-check vs mainnet.blend.capital was performed and matched), T2-D2 in-app alerting (**live in prod
+on the VPS** — schema + cron running, real `alert_fired` notifications in prod), T2-D3 bridge
+monitoring (**live in prod** — schema applied + Allbridge bootstrap run, `bridge_flows` populated).
+The ~5-min prod demo video is recorded; T2 build, deploy, and evidence are complete.
 
 ---
 
@@ -165,7 +166,8 @@ positions don't linger. The UI shows a consolidated "DeFi positions (Blend)" hea
 supplied/borrowed/HF with colour-coded health states; `total_portfolio_usd` (liquid balances) stays
 distinct from supplied/borrowed — they are not folded into one number. Health factors come from the
 Blend SDK's `PositionsEstimate` (USD via the pool's Reflector oracle), internally consistent
-(collateral/debt); a final visual cross-check against blend.capital's UI is recommended.
+(collateral/debt); the final visual cross-check against the mainnet.blend.capital UI has been
+performed and **matched**.
 
 Weak / not final: auth/session is not a final cryptographic production model; strong
 proof-of-ownership is **deliberately deferred** — connecting a wallet via the Kit is the beta
@@ -173,8 +175,8 @@ proof-of-ownership is **deliberately deferred** — connecting a wallet via the 
 (Soroswap/Aquarius LP positions are post-beta).
 
 Stance: acceptable for beta. Gap A (active-signer model + UI distinction + signing guardrail) and
-Gap B (position aggregation + health factor, resolver → API → UI) are **both done** — T2-D1 is
-substantially complete (live on local; VPS applies the v2 schema at deploy).
+Gap B (position aggregation + health factor, resolver → API → UI) are **both done**, and the visual HF
+cross-check vs mainnet.blend.capital is matched — **T2-D1 is complete** (v2 schema live in prod).
 
 ---
 
@@ -230,9 +232,9 @@ visibility.
 
 ## 7. Notifications / alerting
 
-**Live in prod (T2-D2).** The in-app alerting engine runs end to end on the VPS —
+**Live in prod (T2-D2) — complete.** The in-app alerting engine runs end to end on the VPS —
 `stellar_v3_alerting.sql` applied and the `job:wallet-alert` cron scheduled — with **real
-`alert_fired` notifications in the prod DB**. Only demo capture remains before an SCF claim. The
+`alert_fired` notifications in the prod DB**, and the delivery is captured in the submission demo. The
 as-built is deliberately the minimal shape the T2-D2 criteria require — **not** the sub-minute event
 stream from the architecture doc:
 - **Rule storage:** `alert_rules` + `alert_rule_state` + `notifications` (`stellar_v3_alerting.sql`,
@@ -254,8 +256,8 @@ stream from the architecture doc:
   (real on-chain actions remain T3-D2, out of scope here).
 
 This matches the verbatim criterion (rules evaluated against the snapshot DB → in-app notifications).
-Deploy is done (schema + cron live on the VPS, real `alert_fired` rows in prod); the only remaining
-item before an SCF claim is the demo capture.
+Deploy is done (schema + cron live on the VPS, real `alert_fired` rows in prod) and the delivery is
+captured in the ~5-min submission demo video — T2-D2 is complete.
 
 ---
 
@@ -313,8 +315,9 @@ The security gate `validateSwapXdr` (previously present but **unwired**) is now 
 signature: the returned XDR is validated against an intent derived from user input (source/destination =
 user, exact asset code+issuer, sendAmount, destMin ≥ accepted). It was extended with an opt-in
 `allowTrustlineFor` so a first-time swap's leading `ChangeTrust` (for the exact dest asset only) is
-permitted — a `ChangeTrust` for any other asset, or any other extra op, is still rejected. (Live 2-pair
-Freighter proof + tx hashes: pending the manual signing pass.)
+permitted — a `ChangeTrust` for any other asset, or any other extra op, is still rejected. **Proven
+in-wallet (Jul 21, 2026):** two SDEX swaps through the unified widget were signed in Freighter and
+landed on testnet, each validated against declared intent by `validateSwapXdr`.
 
 Blend deposit — now exercised from the UI (Jul 21, 2026): a testnet-gated "Blend Deposit" card drives
 the previously-never-UI-exercised `POST /v1/actions/blend/deposit`. Reality-checked against
@@ -332,8 +335,9 @@ is never built/signed/submitted without the trustline. The card signs + **confir
 on-chain** (polls `getTransaction`), then **re-requests** the build (now simulatable) before signing the
 deposit. A funded account with no USDC now gets an honest `#10` balance error, not a `#13`. Same
 guardrails throughout (testnet-only, active-signer-only, light client-side XDR check). XLM deposit
-stays single-step. Live on-chain landing is the manual Freighter step; simulation + the 2-step ordering
-are proven on testnet.
+stays single-step. **Proven on-chain (Jul 21, 2026):** an XLM deposit to Blend was signed in Freighter
+and landed on testnet — tx `a842f370c70bf78e9ecd42a612fb22b6307be423478dddec13774bb9c1fbbe39`; the
+2-step USDC ordering is proven in simulation.
 
 USDC acquisition path (checked Jul 21, 2026): there is **no in-app way to obtain this reserve USDC**.
 It is the SAC (`CAQCFV…`) of classic `USDC:GATALTGT` whose admin is the issuer account, so minting needs
@@ -381,23 +385,22 @@ Near-term: this shape is fine for the beta and the Tranche 2 claim. CI/CD and ob
 ## 11. Most fragile right now
 1. Freshness/stale/retry operationalization + observability (T3)
 2. Deployment maturity / CI-CD (T3)
-3. Transaction builder breadth: SDEX swap proven; Blend deposit not yet exercised from UI
-4. T2 submission packaging — the three T2 deliverables are live in prod; demo capture (plus D1's
-   visual HF cross-check vs blend.capital) is the last non-build gap
+3. Transaction builder breadth: SDEX swap + Blend testnet deposit both proven on-chain from the UI
+   (deposit tx `a842f370…`); mainnet execution remains T3-D2
 
 ## 12. Closest tranche-relevant wins
-1. SCF Tranche 2 (20%) submission — all three MVP deliverables meet their criteria
-2. Demo video covering D1 (live `/v1` data), D2 (live dashboard), D3 (live successful swap)
-3. Formalize active-signer vs watch-only as groundwork for T2-D1
+1. SCF Tranche 3 (30%) submission — the T2 group (portfolio/active-signer, live alerting, live bridge)
+   is **filed for disbursement review**, awaiting SCF validation
+2. ~5-min prod demo video — recorded and attached (T2 deliverables + T1 MVP walkthrough)
+3. (Next group) begin the T3 group — mainnet actions (T3-D2) + freshness/observability (T3-D1/D3)
 
 ---
 
 ## 13. Current execution priorities
 1. T1 (MVP) is submitted — **awaiting SCF validation**; no further T1 build work pending review
-2. Package the **T2 (Tranche 3) submission**: the three T2 deliverables are live in prod — capture the
-   demo (portfolio/active-signer, live alerting with a real `alert_fired`, live bridge section) and
-   assemble the evidence links
-3. Close T2-D1's one open item: the visual HF cross-check vs the blend.capital UI
+2. The **T2 (Tranche 3) submission is filed** — **Submitted for disbursement review — awaiting SCF
+   validation** (~5-min prod demo recorded, evidence links assembled; submission ≠ acceptance)
+3. (Next group) begin the T3 group — mainnet actions (T3-D2) + freshness/observability (T3-D1/D3)
 4. Keep `grant-roadmap.md` and `status-board.md` aligned with this reality
 
 (Done this session: data cleanup — stellar-native protocol aggregation, dynamic `protocolCount`=4,

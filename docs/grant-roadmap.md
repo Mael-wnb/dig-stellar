@@ -40,9 +40,9 @@ disbursement is reviewed against.
 | T1 | 1 | Data Indexing Foundation (Horizon & Soroban) | May 25, 2026 | $12,300 | Done — 100% |
 | T1 | 2 | Analytics Dashboard MVP | Jun 8, 2026 | $6,140 | Done — 100% |
 | T1 | 3 | Smart Transaction Builder (Testnet) | Jun 22, 2026 | $11,070 | Done — 100% |
-| T2 | 1 | Multi-Wallet Portfolio & "Active Signer" Model | Jul 6, 2026 | $7,380 | ~95% |
-| T2 | 2 | In-App Alerting Engine | Jul 20, 2026 | $8,610 | Substantially done — live in prod (~95%) |
-| T2 | 3 | Bridge Flow Monitoring | Aug 3, 2026 | $6,140 | Substantially done — live in prod (~95%) |
+| T2 | 1 | Multi-Wallet Portfolio & "Active Signer" Model | Jul 6, 2026 | $7,380 | Done — 100% |
+| T2 | 2 | In-App Alerting Engine | Jul 20, 2026 | $8,610 | Done — live in prod (100%) |
+| T2 | 3 | Bridge Flow Monitoring | Aug 3, 2026 | $6,140 | Done — live in prod (100%) |
 | T3 | 1 | Mainnet Deployment & Freshness Tracking | Aug 10, 2026 | $8,610 | ~45% |
 | T3 | 2 | Non-Custodial Mainnet Actions | Aug 24, 2026 | $8,610 | ~5% |
 | T3 | 3 | Observability, UI/UX Polish & Reference Handoff | Aug 31, 2026 | $6,140 | ~20% |
@@ -202,9 +202,10 @@ Blend. Decision: SDEX swap (`ChangeTrust` + `PathPaymentStrictSend`, one XDR) is
 single-XDR demonstration of the criterion; the Blend deposit is a secondary Soroban pattern using two
 sequential transactions. A `POST /v1/actions/blend/deposit` endpoint exists for that pattern.
 
-**Beyond the contract (not required here):** the Blend deposit has not been exercised end-to-end from
-the UI (a secondary Soroban pattern, and mainnet actions are T3-D2); minor known bug `getAssetBalance`
-re-bundles `ChangeTrust` even when the trustline already exists (harmless). Out of scope: multi-action
+**Beyond the contract (not required here):** the Blend deposit has now been exercised end-to-end from
+the UI and **proven on testnet** (deposit tx `a842f370…`; a secondary Soroban pattern, and mainnet
+actions remain T3-D2); minor known bug `getAssetBalance` re-bundles `ChangeTrust` even when the
+trustline already exists (harmless). Out of scope: multi-action
 menus, mainnet execution (T3-D2), fee sponsorship. None affect the T1-D3 criteria.
 
 ---
@@ -225,9 +226,9 @@ How to measure completion:
 Estimated date: July 6, 2026 — Budget: $7,380
 
 ### Internal interpretation & status (living)
-Owner: `apps/web` + `apps/api` (+ `apps/indexer` as position depth grows). Status: **~95% —
-substantially done.** Both Gaps (A: active-signer/watch-only; B: position + health aggregation)
-are done and live; the one open item is the visual HF cross-check vs the blend.capital UI.
+Owner: `apps/web` + `apps/api` (+ `apps/indexer` as position depth grows). Status: **Done — 100%.**
+Both Gaps (A: active-signer/watch-only; B: position + health aggregation) are done and live, and the
+final visual HF cross-check vs the mainnet.blend.capital UI has been performed and **matched**.
 
 **Foundations in place.** Grouped multi-wallet behavior is real: add/remove/refresh/select flows,
 backend grouping by a persistent `userId`, wallet overview and per-wallet balances. Backed by the raw
@@ -262,8 +263,8 @@ riskiest first), both reading each wallet's **latest snapshot** so repaid/exited
 linger. The portfolio UI shows a consolidated "DeFi positions (Blend)" header + per-wallet
 supplied/borrowed/health-factor with colour-coded risk states. `total_portfolio_usd` (liquid)
 stays distinct from supplied/borrowed. **This closes T2-D1 criterion 2 and, with Gap A, D1 end to
-end** (Blend-only; the one open item is the final visual HF cross-check vs the blend.capital UI; the
-v2 schema is now live in prod — D2's live alerting consumes `wallet_pool_health` there).
+end** (Blend-only; the final visual HF cross-check vs the mainnet.blend.capital UI has been performed
+and matched; the v2 schema is live in prod — D2's live alerting consumes `wallet_pool_health` there).
 
 ---
 
@@ -280,9 +281,9 @@ How to measure completion:
 Estimated date: July 20, 2026 — Budget: $8,610
 
 ### Internal interpretation & status (living)
-Owner: `apps/api` + `apps/web` (+ scheduled evaluation). Status: **Substantially done — live in
-prod (~95%).** Both completion criteria are met and verified end-to-end **live in prod on the VPS**;
-the only remaining item before an SCF claim is the demo capture.
+Owner: `apps/api` + `apps/web` (+ scheduled evaluation). Status: **Done — live in prod (100%).**
+Both completion criteria are met and verified end-to-end **live in prod on the VPS**, and the
+delivery is captured in the ~5-min submission demo video.
 
 **Built to the criteria (smallest version that meets them).** The as-built is deliberately the
 minimal shape the two criteria require — not the architecture doc's sub-minute event-stream evaluator
@@ -302,8 +303,9 @@ minimal shape the two criteria require — not the architecture doc's sub-minute
 live API (`/v1/alert-rules`, `/v1/notifications`); the create round-trip was confirmed; and the fire
 path is proven by **real `alert_fired` notifications in the prod DB** from the evaluator on live
 Blend health factors (YieldBlox 1.274 < 1.5, Fixed 1.353 < 1.85). This satisfies the verbatim
-criterion (rules evaluated against the snapshot database → in-app notifications). Remaining: **demo
-capture** only; optional polish: derive notification severity from `payload` rather than `kind`.
+criterion (rules evaluated against the snapshot database → in-app notifications). Captured in the
+~5-min submission demo video; optional polish: derive notification severity from `payload` rather
+than `kind`.
 
 ---
 
@@ -319,9 +321,9 @@ How to measure completion:
 Estimated date: August 3, 2026 — Budget: $6,140
 
 ### Internal interpretation & status (living)
-Owner: `apps/indexer` + `apps/api` + `apps/web`. Status: **~95% — substantially done, live in prod.**
-Both SCF criteria (Allbridge attribution adapter + dashboard section) are implemented and now running
-in prod on the VPS; the only remaining item is the demo capture.
+Owner: `apps/indexer` + `apps/api` + `apps/web`. Status: **Done — 100%, live in prod.**
+Both SCF criteria (Allbridge attribution adapter + dashboard section) are implemented and running
+in prod on the VPS, and the delivery is captured in the ~5-min submission demo video.
 
 The criteria are narrow and explicit: an **Allbridge** attribution adapter and a dashboard section for
 incoming bridged assets. Axelar / Near Intents are not part of this contract — do not expand scope.
@@ -346,9 +348,9 @@ into `DigDashboard.vue`. This satisfies the SCF "dashboard section" criterion.
 
 **Deployed (live in prod):** `stellar_v1_bridge.sql` is applied on the VPS and the
 `allbridge-upsert-core.ts` bootstrap has been run, so production `bridge_flows` is populated and the live
-dashboard section renders real flows. Remaining (~5%): **demo capture** only. Honest constraint carried
-into the UI copy: Soroban RPC `getEvents` retains ~7 days, so this is a rolling recent-flows view, not
-deep history.
+dashboard section renders real flows. Captured in the ~5-min submission demo video. Honest constraint
+carried into the UI copy: Soroban RPC `getEvents` retains ~7 days, so this is a rolling recent-flows
+view, not deep history.
 
 ---
 
@@ -452,12 +454,12 @@ before then.
 ## Most underdeveloped areas (next groups)
 1. T3-D2 — Mainnet Actions (~5%, path validated by T1-D3)
 
-> T2-D2 — Alerting Engine is no longer in this list: substantially done (~95%, both criteria met and
-> verified end-to-end **live in prod** — schema + `job:wallet-alert` cron running, real `alert_fired`
-> notifications in prod); only demo capture remains.
-> T2-D3 — Bridge Monitoring is no longer in this list: substantially done (~95%, both criteria) and
-> **live in prod** — `stellar_v1_bridge.sql` applied + Allbridge bootstrap run, `bridge_flows`
-> populated; only demo capture remains.
+> The T2 group (D1 portfolio/active-signer, D2 alerting, D3 bridge) is **done — 100%, live in prod**,
+> and its Tranche 3 (30%) disbursement submission is **filed for SCF review** (awaiting validation).
+> D2 alerting: both criteria verified end-to-end live in prod (schema + `job:wallet-alert` cron
+> running, real `alert_fired` notifications in prod). D3 bridge: both criteria live in prod
+> (`stellar_v1_bridge.sql` applied + Allbridge bootstrap run, `bridge_flows` populated). All captured
+> in the ~5-min demo video.
 
 ## Timeline reality (be honest, not optimistic)
 As of June 19, 2026: all three MVP (T1) deliverables now meet their SCF criteria with concrete,
@@ -474,7 +476,7 @@ demo video) for the Tranche 2 (20%) disbursement.
    links (repo, `stellar.getdig.ai`, `/v1/*` endpoints, tx `fb10c5b8…` on stellar.expert/testnet),
    and the ~5-minute demo video.
 2. Keep `current-state.md` and `status-board.md` aligned with reality.
-3. (Next group) start T2-D1: formalize active-signer vs watch-only.
+3. (Next group) start the T3 group: mainnet actions (T3-D2) + freshness/observability (T3-D1/D3).
 
 ---
 
