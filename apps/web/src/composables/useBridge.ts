@@ -128,7 +128,8 @@ export function useBridge() {
   const rawFlows = ref<BridgeFlow[]>([])
   const series = ref<BridgeSeriesPoint[]>([])
 
-  const window = ref<BridgeWindow>('7d') // fuller than 24h at current volume
+  const window = ref<BridgeWindow>('30d') // default 30d: fullest net-flow context, and the
+  // window over which a multi-day pause (e.g. Allbridge) is legible as a pause, not a gap
   const chainScope = ref<string | null>(null) // null = all chains
 
   const loading = ref(true)
@@ -249,6 +250,19 @@ export function useBridge() {
     return bucketFlows(chainScope.value)
   })
 
+  // Days since the freshest bridge flow, from the window-independent recent feed
+  // (not summary.lastFlowAt, which is null once flows fall outside the active
+  // window). Drives the staleness banner. null = no flows at all -> banner hidden.
+  const daysSinceLastFlow = computed<number | null>(() => {
+    let latest = 0
+    for (const f of rawFlows.value) {
+      const ts = new Date(f.occurredAt).getTime()
+      if (Number.isFinite(ts) && ts > latest) latest = ts
+    }
+    if (!latest) return null
+    return Math.floor((Date.now() - latest) / 86_400_000)
+  })
+
   const routes = computed<BridgeRouteRow[]>(() => {
     const s = summary.value
     if (!s) return []
@@ -323,6 +337,7 @@ export function useBridge() {
     buckets,
     routes,
     flows,
+    daysSinceLastFlow,
     // actions
     load,
     refresh: load,

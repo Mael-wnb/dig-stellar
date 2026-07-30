@@ -45,6 +45,7 @@ const {
   routes: bridgeRoutes,
   flows: bridgeFlows,
   chainScope: bridgeChainScope,
+  daysSinceLastFlow: bridgeDaysSinceLastFlow,
   routeSort: bridgeRouteSort,
   flowSort: bridgeFlowSort,
   loading: bridgeLoading,
@@ -250,6 +251,7 @@ const {
         :routes="bridgeRoutes"
         :flows="bridgeFlows"
         :chain-scope="bridgeChainScope"
+        :days-since-last-flow="bridgeDaysSinceLastFlow"
         :route-sort="bridgeRouteSort"
         :flow-sort="bridgeFlowSort"
         :loading="bridgeLoading"

@@ -8,6 +8,7 @@ import { ref, computed } from 'vue'
 import BridgeChart from './BridgeChart.vue'
 import BridgeRoutesTable from './BridgeRoutesTable.vue'
 import BridgeFlowsFeed from './BridgeFlowsFeed.vue'
+import { bridgeAnnotations } from '../../config/bridgeAnnotations'
 
 type Win = '24h' | '7d' | '30d'
 interface Bucket { inflow: number; outflow: number; net: number; centerTs: number }
@@ -21,6 +22,7 @@ const props = defineProps<{
   chainScope: string | null
   routeSort: { key: string; dir: 'asc' | 'desc' }
   flowSort: { key: string; dir: 'asc' | 'desc' }
+  daysSinceLastFlow?: number | null
   loading?: boolean
   error?: string | null
 }>()
@@ -50,10 +52,34 @@ const stats = computed(() => [
   { label: `Outflow · ${winLabel.value}`, value: '−' + fmtUsd(props.totals.outflowUsd), color: '#D0522E' },
   { label: `Net · ${winLabel.value}`, value: fmtUsd(props.totals.netUsd, true), color: props.totals.netUsd < 0 ? '#E0603E' : '#E2E6E1' },
 ])
+
+// Staleness banner: shown only when the freshest flow is older than the threshold.
+// Self-clearing (flows resume -> daysSinceLastFlow drops) and null-safe (no flows ->
+// no banner). "Learn more" reuses the most recent annotation's url, never hardcoded.
+const STALE_THRESHOLD_DAYS = 3
+const showStaleBanner = computed(
+  () => props.daysSinceLastFlow != null && props.daysSinceLastFlow > STALE_THRESHOLD_DAYS
+)
+const staleLink = computed(() => {
+  const latest = [...bridgeAnnotations].sort((a, b) => (a.date < b.date ? 1 : -1))[0]
+  return latest?.url ?? null
+})
 </script>
 
 <template>
   <section class="bg-[#2A2A2A] border border-[#383838] rounded-[12px] p-5">
+    <!-- staleness banner: discreet, amber accent (not an alarm). Self-clearing. -->
+    <div v-if="showStaleBanner"
+         class="flex items-start gap-2 mb-4 rounded-[8px] pl-3 pr-3.5 py-2.5 text-[12px] leading-[1.45] text-[#9a9b99]"
+         style="background:#242422; border-left:2px solid #E6B93B;">
+      <span>
+        No bridge activity for {{ daysSinceLastFlow }} days — the underlying bridge protocol
+        (Allbridge) may be paused or experiencing low activity.
+      </span>
+      <a v-if="staleLink" :href="staleLink" target="_blank" rel="noopener"
+         class="ml-auto flex-shrink-0 font-semibold text-[#d5ff2f]">Learn more ↗</a>
+    </div>
+
     <!-- header -->
     <div class="flex items-start justify-between mb-5">
       <div class="flex items-center gap-[11px]">
