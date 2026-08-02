@@ -67,6 +67,15 @@ const STELLAR_DECIMALS = 7
 const RECOGNIZED_NETWORKS: readonly string[] = [Networks.TESTNET, Networks.PUBLIC]
 
 /**
+ * Fee ceiling (security-invariants INV-2.6), in stroops, on the TOTAL transaction
+ * fee. The API builds at BASE_FEE (100 stroops) per operation, so a legitimate
+ * swap envelope costs 100–200 stroops. 100,000 stroops (0.01 XLM) leaves ample
+ * headroom for a future surge-pricing strategy while still catching a corrupted
+ * or malicious fee field before it can burn XLM at signing.
+ */
+const MAX_FEE_STROOPS = 100000n
+
+/**
  * Converts a non-negative decimal amount string to integer stroops (×10^7) as a
  * BigInt, so amounts can be compared exactly without floating-point error.
  * Returns null for anything that is not a valid Stellar amount (negative, empty,
@@ -154,6 +163,21 @@ export function validateSwapXdr(xdr: string, intent: SwapIntent): ValidationResu
   if (tx.source !== intent.sourceAccount) {
     violations.push(
       `source account mismatch: expected ${intent.sourceAccount}, got ${tx.source}`,
+    )
+  }
+
+  // Fee cap (INV-2.6). `tx.fee` is the total fee in stroops (integer string).
+  let feeStroops: bigint | null = null
+  try {
+    feeStroops = BigInt(tx.fee)
+  } catch {
+    feeStroops = null
+  }
+  if (feeStroops === null || feeStroops < 0n) {
+    violations.push(`fee is not a valid stroop amount: ${tx.fee}`)
+  } else if (feeStroops > MAX_FEE_STROOPS) {
+    violations.push(
+      `fee exceeds cap: ${tx.fee} stroops > ${MAX_FEE_STROOPS} stroops (0.01 XLM)`,
     )
   }
 

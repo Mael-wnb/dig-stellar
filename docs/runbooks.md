@@ -184,10 +184,58 @@ curl -s -X POST http://localhost:3000/v1/actions/sdex/swap \
   -d '{"address":"G...","fromAsset":"XLM","toAsset":"USDC","amount":"10","minReceive":"0.1","network":"testnet"}' | jq
 ```
 Notes:
-- Swap is gated Testnet-only in the UI (disabled + notice on Mainnet); Mainnet actions are T3-D2.
+- Swap is gated Testnet-only by default (disabled + notice on Mainnet). Mainnet is ungated via the
+  controlled regime below (T3-D2, Lot A1) — with the flags unset, behavior is exactly the above.
 - On Testnet the swap op may fail with `pathPaymentStrictSendTooFewOffers` — no SDEX liquidity for
   the pair on Testnet, not a code bug (`ChangeTrust` op 1 still succeeds).
 - Fund a Testnet account via Friendbot; sign with Freighter set to Test Net.
+
+---
+
+## Mainnet actions (T3-D2) — gating regime
+
+Ungating Mainnet swaps is **not** removing the Testnet-only guard — it is replacing it with a
+controlled regime. See `docs/security-invariants.md` §4 (the review checklist) and
+`docs/lot-a1-mainnet-swap.md` (the implementation brief). Blend deposit stays Testnet-only (Lot A2).
+
+**Environment flags** (all default to today's Testnet-only behavior when unset):
+
+| Var | App | Default | Effect |
+|-----|-----|---------|--------|
+| `ACTIONS_MAINNET_ENABLED` | api | unset → OFF | Kill-switch (INV-4.1). `"true"` lets `network:"mainnet"` through; otherwise → **403**. |
+| `ACTIONS_MAINNET_MAX_SEND_XLM` | api | `100` | Per-transaction send-amount cap (INV-4.2). Over-cap `sdex/swap` → **400**. |
+| `ACTIONS_MAINNET_RPC_URL` | api | `https://mainnet.sorobanrpc.com` | Soroban RPC override for the mainnet swap path. |
+| `VITE_ACTIONS_MAINNET_ENABLED` | web | unset → OFF | UX only (reveals the mainnet swap surface). NOT enforcement — the API flag is. |
+
+Mainnet enforcement lives in `apps/api` (`actions.controller.ts` + `network-registry.ts`): the
+kill-switch, the send-amount cap, and the asset whitelist (native XLM + Circle USDC only, INV-4.3).
+The web VITE flag only toggles UI; the API rejects mainnet regardless when its flag is off.
+
+**Ungating procedure** (record the result — date + commit SHA + checker — as T3-D2 evidence):
+
+1. Run the full `docs/security-invariants.md` checklist top to bottom.
+2. Re-verify the Circle USDC **mainnet** issuer on BOTH sides — `MAINNET_USDC_ISSUER` in
+   `apps/api/src/modules/actions/network-registry.ts` AND `apps/web/src/config/mainnetSwapPairs.ts`.
+   They MUST match (currently `GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN`).
+3. Set `ACTIONS_MAINNET_ENABLED=true` on the VPS, restart PM2.
+4. `curl` validation (mainnet):
+   ```bash
+   # quote OK
+   curl -s -X POST $API/v1/actions/sdex/quote -H "Content-Type: application/json" \
+     -d '{"fromAsset":"XLM","toAsset":"USDC","amount":"10","network":"mainnet"}' | jq
+   # over-cap swap → 400
+   curl -s -X POST $API/v1/actions/sdex/swap -H "Content-Type: application/json" \
+     -d '{"address":"G...","fromAsset":"XLM","toAsset":"USDC","amount":"1000000","minReceive":"0.1","network":"mainnet"}' | jq
+   # non-whitelisted asset → 400
+   curl -s -X POST $API/v1/actions/sdex/quote -H "Content-Type: application/json" \
+     -d '{"fromAsset":"XLM","toAsset":{"code":"AQUA","issuer":"G..."},"amount":"10","network":"mainnet"}' | jq
+   # flag OFF (before step 3, or after rollback) → 403
+   ```
+5. Set `VITE_ACTIONS_MAINNET_ENABLED=true` on Vercel, redeploy.
+6. Do ONE small real capped swap from the dashboard; keep the tx hash as the T3-D2 evidence starter.
+
+**Rollback**: unset `ACTIONS_MAINNET_ENABLED` on the VPS and restart PM2 — the API returns to 403 on
+mainnet immediately, independent of the web deploy.
 
 ---
 

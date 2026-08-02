@@ -10,10 +10,18 @@ import {
   swapAssetKey,
   type TestnetSwapAsset,
 } from "../config/testnetSwapPairs";
+import { MAINNET_SWAP_ASSETS } from "../config/mainnetSwapPairs";
 
 const TESTNET_RPC_URL = "https://soroban-testnet.stellar.org";
 const MAINNET_RPC_URL = "https://mainnet.sorobanrpc.com";
 const TESTNET_HORIZON_URL = "https://horizon-testnet.stellar.org";
+const MAINNET_HORIZON_URL = "https://horizon.stellar.org";
+
+// UX-only mainnet gate (INV-4.1): the API kill-switch is the real enforcement. When
+// this is false, mainnet is `mainnetBlocked` and the UI is exactly today's testnet-only
+// behavior; flipping it on reveals the (still API-gated) mainnet swap surface.
+const MAINNET_SWAP_ENABLED =
+  import.meta.env.VITE_ACTIONS_MAINNET_ENABLED === "true";
 
 // Beta-first slippage tolerance for testnet (5%): no configurable selector.
 const SLIPPAGE = 0.05;
@@ -30,15 +38,22 @@ const rpcUrl = computed(() =>
 );
 
 // --- Asset selection (Uniswap-style From / To) ----------------------------
-const assets = TESTNET_SWAP_ASSETS;
-const fromKey = ref(swapAssetKey(assets[0])); // XLM
-const toKey = ref(swapAssetKey(assets[1] ?? assets[0])); // first vetted target
+// The asset universe follows the active network: the vetted testnet list, or the
+// vetted mainnet list (XLM ↔ USDC at launch). Selections reset on a network switch.
+function assetsFor(net: string): TestnetSwapAsset[] {
+  return net === "mainnet" ? MAINNET_SWAP_ASSETS : TESTNET_SWAP_ASSETS;
+}
+const assets = computed<TestnetSwapAsset[]>(() => assetsFor(network.value));
+
+const initialAssets = assetsFor(network.value);
+const fromKey = ref(swapAssetKey(initialAssets[0])); // XLM
+const toKey = ref(swapAssetKey(initialAssets[1] ?? initialAssets[0])); // first vetted target
 
 const fromAsset = computed<TestnetSwapAsset>(
-  () => assets.find((a) => swapAssetKey(a) === fromKey.value) ?? assets[0],
+  () => assets.value.find((a) => swapAssetKey(a) === fromKey.value) ?? assets.value[0],
 );
 const toAsset = computed<TestnetSwapAsset>(
-  () => assets.find((a) => swapAssetKey(a) === toKey.value) ?? assets[0],
+  () => assets.value.find((a) => swapAssetKey(a) === toKey.value) ?? assets.value[0],
 );
 const fromCode = computed(() => fromAsset.value.code);
 const toCode = computed(() => toAsset.value.code);
@@ -47,7 +62,7 @@ const toCode = computed(() => toAsset.value.code);
 // didn't just change) to the next free asset.
 watch([fromKey, toKey], ([f, t], [pf]) => {
   if (f !== t) return;
-  const free = assets.find((a) => swapAssetKey(a) !== f);
+  const free = assets.value.find((a) => swapAssetKey(a) !== f);
   if (!free) return;
   if (f !== pf) toKey.value = swapAssetKey(free); // From changed → move To
   else fromKey.value = swapAssetKey(free); // To changed → move From
@@ -75,9 +90,13 @@ const balances = ref<Record<string, string>>({});
 async function loadBalances() {
   balances.value = {};
   const addr = connectedAddress.value;
-  if (!addr || network.value !== "testnet") return;
+  // No balances while mainnet is blocked (UI hidden) — same as today's testnet-only
+  // early return. Otherwise load from the active network's Horizon.
+  if (!addr || mainnetBlocked.value) return;
+  const horizonUrl =
+    network.value === "mainnet" ? MAINNET_HORIZON_URL : TESTNET_HORIZON_URL;
   try {
-    const res = await fetch(`${TESTNET_HORIZON_URL}/accounts/${addr}`);
+    const res = await fetch(`${horizonUrl}/accounts/${addr}`);
     if (!res.ok) return; // unfunded / not found → all balances stay 0
     const data = await res.json();
     const map: Record<string, string> = {};
@@ -101,6 +120,17 @@ function balanceFor(a: TestnetSwapAsset): string {
 onMounted(loadBalances);
 watch(connectedAddress, loadBalances);
 
+// On a network switch the asset universe changes — reset From/To to that network's
+// defaults, clear the amount + any stale quote, and reload balances from its Horizon.
+watch(network, () => {
+  const list = assets.value;
+  fromKey.value = swapAssetKey(list[0]);
+  toKey.value = swapAssetKey(list[1] ?? list[0]);
+  amount.value = "";
+  clearQuote();
+  loadBalances();
+});
+
 // --- Amount / quote --------------------------------------------------------
 const amount = ref("");
 
@@ -117,6 +147,14 @@ const errorMessage = ref("");
 
 const isConnected = computed(() => !!connectedAddress.value);
 const isMainnet = computed(() => network.value === "mainnet");
+// Mainnet without the UX flag = today's testnet-only behavior (blocked). This — not
+// raw isMainnet — gates every swap surface, so flipping the flag reveals the (still
+// API-gated) mainnet path in one place.
+const mainnetBlocked = computed(() => isMainnet.value && !MAINNET_SWAP_ENABLED);
+
+// stellar.expert path segment must follow the real network (INV-6.1): `public` on
+// mainnet, `testnet` otherwise.
+const explorerNetwork = computed(() => (isMainnet.value ? "public" : "testnet"));
 
 const isActiveSignerConnected = computed(
   () =>
@@ -136,7 +174,7 @@ const signerBlockReason = computed<string | null>(() => {
 
 const canSwap = computed(
   () =>
-    !isMainnet.value &&
+    !mainnetBlocked.value &&
     isConnected.value &&
     isActiveSignerConnected.value &&
     status.value !== "loading" &&
@@ -193,7 +231,7 @@ function clearQuote() {
 watch([fromKey, toKey, amount], () => {
   if (quoteTimer) clearTimeout(quoteTimer);
   const parsed = parseFloat(amount.value);
-  if (isNaN(parsed) || parsed <= 0 || isMainnet.value) {
+  if (isNaN(parsed) || parsed <= 0 || mainnetBlocked.value) {
     clearQuote();
     return;
   }
@@ -220,7 +258,7 @@ watch([fromKey, toKey, amount], () => {
       const message = readApiError(err, "Quote failed.");
       if (/liquidity/i.test(message)) {
         quoteStatus.value = "empty";
-        quoteError.value = "No liquidity for this direction on testnet.";
+        quoteError.value = `No liquidity for this direction on ${network.value}.`;
       } else {
         quoteStatus.value = "error";
         quoteError.value = message;
@@ -250,7 +288,7 @@ async function submitToRpc(signedTxXdr: string): Promise<{
 }
 
 async function onSwap() {
-  if (isMainnet.value) return;
+  if (mainnetBlocked.value) return;
   if (signerBlockReason.value) {
     errorMessage.value = signerBlockReason.value;
     status.value = "error";
@@ -300,7 +338,7 @@ async function onSwap() {
     // 3. Sign client-side on the current toggle network.
     const { signedTxXdr } = await signTransaction(xdr, passphrase);
 
-    // 4. Submit to the Testnet RPC.
+    // 4. Submit to the active network's RPC.
     const result = await submitToRpc(signedTxXdr);
 
     if (result.status === "PENDING" || result.status === "SUCCESS") {
@@ -333,9 +371,9 @@ function reset() {
       <span class="text-[10px] text-[#9a9b99] uppercase tracking-widest">{{ network }}</span>
     </div>
 
-    <!-- MAINNET NOTICE (Testnet-only beta) -->
+    <!-- MAINNET NOTICE (Testnet-only until ungated) -->
     <div
-      v-if="isMainnet"
+      v-if="mainnetBlocked"
       class="bg-[#202020] border border-[rgba(213,255,47,0.3)] rounded-md p-3 text-[11px] text-[#9a9b99]"
     >
       Swap is <span class="text-[#d5ff2f] font-semibold">Testnet-only</span> in this beta.
@@ -343,6 +381,15 @@ function reset() {
     </div>
 
     <template v-else>
+      <!-- MAINNET WARNING (live: real funds + launch cap) -->
+      <div
+        v-if="isMainnet"
+        class="bg-[#202020] border border-[rgba(255,184,107,0.5)] rounded-md p-3 text-[11px] text-[#ffb86b]"
+      >
+        <span class="font-semibold">Mainnet</span> — this swap moves real funds. A
+        per-transaction cap applies during the launch period.
+      </div>
+
       <!-- SIGNER GUARDRAIL -->
       <div
         v-if="isConnected && signerBlockReason"
@@ -466,7 +513,7 @@ function reset() {
         <span class="text-[#d5ff2f] font-semibold">Transaction submitted</span>
         <span class="text-[#9a9b99] break-all font-mono">{{ txHash }}</span>
         <a
-          :href="`https://stellar.expert/explorer/testnet/tx/${txHash}`"
+          :href="`https://stellar.expert/explorer/${explorerNetwork}/tx/${txHash}`"
           target="_blank"
           class="text-[#d5ff2f] hover:underline w-fit"
         >

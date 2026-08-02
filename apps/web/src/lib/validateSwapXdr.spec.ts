@@ -41,11 +41,11 @@ type PPSSFields = Parameters<typeof Operation.pathPaymentStrictSend>[0]
 /** Builds a real, decodable single-op PathPaymentStrictSend XDR. */
 function buildSwapXdr(
   overrides: Partial<PPSSFields> = {},
-  opts: { source?: string; passphrase?: string; extraOp?: boolean } = {},
+  opts: { source?: string; passphrase?: string; extraOp?: boolean; fee?: string } = {},
 ): string {
   const account = new Account(opts.source ?? USER, '100')
   const builder = new TransactionBuilder(account, {
-    fee: BASE_FEE,
+    fee: opts.fee ?? BASE_FEE,
     networkPassphrase: opts.passphrase ?? PASSPHRASE,
   })
 
@@ -139,6 +139,12 @@ const failCases: FailCase[] = [
     name: 'wrong operation type',
     xdr: () => buildPaymentXdr(),
     expect: 'no pathPaymentStrictSend operation',
+  },
+  {
+    name: 'fee above the cap (corrupted fee field)',
+    // 2 XLM per op — far beyond the 0.01 XLM total ceiling.
+    xdr: () => buildSwapXdr({}, { fee: '20000000' }),
+    expect: 'fee exceeds cap',
   },
   {
     name: 'wrong sendAsset code',

@@ -3,10 +3,24 @@ import {
   Post,
   Body,
   BadRequestException,
+  ForbiddenException,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
 import { ActionsService, type AssetRef } from './actions.service';
+import {
+  type ActionNetwork,
+  isMainnetEnabled,
+  mainnetMaxSendXlm,
+  isWhitelistedMainnetAsset,
+  MAINNET_ASSET_WHITELIST,
+} from './network-registry';
+
+/** Codes a user can be told are allowed on Mainnet (native XLM + every whitelist code). */
+const MAINNET_ALLOWED_CODES = [
+  'XLM',
+  ...MAINNET_ASSET_WHITELIST.map((a) => a.code),
+].join(', ');
 
 interface BlendDepositBody {
   address: string;
@@ -78,6 +92,42 @@ function sameAsset(a: AssetRef, b: AssetRef): boolean {
   return a.code === b.code && a.issuer === b.issuer;
 }
 
+/**
+ * Resolves the swap network from the request body (Lot A1 gating regime, INV-4.1):
+ *   - absent / 'testnet' → testnet (today's behavior, byte-for-byte)
+ *   - 'mainnet'          → 403 unless ACTIONS_MAINNET_ENABLED === 'true'
+ *   - anything else      → 400
+ * The kill-switch is enforced HERE, server-side; the VITE flag is UX only.
+ */
+function resolveSwapNetwork(network: unknown): ActionNetwork {
+  if (network == null || network === 'testnet') return 'testnet';
+  if (network === 'mainnet') {
+    if (!isMainnetEnabled()) {
+      throw new ForbiddenException('Mainnet actions are not enabled.');
+    }
+    return 'mainnet';
+  }
+  throw new BadRequestException(`unknown network "${String(network)}"`);
+}
+
+/**
+ * Mainnet asset whitelist enforcement (INV-4.3). On testnet this is a no-op — assets
+ * are vetted client-side. On mainnet the server rejects anything off its own list.
+ */
+function assertMainnetAsset(
+  network: ActionNetwork,
+  ref: AssetRef,
+  label: string,
+): void {
+  if (network !== 'mainnet') return;
+  if (!isWhitelistedMainnetAsset(ref)) {
+    const name = ref.issuer ? `${ref.code}:${ref.issuer}` : ref.code;
+    throw new BadRequestException(
+      `${label}: asset ${name} is not on the mainnet whitelist (${MAINNET_ALLOWED_CODES})`,
+    );
+  }
+}
+
 @Controller('v1/actions')
 export class ActionsController {
   constructor(private readonly actionsService: ActionsService) {}
@@ -111,13 +161,11 @@ export class ActionsController {
   async sdexQuote(@Body() body: SdexQuoteBody) {
     const { fromAsset, toAsset, amount, network } = body;
 
-    if (network && network !== 'testnet') {
-      throw new BadRequestException(
-        'Only testnet is supported at this time. Pass network="testnet" or omit it.',
-      );
-    }
+    const resolvedNetwork = resolveSwapNetwork(network);
     const from = normalizeAssetField(fromAsset, 'fromAsset');
     const to = normalizeAssetField(toAsset, 'toAsset');
+    assertMainnetAsset(resolvedNetwork, from, 'fromAsset');
+    assertMainnetAsset(resolvedNetwork, to, 'toAsset');
     if (sameAsset(from, to)) {
       throw new BadRequestException('fromAsset and toAsset must differ');
     }
@@ -126,7 +174,12 @@ export class ActionsController {
       throw new BadRequestException('amount must be a positive numeric string');
     }
 
-    return this.actionsService.quoteSdexSwap({ fromAsset: from, toAsset: to, amount });
+    return this.actionsService.quoteSdexSwap({
+      fromAsset: from,
+      toAsset: to,
+      amount,
+      network: resolvedNetwork,
+    });
   }
 
   @Post('sdex/swap')
@@ -134,22 +187,29 @@ export class ActionsController {
   async sdexSwap(@Body() body: SdexSwapBody) {
     const { address, fromAsset, toAsset, amount, minReceive, network } = body;
 
-    if (network && network !== 'testnet') {
-      throw new BadRequestException(
-        'Only testnet is supported at this time. Pass network="testnet" or omit it.',
-      );
-    }
+    const resolvedNetwork = resolveSwapNetwork(network);
     if (!address || typeof address !== 'string') {
       throw new BadRequestException('address is required');
     }
     const from = normalizeAssetField(fromAsset, 'fromAsset');
     const to = normalizeAssetField(toAsset, 'toAsset');
+    assertMainnetAsset(resolvedNetwork, from, 'fromAsset');
+    assertMainnetAsset(resolvedNetwork, to, 'toAsset');
     if (sameAsset(from, to)) {
       throw new BadRequestException('fromAsset and toAsset must differ');
     }
     const parsedAmount = parseFloat(amount);
     if (!amount || isNaN(parsedAmount) || parsedAmount <= 0) {
       throw new BadRequestException('amount must be a positive numeric string');
+    }
+    // Mainnet per-transaction send-amount cap (INV-4.2), enforced server-side.
+    if (resolvedNetwork === 'mainnet') {
+      const cap = mainnetMaxSendXlm();
+      if (parsedAmount > cap) {
+        throw new BadRequestException(
+          `amount exceeds the mainnet per-transaction cap of ${cap} ${from.code}`,
+        );
+      }
     }
     const parsedMin = parseFloat(minReceive);
     if (!minReceive || isNaN(parsedMin) || parsedMin <= 0) {
@@ -162,6 +222,7 @@ export class ActionsController {
       toAsset: to,
       amount,
       minReceive,
+      network: resolvedNetwork,
     });
   }
 }

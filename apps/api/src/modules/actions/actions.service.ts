@@ -22,10 +22,14 @@ import {
   TESTNET_NETWORK_PASSPHRASE,
   TESTNET_BLEND_POOL,
   TESTNET_USDC_CLASSIC,
-  TESTNET_USDC_SDEX,
   ASSET_DECIMALS,
   ASSET_SAC,
 } from './testnet-registry';
+import {
+  type ActionNetwork,
+  getNetworkConfig,
+  vettedUsdcSdex,
+} from './network-registry';
 
 export interface BlendDepositParams {
   address: string;
@@ -77,6 +81,7 @@ export interface SdexSwapParams {
   toAsset: AssetRef;
   amount: string;
   minReceive: string;
+  network: ActionNetwork;
 }
 
 export interface SdexSwapResult {
@@ -92,6 +97,7 @@ export interface SdexQuoteParams {
   fromAsset: AssetRef;
   toAsset: AssetRef;
   amount: string;
+  network: ActionNetwork;
 }
 
 export interface SdexQuoteResult {
@@ -121,14 +127,14 @@ function isNativeRef(ref: AssetRef): boolean {
 
 /**
  * Resolves a canonical AssetRef to a classic Stellar Asset used by the SDEX swap.
- * Native XLM maps to Asset.native(). The legacy issuer-less 'USDC' resolves to
- * Circle's vetted testnet USDC (TESTNET_USDC_SDEX) for backward compatibility with
- * the pre-multi-pair frontend; any other asset uses its explicit (code, issuer).
+ * Native XLM maps to Asset.native(). The legacy issuer-less 'USDC' resolves to the
+ * network's vetted Circle USDC (testnet vs Pubnet issuer) for backward compatibility
+ * with the pre-multi-pair frontend; any other asset uses its explicit (code, issuer).
  * Blend uses TESTNET_USDC_CLASSIC directly and does not go through here.
  */
-function resolveAsset(ref: AssetRef): Asset {
+function resolveAsset(ref: AssetRef, network: ActionNetwork): Asset {
   if (isNativeRef(ref)) return Asset.native();
-  if (ref.code === 'USDC' && !ref.issuer) return TESTNET_USDC_SDEX;
+  if (ref.code === 'USDC' && !ref.issuer) return vettedUsdcSdex(network);
   if (!ref.issuer) {
     throw new UnprocessableEntityException(`issuer required for asset ${ref.code}`);
   }
@@ -137,14 +143,40 @@ function resolveAsset(ref: AssetRef): Asset {
 
 @Injectable()
 export class ActionsService {
+  // Testnet servers dedicated to the Blend deposit path (testnet-only in this lot).
   private readonly rpcServer: rpc.Server;
   private readonly horizonServer: Horizon.Server;
   private readonly poolContract: PoolContractV2;
+
+  // Per-network servers for the SDEX swap/quote path, built lazily on first use so
+  // no Mainnet endpoint is contacted while the kill-switch is off.
+  private readonly rpcServers = new Map<ActionNetwork, rpc.Server>();
+  private readonly horizonServers = new Map<ActionNetwork, Horizon.Server>();
 
   constructor() {
     this.rpcServer = new rpc.Server(TESTNET_RPC_URL, { allowHttp: false });
     this.horizonServer = new Horizon.Server(TESTNET_HORIZON_URL);
     this.poolContract = new PoolContractV2(TESTNET_BLEND_POOL);
+  }
+
+  /** Lazily-built Soroban RPC server for the swap path on the given network. */
+  private rpcFor(network: ActionNetwork): rpc.Server {
+    let server = this.rpcServers.get(network);
+    if (!server) {
+      server = new rpc.Server(getNetworkConfig(network).rpcUrl, { allowHttp: false });
+      this.rpcServers.set(network, server);
+    }
+    return server;
+  }
+
+  /** Lazily-built Horizon server for the swap path on the given network. */
+  private horizonFor(network: ActionNetwork): Horizon.Server {
+    let server = this.horizonServers.get(network);
+    if (!server) {
+      server = new Horizon.Server(getNetworkConfig(network).horizonUrl);
+      this.horizonServers.set(network, server);
+    }
+    return server;
   }
 
   /**
@@ -157,15 +189,15 @@ export class ActionsService {
    * estimate that would later fail op_under_dest_min.
    */
   async quoteSdexSwap(params: SdexQuoteParams): Promise<SdexQuoteResult> {
-    const { fromAsset, toAsset, amount } = params;
-    const sendAsset = resolveAsset(fromAsset);
-    const destAsset = resolveAsset(toAsset);
+    const { fromAsset, toAsset, amount, network } = params;
+    const sendAsset = resolveAsset(fromAsset, network);
+    const destAsset = resolveAsset(toAsset, network);
     const fromLabel = fromAsset.code;
     const toLabel = toAsset.code;
 
     let records: Horizon.ServerApi.PaymentPathRecord[];
     try {
-      const resp = await this.horizonServer
+      const resp = await this.horizonFor(network)
         .strictSendPaths(sendAsset, amount, [destAsset])
         .call();
       records = resp.records;
@@ -180,7 +212,7 @@ export class ActionsService {
     const direct = records.filter((r) => r.path.length === 0);
     if (direct.length === 0) {
       throw new UnprocessableEntityException(
-        `No direct liquidity for ${fromLabel}→${toLabel} at this amount on testnet`,
+        `No direct liquidity for ${fromLabel}→${toLabel} at this amount on ${network}`,
       );
     }
 
@@ -229,6 +261,7 @@ export class ActionsService {
       const hasTrustline = await this.hasClassicTrustline(
         address,
         TESTNET_USDC_CLASSIC,
+        this.horizonServer,
       );
       if (!hasTrustline) {
         const ctTx = new TransactionBuilder(
@@ -341,9 +374,10 @@ export class ActionsService {
   private async hasClassicTrustline(
     address: string,
     asset: Asset,
+    horizonServer: Horizon.Server,
   ): Promise<boolean> {
     try {
-      const account = await this.horizonServer.loadAccount(address);
+      const account = await horizonServer.loadAccount(address);
       return account.balances.some(
         (b) =>
           'asset_code' in b &&
@@ -364,37 +398,44 @@ export class ActionsService {
    * as a ChangeTrust op in the SAME transaction (classic ops can be batched freely).
    */
   async buildSdexSwap(params: SdexSwapParams): Promise<SdexSwapResult> {
-    const { address, fromAsset, toAsset, amount, minReceive } = params;
+    const { address, fromAsset, toAsset, amount, minReceive, network } = params;
+    const config = getNetworkConfig(network);
 
-    const sendAsset = resolveAsset(fromAsset);
-    const destAsset = resolveAsset(toAsset);
+    const sendAsset = resolveAsset(fromAsset, network);
+    const destAsset = resolveAsset(toAsset, network);
     const fromLabel = fromAsset.code;
     const toLabel = toAsset.code;
 
     // Load account for sequence number. The private key never reaches this layer.
     let account: Account;
     try {
-      account = await this.rpcServer.getAccount(address);
+      account = await this.rpcFor(network).getAccount(address);
     } catch {
       throw new InternalServerErrorException(
-        `Account ${address.slice(0, 8)}... not found on testnet`,
+        `Account ${address.slice(0, 8)}... not found on ${network}`,
       );
     }
 
     // Check destination trustline. XLM (native) never needs one.
+    // Horizon is the authoritative source for classic trustlines — same helper
+    // the Blend deposit gate uses. The previous rpc.getAssetBalance-based check
+    // misreported existing trustlines as missing, re-bundling a redundant
+    // ChangeTrust into the envelope (security-invariants INV-5.1: ChangeTrust
+    // must be present IFF the trustline is genuinely missing). A Horizon load
+    // failure returns false → we bundle the ChangeTrust: redundant is a no-op,
+    // missing guarantees op_no_trust.
     let needsTrustline = false;
     if (!isNativeRef(toAsset)) {
-      try {
-        const balanceResp = await this.rpcServer.getAssetBalance(address, destAsset);
-        needsTrustline = balanceResp.balanceEntry === undefined;
-      } catch {
-        needsTrustline = true;
-      }
+      needsTrustline = !(await this.hasClassicTrustline(
+        address,
+        destAsset,
+        this.horizonFor(network),
+      ));
     }
 
     const builder = new TransactionBuilder(account, {
       fee: BASE_FEE,
-      networkPassphrase: TESTNET_NETWORK_PASSPHRASE,
+      networkPassphrase: config.networkPassphrase,
     });
 
     const operations: string[] = [];
