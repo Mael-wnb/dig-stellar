@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useProtocol } from "../composables/useProtocol";
 import { useNetworkStats } from "../composables/useNetworkStats";
 import { useNetwork } from "../composables/useNetwork";
@@ -37,6 +38,20 @@ const {
 
 const { stats } = useNetworkStats();
 const { network } = useNetwork();
+
+// Mainnet actions UX flag (T3-D2, Lot A1) — same flag the swap widget reads.
+// UX only: the API keeps its own kill-switch; this template is never the
+// enforcement point.
+const MAINNET_ACTIONS_ENABLED =
+  import.meta.env.VITE_ACTIONS_MAINNET_ENABLED === "true";
+
+/** The actions section shows its widgets on testnet always, on mainnet only when ungated. */
+const actionsLive = computed(
+  () => network.value === "testnet" || MAINNET_ACTIONS_ENABLED,
+);
+const isMainnetLive = computed(
+  () => network.value === "mainnet" && MAINNET_ACTIONS_ENABLED,
+);
 
 const {
   window: bridgeWindow,
@@ -94,16 +109,18 @@ const {
         <WalletSection />
       </section>
 
-      <!-- TESTNET ACTIONS — section header (incl. network selector) is always
-           visible; only the swap widget itself is gated to Testnet. The network
-           selector scopes signing only, NOT the Mainnet portfolio above. -->
+      <!-- ACTIONS — section header (incl. network selector) is always visible.
+           Testnet: swap + Blend deposit. Mainnet: swap only, and only when the
+           VITE_ACTIONS_MAINNET_ENABLED UX flag is on (the API keeps its own
+           kill-switch — this template is never the enforcement point). The
+           network selector scopes signing only, NOT the Mainnet portfolio above. -->
       <section class="flex flex-col gap-3">
         <div class="flex items-center justify-between gap-3 flex-wrap">
           <div class="flex flex-col">
             <span
               class="text-[11px] font-bold uppercase tracking-[0.14em] text-accent"
             >
-              Testnet Actions
+              {{ isMainnetLive ? "Mainnet Actions" : "Testnet Actions" }}
             </span>
 
             <span class="text-[11px] text-muted">
@@ -115,9 +132,19 @@ const {
           <NetworkToggle />
         </div>
 
-        <template v-if="network === 'testnet'">
+        <template v-if="actionsLive">
           <SdexSwapWidget />
-          <BlendDepositCard />
+
+          <!-- Blend deposit stays Testnet-only until T3-D2 Lot A2. -->
+          <BlendDepositCard v-if="network === 'testnet'" />
+          <div
+            v-else
+            class="bg-[#2A2A2A] border border-[#383838] rounded-lg p-3 text-[11px] text-[#9a9b99]"
+          >
+            Blend deposit is
+            <span class="text-[#d5ff2f] font-semibold">Testnet-only</span> for now —
+            mainnet lending actions are coming next.
+          </div>
         </template>
 
         <div
