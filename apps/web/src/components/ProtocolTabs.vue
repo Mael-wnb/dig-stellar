@@ -13,7 +13,13 @@ const props = defineProps<{
   protocols: ProtocolTabItem[]
   selectedProtocolId: string
   pools: PoolListItem[]
+  // Protocol ids with at least one stale pool (T3-D1) — shows an amber badge.
+  staleProtocolIds?: Set<string>
 }>()
+
+function isProtocolStale(protocolId: string): boolean {
+  return props.staleProtocolIds?.has(protocolId) ?? false
+}
 
 const emit = defineEmits<{ select: [id: string] }>()
 
@@ -74,11 +80,19 @@ function getProtocolTvl(protocolId: string): string {
 
         <div class="flex flex-col">
           <span
-            class="text-[20px] font-bold leading-tight"
+            class="text-[20px] font-bold leading-tight flex items-center gap-2"
             style="font-family: 'Clash Display', sans-serif; letter-spacing: 0.01em"
             :style="{ color: p.id === selectedProtocolId ? '#E2E6E1' : '#838583' }"
           >
             {{ p.name }}
+            <span
+              v-if="isProtocolStale(p.id)"
+              class="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-[rgba(245,158,11,0.12)] text-[#F59E0B] border border-[rgba(245,158,11,0.35)]"
+              title="This protocol has at least one source older than the freshness window."
+            >
+              <span class="w-1.5 h-1.5 rounded-full bg-[#F59E0B]" />
+              Stale
+            </span>
           </span>
           <span class="text-[16px] text-[#5E5F5D]">
             {{ p.type }}

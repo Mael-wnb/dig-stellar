@@ -30,6 +30,8 @@ export function mapPoolToDisplay(data: PoolDetailData): PoolDisplay {
     chain: data.chain,
     contractAddress: data.contractAddress,
     updatedAt: data.updatedAt,
+    isStale: data.isStale ?? null,
+    staleAfterSeconds: data.staleAfterSeconds ?? null,
 
     /* ───────────────────────── */
     /* METRICS (CRITICAL FIX) */

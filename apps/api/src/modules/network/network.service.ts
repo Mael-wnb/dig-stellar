@@ -1,6 +1,7 @@
 // apps/api/src/modules/network/network.service.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../db/prisma.service';
+import { computeFreshness, staleAfterSeconds } from '../../common/freshness';
 
 export type NetworkStatsResponse = {
   xlmPriceUsd: number | null;
@@ -15,6 +16,10 @@ export type NetworkStatsResponse = {
   // null when the indexer has never populated network_stats_latest yet
   // (cold start). Otherwise the real as_of of the stored row.
   updatedAt: string | null;
+  // Freshness (T3-D1): stale when as_of is older than
+  // FRESHNESS_STALE_AFTER_MINUTES; null at cold start (no row yet).
+  isStale: boolean | null;
+  staleAfterSeconds: number;
 };
 
 type NetworkStatsRow = {
@@ -71,6 +76,8 @@ export class NetworkService {
         usdcSupplyUsd: null,
         avgTxFeeXlm: null,
         updatedAt: null,
+        isStale: null,
+        staleAfterSeconds: staleAfterSeconds(),
       };
     }
 
@@ -85,6 +92,8 @@ export class NetworkService {
       usdcSupplyUsd: this.toFiniteNumber(row.usdc_supply_usd),
       avgTxFeeXlm: this.toFiniteNumber(row.avg_tx_fee_xlm),
       updatedAt: this.toIsoString(row.as_of),
+      isStale: computeFreshness(row.as_of).isStale,
+      staleAfterSeconds: staleAfterSeconds(),
     };
   }
 

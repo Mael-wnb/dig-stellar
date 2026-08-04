@@ -56,6 +56,33 @@ pnpm -C apps/indexer exec tsx src/scripts/ingest/73-network-stats-refresh.ts
 pnpm -C apps/indexer tsx src/scripts/bootstrap/blend-upsert-core.ts
 pnpm -C apps/indexer tsx src/scripts/bootstrap/soroswap-upsert-core.ts
 pnpm -C apps/indexer tsx src/scripts/bootstrap/aquarius-upsert-core.ts
+pnpm -C apps/indexer tsx src/scripts/bootstrap/defindex-upsert-core.ts   # T3-D1: venue 'defindex' + 3 mainnet vault entities
+```
+
+### Onboarding DeFindex vaults (T3-D1)
+
+`defindex-upsert-core.ts` seeds the `defindex` venue + the selected mainnet vault entities
+(`entity_type = 'yield_vault'`, `venue_type = 'vault'`) with their underlying asset (USDC/EURC SAC,
+`role = 'underlying'`). The vault set is enumerated from DeFindex's own API —
+`GET https://api.defindex.io/vault/discover?network=mainnet` (Bearer `DEFINDEX_API_KEY`) — picking
+non-trivial-TVL vaults with a real APY; addresses + seed-time evidence are in the bootstrap's header
+comment. After seeding, `71-refresh-all-metrics` discovers them by DB query
+(`entities join venues where v.slug='defindex' and is_active`) and refreshes each per cycle via
+`run-defindex-refresh.ts` (SDK `getVaultInfo` → TVL from `totalManagedFunds`, priced through the
+`asset_prices` pipeline; `getVaultAPY` → stored as a **fraction** in `weighted_supply_apy`). The step
+is **non-fatal** and runs before step 7 so `70-protocol-persist-metrics` folds DeFindex into
+`protocol_metrics_latest` (→ `/v1/protocols`, `protocolCount = 5`). Env: `DEFINDEX_API_KEY`,
+`DEFINDEX_API_URL` (default `https://api.defindex.io`). `DEFINDEX_VAULTS` in `.env` is only for the
+legacy Prisma `run:defindex` script — the live v1 path is DB-driven, not that var.
+
+```bash
+# Re-enumerate mainnet vaults (evidence / picking a new vault to seed)
+curl -s "https://api.defindex.io/vault/discover?network=mainnet" -H "Authorization: Bearer $DEFINDEX_API_KEY" | jq .
+
+# Refresh one vault directly (idempotent)
+ENTITY_SLUG=defindex-meru-usdc \
+DEFINDEX_VAULT_ADDRESS=CCA2ZJP5BVRXYTQH4FAGHCAUMRYCXVC4CRYC2NXHWMR7TIVX36U7F5HR \
+  pnpm -C apps/indexer exec tsx src/scripts/ingest/run-defindex-refresh.ts
 ```
 
 ### Onboarding an additional Blend pool (the actual seed path)
@@ -149,6 +176,43 @@ psql "postgresql://dig:dig@localhost:5432/dig_stellar" -c "select * from user_wa
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" \
   -c "select user_wallet_id, asset_symbol, balance_usd, snapshot_at from wallet_balance_snapshots order by snapshot_at desc limit 20;"
 ```
+
+---
+
+## Data freshness & retries (T3-D1)
+
+**Freshness is computed at read time in the API** — no new indexer state. Every `/v1/*` payload that
+carries an `as_of` (protocols, pools, pool detail, `/v1/network/stats`) also returns:
+- `isStale: boolean | null` — `true` when `now − as_of` exceeds the threshold; `null` when `as_of`
+  is unknown (no metrics row yet). `stale` is kept as a backward-compatible alias of `isStale`.
+- `staleAfterSeconds: number` — the configured threshold, so the UI can label it ("older than 45m").
+
+**Threshold:** `FRESHNESS_STALE_AFTER_MINUTES` (API env, default **45** = 3× the 15-min cron — one
+missed cycle is tolerated, two is stale). Legacy `STALE_THRESHOLD_MINUTES` is honoured as a fallback.
+Helper: `apps/api/src/common/freshness.ts` (env read per-call, so a drill needs no code change).
+
+**UI:** a freshness chip on the Protocol View header ("Updated Xm ago" → amber "Stale — data older
+than 45m" when the selected protocol has any stale pool), an amber "Stale" badge on stale protocol
+tabs, and the chip on `PoolDetail` when a pool is stale (`FreshnessChip.vue`).
+
+**Retries (indexer):** every step of `71-refresh-all-metrics` runs through
+`runTsxWithRetry` (`scripts/shared/retry.ts`): 3 attempts, exponential backoff **5s → 20s** + jitter,
+each retry logged with the step label (`[retry] <label> attempt N/3 failed; backing off Nms`).
+Per-protocol-entity steps retry per entity. Steps that must stay non-fatal (Aquarius / DeFindex /
+Allbridge / network-stats) keep their `try/catch` — retries happen INSIDE first, catch-and-log is
+the last resort.
+
+### Forced-stale drill (evidence)
+
+Prove the read-time stale flip without pausing the cron:
+```bash
+# Set the threshold tiny and restart the API (PM2 re-reads env); the UI chip turns amber.
+FRESHNESS_STALE_AFTER_MINUTES=1 pnpm -C apps/api start:dev   # or: pm2 restart api --update-env
+curl -s http://localhost:3000/v1/protocols | jq '.[] | {id, isStale, staleAfterSeconds}'
+# ...screenshot the amber "Stale" chip/badges, then restore (unset the env / pm2 restart) and re-screenshot recovery.
+```
+Unit-level equivalent (no restart), evaluating real `as_of` rows at two thresholds — see
+`docs/evidence/lot-b/`.
 
 ---
 

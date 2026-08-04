@@ -17,6 +17,7 @@ import WalletSection from "./WalletSection.vue";
 import ProtocolTabs from "./ProtocolTabs.vue";
 import PoolTabs from "./PoolTabs.vue";
 import PoolDetail from "./PoolDetail.vue";
+import FreshnessChip from "./FreshnessChip.vue";
 
 import heroImg from "@/assets/hero.png";
 import stellarLogo from "@/assets/stellar-logo.svg";
@@ -29,6 +30,8 @@ const {
   selectedPoolId,
   selectedProtocol,
   selectedPool,
+  staleProtocolIds,
+  selectedProtocolFreshness,
   loadingProtocols,
   loadingPoolDetail,
   error,
@@ -168,7 +171,16 @@ const {
 
           <div class="flex-1 h-px bg-[#7D922A]" />
 
-          <span class="text-[14px] text-[#838583] font-light whitespace-nowrap">
+          <FreshnessChip
+            v-if="!loadingProtocols && selectedProtocolFreshness.updatedAt"
+            :updated-at="selectedProtocolFreshness.updatedAt"
+            :is-stale="selectedProtocolFreshness.isStale"
+            :stale-after-seconds="selectedProtocolFreshness.staleAfterSeconds"
+          />
+          <span
+            v-else
+            class="text-[14px] text-[#838583] font-light whitespace-nowrap"
+          >
             Select a protocol
           </span>
         </div>
@@ -206,6 +218,7 @@ const {
             :protocols="protocolDisplays"
             :selected-protocol-id="selectedProtocolId"
             :pools="pools"
+            :stale-protocol-ids="staleProtocolIds"
             @select="selectProtocol"
           />
 

@@ -1,7 +1,7 @@
 // apps/indexer/src/scripts/ingest/71-refresh-all-metrics.ts
 
-import { spawn } from 'node:child_process';
 import { createPgClient } from '../shared/db';
+import { runTsxWithRetry } from '../shared/retry';
 
 type PgClient = ReturnType<typeof createPgClient>;
 
@@ -10,32 +10,21 @@ type PoolRow = {
   contract_address: string | null;
 };
 
-function runTsx(
+// Standardized exponential-backoff retry for every step (T3-D1). One mechanism:
+// 3 attempts, 5s → 20s backoff + jitter, each retry logged with the step label.
+// Per-protocol-entity steps retry per entity. Steps that must stay non-fatal
+// (Aquarius / DeFindex / Allbridge / network-stats) keep their try/catch — the
+// retries happen INSIDE, catch-and-log is the last resort.
+function runStep(
+  label: string,
   scriptPath: string,
-  extraEnv?: Record<string, string>
+  env?: Record<string, string>
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn('pnpm', ['tsx', scriptPath], {
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        ...(extraEnv ?? {}),
-      },
-    });
-
-    child.on('error', reject);
-
-    child.on('exit', (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(
-          new Error(
-            `Command failed (${code}): pnpm tsx ${scriptPath}`
-          )
-        );
-      }
-    });
+  return runTsxWithRetry(scriptPath, {
+    env,
+    label,
+    attempts: 3,
+    baseDelayMs: 5000,
   });
 }
 
@@ -48,7 +37,7 @@ function sleep(ms: number): Promise<void> {
 async function getPoolsByVenue(
   client: PgClient,
   venueSlug: string,
-  entityType: 'amm_pool' | 'lending_pool'
+  entityType: 'amm_pool' | 'lending_pool' | 'yield_vault'
 ): Promise<Array<{ entitySlug: string; contractAddress: string }>> {
   // Only refresh entities that are still active. Pools whose Soroban contract
   // has been archived (TTL expired) or delisted return 404 on every state read
@@ -97,7 +86,8 @@ async function main() {
   try {
     console.log('\n=== 1. Refresh reference prices ===');
 
-    await runTsx(
+    await runStep(
+      'prices:reference',
       'src/scripts/ingest/62-price-reference-assets.ts'
     );
 
@@ -113,7 +103,8 @@ async function main() {
       );
 
     for (const pool of soroswapPools) {
-      await runTsx(
+      await runStep(
+        `prices:soroswap-derived:${pool.entitySlug}`,
         'src/scripts/ingest/63-price-soroswap-derived.ts',
         {
           ENTITY_SLUG: pool.entitySlug,
@@ -137,7 +128,8 @@ async function main() {
         `\n--- Blend: ${pool.entitySlug} (${pool.contractAddress}) ---`
       );
 
-      await runTsx(
+      await runStep(
+        `blend:${pool.entitySlug}`,
         'src/scripts/ingest/run-blend-pool-refresh.ts',
         {
           ENTITY_SLUG: pool.entitySlug,
@@ -155,7 +147,8 @@ async function main() {
         `\n--- Soroswap: ${pool.entitySlug} (${pool.contractAddress}) ---`
       );
 
-      await runTsx(
+      await runStep(
+        `soroswap:${pool.entitySlug}`,
         'src/scripts/ingest/run-soroswap-pair-refresh.ts',
         {
           ENTITY_SLUG: pool.entitySlug,
@@ -181,7 +174,8 @@ async function main() {
       );
 
       try {
-        await runTsx(
+        await runStep(
+          `aquarius:${pool.entitySlug}`,
           'src/scripts/ingest/run-aquarius-pool-refresh.ts',
           {
             ENTITY_SLUG: pool.entitySlug,
@@ -207,15 +201,54 @@ async function main() {
       '\n=== 6. Refresh Stellar Native pools ==='
     );
 
-    await runTsx(
+    await runStep(
+      'stellar-native',
       'src/scripts/ingest/run-stellar-native-refresh.ts'
     );
+
+    console.log(
+      '\n=== 6b. Refresh DeFindex vaults + metrics ==='
+    );
+
+    // Non-fatal: a DeFindex API hiccup must never abort the whole refresh
+    // (mirrors the Aquarius / Allbridge / network-stats catch-and-log). Runs
+    // after the price steps so the underlying (USDC/EURC) is priced, and before
+    // step 7 so 70-protocol-persist-metrics folds DeFindex into protocol_metrics.
+    const defindexVaults = await getPoolsByVenue(
+      client,
+      'defindex',
+      'yield_vault'
+    );
+
+    for (const vault of defindexVaults) {
+      console.log(
+        `\n--- DeFindex: ${vault.entitySlug} (${vault.contractAddress}) ---`
+      );
+
+      try {
+        await runStep(
+          `defindex:${vault.entitySlug}`,
+          'src/scripts/ingest/run-defindex-refresh.ts',
+          {
+            ENTITY_SLUG: vault.entitySlug,
+            DEFINDEX_VAULT_ADDRESS: vault.contractAddress,
+          }
+        );
+      } catch (error) {
+        console.error(
+          `DeFindex refresh failed for ${vault.entitySlug} (non-fatal)`
+        );
+
+        console.error(error);
+      }
+    }
 
     console.log(
       '\n=== 7. Refresh protocol metrics ==='
     );
 
-    await runTsx(
+    await runStep(
+      'protocol-metrics',
       'src/scripts/ingest/70-protocol-persist-metrics.ts'
     );
 
@@ -228,7 +261,8 @@ async function main() {
     // the price steps so amount_usd can use fresh prices. Single contract, so no
     // entity discovery query — the step runs unconditionally once per cycle.
     try {
-      await runTsx(
+      await runStep(
+        'allbridge',
         'src/scripts/ingest/run-allbridge-bridge-refresh.ts'
       );
     } catch (error) {
@@ -244,7 +278,8 @@ async function main() {
     // Horizon) must never break the whole refresh job. Mirror the Aquarius
     // step's catch-and-log behaviour.
     try {
-      await runTsx(
+      await runStep(
+        'network-stats',
         'src/scripts/ingest/73-network-stats-refresh.ts'
       );
     } catch (error) {

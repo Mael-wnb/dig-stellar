@@ -6,6 +6,9 @@ export interface PoolDisplay {
   chain: string
   contractAddress: string | null
   updatedAt?: string | null
+  // Freshness (T3-D1): computed at read time in the API.
+  isStale?: boolean | null
+  staleAfterSeconds?: number | null
 
   metrics: {
     tvlUsd?: number | null

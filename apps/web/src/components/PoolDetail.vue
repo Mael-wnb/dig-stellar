@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PoolDetailData } from "../types/protocol";
 import { displaySymbol, formatCount, formatPrice, formatUsd } from "../utils/format";
+import FreshnessChip from "./FreshnessChip.vue";
 
 interface ProtocolDisplay {
   id: string;
@@ -52,6 +53,21 @@ function isLendingPool(pool: PoolDetailData) {
   return pool.type === "lending_pool";
 }
 
+// DeFindex vaults (entity_type 'yield_vault') are neither AMM nor lending: no
+// swaps, no borrowing. They get their own display variant (TVL + Supply APY +
+// underlying), mirroring how Blend gets a lending-only panel.
+function isYieldVault(pool: PoolDetailData) {
+  return pool.type === "yield_vault";
+}
+
+// Underlying asset symbol for a yield vault. The pool-detail payload carries no
+// reserves/tokens for a single-asset vault, but the entity name is the seeded
+// "DeFindex <label> (SYMBOL)" convention — parse the trailing parenthetical.
+function underlyingSymbol(pool: PoolDetailData): string | null {
+  const match = pool.name?.match(/\(([A-Za-z0-9]+)\)\s*$/);
+  return match ? match[1] : null;
+}
+
 function isStellarNative(_pool?: PoolDetailData) {
   return props.protocol?.id === "stellar-native";
 }
@@ -79,10 +95,16 @@ async function copyContract(value?: string | null) {
 function typeLabel(type?: string | null): string {
   if (type === "amm_pool") return "AMM";
   if (type === "lending_pool") return "Lending";
+  if (type === "yield_vault") return "Yield vault";
   return type ?? "—";
 }
 
 function poolDescription(pool: PoolDetailData): string {
+  if (isYieldVault(pool)) {
+    const underlying = underlyingSymbol(pool);
+    const asset = underlying ? displaySymbol(underlying) : "a single asset";
+    return `This DeFindex yield vault auto-compounds ${asset} into underlying Soroban strategies. Depositors earn a variable APY as the vault's share price grows — it does not swap or borrow, so it has no 24h volume or fees.`;
+  }
   if (isLendingPool(pool)) {
     return "This lending pool allows users to supply and borrow assets on Stellar's Soroban smart contract platform. Interest rates adjust dynamically based on utilization.";
   }
@@ -119,7 +141,7 @@ function poolDescription(pool: PoolDetailData): string {
             <span
               class="bg-[#485127] rounded-[4px] px-2 py-1 text-[#D5FF2F] text-[14px] font-light"
             >
-              {{ pool.type === "lending_pool" ? "Lending" : "AMM" }}
+              {{ typeLabel(pool.type) }}
             </span>
           </div>
           <a href="#" class="text-[#D5FF2F] text-[14px] font-light"
@@ -183,6 +205,35 @@ function poolDescription(pool: PoolDetailData): string {
                 "
               >
                 {{ formatUsd(pool.metrics.volume24hUsd) }}
+              </div>
+            </div>
+          </template>
+          <!-- DeFindex yield vault: no swaps → TVL | Supply APY (no Volume/Fees). -->
+          <template v-else-if="isYieldVault(pool)">
+            <div class="flex-1 min-w-[140px] p-4 sm:p-6 border-r border-[#383838] max-sm:border-r-0 max-sm:border-b max-sm:border-[#383838]">
+              <div class="text-[16px] text-[#5E5F5D]">TVL</div>
+              <div
+                class="text-[20px] font-bold text-[#D5FF2F]"
+                style="
+                  font-family:
+                    Clash Display,
+                    sans-serif;
+                "
+              >
+                {{ formatUsd(pool.metrics.tvlUsd) }}
+              </div>
+            </div>
+            <div class="flex-1 min-w-[140px] p-4 sm:p-6">
+              <div class="text-[16px] text-[#5E5F5D]">Supply APY</div>
+              <div
+                class="text-[20px] font-bold text-[#E2E6E1]"
+                style="
+                  font-family:
+                    Clash Display,
+                    sans-serif;
+                "
+              >
+                {{ formatPercentFromRatio(pool.metrics.supplyApy) }}
               </div>
             </div>
           </template>
@@ -289,6 +340,35 @@ function poolDescription(pool: PoolDetailData): string {
               </div>
             </div>
           </template>
+          <!-- DeFindex yield vault: Underlying asset | Strategy (no Swaps/Events). -->
+          <template v-else-if="isYieldVault(pool)">
+            <div class="flex-1 min-w-[140px] p-4 sm:p-6 border-r border-[#383838] max-sm:border-r-0 max-sm:border-b max-sm:border-[#383838]">
+              <div class="text-[16px] text-[#5E5F5D]">Underlying</div>
+              <div
+                class="text-[20px] font-bold text-[#E2E6E1]"
+                style="
+                  font-family:
+                    Clash Display,
+                    sans-serif;
+                "
+              >
+                {{ displaySymbol(underlyingSymbol(pool)) }}
+              </div>
+            </div>
+            <div class="flex-1 min-w-[140px] p-4 sm:p-6">
+              <div class="text-[16px] text-[#5E5F5D]">Strategy</div>
+              <div
+                class="text-[20px] font-bold text-[#E2E6E1]"
+                style="
+                  font-family:
+                    Clash Display,
+                    sans-serif;
+                "
+              >
+                Auto-compound
+              </div>
+            </div>
+          </template>
           <template v-else>
             <div class="flex-1 min-w-[140px] p-4 sm:p-6 border-r border-[#383838] max-sm:border-r-0 max-sm:border-b max-sm:border-[#383838]">
               <div class="text-[16px] text-[#5E5F5D]">Swaps 24h</div>
@@ -388,9 +468,17 @@ function poolDescription(pool: PoolDetailData): string {
               </button>
             </span>
           </div>
-          <div class="flex justify-between items-center px-3 sm:px-6 bg-[rgba(226,230,225,0.05)] rounded-[4px] flex-1">
+          <div class="flex justify-between items-center gap-2 px-3 sm:px-6 bg-[rgba(226,230,225,0.05)] rounded-[4px] flex-1">
             <span class="text-[16px] text-[#5E5F5D]">Updated</span>
-            <span class="text-[14px] font-semibold text-[#E2E6E1]">{{ formatDate(pool.updatedAt) }}</span>
+            <span class="flex items-center gap-2">
+              <FreshnessChip
+                v-if="pool.isStale === true"
+                :updated-at="pool.updatedAt"
+                :is-stale="pool.isStale"
+                :stale-after-seconds="pool.staleAfterSeconds"
+              />
+              <span class="text-[14px] font-semibold text-[#E2E6E1]">{{ formatDate(pool.updatedAt) }}</span>
+            </span>
           </div>
         </div>
       </div>

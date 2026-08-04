@@ -190,11 +190,14 @@ cross-check vs mainnet.blend.capital is matched — **T2-D1 is complete** (v2 sc
 | Aquarius | Soroban RPC | 4 | ≈ $22.7M | operational |
 | Stellar native DEX | Horizon | 9 | ≈ $6.2M | operational (now aggregated at protocol level) |
 | Soroswap | Soroban RPC | 1 active | ≈ $130k | operational (dead native/EURC pair disabled) |
+| DeFindex | DeFindex API (SDK) | 3 vaults | ≈ $18.6M | operational — T3-D1 (local-validated; **prod deploy pending**) |
 | Wallet balances | Horizon + Stellar RPC | — | — | operational |
 
-All four protocols aggregate at the protocol level (`protocol_metrics_latest`), with a synchronous
-`as_of` within one `job:refresh` cycle, observed advancing across consecutive cycles in prod.
-`protocolCount` = 4. The Soroswap native/EURC pair was archived on-chain (all reads 404); it is
+All five protocols aggregate at the protocol level (`protocol_metrics_latest`), with a synchronous
+`as_of` within one `job:refresh` cycle, observed advancing across consecutive cycles.
+`protocolCount` = 5 (DeFindex added — T3-D1 Lot B; enumerated from `GET /vault/discover`, 3 mainnet
+vaults incl. an EURC one, TVL priced via the `asset_prices` pipeline, APY stored as a fraction; venue
+`defindex`, `entity_type='yield_vault'`). The Soroswap native/EURC pair was archived on-chain (all reads 404); it is
 soft-disabled and excluded from the API and from TVL aggregation, which corrected the inflated
 Soroswap TVL (was ≈$587k including the dead pair, now ≈$130k of live liquidity).
 
@@ -207,26 +210,33 @@ frozen (Blend UI: "oracle currently experiencing issues"), which would yield gar
 revisit when it recovers. `BLEND_POOL_ID` in the indexer `.env` is a discovery/probe default only — the
 indexed perimeter is the Blend entities in the DB, not that var.
 
-Remaining gaps: DeFindex (T3), freshness visibility, stronger retry/backoff. The implementation exists;
-remaining work is operationalization and freshness exposure — all later tranches.
+Remaining gaps: prod deployment of the T3-D1 Lot B changes (DeFindex + freshness + retries are
+code-complete and locally validated on real Mainnet data via a full `job:refresh`, but the VPS/Vercel
+deploy is pending). DeFindex user positions stay out of scope (portfolio is Blend-only by design).
 
 ---
 
 ## 6. Data freshness / reliability
 
-**Partially operationalized.**
+**First-class as of T3-D1 Lot B (code-complete + locally validated; prod deploy pending).**
 
 Exists: refresh jobs on a 15-min cron; persisted timestamps across snapshots/metrics (`snapshot_at`,
-`as_of`, `occurred_at`, `observed_at`); synchronous refresh cycles verifiable in prod; inactive sources
-soft-disabled and excluded.
+`as_of`, `occurred_at`, `observed_at`); synchronous refresh cycles; inactive sources soft-disabled.
 
-Incomplete: freshness metadata is not consistently exposed through the API; stale detection is not
-first-class; retries/backoff are protocol-specific, not standardized; health visibility is limited.
+**Landed (T3-D1 Lot B):**
+- **Stale detection exposed on the read path** — every `/v1/*` payload with an `as_of` (protocols,
+  pools, pool detail, `/v1/network/stats`) returns `isStale` + `staleAfterSeconds`, computed at read
+  time (`apps/api/src/common/freshness.ts`). Threshold `FRESHNESS_STALE_AFTER_MINUTES`, default 45
+  (3× the cron). `stale` kept as a backward-compatible alias.
+- **UI staleness indicator** — freshness chip on the Protocol View header ("Updated Xm ago" → amber
+  "Stale — older than 45m"), amber badge on stale protocol tabs, chip on `PoolDetail`
+  (`FreshnessChip.vue`).
+- **Standardized exponential-backoff retries** — every step of `71-refresh-all-metrics` runs through
+  `runTsxWithRetry` (`scripts/shared/retry.ts`): 3 attempts, 5s→20s + jitter, per-step logging;
+  non-fatal steps keep catch-and-log as the last resort.
 
-Why it matters: data credibility, the T3-D1 freshness-tracking promise, user trust, debugging.
-Priorities (all T3-D1): (1) expose freshness in API responses; (2) define expected intervals per
-dataset; (3) auto-detect stale sources; (4) standardize retry/backoff; (5) minimal ingestion health
-visibility.
+Still incomplete (later T3): ingestion health endpoint / observability (RPC latency + error-rate
+metrics are T3-D3), and the prod deploy of the above.
 
 ---
 

@@ -114,6 +114,60 @@ export function useProtocol() {
   });
 
   /* ───────────────────────── */
+  /* FRESHNESS (T3-D1) */
+  /* ───────────────────────── */
+
+  // Protocol ids that have at least one stale pool — drives the amber dot on
+  // the protocol tabs.
+  const staleProtocolIds = computed<Set<string>>(() => {
+    const set = new Set<string>();
+    for (const pool of pools.value) {
+      if (pool.isStale === true) set.add(pool.protocol.id);
+    }
+    return set;
+  });
+
+  // Freshness of the selected protocol, aggregated across its pools: stale if
+  // any pool is stale; updatedAt = most recent pool as_of. Feeds the header chip.
+  const selectedProtocolFreshness = computed<{
+    isStale: boolean | null;
+    updatedAt: string | null;
+    staleAfterSeconds: number | null;
+  }>(() => {
+    const list = pools.value.filter(
+      (pool) => pool.protocol.id === selectedProtocolId.value,
+    );
+
+    if (!list.length) {
+      return { isStale: null, updatedAt: null, staleAfterSeconds: null };
+    }
+
+    let isStale = false;
+    let hasStaleInfo = false;
+    let latest: string | null = null;
+    let staleAfterSeconds: number | null = null;
+
+    for (const pool of list) {
+      if (pool.isStale === true) isStale = true;
+      if (pool.isStale === true || pool.isStale === false) hasStaleInfo = true;
+      if (pool.staleAfterSeconds != null)
+        staleAfterSeconds = pool.staleAfterSeconds;
+      if (
+        pool.updatedAt &&
+        (!latest || new Date(pool.updatedAt) > new Date(latest))
+      ) {
+        latest = pool.updatedAt;
+      }
+    }
+
+    return {
+      isStale: hasStaleInfo ? isStale : null,
+      updatedAt: latest,
+      staleAfterSeconds,
+    };
+  });
+
+  /* ───────────────────────── */
   /* LOAD LIST */
   /* ───────────────────────── */
 
@@ -273,6 +327,8 @@ export function useProtocol() {
     selectedPoolId,
     selectedProtocol,
     selectedPool,
+    staleProtocolIds,
+    selectedProtocolFreshness,
     loadingProtocols,
     loadingPoolDetail,
     error,

@@ -1,0 +1,11 @@
+=== STEADY STATE (FRESHNESS_STALE_AFTER_MINUTES=45 default) ===
+/v1/protocols:
+  aquarius         tvl=$  20,400,011 isStale=false staleAfterSeconds=2700
+  blend            tvl=$ 166,377,493 isStale=false staleAfterSeconds=2700
+  defindex         tvl=$  18,608,603 isStale=false staleAfterSeconds=2700
+  soroswap         tvl=$     554,676 isStale=false staleAfterSeconds=2700
+  stellar-native   tvl=$   5,382,262 isStale=false staleAfterSeconds=2700
+/v1/pools?protocol=defindex:
+  defindex-beans-eurc  type=yield_vault tvl=$200,449 apy=4.90% isStale=false
+  defindex-beans-usdc  type=yield_vault tvl=$506,152 apy=6.54% isStale=false
+  defindex-meru-usdc   type=yield_vault tvl=$17,902,002 apy=7.15% isStale=false

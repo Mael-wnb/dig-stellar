@@ -1,0 +1,13 @@
+=== FORCED-STALE DRILL (unit-level; real as_of, no server restart) ===
+Evaluating the SAME real DeFindex as_of rows at two thresholds:
+
+-- FRESHNESS_STALE_AFTER_MINUTES=45  → STEADY STATE (default 45m) --
+   defindex-beans-eurc  ageSeconds=  338 staleAfterSeconds=2700 => isStale=false
+   defindex-beans-usdc  ageSeconds=  337 staleAfterSeconds=2700 => isStale=false
+   defindex-meru-usdc   ageSeconds=  336 staleAfterSeconds=2700 => isStale=false
+
+-- FRESHNESS_STALE_AFTER_MINUTES=0.02  → FORCED STALE (threshold ~1.2s) --
+   defindex-beans-eurc  ageSeconds=  338 staleAfterSeconds=   1 => isStale=true
+   defindex-beans-usdc  ageSeconds=  337 staleAfterSeconds=   1 => isStale=true
+   defindex-meru-usdc   ageSeconds=  336 staleAfterSeconds=   1 => isStale=true
+

@@ -44,6 +44,9 @@ export interface ProtocolSummary {
     tokens: PoolTokenSummary[]
     metrics: PoolMetricsSummary
     updatedAt?: string | null
+    // Freshness (T3-D1): computed at read time in the API.
+    isStale?: boolean | null
+    staleAfterSeconds?: number | null
   }
   
   export interface PoolReserveDetail {
@@ -78,4 +81,7 @@ export interface ProtocolSummary {
     reserves?: PoolReserveDetail[]
     tokens?: PoolTokenSummary[]
     updatedAt?: string | null
+    // Freshness (T3-D1): computed at read time in the API.
+    isStale?: boolean | null
+    staleAfterSeconds?: number | null
   }
