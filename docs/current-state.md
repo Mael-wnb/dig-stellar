@@ -71,8 +71,10 @@ pass; some zones still mix real features and "coming soon" placeholders.
 
 Network selection: the wallet network follows the Mainnet/Testnet toggle (`useNetwork`) as the single
 source of truth — the Wallets Kit follows it via `kit.setNetwork`, signing uses the current network,
-and `VITE_STELLAR_NETWORK` is only the initial default. The swap widget is gated Testnet-only
-(disabled + notice on Mainnet) since the Mainnet action path is T3-D2, not yet validated.
+and `VITE_STELLAR_NETWORK` is only the initial default. Since Aug 2 (T3-D2 ungating) the swap runs
+on **both networks**: mainnet behind the double flag (`VITE_ACTIONS_MAINNET_ENABLED` UX-side +
+`ACTIONS_MAINNET_ENABLED` server kill-switch), with a real-funds warning banner and per-network
+vetted pair lists; testnet unchanged. The Blend deposit card stays testnet-only (Lot A2).
 
 Direction: a pure UI + composables/state + internal-API-consumer layer. Core network stats are already
 served by the API from the DB (see §2).
@@ -190,7 +192,7 @@ cross-check vs mainnet.blend.capital is matched — **T2-D1 is complete** (v2 sc
 | Aquarius | Soroban RPC | 4 | ≈ $22.7M | operational |
 | Stellar native DEX | Horizon | 9 | ≈ $6.2M | operational (now aggregated at protocol level) |
 | Soroswap | Soroban RPC | 1 active | ≈ $130k | operational (dead native/EURC pair disabled) |
-| DeFindex | DeFindex API (SDK) | 3 vaults | ≈ $18.6M | operational — T3-D1 (local-validated; **prod deploy pending**) |
+| DeFindex | DeFindex API (SDK) | 3 vaults | ≈ $18.8M | operational — **live in prod since Aug 4** (T3-D1) |
 | Wallet balances | Horizon + Stellar RPC | — | — | operational |
 
 All five protocols aggregate at the protocol level (`protocol_metrics_latest`), with a synchronous
@@ -210,15 +212,16 @@ frozen (Blend UI: "oracle currently experiencing issues"), which would yield gar
 revisit when it recovers. `BLEND_POOL_ID` in the indexer `.env` is a discovery/probe default only — the
 indexed perimeter is the Blend entities in the DB, not that var.
 
-Remaining gaps: prod deployment of the T3-D1 Lot B changes (DeFindex + freshness + retries are
-code-complete and locally validated on real Mainnet data via a full `job:refresh`, but the VPS/Vercel
-deploy is pending). DeFindex user positions stay out of scope (portfolio is Blend-only by design).
+Remaining gaps: none for T3-D1 — the Lot B changes (DeFindex + freshness + retries) are **deployed
+to prod** (VPS bootstrap + full `job:refresh` clean on Aug 4, ~3 min end-to-end; `/v1/protocols`
+serves 5 protocols with `isStale=false`; Vercel front live). DeFindex user positions stay out of
+scope (portfolio is Blend-only by design).
 
 ---
 
 ## 6. Data freshness / reliability
 
-**First-class as of T3-D1 Lot B (code-complete + locally validated; prod deploy pending).**
+**First-class as of T3-D1 Lot B — live in prod since Aug 4.**
 
 Exists: refresh jobs on a 15-min cron; persisted timestamps across snapshots/metrics (`snapshot_at`,
 `as_of`, `occurred_at`, `observed_at`); synchronous refresh cycles; inactive sources soft-disabled.
@@ -236,7 +239,7 @@ Exists: refresh jobs on a 15-min cron; persisted timestamps across snapshots/met
   non-fatal steps keep catch-and-log as the last resort.
 
 Still incomplete (later T3): ingestion health endpoint / observability (RPC latency + error-rate
-metrics are T3-D3), and the prod deploy of the above.
+metrics are T3-D3).
 
 ---
 
@@ -358,13 +361,16 @@ balances, and when USDC is selected with a 0 balance it blocks with an honest "c
 use XLM" message (the user must acquire that USDC out-of-band to demo the USDC 2-step). XLM deposit
 sim on a fresh friendbot account: OK (~0.061 XLM resource fee).
 
-Minor known bug (still open, USDC path only): `getAssetBalance` re-bundles `ChangeTrust` even when the
-trustline already exists (harmless; fix via Horizon `/accounts/:id`). Polish / T3-D2 item, not a gap
-against the T1-D3 contract.
+The `getAssetBalance` trustline bug is **fixed** (both action paths now check classic trustlines via
+Horizon — `hasClassicTrustline`; `ChangeTrust` is bundled iff genuinely missing, INV-5.1).
 
-The builder gates Mainnet-only swaps off (button disabled + notice + hard guard in `onSwap`), so no
-real Mainnet swap can fire before T3-D2. The same builder code targets mainnet — only contract
-addresses and the network differ.
+**Mainnet swaps are LIVE since Aug 2 (T3-D2)** — ungating replaced the hard testnet-only gate with a
+controlled regime: server kill-switch `ACTIONS_MAINNET_ENABLED` (403 by default), server-enforced
+100 XLM per-tx cap, issuer-verified 5-pair whitelist (XLM↔USDC/EURC/AQUA/yXLM/PYUSD), client-side
+pre-sign XDR validation (`validateSwapXdr`, fail closed, incl. fee cap), in-wallet signing only.
+First real mainnet swaps executed in both directions (1 XLM→USDC; USDC→XLM `eeeae199…`). Contract:
+`docs/security-invariants.md`; evidence: `docs/evidence/mainnet-ungating-2026-08-02.md` +
+`pair-vetting-2026-08-01.md`. The Blend deposit remains testnet-only until Lot A2.
 
 ---
 
@@ -406,12 +412,15 @@ Near-term: this shape is fine for the beta and the Tranche 2 claim. CI/CD and ob
 
 ---
 
-## 13. Current execution priorities
-1. T1 (MVP) is submitted — **awaiting SCF validation**; no further T1 build work pending review
-2. The **T2 (Tranche 3) submission is filed** — **Submitted for disbursement review — awaiting SCF
-   validation** (~5-min prod demo recorded, evidence links assembled; submission ≠ acceptance)
-3. (Next group) begin the T3 group — mainnet actions (T3-D2) + freshness/observability (T3-D1/D3)
-4. Keep `grant-roadmap.md` and `status-board.md` aligned with this reality
+## 13. Current execution priorities (updated 2026-08-04 — internal T3 target: Aug 15)
+1. **T3-D2 KPI push** — mainnet swaps are live; 50+ wallets / 200+ txs accumulate only while the
+   window is open. Distribution (Stellar/SCF channels, communities) is scheduled work.
+2. **Lot A2 — Blend deposit on Mainnet** (the "vault/lending" half of T3-D2; testnet-proven
+   `a842f370…`, mainnet extension under the same flag/cap regime)
+3. **T3-D3** — sidebar UX redesign, RPC latency/error metrics, SDF reference packaging
+4. **T3-D1 demo capture** (the only remaining T3-D1 item — everything else is live in prod)
+5. Keep `grant-roadmap.md` and `status-board.md` aligned with this reality
+   (T1 + T2 submissions both filed, awaiting SCF validation — nothing pending on our side)
 
 (Done this session: data cleanup — stellar-native protocol aggregation, dynamic `protocolCount`=4,
 dead Soroswap pair hidden + TVL corrected, "native"→"XLM" display, Blend panel trimmed; cron moved to

@@ -369,18 +369,27 @@ How to measure completion:
 Estimated date: August 10, 2026 — Budget: $8,610
 
 ### Internal interpretation & status (living)
-Owner: `apps/web` + `apps/api` + `apps/indexer`. Status: ~45%.
+Owner: `apps/web` + `apps/api` + `apps/indexer`. Status: **Done in prod — ~95%** (demo capture
+remaining). Landed as **Lot B** (2026-08-02, deployed to prod 2026-08-04).
 
-**Partly real already.** The product runs on real Mainnet data for Blend, Soroswap, Aquarius, and the
-native DEX, deployed in production (Vercel + VPS + 15-min cron). Inactive sources are soft-disabled and
-excluded. **DeFindex lives here**: this criterion is the one that explicitly requires DeFindex
-coverage, so the scaffolded `run:defindex` / `@defindex/sdk` work must be completed and validated for
-this deliverable (not for T1-D1).
+**Criterion 1 — met.** Production runs on real Mainnet data for all five named protocols. DeFindex
+was integrated into the **v1 product pipeline** (NOT the legacy Prisma scaffold): venue `defindex`
++ 3 mainnet vault entities (Meru USDC ≈$18.1M, Beans USDC ≈$507k, Beans EURC ≈$200k — enumerated
+from DeFindex's own `GET /vault/discover`, issuer/asset priced via `asset_prices`), refreshed
+non-fatally inside `job:refresh`, folded into `protocol_metrics_latest`. Verified in prod:
+`/v1/protocols` serves 5 protocols (DeFindex ≈$18.8M aggregate, avg supply APY ≈7.1%),
+`protocolCount = 5`, dashboard renders the DeFindex protocol + a dedicated yield-vault detail
+variant (TVL | Supply APY | Underlying | Strategy — no fake AMM metrics).
 
-**Remaining gap:** the freshness *system* the criterion describes — staleness surfaced in the UI,
-retries with exponential backoff — is not yet first-class (timestamps exist; stale detection and
-backoff are not standardized). Plus a formalized production topology, health/metrics visibility, and
-DeFindex. This is the operationalization deliverable; freshness/stale/retry is the spine of it.
+**Criterion 2 — met.** Freshness is first-class: every `/v1/*` payload carrying an `as_of` returns
+`isStale` + `staleAfterSeconds` (computed at read time, `FRESHNESS_STALE_AFTER_MINUTES` default 45
+= 3× the 15-min cron); the UI shows an explicit freshness chip ("Updated Xm ago" → amber "Stale")
+plus stale badges on protocol tabs and pool detail; every step of the refresh chain runs through
+standardized exponential-backoff retries (`runTsxWithRetry`, 3 attempts, 5s→20s + jitter).
+Evidence (forced-stale drill, retry-backoff log, full `job:refresh` log, UI captures) in
+`docs/evidence/lot-b/`.
+
+**Remaining:** demo capture for the claim. Health/metrics visibility beyond this belongs to T3-D3.
 
 ---
 
@@ -402,15 +411,29 @@ KPI:
 Estimated date: August 24, 2026 — Budget: $8,610
 
 ### Internal interpretation & status (living)
-Owner: `apps/web` + `apps/api`. Status: ~5%. Builds on the proven T1-D3 path.
+Owner: `apps/web` + `apps/api`. Status: **~60% — mainnet swaps LIVE in prod** (ungated 2026-08-02).
 
-This is the mainnet extension of the transaction builder. T1-D3 has proven the build → quote →
-in-wallet-sign → execute path on Testnet with a successful transaction, so the path is validated; the
-same builder code targets mainnet (only contract addresses and the network differ). Note the **hard
-KPIs** (50+ unique mainnet wallets, 200+ mainnet transactions) — adoption metrics, not just functional
-checks, so the claim needs both a working action surface *and* real usage. Sequence: validate the
-action surface per protocol, harden security/UX, ship to mainnet with narrow scope first, then drive
-usage. (The swap is currently gated Testnet-only by design until this deliverable.)
+**Criterion 1 — half met (swaps ✅, vault/lending pending).** The SDEX swap runs on Mainnet from
+the dashboard: first real executions succeeded in **both directions** (1 XLM → USDC, and USDC →
+XLM `eeeae199…`). Five vetted pairs at launch (XLM ↔ USDC, EURC, AQUA, yXLM, PYUSD), each vetted
+by direct-book liquidity probes at cap size AND issuer verification (Circle docs / stellar.toml)
+— a look-alike "XRP" with an unaffiliated issuer was explicitly rejected. Remaining half: the
+**Blend deposit on Mainnet (Lot A2)** — its 2-step trustline-gated path is already proven E2E on
+testnet (deposit tx `a842f370…`), so A2 is a mainnet extension, not a first build.
+
+**Criterion 2 — met.** Security regime live and verified in prod: server-side kill-switch
+(`ACTIONS_MAINNET_ENABLED`, 403 by default), per-transaction cap (100 XLM, server-enforced),
+server-side asset whitelist (code AND issuer), client-side pre-sign XDR validation
+(`validateSwapXdr`: ops whitelist, issuer match, amounts, fee cap — fail closed), signing
+exclusively in-wallet. Contract: `docs/security-invariants.md`; evidence:
+`docs/evidence/mainnet-ungating-2026-08-02.md` + `docs/evidence/pair-vetting-2026-08-01.md`.
+
+**Criterion 3 — met** for the swap (pending/success/failure states, network-aware
+stellar.expert link); the deposit inherits the same surface in A2.
+
+**Remaining:** Lot A2 (Blend deposit mainnet) and the **hard KPIs** (50+ unique mainnet wallets,
+200+ mainnet transactions) — adoption metrics whose window opened with the ungating; distribution
+is scheduled work, not an afterthought.
 
 ---
 
@@ -428,13 +451,15 @@ How to measure completion:
 Estimated date: August 31, 2026 — Budget: $6,140
 
 ### Internal interpretation & status (living)
-Owner: all apps. Status: ~20%.
+Owner: all apps. Status: ~25%.
 
 **Partial groundwork.** A `docker-compose.yml` exists (Postgres + Redis) — partial evidence toward the
 "functional Docker compose" criterion, though it is currently the local-dev stack, not a packaged
-reference implementation. A `/health` endpoint exists (liveness only). Documentation is well underway
-(status-board, current-state, grant-roadmap, runbooks, repo-structure, data-model all maintained) and
-the architecture is modular.
+reference implementation. A `/health` endpoint exists (liveness only). Documentation is strong and
+growing (status-board, current-state, grant-roadmap, runbooks, repo-structure, data-model, plus the
+T3 additions: `security-invariants.md` and the `docs/evidence/` corpus — vetting, ungating, Lot B
+captures) and the architecture is modular. UI-polish scope for this cycle includes the **sidebar
+navigation redesign** (user-directed, maps to the "Final UI polish" criterion).
 
 **Remaining gap:** real metrics endpoints (RPC latency p50/p95/p99, error rates), packaging as an SDF
 reference implementation with docs, and the final report with adoption metrics (which depends on the
@@ -452,7 +477,9 @@ before then.
 3. T1-D3 — Smart Transaction Builder — **Done.** Fully successful Testnet swap (tx `fb10c5b8…`), non-custodial.
 
 ## Most underdeveloped areas (next groups)
-1. T3-D2 — Mainnet Actions (~5%, path validated by T1-D3)
+1. T3-D2 KPIs — 50+ wallets / 200+ txs (swap surface is live; adoption is the gap)
+2. T3-D2 Lot A2 — Blend deposit on Mainnet (testnet-proven, mainnet extension pending)
+3. T3-D3 — observability metrics, sidebar redesign, SDF reference packaging, final report
 
 > The T2 group (D1 portfolio/active-signer, D2 alerting, D3 bridge) is **done — 100%, live in prod**,
 > and its Tranche 3 (30%) disbursement submission is **filed for SCF review** (awaiting validation).
@@ -471,12 +498,12 @@ demo video) for the Tranche 2 (20%) disbursement.
 
 ---
 
-# Immediate execution priorities
-1. Assemble the SCF Tranche 2 submission: the "Tranche Deliverables" text (D1/D2/D3 with proof), the
-   links (repo, `stellar.getdig.ai`, `/v1/*` endpoints, tx `fb10c5b8…` on stellar.expert/testnet),
-   and the ~5-minute demo video.
-2. Keep `current-state.md` and `status-board.md` aligned with reality.
-3. (Next group) start the T3 group: mainnet actions (T3-D2) + freshness/observability (T3-D1/D3).
+# Immediate execution priorities (updated 2026-08-04 — internal T3 target: Aug 15)
+1. Drive the T3-D2 KPIs: mainnet swap is live — distribution push (Stellar/SCF channels, community).
+2. Lot A2 — Blend deposit on Mainnet (the "vault/lending" half of T3-D2 criterion 1).
+3. T3-D3: sidebar UX redesign + observability endpoints + SDF reference packaging.
+4. Demo captures for the T3-D1 claim; keep `current-state.md` and `status-board.md` aligned.
+(T1 and T2 submissions are both filed and awaiting SCF validation — nothing pending on our side.)
 
 ---
 

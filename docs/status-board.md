@@ -37,21 +37,21 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
 
 ## Global status
 
-- Current phase: T1 (MVP) submitted & **awaiting SCF validation** (not yet validated, approved,
-  or paid). The **T2 deliverable group is complete and live in prod**, and its **Tranche 3 (30%)
-  disbursement submission is being filed today** (submission ≠ acceptance).
-- T2 group status: **Submitted for disbursement review — awaiting SCF validation.** All three
-  deliverables meet their SCF criteria, run in prod, and their remaining items are closed —
-  T2-D1 portfolio/active-signer (**done** — the visual HF cross-check vs mainnet.blend.capital was
-  performed and matched), T2-D2 in-app alerting (**live in prod on the VPS** — `stellar_v3_alerting.sql`
-  + `job:wallet-alert` cron running, real `alert_fired` notifications in prod), T2-D3 bridge
-  monitoring (**live in prod** — `stellar_v1_bridge.sql` applied + Allbridge bootstrap run,
-  `bridge_flows` populated). The ~5-min prod demo video is recorded.
-- Closest tranche-critical target: SCF validation of the filed T2 submission (out of our hands now).
-- Biggest current risk: none blocking — T2 build, deploy, and evidence are complete; the submission
-  is filed and awaiting review.
-- Main execution goal: T2 submission filed; next build focus shifts to the T3 group.
-- Last updated: 2026-07-22
+- Current phase: **T3 execution sprint** (internal target: Aug 15). T1 (MVP) and T2 submissions are
+  both **filed and awaiting SCF validation** (neither validated nor paid yet — nothing pending on
+  our side).
+- T3 headline: **T3-D1 is DONE in prod** (Aug 4 — DeFindex live as the 5th protocol ≈$18.8M,
+  first-class freshness + standardized backoff retries; demo capture remaining) and **T3-D2 mainnet
+  swaps are LIVE** (ungated Aug 2 behind kill-switch + 100 XLM cap + issuer-verified 5-pair
+  whitelist; first real swaps executed both directions). The KPI window (50+ wallets / 200+ txs)
+  is open.
+- Closest tranche-critical targets: T3-D2 KPIs (adoption — distribution push starts now), Lot A2
+  (Blend deposit mainnet; testnet-proven `a842f370…`), T3-D3 (sidebar redesign + observability +
+  reference packaging).
+- Biggest current risk: **the T3-D2 KPIs** — they cannot be built, only accumulated; every day of
+  the open window counts.
+- Main execution goal: KPI push + A2 + T3-D3, converging on the Aug 15 internal target.
+- Last updated: 2026-08-04
 
 ---
 
@@ -85,30 +85,32 @@ T1-D3 criteria.
 
 | Deliverable | Status | Completion | Confidence | Current evidence | Main remaining gap | Next action |
 |---|---|---:|---|---|---|---|
-| D1 — Mainnet Deployment & Freshness Tracking | Partial | 45% | Medium | Real Mainnet data already powers Blend, Soroswap, Aquarius, native DEX; refresh jobs operational on a 15-min cron; persisted timestamps; inactive entities soft-disabled (`is_active`) and excluded from API + aggregation | Stale detection + exponential backoff + UI staleness not first-class; production topology + health visibility; **DeFindex coverage belongs here** (scaffolded `run:defindex`/`@defindex/sdk`, not validated) | Make the freshness system first-class; complete + validate DeFindex |
-| D2 — Non-Custodial Mainnet Actions | Early | 5% | Low | Wallet foundation exists; **T1-D3 proves the build → quote → sign-in-wallet → execute path on Testnet with a successful tx** — the same builder code targets mainnet (only contract addresses + network differ) | Hard KPIs (50+ unique mainnet wallets, 200+ mainnet transactions); mainnet gating currently disabled by design | Extend the proven builder to mainnet narrowly, then drive usage |
-| D3 — Observability, UI/UX Polish & Reference Handoff | Early | 20% | Low | `docker-compose.yml` (Postgres+Redis) exists as local-dev stack; architecture is modular; docs effort well underway (status-board, current-state, grant-roadmap, runbooks, repo-structure, data-model all maintained) | Real `/health` + RPC latency/error metrics; packaged SDF reference implementation; final report w/ adoption metrics (depends on T3-D2 KPIs) | Add health/metrics endpoints incrementally |
+| D1 — Mainnet Deployment & Freshness Tracking | Done in prod | 95% | High | **Both criteria met, deployed to prod Aug 4 (Lot B).** (1) All 5 named protocols live on real Mainnet data — **DeFindex integrated into the v1 pipeline** (venue + 3 vaults enumerated from `GET /vault/discover`: Meru ≈$18.1M, Beans USDC ≈$507k, Beans EURC ≈$200k; ≈$18.8M aggregate, avg APY ≈7.1%; `protocolCount = 5`; yield-vault detail variant in the UI). (2) Freshness first-class: `isStale` + `staleAfterSeconds` on every `/v1/*` payload (read-time, threshold 45 min = 3× cron), FreshnessChip + stale badges in the UI, standardized exponential-backoff retries on every refresh step. Evidence in `docs/evidence/lot-b/`. Full prod `job:refresh` clean in ~3 min | **Demo capture** for the claim (only non-build item) | Capture the T3-D1 demo (5 protocols + stale drill) |
+| D2 — Non-Custodial Mainnet Actions | Substantially done — swaps live | 60% | Medium | **Mainnet swaps LIVE from the dashboard** (ungated Aug 2): first real executions in both directions (1 XLM→USDC; USDC→XLM `eeeae199…`). Security regime verified in prod: kill-switch (403 by default), server-enforced 100 XLM cap, issuer-verified 5-pair whitelist (XLM↔USDC/EURC/AQUA/yXLM/PYUSD — look-alike "XRP" rejected), client-side pre-sign XDR validation (fail closed), in-wallet signing only. Execution feedback UI with network-aware explorer links. Contract: `docs/security-invariants.md`; evidence: `docs/evidence/mainnet-ungating-2026-08-02.md` + `pair-vetting-2026-08-01.md`. Blend deposit already E2E-proven on **testnet** (`a842f370…`) | **KPIs** (50+ wallets / 200+ txs — window open, needs distribution) + **Lot A2** (Blend deposit mainnet) | KPI push now; A2 brief → implement |
+| D3 — Observability, UI/UX Polish & Reference Handoff | Early | 25% | Low | `docker-compose.yml` (Postgres+Redis) as local-dev stack; `/health` liveness; modular architecture; docs corpus grown (security-invariants + `docs/evidence/` with vetting/ungating/lot-b captures) | Real RPC latency/error metrics; **sidebar UX redesign** (user-directed polish scope); packaged SDF reference implementation; final report w/ adoption metrics (depends on T3-D2 KPIs) | Sidebar redesign + metrics endpoints |
 
 ---
 
 ## Strongest areas right now
-1. Horizon + Soroban indexing foundation (4 protocols, verified coverage + freshness, 15-min cron)
-2. Protocol analytics architecture (raw SQL v1 pipeline → `/v1/*`)
-3. Non-custodial transaction builder: SDEX swap **fully successful** on Testnet, with live quote + auto-slippage
-4. Backend/API foundation as the single façade (network stats, protocol metrics, freshness all DB-backed)
-5. Public beta dashboard on real Mainnet data
-6. Grouped multi-wallet portfolio flows (raw SQL v2)
-7. Clear separation between web, api, and indexer
+1. Indexing foundation at 5 protocols (Horizon + Soroban + DeFindex API), verified prod coverage, ~3-min refresh on a 15-min cron, standardized backoff retries
+2. **Live mainnet non-custodial actions**: SDEX swap in prod, both directions executed, defense in depth (kill-switch / cap / whitelist / client XDR gate)
+3. First-class freshness: read-time staleness on every `/v1/*` payload + explicit UI indicators
+4. Backend/API as the single façade (network stats, protocol metrics, freshness all DB-backed)
+5. Public beta dashboard on real Mainnet data (5 protocols incl. DeFindex yield vaults)
+6. Grouped multi-wallet portfolio + live alerting + bridge monitoring (T2 group, in prod)
+7. Evidence discipline: `docs/security-invariants.md` + `docs/evidence/` corpus, claim-ready
 
 ## Weakest areas right now
-1. Freshness/stale/retry operationalization + observability (T3)
-2. Deployment maturity / CI-CD (still manual VPS deploy)
-3. Transaction builder breadth: SDEX swap + Blend testnet deposit both proven on-chain from the UI (deposit tx `a842f370…`); mainnet execution remains T3-D2
+1. **T3-D2 KPIs** — adoption can't be built, only accumulated; distribution push not yet started
+2. Observability beyond freshness (RPC latency/error metrics) + CI/CD (still manual VPS deploy) — T3-D3
+3. Blend deposit mainnet (Lot A2) not yet extended from its proven testnet path
+4. UI polish debt: sidebar redesign pending; responsive + loading/error consistency partial
 
 ## Best near-term tranche wins
-1. SCF Tranche 3 (30%) submission — the T2 deliverable group (D1 portfolio/active-signer, D2 live alerting, D3 live bridge) is **filed for disbursement review**, awaiting SCF validation
-2. ~5-min prod demo video — **recorded** and attached to the submission (plus the T1 MVP walkthrough while the Tranche 2 review is still open)
-3. (Next group) begin the T3 group — mainnet actions (T3-D2), freshness/observability (T3-D1/D3)
+1. T3-D1 demo capture → claim-ready (everything else already live in prod)
+2. KPI distribution push — the swap is live; every announcement day counts toward 50/200
+3. Lot A2 (Blend deposit mainnet) → completes T3-D2 criterion 1
+4. Sidebar redesign + metrics endpoints → T3-D3 momentum before the final report
 
 ---
 
