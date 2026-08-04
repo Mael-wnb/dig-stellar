@@ -16,18 +16,11 @@ import {
 } from '@stellar/stellar-sdk';
 import { PoolContractV2, RequestType } from '@blend-capital/blend-sdk';
 import type { SubmitArgs, Request as BlendRequest } from '@blend-capital/blend-sdk';
-import {
-  TESTNET_RPC_URL,
-  TESTNET_HORIZON_URL,
-  TESTNET_NETWORK_PASSPHRASE,
-  TESTNET_BLEND_POOL,
-  TESTNET_USDC_CLASSIC,
-  ASSET_DECIMALS,
-  ASSET_SAC,
-} from './testnet-registry';
+import { ASSET_DECIMALS } from './testnet-registry';
 import {
   type ActionNetwork,
   getNetworkConfig,
+  getBlendConfig,
   vettedUsdcSdex,
 } from './network-registry';
 
@@ -35,6 +28,7 @@ export interface BlendDepositParams {
   address: string;
   asset: 'USDC' | 'XLM';
   amount: string;
+  network: ActionNetwork;
 }
 
 export interface BlendDepositResult {
@@ -143,20 +137,21 @@ function resolveAsset(ref: AssetRef, network: ActionNetwork): Asset {
 
 @Injectable()
 export class ActionsService {
-  // Testnet servers dedicated to the Blend deposit path (testnet-only in this lot).
-  private readonly rpcServer: rpc.Server;
-  private readonly horizonServer: Horizon.Server;
-  private readonly poolContract: PoolContractV2;
-
-  // Per-network servers for the SDEX swap/quote path, built lazily on first use so
-  // no Mainnet endpoint is contacted while the kill-switch is off.
+  // Per-network servers + pool contracts, built lazily on first use so no Mainnet
+  // endpoint is contacted while both kill-switches are off. Shared by the swap and
+  // the Blend deposit paths.
   private readonly rpcServers = new Map<ActionNetwork, rpc.Server>();
   private readonly horizonServers = new Map<ActionNetwork, Horizon.Server>();
+  private readonly poolContracts = new Map<ActionNetwork, PoolContractV2>();
 
-  constructor() {
-    this.rpcServer = new rpc.Server(TESTNET_RPC_URL, { allowHttp: false });
-    this.horizonServer = new Horizon.Server(TESTNET_HORIZON_URL);
-    this.poolContract = new PoolContractV2(TESTNET_BLEND_POOL);
+  /** Lazily-built Blend pool contract (V2) for the given network. */
+  private poolContractFor(network: ActionNetwork): PoolContractV2 {
+    let pool = this.poolContracts.get(network);
+    if (!pool) {
+      pool = new PoolContractV2(getBlendConfig(network).poolId);
+      this.poolContracts.set(network, pool);
+    }
+    return pool;
   }
 
   /** Lazily-built Soroban RPC server for the swap path on the given network. */
@@ -227,18 +222,21 @@ export class ActionsService {
   }
 
   async buildBlendDeposit(params: BlendDepositParams): Promise<BlendDepositResult> {
-    const { address, asset, amount } = params;
+    const { address, asset, amount, network } = params;
+    const cfg = getBlendConfig(network);
+    const rpcServer = this.rpcFor(network);
+    const poolContract = this.poolContractFor(network);
     const decimals = ASSET_DECIMALS[asset];
-    const assetSac = ASSET_SAC[asset];
+    const assetSac = cfg.sac[asset];
     const scaledAmount = toI128(amount, decimals);
 
     // Load account for sequence number. The private key never reaches this layer.
     let account: Account;
     try {
-      account = await this.rpcServer.getAccount(address);
+      account = await rpcServer.getAccount(address);
     } catch {
       throw new InternalServerErrorException(
-        `Account ${address.slice(0, 8)}... not found on testnet`,
+        `Account ${address.slice(0, 8)}... not found on ${network}`,
       );
     }
 
@@ -247,11 +245,12 @@ export class ActionsService {
 
     // Trustline gate (USDC only; XLM is native and needs no trustline).
     //
-    // The Blend USDC reserve is the SAC (TESTNET_USDC_SAC / CAQCFV…) wrapping the
-    // CLASSIC asset USDC:GATALTGT. Supplying it moves the classic balance, so the
-    // account MUST hold a classic trustline to USDC:GATALTGT first — otherwise the
-    // SAC transfer traps with Contract #13 ("trustline entry is missing"). We cannot
-    // even SIMULATE the deposit until that trustline exists (proven on testnet).
+    // The Blend USDC reserve is a SAC (cfg.sac.USDC) wrapping the CLASSIC asset
+    // cfg.usdcClassic (testnet USDC:GATALTGT / Circle mainnet USDC:GA5ZSE…).
+    // Supplying it moves the classic balance, so the account MUST hold a classic
+    // trustline to that issuer first — otherwise the SAC transfer traps with
+    // Contract #13 ("trustline entry is missing"). We cannot even SIMULATE the
+    // deposit until that trustline exists (proven on testnet).
     //
     // So when the trustline is absent we return ONLY the ChangeTrust step and stop:
     // the client signs + confirms it on-chain, then re-requests this build (which can
@@ -260,15 +259,15 @@ export class ActionsService {
     if (asset === 'USDC') {
       const hasTrustline = await this.hasClassicTrustline(
         address,
-        TESTNET_USDC_CLASSIC,
-        this.horizonServer,
+        cfg.usdcClassic,
+        this.horizonFor(network),
       );
       if (!hasTrustline) {
         const ctTx = new TransactionBuilder(
           new Account(address, seqBeforeBuild),
-          { fee: BASE_FEE, networkPassphrase: TESTNET_NETWORK_PASSPHRASE },
+          { fee: BASE_FEE, networkPassphrase: cfg.networkPassphrase },
         )
-          .addOperation(Operation.changeTrust({ asset: TESTNET_USDC_CLASSIC }))
+          .addOperation(Operation.changeTrust({ asset: cfg.usdcClassic }))
           .setTimeout(300)
           .build();
         const inclusionFee = parseInt(BASE_FEE, 10);
@@ -300,7 +299,7 @@ export class ActionsService {
       requests: [request],
     };
     const blendOp = xdr.Operation.fromXDR(
-      this.poolContract.submit(submitArgs),
+      poolContract.submit(submitArgs),
       'base64',
     );
 
@@ -308,13 +307,13 @@ export class ActionsService {
     // incremented by build()). Simulation results are independent of tx sequence.
     const txForSim = new TransactionBuilder(account, {
       fee: BASE_FEE,
-      networkPassphrase: TESTNET_NETWORK_PASSPHRASE,
+      networkPassphrase: cfg.networkPassphrase,
     })
       .addOperation(blendOp)
       .setTimeout(300)
       .build();
 
-    const simResult = await this.rpcServer.simulateTransaction(txForSim);
+    const simResult = await rpcServer.simulateTransaction(txForSim);
 
     if (rpc.Api.isSimulationError(simResult) || rpc.Api.isSimulationRestore(simResult)) {
       const error = rpc.Api.isSimulationError(simResult)
@@ -340,7 +339,7 @@ export class ActionsService {
     const accountForDeposit = new Account(address, seqBeforeBuild);
     const txForDeposit = new TransactionBuilder(accountForDeposit, {
       fee: totalFee.toString(),
-      networkPassphrase: TESTNET_NETWORK_PASSPHRASE,
+      networkPassphrase: cfg.networkPassphrase,
     })
       .addOperation(blendOp)
       .setTimeout(300)

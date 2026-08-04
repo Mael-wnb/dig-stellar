@@ -11,6 +11,7 @@ import { ActionsService, type AssetRef } from './actions.service';
 import {
   type ActionNetwork,
   isMainnetEnabled,
+  isMainnetBlendEnabled,
   mainnetMaxSendXlm,
   isWhitelistedMainnetAsset,
   MAINNET_ASSET_WHITELIST,
@@ -111,6 +112,25 @@ function resolveSwapNetwork(network: unknown): ActionNetwork {
 }
 
 /**
+ * Resolves the Blend deposit network (Lot A2). Same shape as resolveSwapNetwork but
+ * gated by the deposit's OWN kill-switch (ACTIONS_MAINNET_BLEND_ENABLED), so the
+ * deposit's mainnet rollout is independent of the swap:
+ *   - absent / 'testnet' → testnet (today's behavior, byte-for-byte)
+ *   - 'mainnet'          → 403 unless ACTIONS_MAINNET_BLEND_ENABLED === 'true'
+ *   - anything else      → 400
+ */
+function resolveBlendNetwork(network: unknown): ActionNetwork {
+  if (network == null || network === 'testnet') return 'testnet';
+  if (network === 'mainnet') {
+    if (!isMainnetBlendEnabled()) {
+      throw new ForbiddenException('Mainnet Blend deposits are not enabled.');
+    }
+    return 'mainnet';
+  }
+  throw new BadRequestException(`unknown network "${String(network)}"`);
+}
+
+/**
  * Mainnet asset whitelist enforcement (INV-4.3). On testnet this is a no-op — assets
  * are vetted client-side. On mainnet the server rejects anything off its own list.
  */
@@ -137,14 +157,14 @@ export class ActionsController {
   async blendDeposit(@Body() body: BlendDepositBody) {
     const { address, asset, amount, network } = body;
 
-    if (network && network !== 'testnet') {
-      throw new BadRequestException(
-        'Only testnet is supported at this time. Pass network="testnet" or omit it.',
-      );
-    }
+    // Lot A2 gating regime: mainnet requires the deposit's own kill-switch (403
+    // otherwise); absent/'testnet' keeps today's behavior byte-for-byte.
+    const resolvedNetwork = resolveBlendNetwork(network);
     if (!address || typeof address !== 'string') {
       throw new BadRequestException('address is required');
     }
+    // Mainnet asset whitelist for the deposit = XLM | USDC only. The USDC/XLM guard
+    // below already rejects anything else (e.g. EURC) with a 400 on both networks.
     if (!asset || !['USDC', 'XLM'].includes(asset)) {
       throw new BadRequestException('asset must be USDC or XLM');
     }
@@ -152,8 +172,23 @@ export class ActionsController {
     if (!amount || isNaN(parsedAmount) || parsedAmount <= 0) {
       throw new BadRequestException('amount must be a positive numeric string');
     }
+    // Mainnet per-transaction cap (reuses ACTIONS_MAINNET_MAX_SEND_XLM, default 100),
+    // applied to the deposit amount whatever the asset. Testnet is uncapped.
+    if (resolvedNetwork === 'mainnet') {
+      const cap = mainnetMaxSendXlm();
+      if (parsedAmount > cap) {
+        throw new BadRequestException(
+          `amount exceeds the mainnet per-transaction cap of ${cap} ${asset}`,
+        );
+      }
+    }
 
-    return this.actionsService.buildBlendDeposit({ address, asset, amount });
+    return this.actionsService.buildBlendDeposit({
+      address,
+      asset,
+      amount,
+      network: resolvedNetwork,
+    });
   }
 
   @Post('sdex/quote')

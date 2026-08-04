@@ -75,6 +75,39 @@ Review check: the validation module stays pure (XDR in → verdict out) and unit
 invariant, including red tests (wrong issuer, extra op, foreign source, inflated fee, worse
 destMin). Suite: `apps/web/src/lib/validateSwapXdr.spec.ts`.
 
+### 2b. Client-side XDR validation for the Blend deposit (Soroban path) — Lot A2
+
+The Blend deposit is a Soroban `invokeHostFunction`, so it gets its own gate,
+`apps/web/src/lib/validateDepositXdr.ts`, wired in `BlendDepositCard.onDeposit` **before EVERY
+signing prompt** (the ChangeTrust step AND the deposit step). Intent derives from user input +
+client config (`apps/web/src/config/blendPools.ts` — per-network pool id + reserve SACs + classic
+USDC issuer), **never** from the API response. Same fail-closed, collect-all-violations contract.
+
+For the **deposit XDR**, the validator asserts (`validateDepositXdr`):
+
+- **INV-2.8** ✅ **Network / envelope**: parses under the intent passphrase, that passphrase is one
+  this app signs on (TESTNET / PUBLIC), and the tx is not a fee-bump wrapper — same guarantee as
+  INV-2.1, signed with the same passphrase validated with.
+- **INV-2.9** ✅ **Source + single op**: tx source (and op source, if set) equals the connected
+  active-signer address, and the deposit is the **sole** operation, of type `invokeHostFunction`.
+- **INV-2.10** ✅ **Pool pinning**: the invoked contract id equals the expected pool from the CLIENT
+  registry (`config/blendPools.ts`), and the called function is `submit`. A swapped pool/contract is
+  rejected regardless of what the API returned.
+- **INV-2.11** ✅ **Submit args**: `from` / `spender` / `to` all equal the user; exactly ONE request;
+  `request_type` = `SupplyCollateral` (enum value `2`, verified against `@blend-capital/blend-sdk`
+  source); request `address` = the expected reserve SAC for the chosen asset; request `amount` =
+  the user's amount scaled to the asset decimals (exact BigInt compare).
+- **INV-2.12** ✅ **Fee cap**: total fee ≤ **2 XLM** (20,000,000 stroops). Soroban fees include the
+  resource fee (observed ≈0.06 XLM); the cap is generous but catches a corrupted fee field.
+
+For the **trustline XDR** (`validateTrustlineXdr`, when `trustlineRequired`): a single `changeTrust`
+op for exactly the expected classic USDC (code AND issuer from client constants), source unset/the
+user, recognized passphrase, classic fee cap (0.01 XLM).
+
+Review check: pure module, unit-tested per invariant with red tests (wrong contract id, wrong
+request amount, foreign `to`/`from`/`spender`, extra op, wrong asset SAC, wrong request_type,
+inflated fee, wrong trustline issuer/code). Suite: `apps/web/src/lib/validateDepositXdr.spec.ts`.
+
 ## 3. Simulation before signature (Soroban path)
 
 - **INV-3.1** ✅ The Blend deposit is **simulated** and must succeed before any signing prompt; a
@@ -82,8 +115,9 @@ destMin). Suite: `apps/web/src/lib/validateSwapXdr.spec.ts`.
 - **INV-3.2** ✅ **Trustline gate (2-step, honest)**: when the classic USDC trustline is missing,
   the API returns ONLY the ChangeTrust step (`trustlineRequired: true`, empty deposit XDR) — the
   deposit is never built, signed, or submitted while the trustline is missing (the SAC transfer
-  would trap with Contract #13, and cannot even be simulated). The client signs + confirms the
-  trustline on-chain, then re-requests the deposit build.
+  would trap with Contract #13, and cannot even be simulated). The client **validates that
+  ChangeTrust XDR client-side** (§2b `validateTrustlineXdr`), signs + confirms the trustline
+  on-chain, then re-requests the deposit build.
 - **INV-3.3** ✅ Classic SDEX swaps rely on the live quote (`/v1/actions/sdex/quote`, direct routes
   only — matching the swap's empty path) fetched seconds before build; min-receive is derived from
   it with bounded slippage, never hand-entered.
@@ -114,7 +148,14 @@ regime (see `docs/tasks/lot-a1-mainnet-swap.md` for the implementation brief):
   gate `validateSwapXdr` already asserts on-chain `destMin` ≥ accepted minimum).
 - **INV-4.5** ✅ **The Testnet demo path stays intact**: gating replaces, never removes, the
   testnet-only guard — with flags unset the testnet flow is byte-for-byte today's (web build +
-  23 vitest specs green, testnet swap path untouched).
+  vitest specs green, testnet swap path untouched).
+- **INV-4.6** ✅ **Blend deposit has its OWN kill-switch (Lot A2)**: `ACTIONS_MAINNET_BLEND_ENABLED`
+  in `apps/api` (default OFF → 403 for `blend/deposit` `network:"mainnet"`) + `VITE_ACTIONS_MAINNET_BLEND_ENABLED`
+  in `apps/web` (UX only). Independent of the swap switch, so each ungates on its own. The mainnet
+  deposit reuses the shared per-transaction cap (`ACTIONS_MAINNET_MAX_SEND_XLM`) on the deposit
+  amount, and its asset set is XLM | USDC only (any other → 400). Enforced in `actions.controller.ts`
+  (`resolveBlendNetwork`); pool + reserve SACs read per-network from `network-registry.ts`
+  (`getBlendConfig`). Flags unset = testnet deposit byte-for-byte today's.
 
 ## 5. Known defects — status
 

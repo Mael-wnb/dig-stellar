@@ -1,42 +1,51 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { TransactionBuilder, FeeBumpTransaction } from "@stellar/stellar-sdk";
-import type { Asset } from "@stellar/stellar-sdk";
 import { buildBlendDeposit } from "../api/actions";
 import { useWalletSession } from "../composables/useWalletSession";
 import { useActiveSigner } from "../composables/useActiveSigner";
 import { useNetwork, toWalletNetwork } from "../composables/useNetwork";
-import { TESTNET_BLEND_POOL } from "../config/testnetBlendPools";
+import { blendPoolFor } from "../config/blendPools";
+import {
+  validateDepositXdr,
+  validateTrustlineXdr,
+  type DepositIntent,
+  type TrustlineIntent,
+} from "../lib/validateDepositXdr";
 
-const TESTNET_RPC_URL = "https://soroban-testnet.stellar.org";
-const TESTNET_HORIZON_URL = "https://horizon-testnet.stellar.org";
-// The classic asset the Blend deposit trustline must point at (SAC-backed USDC).
-const BLEND_USDC_ISSUER = "GATALTGTWIOT6BUDBCZM3Q4OQ4BO2COLOAZ7IYSKPLC2PMSOPPGF5V56";
+// UX-only mainnet gate (Lot A2): the deposit has its OWN kill-switch, independent of
+// the swap. The API kill-switch (ACTIONS_MAINNET_BLEND_ENABLED) is the real
+// enforcement; when this VITE flag is false the mainnet card is blocked and the UI is
+// exactly today's testnet-only behavior.
+const MAINNET_BLEND_ENABLED =
+  import.meta.env.VITE_ACTIONS_MAINNET_BLEND_ENABLED === "true";
 
 const { connectedAddress, signTransaction } = useWalletSession();
 const { activeSignerAddress } = useActiveSigner();
 const { network } = useNetwork();
 
-const pool = TESTNET_BLEND_POOL;
-// XLM is the default/primary path: native, no trustline, funded by friendbot →
-// zero-prerequisite and proven. USDC is secondary and cannot be obtained in-app
-// (see usdcUnavailable below).
+// Per-network Blend config (pool id, reserve SACs, classic USDC issuer, endpoints).
+// This is the CLIENT-SIDE intent source for the validation gate — never the API.
+const config = computed(() => blendPoolFor(network.value));
+
+// XLM is the default/primary path: native, no trustline. On mainnet it's the simplest
+// first deposit (no trustline prerequisite); on testnet it's funded by friendbot.
 const asset = ref<"XLM" | "USDC">("XLM");
 const amount = ref("");
 
-const selectedAssetNote = computed(
-  () => pool.assets.find((a) => a.code === asset.value)?.note ?? "",
+const selectedAsset = computed(
+  () => config.value.assets.find((a) => a.code === asset.value),
 );
+const selectedAssetNote = computed(() => selectedAsset.value?.note ?? "");
 
-// --- Testnet balances (Horizon /accounts/:id) -----------------------------
+// --- Balances (network's Horizon /accounts/:id) ---------------------------
 const balances = ref<Record<string, string>>({});
 
 async function loadBalances() {
   balances.value = {};
   const addr = connectedAddress.value;
-  if (!addr || network.value !== "testnet") return;
+  if (!addr || mainnetDepositBlocked.value) return;
   try {
-    const res = await fetch(`${TESTNET_HORIZON_URL}/accounts/${addr}`);
+    const res = await fetch(`${config.value.horizonUrl}/accounts/${addr}`);
     if (!res.ok) return;
     const data = await res.json();
     const map: Record<string, string> = {};
@@ -54,24 +63,21 @@ async function loadBalances() {
 
 onMounted(loadBalances);
 watch(connectedAddress, loadBalances);
+// On a network switch the endpoints + issuer change — reset transient state and
+// reload balances from that network's Horizon.
+watch(network, () => {
+  reset();
+  amount.value = "";
+  loadBalances();
+});
 
 const xlmBalance = computed(() => parseFloat(balances.value["XLM"] ?? "0") || 0);
 const usdcBalance = computed(
-  () => parseFloat(balances.value[`USDC:${BLEND_USDC_ISSUER}`] ?? "0") || 0,
+  () =>
+    parseFloat(balances.value[`USDC:${config.value.usdcClassic.issuer}`] ?? "0") || 0,
 );
 const selectedBalance = computed(() =>
   asset.value === "XLM" ? xlmBalance.value : usdcBalance.value,
-);
-
-/**
- * The Blend reserve USDC (SAC CAQCFV… / classic USDC:GATALTGT…) cannot be acquired
- * in-app: no permissionless faucet (its SAC admin is the issuer account — minting
- * needs that secret, e.g. blend-utils), and testnet SDEX only has dust liquidity
- * for it (~0.001 USDC for 50 XLM). So when USDC is selected without a balance, the
- * deposit is a dead end — steer the user to XLM, the working path.
- */
-const usdcUnavailable = computed(
-  () => asset.value === "USDC" && usdcBalance.value <= 0,
 );
 
 type DepositStatus = "idle" | "building" | "step1" | "step2" | "success" | "error";
@@ -82,6 +88,21 @@ const errorMessage = ref("");
 
 const isConnected = computed(() => !!connectedAddress.value);
 const isMainnet = computed(() => network.value === "mainnet");
+// Mainnet without the UX flag = today's testnet-only behavior (blocked). This — not
+// raw isMainnet — gates the card, so flipping the flag reveals the (still API-gated)
+// mainnet deposit path in one place.
+const mainnetDepositBlocked = computed(() => isMainnet.value && !MAINNET_BLEND_ENABLED);
+const explorerNetwork = computed(() => config.value.explorer);
+
+/**
+ * The testnet SAC-backed USDC (issuer GATALTGT…) cannot be acquired in-app (no
+ * permissionless faucet, only dust SDEX liquidity), so a USDC deposit with 0 balance
+ * is a dead end there — steer to XLM. On MAINNET the USDC reserve is Circle USDC (a
+ * real, acquirable asset with a proper trustline flow), so this dead-end never applies.
+ */
+const usdcUnavailable = computed(
+  () => !config.value.realFunds && asset.value === "USDC" && usdcBalance.value <= 0,
+);
 
 const isActiveSignerConnected = computed(
   () =>
@@ -105,7 +126,7 @@ const isBusy = computed(
 
 const canDeposit = computed(
   () =>
-    !isMainnet.value &&
+    !mainnetDepositBlocked.value &&
     isConnected.value &&
     isActiveSignerConnected.value &&
     !isBusy.value &&
@@ -125,48 +146,52 @@ function readApiError(err: unknown, fallback: string): string {
 }
 
 /**
- * Minimal client-side guard, mirroring the non-custodial invariant: before signing
- * ANY returned XDR we confirm it spends from the user's own account and contains
- * exactly the op we expect (a Soroban invokeHostFunction for the deposit, or a
- * ChangeTrust to the expected USDC asset for the trustline). Not a full Soroban
- * arg-decoder — but it blocks a foreign source, a fee-bump wrapper, or a swapped op.
+ * SECURITY GATE — validate a returned XDR against an intent DERIVED FROM USER INPUT +
+ * client-side config (config/blendPools.ts), BEFORE the wallet is invoked. Wired
+ * before EVERY signing prompt (trustline tx AND deposit tx). Throws (fail closed) with
+ * every violation on any mismatch, so nothing wrong ever reaches the wallet.
  */
-function assertOwnTx(
-  xdr: string,
-  passphrase: string,
-  expect: "deposit" | "trustline",
-): void {
-  const tx = TransactionBuilder.fromXDR(xdr, passphrase);
-  if (tx instanceof FeeBumpTransaction) {
-    throw new Error("Refused to sign: unexpected fee-bump wrapper.");
+function assertDepositXdr(xdr: string, passphrase: string): void {
+  const sac = selectedAsset.value?.sac;
+  const decimals = selectedAsset.value?.decimals;
+  if (!sac || decimals === undefined || !connectedAddress.value) {
+    throw new Error("Refused to sign: missing deposit intent.");
   }
-  if (tx.source !== connectedAddress.value) {
-    throw new Error("Refused to sign: transaction source is not your account.");
+  const intent: DepositIntent = {
+    sourceAccount: connectedAddress.value,
+    poolId: config.value.poolId,
+    assetSac: sac,
+    amount: amount.value,
+    decimals,
+    networkPassphrase: passphrase,
+  };
+  const check = validateDepositXdr(xdr, intent);
+  if (!check.ok) {
+    throw new Error(
+      `Refused to sign — deposit XDR did not match your request: ${check.violations.join("; ")}`,
+    );
   }
-  if (tx.operations.length !== 1) {
-    throw new Error(`Refused to sign: expected 1 operation, found ${tx.operations.length}.`);
+}
+
+function assertTrustlineXdr(xdr: string, passphrase: string): void {
+  if (!connectedAddress.value) {
+    throw new Error("Refused to sign: missing trustline intent.");
   }
-  const op = tx.operations[0];
-  if (expect === "deposit" && op.type !== "invokeHostFunction") {
-    throw new Error(`Refused to sign: expected a Soroban deposit, got ${op.type}.`);
-  }
-  if (expect === "trustline") {
-    if (op.type !== "changeTrust") {
-      throw new Error(`Refused to sign: expected a trustline op, got ${op.type}.`);
-    }
-    const line = op.line as Asset;
-    const okAsset =
-      typeof line?.getCode === "function" &&
-      line.getCode() === "USDC" &&
-      line.getIssuer() === BLEND_USDC_ISSUER;
-    if (!okAsset) {
-      throw new Error("Refused to sign: trustline points at an unexpected asset.");
-    }
+  const intent: TrustlineIntent = {
+    sourceAccount: connectedAddress.value,
+    asset: config.value.usdcClassic,
+    networkPassphrase: passphrase,
+  };
+  const check = validateTrustlineXdr(xdr, intent);
+  if (!check.ok) {
+    throw new Error(
+      `Refused to sign — trustline XDR did not match your request: ${check.violations.join("; ")}`,
+    );
   }
 }
 
 async function rpcCall(method: string, params: unknown): Promise<any> {
-  const res = await fetch(TESTNET_RPC_URL, {
+  const res = await fetch(config.value.rpcUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
@@ -198,7 +223,7 @@ async function submitAndConfirm(signedXdr: string): Promise<string> {
 }
 
 async function onDeposit() {
-  if (isMainnet.value) return;
+  if (mainnetDepositBlocked.value) return;
   if (signerBlockReason.value) {
     errorMessage.value = signerBlockReason.value;
     status.value = "error";
@@ -224,8 +249,8 @@ async function onDeposit() {
 
     // Step 1/2 — the deposit CANNOT be simulated until the classic USDC trustline
     // exists (the SAC transfer would trap with Contract #13). So when the backend
-    // reports one is required, it returns ONLY the ChangeTrust: sign it, confirm it
-    // ON-CHAIN, then re-request the build — which can now simulate the deposit.
+    // reports one is required, it returns ONLY the ChangeTrust: validate it, sign it,
+    // confirm it ON-CHAIN, then re-request the build — which can now simulate.
     const twoStep = built.trustlineRequired === true;
     if (twoStep) {
       if (!built.changetrustXdr) {
@@ -233,7 +258,7 @@ async function onDeposit() {
       }
       status.value = "step1";
       stepLabel.value = "1/2 Approve trustline";
-      assertOwnTx(built.changetrustXdr, passphrase, "trustline");
+      assertTrustlineXdr(built.changetrustXdr, passphrase);
       const ct = await signTransaction(built.changetrustXdr, passphrase);
       await submitAndConfirm(ct.signedTxXdr);
 
@@ -257,7 +282,7 @@ async function onDeposit() {
     if (!built.simulation.success || !built.xdr) {
       errorMessage.value =
         built.simulation.error ||
-        "Deposit simulation failed. Ensure the account holds this asset on testnet.";
+        "Deposit simulation failed. Ensure the account holds this asset.";
       status.value = "error";
       return;
     }
@@ -265,7 +290,7 @@ async function onDeposit() {
     // Step (2/2 or 1/1) — the Soroban deposit itself.
     status.value = "step2";
     stepLabel.value = twoStep ? "2/2 Sign deposit" : "Sign deposit";
-    assertOwnTx(built.xdr, passphrase, "deposit");
+    assertDepositXdr(built.xdr, passphrase);
     const dep = await signTransaction(built.xdr, passphrase);
     const hash = await submitAndConfirm(dep.signedTxXdr);
 
@@ -294,13 +319,29 @@ function reset() {
     </div>
 
     <div
-      v-if="isMainnet"
+      v-if="mainnetDepositBlocked"
       class="bg-[#202020] border border-[rgba(213,255,47,0.3)] rounded-md p-3 text-[11px] text-[#9a9b99]"
     >
       Blend deposit is <span class="text-[#d5ff2f] font-semibold">Testnet-only</span> in this beta.
     </div>
 
     <template v-else>
+      <!-- MAINNET WARNING (live: real funds + launch cap) -->
+      <div
+        v-if="isMainnet"
+        class="bg-[#202020] border border-[rgba(255,184,107,0.5)] rounded-md p-3 text-[11px] text-[#ffb86b] flex flex-col gap-1"
+      >
+        <span>
+          <span class="font-semibold">Mainnet</span> — this deposit supplies real funds to
+          Blend as collateral. A per-transaction cap applies during the launch period.
+        </span>
+        <span class="text-[#9a9b99]">
+          Non-custodial: your position is always manageable directly on
+          <a href="https://mainnet.blend.capital" target="_blank" class="text-[#d5ff2f] hover:underline">blend.capital</a>
+          with this same wallet. In-app withdraw ships next.
+        </span>
+      </div>
+
       <div
         v-if="isConnected && signerBlockReason"
         class="bg-[#202020] border border-[rgba(255,184,107,0.4)] rounded-md p-3 text-[11px] text-[#ffb86b]"
@@ -309,14 +350,18 @@ function reset() {
       </div>
 
       <div class="text-[11px] text-[#9a9b99] flex items-center justify-between">
-        <span>{{ pool.label }}</span>
-        <span class="font-mono">{{ pool.contractId.slice(0, 6) }}…{{ pool.contractId.slice(-4) }}</span>
+        <span>{{ config.label }}</span>
+        <a
+          :href="`https://stellar.expert/explorer/${explorerNetwork}/contract/${config.poolId}`"
+          target="_blank"
+          class="font-mono hover:text-[#d5ff2f]"
+        >{{ config.poolId.slice(0, 6) }}…{{ config.poolId.slice(-4) }}</a>
       </div>
 
       <!-- ASSET (XLM is the recommended, zero-prerequisite path) -->
       <div class="flex gap-2">
         <button
-          v-for="a in pool.assets"
+          v-for="a in config.assets"
           :key="a.code"
           type="button"
           class="flex-1 px-3 py-2 rounded-md border text-xs font-semibold transition flex items-center justify-center gap-1"
@@ -342,8 +387,7 @@ function reset() {
         <span>Balance: {{ selectedBalance.toLocaleString(undefined, { maximumFractionDigits: 4 }) }} {{ asset }}</span>
       </div>
 
-      <!-- USDC dead-end: cannot be acquired in-app (no faucet, no SDEX liquidity).
-           Steer the user to XLM, the working path. -->
+      <!-- TESTNET USDC dead-end: cannot be acquired in-app (no faucet, no SDEX liquidity). -->
       <div
         v-if="usdcUnavailable"
         class="bg-[#202020] border border-[rgba(255,184,107,0.4)] rounded-md p-2 text-[10px] text-[#ffb86b] flex flex-col gap-2"
@@ -352,8 +396,7 @@ function reset() {
           You hold 0 of this SAC-backed testnet USDC (issuer GATALTGT…) and it
           <span class="font-semibold">can't be obtained in-app</span>: no permissionless
           faucet (minting needs the issuer admin), and testnet SDEX has only dust
-          liquidity for it. It's also a different asset than the Circle USDC our swap
-          produces. Use XLM for a working deposit, or acquire this USDC out-of-band first.
+          liquidity for it. Use XLM for a working deposit, or acquire this USDC out-of-band first.
         </span>
         <button
           type="button"
@@ -364,14 +407,20 @@ function reset() {
         </button>
       </div>
 
-      <!-- USDC held: honest note about the 2-step first-time flow. -->
+      <!-- USDC selected: honest note about the 2-step first-time flow (differs by network). -->
       <div
         v-else-if="asset === 'USDC'"
         class="bg-[#202020] border border-[rgba(255,184,107,0.4)] rounded-md p-2 text-[10px] text-[#ffb86b]"
       >
-        This is the SAC-backed testnet USDC (issuer GATALTGT…), a
-        <span class="font-semibold">different asset</span> than the Circle USDC our swap
-        produces. First-time deposits sign a trustline (step 1/2), then the deposit (step 2/2).
+        <template v-if="isMainnet">
+          Circle USDC. A first-time deposit signs a trustline (step 1/2), then the deposit
+          (step 2/2). Both steps are validated against this pool before your wallet is asked to sign.
+        </template>
+        <template v-else>
+          This is the SAC-backed testnet USDC (issuer GATALTGT…), a
+          <span class="font-semibold">different asset</span> than the Circle USDC our swap
+          produces. First-time deposits sign a trustline (step 1/2), then the deposit (step 2/2).
+        </template>
       </div>
 
       <!-- AMOUNT -->
@@ -413,12 +462,16 @@ function reset() {
         <span class="text-[#d5ff2f] font-semibold">Deposit confirmed</span>
         <span class="text-[#9a9b99] break-all font-mono">{{ txHash }}</span>
         <a
-          :href="`https://stellar.expert/explorer/testnet/tx/${txHash}`"
+          :href="`https://stellar.expert/explorer/${explorerNetwork}/tx/${txHash}`"
           target="_blank"
           class="text-[#d5ff2f] hover:underline w-fit"
         >
           View on stellar.expert ↗
         </a>
+        <span class="text-[#9a9b99]">
+          Your Blend position + health factor appear in the portfolio above on its next
+          wallet refresh<span v-if="isMainnet">, and on blend.capital with this same wallet</span>.
+        </span>
         <button type="button" class="text-[#9a9b99] hover:text-[#d5ff2f] w-fit mt-1" @click="reset">
           New deposit
         </button>

@@ -138,16 +138,10 @@ const {
         <template v-if="actionsLive">
           <SdexSwapWidget />
 
-          <!-- Blend deposit stays Testnet-only until T3-D2 Lot A2. -->
-          <BlendDepositCard v-if="network === 'testnet'" />
-          <div
-            v-else
-            class="bg-[#2A2A2A] border border-[#383838] rounded-lg p-3 text-[11px] text-[#9a9b99]"
-          >
-            Blend deposit is
-            <span class="text-[#d5ff2f] font-semibold">Testnet-only</span> for now —
-            mainnet lending actions are coming next.
-          </div>
+          <!-- Blend deposit (Lot A2): self-gates via its own VITE flag +
+               ACTIONS_MAINNET_BLEND_ENABLED API kill-switch. On mainnet with the flag
+               off it renders its own "Testnet-only" note, exactly like the swap. -->
+          <BlendDepositCard />
         </template>
 
         <div

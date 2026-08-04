@@ -258,22 +258,26 @@ Notes:
 
 ## Mainnet actions (T3-D2) — gating regime
 
-Ungating Mainnet swaps is **not** removing the Testnet-only guard — it is replacing it with a
-controlled regime. See `docs/security-invariants.md` §4 (the review checklist) and
-`docs/lot-a1-mainnet-swap.md` (the implementation brief). Blend deposit stays Testnet-only (Lot A2).
+Ungating Mainnet actions is **not** removing the Testnet-only guard — it is replacing it with a
+controlled regime. See `docs/security-invariants.md` §4 (the review checklist) and the implementation
+briefs `docs/lot-a1-mainnet-swap.md` (swap) + `docs/lot-a2-blend-mainnet.md` (Blend deposit). The
+**swap and the Blend deposit each have their OWN kill-switch**, so they ungate independently.
 
 **Environment flags** (all default to today's Testnet-only behavior when unset):
 
 | Var | App | Default | Effect |
 |-----|-----|---------|--------|
-| `ACTIONS_MAINNET_ENABLED` | api | unset → OFF | Kill-switch (INV-4.1). `"true"` lets `network:"mainnet"` through; otherwise → **403**. |
-| `ACTIONS_MAINNET_MAX_SEND_XLM` | api | `100` | Per-transaction send-amount cap (INV-4.2). Over-cap `sdex/swap` → **400**. |
-| `ACTIONS_MAINNET_RPC_URL` | api | `https://mainnet.sorobanrpc.com` | Soroban RPC override for the mainnet swap path. |
-| `VITE_ACTIONS_MAINNET_ENABLED` | web | unset → OFF | UX only (reveals the mainnet swap surface). NOT enforcement — the API flag is. |
+| `ACTIONS_MAINNET_ENABLED` | api | unset → OFF | Swap kill-switch (INV-4.1). `"true"` lets `sdex/*` `network:"mainnet"` through; otherwise → **403**. |
+| `ACTIONS_MAINNET_BLEND_ENABLED` | api | unset → OFF | Blend-deposit kill-switch (Lot A2), independent of the swap. `"true"` lets `blend/deposit` `network:"mainnet"` through; otherwise → **403**. |
+| `ACTIONS_MAINNET_MAX_SEND_XLM` | api | `100` | Per-transaction cap (INV-4.2). Over-cap `sdex/swap` **and** `blend/deposit` → **400**. |
+| `ACTIONS_MAINNET_RPC_URL` | api | `https://mainnet.sorobanrpc.com` | Soroban RPC override for the mainnet swap **and** Blend deposit paths. |
+| `VITE_ACTIONS_MAINNET_ENABLED` | web | unset → OFF | UX only — reveals the mainnet swap surface. NOT enforcement. |
+| `VITE_ACTIONS_MAINNET_BLEND_ENABLED` | web | unset → OFF | UX only — reveals the mainnet Blend deposit card. NOT enforcement. |
 
-Mainnet enforcement lives in `apps/api` (`actions.controller.ts` + `network-registry.ts`): the
-kill-switch, the send-amount cap, and the asset whitelist (native XLM + Circle USDC only, INV-4.3).
-The web VITE flag only toggles UI; the API rejects mainnet regardless when its flag is off.
+Mainnet enforcement lives in `apps/api` (`actions.controller.ts` + `network-registry.ts`): the two
+kill-switches, the shared per-transaction cap, the swap asset whitelist (native XLM + Circle USDC
+only, INV-4.3), and the Blend deposit asset whitelist (XLM | USDC only). The web VITE flags only
+toggle UI; the API rejects mainnet regardless when its flag is off.
 
 **Ungating procedure** (record the result — date + commit SHA + checker — as T3-D2 evidence):
 
@@ -300,6 +304,43 @@ The web VITE flag only toggles UI; the API rejects mainnet regardless when its f
 
 **Rollback**: unset `ACTIONS_MAINNET_ENABLED` on the VPS and restart PM2 — the API returns to 403 on
 mainnet immediately, independent of the web deploy.
+
+### Blend deposit ungating (Lot A2)
+
+The deposit ungates on its OWN switch (`ACTIONS_MAINNET_BLEND_ENABLED`), independently of the swap.
+Its 2-step trustline-gated path is already proven E2E on testnet; this is the mainnet extension.
+
+1. Run the full `docs/security-invariants.md` checklist top to bottom (record date + commit SHA + checker).
+2. Re-verify the Blend **Fixed pool** id + reserve **SACs** on BOTH sides — `MAINNET_BLEND_POOL` /
+   `MAINNET_USDC_SAC` / `MAINNET_XLM_SAC` in `apps/api/src/modules/actions/network-registry.ts` AND
+   `apps/web/src/config/blendPools.ts` — against the prod DB (`entities` where venue=Blend →
+   `blend-fixed-pool`; `reserve_snapshots` for its USDC/native reserves) **and** blend.capital. The
+   SACs are the deterministic contract ids of `USDC:GA5ZSE…` and native XLM on Pubnet (cross-check
+   with `Asset(...).contractId(Networks.PUBLIC)`). Confirm it is a **V2** pool.
+3. Set `ACTIONS_MAINNET_BLEND_ENABLED=true` on the VPS, restart PM2.
+4. `curl` validation (mainnet), using a real funded address:
+   ```bash
+   # flag OFF (before step 3, or after rollback) → 403
+   curl -s -X POST $API/v1/actions/blend/deposit -H "Content-Type: application/json" \
+     -d '{"address":"G...","asset":"XLM","amount":"5","network":"mainnet"}' | jq
+   # flag ON, XLM deposit → returns xdr + simulation.success:true
+   # USDC without the classic trustline → trustlineRequired:true + changetrustXdr (deposit xdr empty)
+   # over-cap → 400
+   curl -s -X POST $API/v1/actions/blend/deposit -H "Content-Type: application/json" \
+     -d '{"address":"G...","asset":"XLM","amount":"1000000","network":"mainnet"}' | jq
+   # EURC (or any non XLM/USDC asset) → 400
+   curl -s -X POST $API/v1/actions/blend/deposit -H "Content-Type: application/json" \
+     -d '{"address":"G...","asset":"EURC","amount":"5","network":"mainnet"}' | jq
+   ```
+5. Set `VITE_ACTIONS_MAINNET_BLEND_ENABLED=true` on Vercel, redeploy.
+6. Do ONE small real deposit (a few XLM) from the dashboard. The client gate
+   (`apps/web/src/lib/validateDepositXdr.ts`) validates the XDR against `config/blendPools.ts`
+   before EVERY signing prompt. Verify the new position appears in the portfolio above (T2-D1
+   resolver picks up the Blend position + health factor) AND on blend.capital. Record the tx hash
+   in `docs/evidence/` — it is the "vault/lending" evidence for T3-D2 criterion 1.
+
+**Rollback**: unset `ACTIONS_MAINNET_BLEND_ENABLED` on the VPS and restart PM2 — `blend/deposit`
+returns to 403 on mainnet immediately, independent of the swap flag and the web deploy.
 
 ---
 

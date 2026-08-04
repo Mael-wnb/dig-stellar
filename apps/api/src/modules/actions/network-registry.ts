@@ -13,6 +13,10 @@ import {
   TESTNET_HORIZON_URL,
   TESTNET_NETWORK_PASSPHRASE,
   TESTNET_USDC_SDEX,
+  TESTNET_BLEND_POOL,
+  TESTNET_USDC_SAC,
+  TESTNET_XLM_SAC,
+  TESTNET_USDC_CLASSIC,
 } from './testnet-registry';
 
 export type ActionNetwork = 'testnet' | 'mainnet';
@@ -44,11 +48,69 @@ export const MAINNET_USDC_ISSUER =
 /** Circle mainnet USDC as a classic Asset (SDEX swap target). */
 export const MAINNET_USDC_SDEX = new Asset('USDC', MAINNET_USDC_ISSUER);
 
+// --- Mainnet Blend deposit registry (Lot A2, T3-D2) -------------------------
+//
+// Launch scope: the ONE Blend "Fixed" pool (the main ≈$171M-TVL pool). Every
+// constant below was re-verified 2026-08-04 against the prod DB (entities where
+// venue=Blend; reserve_snapshots for the pool) AND cross-checked cryptographically
+// (the SACs are the deterministic contract ids of their classic assets on Pubnet):
+//   - Fixed pool id  == entities.slug 'blend-fixed-pool'.contract_address, loaded
+//     on-chain by the indexer via PoolV2.load (→ this IS a V2 pool; the builder uses
+//     PoolContractV2). stellar.expert creator == the pool admin in DB metadata.
+//   - USDC SAC       == Asset('USDC', MAINNET_USDC_ISSUER).contractId(PUBLIC), and
+//     == the pool's USDC reserve contract_address in reserve_snapshots.
+//   - XLM SAC        == Asset.native().contractId(PUBLIC), == the pool's native
+//     reserve contract_address in reserve_snapshots.
+// Re-verify all three against the DB + blend.capital before any Mainnet ungating
+// (see docs/runbooks.md).
+
+/** Blend "Fixed" pool (V2) on Pubnet — the single mainnet deposit target at launch. */
+export const MAINNET_BLEND_POOL =
+  'CAJJZSGMMM3PD7N33TAPHGBUGTB43OC73HVIK2L2G6BNGGGYOSSYBXBD';
+
+/** Circle USDC Stellar Asset Contract (SAC) — the pool's USDC reserve. */
+export const MAINNET_USDC_SAC =
+  'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75';
+
+/** Native XLM Stellar Asset Contract (SAC) — the pool's native reserve. */
+export const MAINNET_XLM_SAC =
+  'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA';
+
+/**
+ * The classic USDC asset the mainnet SAC deposit's trustline must point at. The
+ * USDC SAC wraps Circle's classic USDC:GA5ZSE… (proven: the SAC id above is that
+ * asset's deterministic contractId), so supplying it moves the classic balance and
+ * requires this trustline first — exactly the testnet 2-step gate, on Pubnet.
+ */
+export const MAINNET_USDC_CLASSIC = new Asset('USDC', MAINNET_USDC_ISSUER);
+
+/** Per-network Blend deposit config (pool + reserve SACs + classic USDC trustline). */
+export interface BlendNetworkConfig {
+  poolId: string;
+  networkPassphrase: string;
+  rpcUrl: string;
+  horizonUrl: string;
+  /** SAC contract id per depositable asset. */
+  sac: Record<'USDC' | 'XLM', string>;
+  /** The classic USDC asset whose trustline the SAC deposit needs. */
+  usdcClassic: Asset;
+}
+
 // --- Env-backed launch controls (read lazily so tests / restarts pick up state) ---
 
-/** ACTIONS_MAINNET_ENABLED kill-switch (INV-4.1). Default OFF. */
+/** ACTIONS_MAINNET_ENABLED kill-switch (INV-4.1). Default OFF. Swap path only. */
 export function isMainnetEnabled(): boolean {
   return process.env.ACTIONS_MAINNET_ENABLED === 'true';
+}
+
+/**
+ * ACTIONS_MAINNET_BLEND_ENABLED kill-switch (Lot A2). Default OFF. The Blend
+ * deposit gets its OWN switch so its mainnet rollout is independent of the swap:
+ * with this unset the deposit stays testnet-only (mainnet → 403) even when the
+ * swap kill-switch is on.
+ */
+export function isMainnetBlendEnabled(): boolean {
+  return process.env.ACTIONS_MAINNET_BLEND_ENABLED === 'true';
 }
 
 /** Per-transaction send-amount cap in XLM (INV-4.2). Default 100. */
@@ -89,6 +151,32 @@ export function getNetworkConfig(network: ActionNetwork): NetworkConfig {
  */
 export function vettedUsdcSdex(network: ActionNetwork): Asset {
   return network === 'testnet' ? TESTNET_USDC_SDEX : MAINNET_USDC_SDEX;
+}
+
+/**
+ * Full per-network Blend deposit config. Testnet re-exports the testnet-registry
+ * constants verbatim (so the testnet deposit stays byte-for-byte identical);
+ * mainnet uses the Fixed-pool registry above.
+ */
+export function getBlendConfig(network: ActionNetwork): BlendNetworkConfig {
+  if (network === 'testnet') {
+    return {
+      poolId: TESTNET_BLEND_POOL,
+      networkPassphrase: TESTNET_NETWORK_PASSPHRASE,
+      rpcUrl: TESTNET_RPC_URL,
+      horizonUrl: TESTNET_HORIZON_URL,
+      sac: { USDC: TESTNET_USDC_SAC, XLM: TESTNET_XLM_SAC },
+      usdcClassic: TESTNET_USDC_CLASSIC,
+    };
+  }
+  return {
+    poolId: MAINNET_BLEND_POOL,
+    networkPassphrase: Networks.PUBLIC,
+    rpcUrl: mainnetRpcUrl(),
+    horizonUrl: MAINNET_HORIZON_URL,
+    sac: { USDC: MAINNET_USDC_SAC, XLM: MAINNET_XLM_SAC },
+    usdcClassic: MAINNET_USDC_CLASSIC,
+  };
 }
 
 /**
