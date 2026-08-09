@@ -16,8 +16,22 @@ export async function persistSoroswapPairEvents(params: {
 }) {
   const { client, entitySlug, expectedPairId, rows } = params;
 
+  // Zero normalized rows = the capped event window (EVENTS_LIMIT / MAX_EVENT_PAGES
+  // / LEDGER_LOOKBACK) simply held no new pair events this cycle. That is a VALID
+  // no-op, NOT an error: skip the event upsert and let the caller still run the
+  // pool-state/metrics update (which reads existing DB state and advances as_of).
+  // Real failures — RPC, decode, state-mismatch, DB — throw earlier / elsewhere
+  // and are intentionally left untouched so the retry wrapper still fires.
   if (!rows.length) {
-    throw new Error('No Soroswap normalized rows to persist');
+    console.log(
+      `[soroswap] no new events in window — keeping previous state (${entitySlug})`
+    );
+    return {
+      entitySlug,
+      expectedPairId,
+      processed: 0,
+      skipped: true,
+    };
   }
 
   for (const row of rows) {
@@ -124,5 +138,6 @@ export async function persistSoroswapPairEvents(params: {
     entitySlug,
     expectedPairId,
     processed,
+    skipped: false,
   };
 }
