@@ -76,6 +76,16 @@ Lot D). Legacy `DigDashboard.vue` / `DashboardHeader.vue` removed. Evidence: `do
 
 **QA pass (post-port) fixes.** A headless-CDP QA sweep (all 5 views + modals, 1440/1280px, API-down, connected/disconnected) found no console errors, exceptions, or overflow. Fixes applied: (a) sidebar footer always names the data plane ("Live · Stellar mainnet") — the signing selector no longer flips it; (b) the notifications bell dropdown restyled to the design's "Activity feed"; (c) retry buttons on the protocols/pool-detail API-down states and honest empty states on the dashboard protocols summary + bridge (`—`, not `+$0`); (d) the action modal's network selector is kept for both swap and Blend deposits. **Wallet management (T2-D1: refresh / set active signer / set primary / activate-deactivate / delete) was ported from the legacy `WalletSection` into `PortfolioView`** (per-card ⋯ menu) before removing the now-orphaned legacy components (`WalletSection`, `WalletAlertsPanel`, `PoolDetail`, `PoolTabs`, `ProtocolTabs`, `PoolTable`, `StellarMetrics`, `NetworkStats`, `HeroBanner`, `Dashboard`). The SDEX-swap / Blend-deposit widgets and XDR validators were not touched.
 
+**Honest per-type metrics on Protocols (post-QA).** 24h volume/fees are structurally N/A for lending
+(Blend) and yield-vault (DeFindex) pools — the API returns `0` there, which previously rendered as a
+misleading `$0` (a measured zero). The pool-detail per-type variant principle now extends to the
+Protocols page: protocol cards show type-appropriate metrics (Blend → TVL + avg supply/borrow APY;
+DeFindex → TVL + avg APY, TVL-weighted; AMM/native → TVL + vol + fees), and the pools table renders
+N/A cells as "—" (vol/fees on lending/vault rows, utilization on AMM/vault rows) while a genuinely
+measured zero on an applicable metric still shows `0`/`0%`. Sorting treats N/A as absent (sorts to the
+bottom), not as `0`. Confined to `ProtocolsView.vue`; dashboard protocol rows show only TVL so needed
+no change. Evidence: `docs/evidence/lot-c/qa-protocols-per-type-metrics.png`.
+
 Working: real dashboard structure, protocol browsing, pool detail views, wallet connection UX,
 multi-wallet portfolio UX, backend-driven data in the important flows, a public beta on real Mainnet
 data. Display polish landed this session: native token rendered as "XLM" (display-only helpers, DB
