@@ -4,15 +4,21 @@
 // Two-column layout: Activity feed (left) + Your alert rules (right).
 // Topbar copy for the shell: "Alerts / Catch every move before it moves the market".
 
-import { onMounted, onUnmounted, computed, ref } from 'vue'
+import { onMounted, onUnmounted, computed, ref, watch } from 'vue'
 import AlertRuleModal from './AlertRuleModal.vue'
-import DashboardHeader from './DashboardHeader.vue'
 import {
   useAlerts, SEVERITY_STYLE, metricIconKey, conditionLabel, timeAgo,
   type CreateRulePayload,
 } from '../composables/useAlerts'
+import { useNotifications } from '../composables/useNotifications'
+import { useModals } from '../composables/useModals'
 
 const { rules, feed, wallets, loading, error, load, createRule, toggleRule } = useAlerts()
+// Shared unread state (drives the bell + sidebar badge). "Mark all read" here
+// clears the same in-app notifications the bell surfaces.
+const { unreadCount, markAllAsRead } = useNotifications()
+// Other surfaces (dashboard, pool detail) request the create-rule modal here.
+const { pendingAlert, consumeAlertRequest } = useModals()
 
 const filter = ref<'all' | 'critical' | 'activity'>('all')
 const modalOpen = ref(false)
@@ -28,8 +34,17 @@ const activeCount = computed(() => rules.value.filter(r => r.enabled).length)
 
 // HTTP polling, mirroring the existing bell / Alerts page behaviour.
 let timer: number | undefined
-onMounted(() => { load(); timer = window.setInterval(load, 30_000) })
+onMounted(() => {
+  load()
+  timer = window.setInterval(load, 30_000)
+  // Consume a request made just before navigating here (e.g. dashboard/pool
+  // "New alert rule").
+  if (consumeAlertRequest()) modalOpen.value = true
+})
 onUnmounted(() => { if (timer) clearInterval(timer) })
+
+// Also handle requests made while the alerts view is already mounted.
+watch(pendingAlert, (v) => { if (v && consumeAlertRequest()) modalOpen.value = true })
 
 async function onCreate(payload: CreateRulePayload) {
   await createRule(payload)
@@ -48,18 +63,10 @@ const iconFor = (n: { metric?: any; category?: string }) => ICONS[metricIconKey(
 </script>
 
 <template>
-  <div class="min-h-screen bg-bg text-text">
-    <!-- shell header (nav + notifications bell + wallet) -->
-    <DashboardHeader />
-
-    <div class="max-w-[1100px] mx-auto px-3 sm:px-6 py-6 sm:py-8 text-[#E2E6E1]"
+  <div class="text-text">
+    <div class="max-w-[1180px] mx-auto px-[26px] py-[26px] text-[#E2E6E1]"
          style="animation: digFade .35s ease both;">
-      <!-- topbar copy: "Alerts / Catch every move before it moves the market" -->
-      <div class="flex items-baseline gap-3 mb-6">
-        <h1 class="text-lg font-semibold">Alerts</h1>
-        <span class="text-[13px] text-[#5E5F5D]">Catch every move before it moves the market</span>
-      </div>
-
+      <!-- Title is provided by the shell topbar ("Alerts / Monitoring rules and activity"). -->
       <div class="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-4 items-start">
 
       <!-- ── LEFT: Activity feed ─────────────────────────────────────────── -->
@@ -78,7 +85,13 @@ const iconFor = (n: { metric?: any; category?: string }) => ICONS[metricIconKey(
             >{{ label }}</button>
           </div>
           <button
-            class="ml-auto h-[34px] px-3.5 rounded-[10px] bg-[#D5FF2F] text-[#252525] font-bold text-[12.5px] cursor-pointer hover:brightness-105"
+            v-if="unreadCount > 0"
+            class="ml-auto text-[12px] font-semibold text-[#5E5F5D] cursor-pointer px-2 py-1 rounded-lg hover:bg-[#2A2A27]"
+            @click="markAllAsRead"
+          >Mark all read</button>
+          <button
+            class="h-[34px] px-3.5 rounded-[10px] bg-[#D5FF2F] text-[#252525] font-bold text-[12.5px] cursor-pointer hover:brightness-105"
+            :class="unreadCount > 0 ? 'ml-2.5' : 'ml-auto'"
             @click="modalOpen = true"
           >+ New rule</button>
         </header>

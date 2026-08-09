@@ -12,6 +12,9 @@ export type NetworkStatsResponse = {
   usdcSupplyUsd: number | null
   avgTxFeeXlm: number | null
   updatedAt: string
+  // Freshness (T1-D2 / Lot B): computed at read time in the API.
+  isStale?: boolean | null
+  staleAfterSeconds?: number | null
 }
 
 export async function fetchNetworkStats(): Promise<NetworkStatsResponse> {

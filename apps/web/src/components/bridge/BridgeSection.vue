@@ -47,11 +47,29 @@ const fmtUsd = (v: number, signed = false) => {
   const s = a >= 1e6 ? `$${(a / 1e6).toFixed(2)}M` : a >= 1e3 ? `$${(a / 1e3).toFixed(1)}K` : `$${a.toFixed(0)}`
   return signed ? (v < 0 ? '−' : '+') + s : s
 }
-const stats = computed(() => [
-  { label: `Inflow · ${winLabel.value}`, value: fmtUsd(props.totals.inflowUsd, true), color: '#2E9E63' },
-  { label: `Outflow · ${winLabel.value}`, value: '−' + fmtUsd(props.totals.outflowUsd), color: '#D0522E' },
-  { label: `Net · ${winLabel.value}`, value: fmtUsd(props.totals.netUsd, true), color: props.totals.netUsd < 0 ? '#E0603E' : '#E2E6E1' },
-])
+// "No data" vs "genuine zero": if the fetch errored, or there are no buckets and
+// zero flows both ways, the window has no data — show "—" rather than a decorative
+// "+$0" that reads like a real zero. The staleness banner explains the "why".
+const noData = computed(
+  () =>
+    !!props.error ||
+    (!props.buckets.length &&
+      props.totals.inflowUsd === 0 &&
+      props.totals.outflowUsd === 0)
+)
+const stats = computed(() =>
+  noData.value
+    ? [
+        { label: `Inflow · ${winLabel.value}`, value: '—', color: '#5E5F5D' },
+        { label: `Outflow · ${winLabel.value}`, value: '—', color: '#5E5F5D' },
+        { label: `Net · ${winLabel.value}`, value: '—', color: '#5E5F5D' },
+      ]
+    : [
+        { label: `Inflow · ${winLabel.value}`, value: fmtUsd(props.totals.inflowUsd, true), color: '#2E9E63' },
+        { label: `Outflow · ${winLabel.value}`, value: '−' + fmtUsd(props.totals.outflowUsd), color: '#D0522E' },
+        { label: `Net · ${winLabel.value}`, value: fmtUsd(props.totals.netUsd, true), color: props.totals.netUsd < 0 ? '#E0603E' : '#E2E6E1' },
+      ]
+)
 
 // Staleness banner: shown only when the freshest flow is older than the threshold.
 // Self-clearing (flows resume -> daysSinceLastFlow drops) and null-safe (no flows ->

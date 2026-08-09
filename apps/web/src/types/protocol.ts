@@ -84,4 +84,48 @@ export interface ProtocolSummary {
     // Freshness (T3-D1): computed at read time in the API.
     isStale?: boolean | null
     staleAfterSeconds?: number | null
+    ageSeconds?: number | null
+  }
+
+  // Inflows & outflows (Lot C) — GET /v1/pools/:slug/flows
+  export interface PoolFlowsSeriesPoint {
+    day: string
+    inflowUsd: number
+    outflowUsd: number
+    netUsd: number
+    cumulativeNetUsd: number
+  }
+
+  export interface PoolFlows {
+    slug: string
+    // false → the pool has no deposit/withdraw event coverage; hide the section.
+    covered: boolean
+    window: '24h' | '7d' | '30d'
+    days: number
+    series: PoolFlowsSeriesPoint[]
+    totals: {
+      inflowUsd: number
+      outflowUsd: number
+      netUsd: number
+      depositCount: number
+      withdrawCount: number
+    }
+    updatedAt: string
+  }
+
+  // TVL history (Lot C) — GET /v1/pools/:slug/series. Blend-only honest
+  // reconstruction; covered=false → the UI keeps the "building history" note.
+  export interface PoolSeriesPoint {
+    day: string
+    tvlUsd: number
+  }
+
+  export interface PoolSeries {
+    slug: string
+    covered: boolean
+    kind: 'tvl'
+    points: PoolSeriesPoint[]
+    first: string | null
+    last: string | null
+    updatedAt: string
   }

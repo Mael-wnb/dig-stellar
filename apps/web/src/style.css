@@ -23,11 +23,61 @@
   --danger: #FF5A5A;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Lot C — Design-handoff tokens (Dig Stellar.dc.html)
+   IBM Plex Sans + Geist Mono. Dark charcoal surfaces + lime accent.
+   These sit alongside the legacy tokens above; new views use --dig-*.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --dig-bg: #141414;        /* app background */
+  --dig-surface: #1E1E1E;   /* cards / sidebar / topbar */
+  --dig-surface-2: #242422; /* insets / rows */
+  --dig-surface-3: #262624; /* ghost buttons */
+  --dig-line: #2F2F2C;      /* hairline borders */
+  --dig-line-soft: #2C2C29; /* softer dividers */
+  --dig-text: #E2E6E1;      /* primary text */
+  --dig-text-2: #B7B3AB;    /* secondary text */
+  --dig-muted: #8A857B;     /* muted */
+  --dig-faint: #5E5F5D;     /* labels / faint */
+  --dig-accent: #D5FF2F;    /* lime accent */
+  --dig-green: #2E9E63;     /* positive */
+  --dig-red: #E0603E;       /* negative */
+  --dig-amber: #C98A1E;     /* warning */
+}
+
 /* GLOBAL */
 body {
   background: var(--bg);
   color: var(--text);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
+
+::selection { background: #3E5016; }
+
+.font-mono-geist { font-family: 'Geist Mono', monospace; }
+
+/* Scrollbars inside dig surfaces */
+.dig-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.dig-scroll::-webkit-scrollbar-thumb { background: #34342E; border-radius: 10px; border: 3px solid var(--dig-bg); }
+.dig-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* Design-system animations (mirrors the handoff keyframes) */
+@keyframes digPulse   { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes digSpin    { to { transform: rotate(360deg); } }
+@keyframes digBar     { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+/* Shared hover affordances (used across the new shell + views) */
+.dig-nav:hover    { background: #2A2A27 !important; }
+.dig-navon:hover  { background: #34342E !important; }
+.dig-social:hover { background: #2E2E2A !important; border-color: #3A3A34 !important; color: var(--dig-accent) !important; }
+.dig-row:hover    { background: #242422 !important; }
+.dig-btn:hover    { filter: brightness(1.06); }
+.dig-ghost:hover  { background: #2A2A27 !important; }
+.dig-chip:hover   { background: #2A2A27 !important; }
+.dig-card-h:hover { border-color: #34342E !important; box-shadow: 0 8px 28px -18px rgba(40,36,32,.28) !important; }
+.dig-wcard:hover .dig-wactions { opacity: 1 !important; }
+.dig-spin { animation: digSpin .9s linear infinite; }
 
 /* SKELETON LOADING */
 .skeleton-pulse {

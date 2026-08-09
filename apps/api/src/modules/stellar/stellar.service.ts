@@ -143,6 +143,32 @@ type EventCountRow = {
   swaps_24h: unknown;
 };
 
+// ── Pool flows (Lot C) — whitelisted windows + shared classification SQL ──────
+// Windows map to fixed Postgres intervals (bound $::interval, never
+// interpolated) and to the number of daily buckets the JS gap-fill emits.
+const FLOW_WINDOW_INTERVALS: Record<string, string> = {
+  '24h': '24 hours',
+  '7d': '7 days',
+  '30d': '30 days',
+};
+const FLOW_WINDOW_DAYS: Record<string, number> = {
+  '24h': 1,
+  '7d': 7,
+  '30d': 30,
+};
+const DEFAULT_FLOW_WINDOW = '7d';
+// Coverage predicate: liquidity deposit/withdraw event families (Aquarius
+// deposit_liquidity/withdraw_liquidity, Blend POOL:deposit/exit_pool, and the
+// generic add_liquidity/remove_liquidity). Kept in one place so the coverage
+// count and the bucketing classification never drift.
+const FLOW_FAMILY_SQL = `
+  event_key ilike '%deposit%'
+  or event_key ilike '%withdraw%'
+  or event_key ilike '%add_liquidity%'
+  or event_key ilike '%remove_liquidity%'
+  or event_key ilike '%exit_pool%'
+`;
+
 @Injectable()
 export class StellarService {
   constructor(private readonly prisma: PrismaService) {}
@@ -496,6 +522,252 @@ export class StellarService {
       console.error(error);
       throw error;
     }
+  }
+
+  // ── Inflows & outflows (Lot C) ────────────────────────────────────────────
+  // On-read aggregation over normalized_events for a single pool: deposits
+  // (liquidity IN) vs withdrawals (liquidity OUT), bucketed by UTC day over a
+  // whitelisted window. Same shape/discipline as the /v1/bridge series:
+  //  • window is a whitelisted enum → bound $2::interval, never interpolated;
+  //  • the day key is emitted as a UTC 'YYYY-MM-DD' text key (avoids the
+  //    timestamptz→JS-Date tz drift documented in bridge.service.ts);
+  //  • JS gap-fills empty days so the chart gets a continuous axis.
+  //
+  // USD is derived on read (events carry no amount_usd): each event's magnitude
+  // is greatest(in_scaled × latest price_in, out_scaled × latest price_out) —
+  // the same max-of-legs approximation the indexer uses (prices are only a few
+  // days deep, so latest-price is the honest best-effort, not historical-exact).
+  //
+  // "covered" is data-driven: a pool is covered only if it has ≥1 deposit/
+  // withdraw-family event ever. AMMs that emit only swaps/syncs (Soroswap) and
+  // pools with no Soroban events (stellar-native, DeFindex) come back
+  // covered=false so the UI hides the section rather than showing zeros.
+  async getPoolFlows(poolSlug: string, window?: string) {
+    const resolvedWindow =
+      window && FLOW_WINDOW_INTERVALS[window] ? window : DEFAULT_FLOW_WINDOW;
+    const interval = FLOW_WINDOW_INTERVALS[resolvedWindow];
+
+    const poolRows = (await this.prisma.$queryRawUnsafe(
+      `select id as entity_id from entities where slug = $1 and is_active = true limit 1`,
+      poolSlug
+    )) as Array<{ entity_id: string }>;
+    const entityId = poolRows[0]?.entity_id;
+    if (!entityId) {
+      throw new NotFoundException(`Pool not found: ${poolSlug}`);
+    }
+
+    // Coverage: any deposit/withdraw-family event ever for this pool.
+    const coverageRows = (await this.prisma.$queryRawUnsafe(
+      `
+      select count(*)::int as n
+      from normalized_events
+      where entity_id = $1::uuid
+        and (${FLOW_FAMILY_SQL})
+      `,
+      entityId
+    )) as Array<{ n: number }>;
+    const covered = (toNumber(coverageRows[0]?.n) ?? 0) > 0;
+
+    if (!covered) {
+      return {
+        slug: poolSlug,
+        covered: false,
+        window: resolvedWindow,
+        days: FLOW_WINDOW_DAYS[resolvedWindow],
+        series: [],
+        totals: {
+          inflowUsd: 0,
+          outflowUsd: 0,
+          netUsd: 0,
+          depositCount: 0,
+          withdrawCount: 0,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `
+      select day, family,
+             coalesce(sum(usd), 0) as usd,
+             count(*)::int as n
+      from (
+        select
+          to_char(date_trunc('day', ne.occurred_at at time zone 'UTC'), 'YYYY-MM-DD') as day,
+          case
+            when ne.event_key ilike '%withdraw%'
+              or ne.event_key ilike '%exit_pool%'
+              or ne.event_key ilike '%remove_liquidity%' then 'outflow'
+            when ne.event_key ilike '%deposit%'
+              or ne.event_key ilike '%add_liquidity%' then 'inflow'
+            else 'other'
+          end as family,
+          greatest(
+            coalesce(ne.token_amount_in_scaled * pin.price_usd, 0),
+            coalesce(ne.token_amount_out_scaled * pout.price_usd, 0)
+          ) as usd
+        from normalized_events ne
+        left join lateral (
+          select ap.price_usd from asset_prices ap
+          where ap.asset_id = ne.token_in_asset_id
+          order by ap.observed_at desc limit 1
+        ) pin on true
+        left join lateral (
+          select ap.price_usd from asset_prices ap
+          where ap.asset_id = ne.token_out_asset_id
+          order by ap.observed_at desc limit 1
+        ) pout on true
+        where ne.entity_id = $1::uuid
+          and ne.occurred_at > now() - $2::interval
+      ) t
+      where family <> 'other'
+      group by day, family
+      order by day
+      `,
+      entityId,
+      interval
+    )) as Array<{ day: string; family: string; usd: unknown; n: unknown }>;
+
+    const days = FLOW_WINDOW_DAYS[resolvedWindow];
+    const byDay = new Map<string, { inflowUsd: number; outflowUsd: number; deposits: number; withdrawals: number }>();
+    for (const row of rows) {
+      if (!row.day) continue;
+      const usd = toNumber(row.usd) ?? 0;
+      const n = toNumber(row.n) ?? 0;
+      const entry = byDay.get(row.day) ?? { inflowUsd: 0, outflowUsd: 0, deposits: 0, withdrawals: 0 };
+      if (row.family === 'inflow') { entry.inflowUsd += usd; entry.deposits += n; }
+      else if (row.family === 'outflow') { entry.outflowUsd += usd; entry.withdrawals += n; }
+      byDay.set(row.day, entry);
+    }
+
+    const series: Array<{
+      day: string;
+      inflowUsd: number;
+      outflowUsd: number;
+      netUsd: number;
+      cumulativeNetUsd: number;
+    }> = [];
+    let inflowUsd = 0;
+    let outflowUsd = 0;
+    let depositCount = 0;
+    let withdrawCount = 0;
+    let cumulative = 0;
+    const today = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setUTCDate(d.getUTCDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      const hit = byDay.get(key) ?? { inflowUsd: 0, outflowUsd: 0, deposits: 0, withdrawals: 0 };
+      const dayIn = Number(hit.inflowUsd.toFixed(2));
+      const dayOut = Number(hit.outflowUsd.toFixed(2));
+      const net = Number((dayIn - dayOut).toFixed(2));
+      cumulative = Number((cumulative + net).toFixed(2));
+      inflowUsd += dayIn;
+      outflowUsd += dayOut;
+      depositCount += hit.deposits;
+      withdrawCount += hit.withdrawals;
+      series.push({ day: key, inflowUsd: dayIn, outflowUsd: dayOut, netUsd: net, cumulativeNetUsd: cumulative });
+    }
+
+    return {
+      slug: poolSlug,
+      covered: true,
+      window: resolvedWindow,
+      days,
+      series,
+      totals: {
+        inflowUsd: Number(inflowUsd.toFixed(2)),
+        outflowUsd: Number(outflowUsd.toFixed(2)),
+        netUsd: Number((inflowUsd - outflowUsd).toFixed(2)),
+        depositCount,
+        withdrawCount,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  // ── TVL history series (Lot C) ────────────────────────────────────────────
+  // Blend-only, honest reconstruction. No stored USD time-series exists in the
+  // DB (pool_metrics_latest is a single-row upsert), but Blend lending pools
+  // retain per-asset reserve history in reserve_snapshots. We reconstruct TVL
+  // per snapshot as sum(d_supply_scaled × latest asset price) — a degraded,
+  // irregular-cadence, latest-price approximation (asset_prices is only ~18 days
+  // deep). AMM/native/vault pools have no usable reserve history → covered=false
+  // so the UI keeps the honest "building history" note rather than a fake curve.
+  //
+  // Volume history does not exist for any pool, so this series is TVL-only.
+  async getPoolSeries(poolSlug: string) {
+    const poolRows = (await this.prisma.$queryRawUnsafe(
+      `
+      select e.id as entity_id, e.entity_type, v.venue_type
+      from entities e
+      join venues v on v.id = e.venue_id
+      where e.slug = $1 and e.is_active = true
+      limit 1
+      `,
+      poolSlug
+    )) as Array<{ entity_id: string; entity_type: string; venue_type: string }>;
+    const pool = poolRows[0];
+    if (!pool) {
+      throw new NotFoundException(`Pool not found: ${poolSlug}`);
+    }
+
+    const isLending =
+      pool.venue_type === 'lending' || pool.entity_type === 'lending_pool';
+    if (!isLending) {
+      return {
+        slug: poolSlug,
+        covered: false,
+        kind: 'tvl',
+        points: [],
+        first: null,
+        last: null,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    // One TVL value per distinct snapshot; keep the last snapshot per UTC day in
+    // JS for a clean daily line. Latest-price per asset (documented approximation).
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `
+      select
+        rs.snapshot_at,
+        to_char(date_trunc('day', rs.snapshot_at at time zone 'UTC'), 'YYYY-MM-DD') as day,
+        sum(rs.d_supply_scaled * coalesce(p.price_usd, 0)) as tvl_usd
+      from reserve_snapshots rs
+      join lateral (
+        select ap.price_usd from asset_prices ap
+        where ap.asset_id = rs.asset_id
+        order by ap.observed_at desc limit 1
+      ) p on true
+      where rs.entity_id = $1::uuid
+      group by rs.snapshot_at
+      order by rs.snapshot_at asc
+      `,
+      pool.entity_id
+    )) as Array<{ snapshot_at: Date; day: string; tvl_usd: unknown }>;
+
+    // Reduce to one point per UTC day (last snapshot of the day wins).
+    const byDay = new Map<string, number>();
+    for (const row of rows) {
+      const tvl = toNumber(row.tvl_usd);
+      if (tvl === null) continue;
+      byDay.set(row.day, Number(tvl.toFixed(2)));
+    }
+    const points = [...byDay.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([day, tvlUsd]) => ({ day, tvlUsd }));
+
+    const covered = points.length >= 2;
+    return {
+      slug: poolSlug,
+      covered,
+      kind: 'tvl',
+      points,
+      first: points[0]?.day ?? null,
+      last: points[points.length - 1]?.day ?? null,
+      updatedAt: new Date().toISOString(),
+    };
   }
 
   // Build the token/reserve breakdown for a stellar-native (Horizon classic)

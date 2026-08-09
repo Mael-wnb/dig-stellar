@@ -334,5 +334,6 @@ export function useProtocol() {
     error,
     selectProtocol,
     selectPool,
+    reload: loadPools,
   };
 }

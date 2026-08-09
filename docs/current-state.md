@@ -58,6 +58,24 @@ both live entry points and superseded legacy scripts. (See `docs/repo-structure.
 
 **Substantially advanced, not fully stabilized.** Vue 3 + Vite + Tailwind.
 
+**T3-D3 (Lot C — design-handoff port) landed this session.** The co-founder's Claude Design handoff
+(`design/2026-08-handoff/`) is ported into the app: a persistent **sidebar + topbar shell** wraps five
+real views — Dashboard, Protocols, Pool detail, Portfolio, Alerts — plus connect / create-alert /
+action modals. View switching extends the existing module-scoped `useView` to five views + a pool
+sub-view (no router — beta-first) with lightweight hash sync. Fonts moved to IBM Plex Sans + Geist
+Mono; design tokens live in `src/style.css` (`--dig-*`). New composables: `useConnectFlow`,
+`usePoolDetail`, `useSharedWallets` (one shared wallets/overview load across sidebar + portfolio +
+pool-detail), `useModals`. Everything renders real data or an explicit honest state (freshness chips,
+stale badges, empty states). Two API additions back the pool-detail page: `GET /v1/pools/:slug/flows`
+(on-read deposit/withdraw aggregation over `normalized_events`, `covered` flag hides uncovered pools)
+and `GET /v1/pools/:slug/series` (Blend-only honest TVL reconstruction from `reserve_snapshots × latest
+price`; non-Blend keeps a "building history" note — no synthesized curves). The action modal embeds the
+**existing** SDEX-swap / Blend-deposit widgets unmodified, so the client-side validation gates and the
+flags regime are preserved byte-for-byte; Add/Remove-liquidity tabs are present-but-disabled ("soon",
+Lot D). Legacy `DigDashboard.vue` / `DashboardHeader.vue` removed. Evidence: `docs/evidence/lot-c/`.
+
+**QA pass (post-port) fixes.** A headless-CDP QA sweep (all 5 views + modals, 1440/1280px, API-down, connected/disconnected) found no console errors, exceptions, or overflow. Fixes applied: (a) sidebar footer always names the data plane ("Live · Stellar mainnet") — the signing selector no longer flips it; (b) the notifications bell dropdown restyled to the design's "Activity feed"; (c) retry buttons on the protocols/pool-detail API-down states and honest empty states on the dashboard protocols summary + bridge (`—`, not `+$0`); (d) the action modal's network selector is kept for both swap and Blend deposits. **Wallet management (T2-D1: refresh / set active signer / set primary / activate-deactivate / delete) was ported from the legacy `WalletSection` into `PortfolioView`** (per-card ⋯ menu) before removing the now-orphaned legacy components (`WalletSection`, `WalletAlertsPanel`, `PoolDetail`, `PoolTabs`, `ProtocolTabs`, `PoolTable`, `StellarMetrics`, `NetworkStats`, `HeroBanner`, `Dashboard`). The SDEX-swap / Blend-deposit widgets and XDR validators were not touched.
+
 Working: real dashboard structure, protocol browsing, pool detail views, wallet connection UX,
 multi-wallet portfolio UX, backend-driven data in the important flows, a public beta on real Mainnet
 data. Display polish landed this session: native token rendered as "XLM" (display-only helpers, DB

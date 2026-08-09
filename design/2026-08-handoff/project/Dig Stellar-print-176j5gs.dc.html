@@ -1,0 +1,2351 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style data-omelette-print-defaults>
+@media print {
+  @page { margin: 0.5in; }
+  h1, h2, h3, h4, h5, h6 { break-after: avoid; }
+  figure, table, pre, blockquote, img, svg, tr, [class~="card" i] { break-inside: avoid; }
+  img, svg { max-width: 100%; }
+  p { orphans: 3; widows: 3; }
+}
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+<template id="__bundler_thumbnail" data-bg-color="#252525">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#252525"/>
+    <rect x="470" y="300" width="150" height="150" rx="34" fill="#D5FF2F"/>
+    <text x="545" y="415" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="104" font-weight="700" fill="#252525">D</text>
+    <text x="650" y="378" font-family="IBM Plex Sans, sans-serif" font-size="64" font-weight="700" fill="#141414">Dig</text>
+    <text x="650" y="430" font-family="IBM Plex Sans, sans-serif" font-size="30" font-weight="500" fill="#5E5F5D">Stellar</text>
+  </svg>
+</template>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: 'IBM Plex Sans', system-ui, sans-serif; background: #141414; color: #E2E6E1; -webkit-font-smoothing: antialiased; }
+  ::selection { background: #3E5016; }
+  .dig-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+  .dig-scroll::-webkit-scrollbar-thumb { background: #34342E; border-radius: 10px; border: 3px solid #141414; }
+  .dig-scroll::-webkit-scrollbar-track { background: transparent; }
+  @keyframes digFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes digPulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  @keyframes digPing { 0% { transform: scale(1); opacity: .55; } 75%,100% { transform: scale(2.4); opacity: 0; } }
+  @keyframes digSpin { to { transform: rotate(360deg); } }
+  @keyframes digBar { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+  @keyframes digSheet { from { opacity: 0; transform: translateY(24px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @keyframes digOverlay { from { opacity: 0; } to { opacity: 1; } }
+  .dig-nav:hover { background: #2A2A27 !important; }
+  .dig-navon:hover { background: #34342E !important; }
+  .dig-social:hover { background: #2E2E2A !important; border-color: #3A3A34 !important; color: #D5FF2F !important; }
+  .dig-row:hover { background: #242422 !important; }
+  .dig-btn:hover { filter: brightness(1.06); }
+  .dig-ghost:hover { background: #2A2A27 !important; }
+  .dig-card-h:hover { border-color: #34342E !important; box-shadow: 0 8px 28px -18px rgba(40,36,32,.28) !important; }
+  .dig-chip:hover { background: #2A2A27 !important; }
+</style>
+</helmet>
+
+<div ref="{{ rootRef }}" style="display:flex; height:100vh; width:100vw; overflow:hidden; background:#141414;">
+
+  <!-- SIDEBAR -->
+  <aside style="width:236px; flex-shrink:0; height:100%; background:#1E1E1E; border-right:1px solid #2F2F2C; display:flex; flex-direction:column; padding:18px 14px;">
+    <div style="display:flex; align-items:center; padding:8px 10px 18px; margin-bottom:8px; border-bottom:1px solid #2A2A27;">
+      <img src="dig-wordmark.svg" alt="Dig" style="height:30px; width:auto; flex-shrink:0;">
+    </div>
+
+    <div style="font-size:10.5px; font-weight:600; color:#5E5F5D; letter-spacing:.09em; text-transform:uppercase; padding:6px 10px 6px;">Overview</div>
+    <sc-for list="{{ navMain }}" as="item" hint-placeholder-count="4">
+      <div class="{{ item.cls }}" onClick="{{ item.onClick }}" style="{{ item.style }}">
+        <span style="width:18px; display:flex; justify-content:center;">{{ item.icon }}</span>
+        <span>{{ item.label }}</span>
+        <sc-if value="{{ item.badge }}" hint-placeholder-val="">
+          <span style="margin-left: auto; background: #2A2A27; color: #D5FF2F; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 20px">{{ item.badge }}</span>
+        </sc-if>
+      </div>
+    </sc-for>
+
+    <div style="font-size:10.5px; font-weight:600; color:#5E5F5D; letter-spacing:.09em; text-transform:uppercase; padding:18px 10px 6px;">Wallets</div>
+    <sc-for list="{{ walletsNav }}" as="w" hint-placeholder-count="2">
+      <div class="dig-nav" onClick="{{ w.onOpen }}" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px; cursor:pointer; transition:background .12s;">
+        <span style="width:8px; height:8px; border-radius:50%; background:{{ w.dot }};"></span>
+        <span style="font-size:13px; font-weight:500; color:#5E5F5D;">{{ w.label }}</span>
+        <span style="margin-left:auto; font-size:12px; color:#5E5F5D; font-family:'Geist Mono',monospace;">{{ w.short }}</span>
+      </div>
+    </sc-for>
+    <div class="dig-chip" onClick="{{ openAddWallet }}" style="display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:10px; cursor:pointer; color:#5E5F5D; font-size:13px; font-weight:500; margin-top:2px; transition:background .12s;">
+      <span style="font-size:15px; line-height:1;">+</span> Add wallet
+    </div>
+
+    <div style="margin-top:auto; padding:14px 10px 4px; border-top:1px solid #2C2C29;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="width:8px; height:8px; border-radius:50%; background:#3FA46A; box-shadow:0 0 0 3px #12301F; flex-shrink:0;"></div>
+        <span style="font-size:12px; color:#8A857B; font-weight:500;">Live</span>
+        <span style="font-size:12px; color:#5E5F5D;">·</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="#5E5F5D" style="flex-shrink:0;"><path d="M12 1.5C6.201 1.5 1.5 6.201 1.5 12S6.201 22.5 12 22.5 22.5 17.799 22.5 12 17.799 1.5 12 1.5zm6.36 6.03l-2.688 1.37-8.79 4.478-1.02.52a4.62 4.62 0 0 1-.03-.4 5.55 5.55 0 0 1 8.04-4.955l1.02-.52.9-.46A6.6 6.6 0 0 0 5.4 12c0 .16.006.32.018.478L4.2 13.09l-.66.337c-.03-.24-.048-.482-.054-.727L3.48 12A8.52 8.52 0 0 1 16.2 4.573l.9-.46 1.26.417zm.66 4.47a8.52 8.52 0 0 1-12.72 7.427l.9-.46 1.788-.911 8.79-4.479 1.71-.87c.018.19.03.382.03.573z"/></svg>
+        <span style="font-size:12px; color:#8A857B; font-weight:500;">Stellar mainnet</span>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <a href="#" class="dig-social" title="Follow on X" style="flex:1; display:flex; align-items:center; justify-content:center; gap:7px; height:34px; border-radius:10px; background:#242422; border:1px solid #2F2F2C; color:#8A857B; text-decoration:none; font-size:12px; font-weight:600; transition:all .14s;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          X
+        </a>
+        <a href="#" class="dig-social" title="Join Discord" style="flex:1; display:flex; align-items:center; justify-content:center; gap:7px; height:34px; border-radius:10px; background:#242422; border:1px solid #2F2F2C; color:#8A857B; text-decoration:none; font-size:12px; font-weight:600; transition:all .14s;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.955 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+          Discord
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div style="flex:1; height:100%; display:flex; flex-direction:column; min-width:0;">
+
+    <!-- TOPBAR -->
+    <header style="height: 64px; flex-shrink: 0; border-bottom: 1px solid #2F2F2C; backdrop-filter: blur(10px); display: flex; align-items: center; padding: 0 26px; gap: 16px; z-index: 5; background-color: #1E1E1ED1">
+      <div style="display:flex; flex-direction:column;">
+        <h1 style="margin:0; font-size:17px; font-weight:700; letter-spacing:-.02em;">{{ screenTitle }}</h1>
+        <span style="font-size:12px; color:#5E5F5D; margin-top:1px;">{{ screenSub }}</span>
+      </div>
+      
+      <div style="margin-left:auto; display:flex; align-items:center; gap:10px;">
+        
+        <button class="dig-ghost" onClick="{{ openAlertsBell }}" style="position:relative; width:38px; height:38px; border-radius:11px; background:#1E1E1E; border:1px solid #2F2F2C; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#5E5F5D; transition:background .12s;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg>
+          <span style="position:absolute; top:8px; right:9px; width:7px; height:7px; border-radius:50%; background:#E0603E; box-shadow:0 0 0 2px #1E1E1E;"></span>
+        </button>
+        <button class="dig-btn" onClick="{{ openConnect }}" style="height:38px; padding:0 16px; border-radius:11px; background:var(--accent,#D5FF2F); color:#141414; border:none; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px; transition:filter .12s;">
+          <span style="width:7px; height:7px; border-radius:50%; background:var(--accent,#D5FF2F);"></span>
+          {{ connectLabel }}
+        </button>
+      </div>
+    </header>
+
+    <!-- SCROLL AREA -->
+    <main class="dig-scroll" style="flex: 1; overflow-y: auto; padding: 26px; background: url(&quot;./stellar-defi-mr9b4kzs.png&quot;) center / cover no-repeat">
+      <div style="max-width:1180px; margin:0 auto;">
+
+        <!-- ============ DASHBOARD ============ -->
+        <sc-if value="{{ isDash }}" hint-placeholder-val="{{ true }}">
+        <div style="animation:digFade .35s ease both;">
+          <!-- Portfolio hero -->
+          <div style="display:grid; grid-template-columns:1.5fr 1fr; gap:16px; margin-bottom:16px;">
+            <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; padding:24px 26px; position:relative; overflow:hidden;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:14px;">
+                <div style="font-size:13px; color:#5E5F5D; font-weight:500;">Total portfolio value · {{ walletCount }} wallets</div>
+                <div style="display:flex; gap:6px;">
+                  <sc-for list="{{ rangeTabs }}" as="r" hint-placeholder-count="4">
+                    <span class="{{ r.cls }}" onClick="{{ r.onClick }}" style="{{ r.style }}">{{ r.label }}</span>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display:flex; align-items:flex-end; gap:14px; margin-top:8px;">
+                <div style="font-size:42px; font-weight:700; letter-spacing:-.03em; font-variant-numeric:tabular-nums;">{{ portfolioValue }}</div>
+                <div style="display:flex; align-items:center; gap:5px; margin-bottom:9px; color:{{ portfolioChangeColor }}; font-weight:600; font-size:14px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M7 17L17 7M17 7H9M17 7v8"></path></svg>
+                  {{ portfolioChange }}
+                </div>
+              </div>
+              <div style="display:flex; gap:24px; margin-top:20px;">
+                <sc-for list="{{ portfolioBreakdown }}" as="b" hint-placeholder-count="3">
+                  <div>
+                    <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#5E5F5D;"><span style="width:8px;height:8px;border-radius:2px;background:{{ b.color }};"></span>{{ b.label }}</div>
+                    <div style="font-size:17px; font-weight:600; margin-top:3px; font-variant-numeric:tabular-nums;">{{ b.value }}</div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="margin-top:16px;">{{ heroChart }}</div>
+            </div>
+
+            <!-- Alerts summary card -->
+            <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; padding:22px; display:flex; flex-direction:column;">
+              <div style="display:flex; align-items:center; justify-content:space-between;">
+                <div style="font-size:14px; font-weight:600;">Alerts</div>
+                <span class="dig-chip" onClick="{{ goAlerts }}" style="font-size:12px; color:#E2E6E1; font-weight:600; cursor:pointer; padding:3px 8px; border-radius:8px;">View all →</span>
+              </div>
+              <sc-for list="{{ dashAlerts }}" as="a" hint-placeholder-count="3">
+                <div class="dig-row" onClick="{{ goAlerts }}" style="display:flex; gap:11px; padding:11px 8px; border-radius:11px; cursor:pointer; margin:0 -8px; transition:background .12s;">
+                  <span style="width:30px; height:30px; flex-shrink:0; border-radius:9px; background:{{ a.tint }}; color:{{ a.color }}; display:flex; align-items:center; justify-content:center;">{{ a.icon }}</span>
+                  <div style="min-width:0;">
+                    <div style="font-size:13px; font-weight:600; color:#E2E6E1; line-height:1.3;">{{ a.title }}</div>
+                    <div style="font-size:12px; color:#5E5F5D; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ a.venue }} · {{ a.time }}</div>
+                  </div>
+                </div>
+              </sc-for>
+              <button class="dig-ghost" onClick="{{ openCreateAlert }}" style="margin-top:auto; height:40px; border-radius:11px; background:#262624; border:1px solid #2F2F2C; color:#5E5F5D; font-family:inherit; font-weight:600; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px; transition:background .12s;">
+                <span style="font-size:15px;">+</span> New alert rule
+              </button>
+            </div>
+          </div>
+
+          <!-- Stat strip -->
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:16px;">
+            <sc-for list="{{ networkStats }}" as="s" hint-placeholder-count="4">
+              <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:16px; padding:18px 20px;">
+                <div style="font-size:12px; color:#5E5F5D; font-weight:500;">{{ s.label }}</div>
+                <div style="font-size:24px; font-weight:700; letter-spacing:-.02em; margin-top:6px; font-variant-numeric:tabular-nums;">{{ s.value }}</div>
+                <div style="font-size:12px; font-weight:600; margin-top:4px; color:{{ s.color }};">{{ s.delta }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- Two columns: protocols + positions -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; padding:20px 22px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                <div style="font-size:14px; font-weight:600;">Protocols<br></div>
+                <span class="dig-chip" onClick="{{ goProtocols }}" style="font-size:12px; color:#E2E6E1; font-weight:600; cursor:pointer; padding:3px 8px; border-radius:8px;">All Pools&nbsp;→</span>
+              </div>
+              <sc-for list="{{ protocols }}" as="p" hint-placeholder-count="3">
+                <div class="dig-row" onClick="{{ p.onOpen }}" style="display:flex; align-items:center; gap:12px; padding:12px 8px; border-radius:11px; cursor:pointer; margin:0 -8px; transition:background .12s;">
+                  <span style="width:34px; height:34px; border-radius:10px; background:{{ p.tint }}; color:{{ p.color }}; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px;">{{ p.mark }}</span>
+                  <div>
+                    <div style="font-size:14px; font-weight:600;">{{ p.name }}</div>
+                    <div style="font-size:12px; color:#5E5F5D;">{{ p.category }}</div>
+                  </div>
+                  <div style="margin-left:auto; text-align:right;">
+                    <div style="font-size:14px; font-weight:600; font-variant-numeric:tabular-nums;">{{ p.tvl }}</div>
+                    <div style="font-size:12px; font-weight:600; color:{{ p.changeColor }};">{{ p.change }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; padding:20px 22px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                <div style="font-size:14px; font-weight:600;">Your open positions</div>
+                <span class="dig-chip" onClick="{{ goPortfolio }}" style="font-size:12px; color:#E2E6E1; font-weight:600; cursor:pointer; padding:3px 8px; border-radius:8px;">Portfolio →</span>
+              </div>
+              <sc-for list="{{ positions }}" as="pos" hint-placeholder-count="3">
+                <div class="dig-row" style="display:flex; align-items:center; gap:12px; padding:12px 8px; border-radius:11px; margin:0 -8px; transition:background .12s;">
+                  <span style="width:34px; height:34px; border-radius:10px; background:{{ pos.tint }}; color:{{ pos.color }}; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;">{{ pos.mark }}</span>
+                  <div>
+                    <div style="font-size:14px; font-weight:600;">{{ pos.pair }}</div>
+                    <div style="font-size:12px; color:#5E5F5D;">{{ pos.venue }}</div>
+                  </div>
+                  <div style="margin-left:auto; text-align:right;">
+                    <div style="font-size:14px; font-weight:600; font-variant-numeric:tabular-nums;">{{ pos.value }}</div>
+                    <div style="font-size:12px; font-weight:600; color:#2E9E63;">{{ pos.apy }} APY</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <!-- Bridge flow monitoring · Deliverable 3 -->
+          <sc-if value="{{ showBridge }}" hint-placeholder-val="{{ true }}">
+          <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; padding:22px 24px; margin-top:16px;">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:20px;">
+              <div style="display:flex; align-items:center; gap:11px;">
+                <span style="width:34px; height:34px; border-radius:10px; background:#2E3A14; color:#252525; display:flex; align-items:center; justify-content:center;">{{ bridgeIcon }}</span>
+                <div>
+                  <div style="font-size:15px; font-weight:700; display:flex; align-items:center; gap:9px;">Bridge inflows to Stellar
+                    <sc-if value="{{ bridgeScopeActive }}" hint-placeholder-val="">
+                      <span onClick="{{ bridgeClearScope }}" style="display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:600; color:#141414; background:var(--accent,#D5FF2F); padding:3px 6px 3px 10px; border-radius:20px; cursor:pointer;">{{ bridgeScopeLabel }} <span style="display:inline-flex; width:15px; height:15px; border-radius:50%; background:rgba(0,0,0,0.25); align-items:center; justify-content:center; font-size:11px;">×</span></span>
+                    </sc-if>
+                  </div><div style="font-size:12px; color:#5E5F5D; margin-top:1px;">{{ bridgeScopeLabel }} · Allbridge attribution</div>
+                  
+                </div>
+              </div>
+              <div style="display:flex; gap:6px;">
+                <sc-for list="{{ bridgeRanges }}" as="br" hint-placeholder-count="3">
+                  <span class="{{ br.cls }}" onClick="{{ br.onClick }}" style="{{ br.style }}">{{ br.label }}</span>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:flex; gap:36px; margin-bottom:18px; flex-wrap:wrap;">
+              <sc-for list="{{ bridgeStats }}" as="bs" hint-placeholder-count="3">
+                <div>
+                  <div style="font-size:12px; color:#5E5F5D;">{{ bs.label }}</div>
+                  <div style="font-size:24px; font-weight:700; letter-spacing:-.02em; margin-top:3px; font-variant-numeric:tabular-nums; color:{{ bs.color }};">{{ bs.value }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div>{{ bridgeChart }}</div>
+            <div style="display:flex; gap:18px; flex-wrap:wrap; margin-top:12px; margin-bottom:24px;">
+              <sc-for list="{{ bridgeChains }}" as="c" hint-placeholder-count="3">
+                <span style="display:flex; align-items:center; gap:6px; font-size:12px; color:#5E5F5D;"><span style="width:10px; height:10px; border-radius:3px; background:{{ c.color }};"></span>{{ c.name }}</span>
+              </sc-for>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+              <div style="display:flex; gap:4px; background:#242422; padding:3px; border-radius:11px;">
+                <sc-for list="{{ bridgeTabs }}" as="bt" hint-placeholder-count="2">
+                  <span onClick="{{ bt.onClick }}" style="{{ bt.style }}">{{ bt.label }}</span>
+                </sc-for>
+              </div>
+              
+            </div>
+
+            <sc-if value="{{ bridgeShowRoutes }}" hint-placeholder-val="{{ true }}">
+            <div style="font-size:11.5px; color:#5E5F5D; margin-bottom:6px;">Click a route to inspect its recent flows</div>
+            <div style="display:grid; grid-template-columns:2.2fr 1fr 1fr 1fr 0.8fr 0.9fr; padding:11px 8px; font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; border-bottom:1px solid #2C2C29;">
+              <sc-for list="{{ bridgeRouteCols }}" as="col" hint-placeholder-count="5">
+                <div onClick="{{ col.onClick }}" style="{{ col.style }}">{{ col.label }}</div>
+              </sc-for>
+              <div style="text-align:right; color:#5E5F5D;">Flow</div>
+            </div>
+            <sc-for list="{{ bridgeList }}" as="b" hint-placeholder-count="4">
+              <div class="dig-row" onClick="{{ b.onClick }}" style="{{ b.rowStyle }}">
+                <div style="display:flex; align-items:center; gap:11px;">
+                  <span style="width:30px; height:30px; border-radius:9px; background:{{ b.tint }}; color:{{ b.color }}; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px;">{{ b.mark }}</span>
+                  <div>
+                    <div style="display:flex; align-items:center; gap:6px; font-size:13.5px; font-weight:600;">{{ b.chain }} <span style="color:#6E6A62; display:inline-flex;">{{ b.arrow }}</span> <span style="color:#B7B3AB;">Stellar</span></div>
+                    
+                  </div>
+                </div>
+                <div style="text-align:right; font-size:13.5px; font-weight:600; color:#2E9E63; font-variant-numeric:tabular-nums;">{{ b.inflow }}</div>
+                <div style="text-align:right; font-size:13.5px; color:#5E5F5D; font-variant-numeric:tabular-nums;">{{ b.outflow }}</div>
+                <div style="text-align:right; font-size:13.5px; font-weight:700; color:{{ b.netColor }}; font-variant-numeric:tabular-nums;">{{ b.net }}</div>
+                <div style="text-align:right; font-size:13px; color:#5E5F5D; font-variant-numeric:tabular-nums;">{{ b.share }}</div>
+                <div style="text-align:right;"><span style="display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; color:{{ b.flowStatusColor }};">{{ b.flowStatusIcon }}{{ b.flowStatus }}</span></div>
+              </div>
+            </sc-for>
+            </sc-if>
+
+            <sc-if value="{{ bridgeShowFlows }}" hint-placeholder-val="">
+            <div style="display:flex; align-items:center; margin-bottom:6px;">
+              <div style="font-size:12.5px; font-weight:600; color:#5E5F5D;">{{ bridgeFlowsTitle }}</div>
+              
+            </div>
+            <div style="display:grid; grid-template-columns:1.8fr 1fr 0.9fr 1fr 0.9fr 0.9fr; padding:11px 8px; font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; border-bottom:1px solid #2C2C29;">
+              <sc-for list="{{ bridgeFlowCols }}" as="col" hint-placeholder-count="6">
+                <div onClick="{{ col.onClick }}" style="{{ col.style }}">{{ col.label }}</div>
+              </sc-for>
+            </div>
+            <sc-for list="{{ bridgeFlows }}" as="f" hint-placeholder-count="6">
+              <div class="dig-row" style="display:grid; grid-template-columns:1.8fr 1fr 0.9fr 1fr 0.9fr 0.9fr; align-items:center; padding:11px 8px; border-bottom:1px solid #2C2C29; transition:background .12s;">
+                <div style="display:flex; align-items:center; gap:11px;">
+                  <span style="width:28px; height:28px; border-radius:8px; flex-shrink:0; background:{{ f.tint }}; color:{{ f.color }}; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px;">{{ f.mark }}</span>
+                  <div style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600;">{{ f.chain }} <span style="color:#6E6A62; display:inline-flex;">{{ f.arrow }}</span> <span style="color:#B7B3AB;">Stellar</span></div>
+                </div>
+                <div><span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:3px 9px 3px 7px; border-radius:20px; background:{{ f.dirBg }}; color:{{ f.dirColor }};">{{ f.dirIcon }}{{ f.dirLabel }}</span></div>
+                <div style="font-size:13px; color:#B7B3AB; font-variant-numeric:tabular-nums;">{{ f.asset }}</div>
+                <div style="text-align:right; font-size:13.5px; font-weight:700; color:{{ f.amountColor }}; font-variant-numeric:tabular-nums;">{{ f.signedAmount }}</div>
+                <div style="text-align:right; font-size:12.5px; color:#5E5F5D; font-variant-numeric:tabular-nums;">{{ f.time }}</div>
+                <div style="text-align:right;"><span class="dig-chip" style="font-size:11px; font-weight:600; color:#5E5F5D; cursor:pointer; padding:4px 8px; border-radius:7px; font-family:'Geist Mono',monospace;">{{ f.tx }}</span></div>
+              </div>
+            </sc-for>
+            </sc-if>
+          </div>
+          </sc-if>
+        </div>
+        </sc-if>
+
+        <!-- ============ PROTOCOLS ============ -->
+        <sc-if value="{{ isProtocols }}" hint-placeholder-val="">
+        <div style="animation:digFade .35s ease both;">
+          <div class="dig-scroll" style="display:flex; gap:16px; margin-bottom:18px; overflow-x:auto; padding-bottom:4px;">
+            <sc-for list="{{ protocols }}" as="p" hint-placeholder-count="4">
+              <div style="flex:0 0 300px; background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; padding:22px;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                  <span style="width:42px; height:42px; border-radius:12px; background:{{ p.tint }}; color:{{ p.color }}; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:19px;">{{ p.mark }}</span>
+                  <div>
+                    <div style="font-size:16px; font-weight:700;">{{ p.name }}</div>
+                    <div style="font-size:12px; color:#5E5F5D;">{{ p.category }} · {{ p.poolCount }} pools</div>
+                  </div>
+                </div>
+                <div style="display:flex; gap:22px; margin-top:20px;">
+                  <div><div style="font-size:12px; color:#5E5F5D;">TVL</div><div style="font-size:18px; font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums;">{{ p.tvl }}</div></div>
+                  <div><div style="font-size:12px; color:#5E5F5D;">24h vol</div><div style="font-size:18px; font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums;">{{ p.vol }}</div></div>
+                  <div><div style="font-size:12px; color:#5E5F5D;">7d</div><div style="font-size:18px; font-weight:700; margin-top:2px; color:{{ p.changeColor }};">{{ p.change }}</div></div>
+                </div>
+                <div style="margin-top:14px;">{{ p.spark }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; overflow:hidden;">
+            <div style="display:flex; align-items:center; gap:10px; padding:16px 20px; border-bottom:1px solid #2C2C29;">
+              <div style="font-size:14px; font-weight:600;">All pools</div>
+              <div style="display:flex; gap:6px; margin-left:8px;">
+                <sc-for list="{{ poolFilters }}" as="f" hint-placeholder-count="4">
+                  <span class="{{ f.cls }}" onClick="{{ f.onClick }}" style="{{ f.style }}">{{ f.label }}</span>
+                </sc-for>
+              </div>
+              <span style="margin-left:auto; font-size:12px; color:#5E5F5D;">{{ poolCountLabel }}</span>
+            </div>
+            <div style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr 40px; padding:11px 20px; font-size:11px; font-weight:600; color:#5E5F5D; letter-spacing:.04em; text-transform:uppercase; border-bottom:1px solid #2C2C29;">
+              <div>Pool</div>
+              <sc-for list="{{ poolCols }}" as="col" hint-placeholder-count="5">
+                <div onClick="{{ col.onClick }}" style="{{ col.style }}">{{ col.label }}</div>
+              </sc-for>
+              <div></div>
+            </div>
+            <sc-for list="{{ filteredPools }}" as="pl" hint-placeholder-count="7">
+              <div class="dig-row" onClick="{{ pl.onOpen }}" style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr 40px; align-items:center; padding:13px 20px; cursor:pointer; border-bottom:1px solid #2C2C29; transition:background .12s;">
+                <div style="display:flex; align-items:center; gap:11px;">
+                  <span style="width:30px; height:30px; border-radius:9px; background:{{ pl.tint }}; color:{{ pl.color }}; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px;">{{ pl.mark }}</span>
+                  <div><div style="font-size:14px; font-weight:600;">{{ pl.pair }}</div><div style="font-size:11.5px; color:#5E5F5D;">{{ pl.venue }}</div></div>
+                </div>
+                <div style="text-align:right; font-size:14px; font-weight:600; font-variant-numeric:tabular-nums;">{{ pl.tvl }}</div>
+                <div style="text-align:right; font-size:14px; font-weight:600; color:#2E9E63; font-variant-numeric:tabular-nums;">{{ pl.apy }}</div>
+                <div style="text-align:right; font-size:14px; color:#5E5F5D; font-variant-numeric:tabular-nums;">{{ pl.vol }}</div>
+                <div style="text-align:right; font-size:14px; color:#5E5F5D; font-variant-numeric:tabular-nums;">{{ pl.feesDisp }}</div>
+                <div style="text-align:right; font-size:13px; color:#5E5F5D; font-variant-numeric:tabular-nums;">{{ pl.util }}</div>
+                <div style="text-align:right; color:#6A665E;">›</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ============ POOL DETAIL ============ -->
+        <sc-if value="{{ isPool }}" hint-placeholder-val="">
+        <div style="animation:digFade .35s ease both;">
+          <div class="dig-chip" onClick="{{ goProtocols }}" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; color:#5E5F5D; font-weight:500; cursor:pointer; padding:4px 8px; border-radius:8px; margin-bottom:14px; margin-left:-8px;">← Back to pools</div>
+          <div style="display:grid; grid-template-columns:1.6fr 1fr; gap:16px;">
+            <div style="display:flex; flex-direction:column; gap:16px;">
+              <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; padding:24px;">
+                <div style="display:flex; align-items:center; gap:14px;">
+                  <span style="width:46px; height:46px; border-radius:13px; background:{{ pool.tint }}; color:{{ pool.color }}; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:19px;">{{ pool.mark }}</span>
+                  <div>
+                    <div style="font-size:22px; font-weight:700; letter-spacing:-.02em;">{{ pool.pair }}</div>
+                    <div style="font-size:13px; color:#5E5F5D;">{{ pool.venue }} · {{ pool.type }}</div>
+                  </div>
+                  <div style="margin-left:auto; display:flex; gap:8px;">
+                    <button class="dig-ghost" onClick="{{ openCreateAlertForPool }}" style="height:40px; padding:0 15px; border-radius:11px; background:#262624; border:1px solid #2F2F2C; color:#5E5F5D; font-family:inherit; font-weight:600; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:7px;">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path></svg> Alert
+                    </button>
+                    <button class="dig-btn" onClick="{{ openActionForPool }}" style="height:40px; padding:0 18px; border-radius:11px; background:var(--accent,#D5FF2F); color:#252525; border:none; font-family:inherit; font-weight:700; font-size:13px; cursor:pointer;">{{ poolActionLabel }}</button>
+                  </div>
+                </div>
+                <div style="display:flex; gap:34px; margin-top:22px; padding-top:20px; border-top:1px solid #2C2C29; flex-wrap:wrap;">
+                  <sc-for list="{{ poolStats }}" as="ps" hint-placeholder-count="4">
+                    <div><div style="font-size:12px; color:#5E5F5D;">{{ ps.label }}</div><div style="font-size:20px; font-weight:700; margin-top:3px; color:{{ ps.color }}; font-variant-numeric:tabular-nums;">{{ ps.value }}</div></div>
+                  </sc-for>
+                </div>
+                <div style="font-size:13px; color:#8A857B; line-height:1.55; margin-top:18px; max-width:640px;">{{ poolDesc }}</div>
+              </div>
+              <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; padding:22px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                  <div style="font-size:14px; font-weight:600;">TVL &amp; volume · 30d</div>
+                  <div style="display:flex; gap:16px; font-size:12px;">
+                    <span style="display:flex;align-items:center;gap:6px;color:#5E5F5D;"><span style="width:10px;height:3px;border-radius:2px;background:#E2E6E1;"></span>TVL</span>
+                    <span style="display:flex;align-items:center;gap:6px;color:#5E5F5D;"><span style="width:10px;height:10px;border-radius:3px;background:#37372F;"></span>Volume</span>
+                  </div>
+                </div>
+                <div>{{ poolChart }}</div>
+              </div>
+              <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; padding:22px;">
+                <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px;">
+                  <div>
+                    <div style="font-size:14px; font-weight:600;">Inflows &amp; outflows</div>
+                    <div style="font-size:12px; color:#5E5F5D; margin-top:2px;">Deposits vs withdrawals · derived from the event stream</div>
+                  </div>
+                  <div style="display:flex; gap:6px;">
+                    <sc-for list="{{ flowRanges }}" as="fr" hint-placeholder-count="3">
+                      <span class="{{ fr.cls }}" onClick="{{ fr.onClick }}" style="{{ fr.style }}">{{ fr.label }}</span>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:18px;">
+                  <sc-for list="{{ flowStats }}" as="fs" hint-placeholder-count="3">
+                    <div style="background:#242422; border:1px solid #2C2C29; border-radius:12px; padding:12px 14px;">
+                      <div style="font-size:11.5px; color:#5E5F5D; font-weight:500;">{{ fs.label }}</div>
+                      <div style="display:flex; align-items:center; gap:7px; margin-top:6px;">
+                        <span style="width:20px; height:20px; border-radius:6px; background:{{ fs.tint }}; color:{{ fs.color }}; display:flex; align-items:center; justify-content:center;">{{ fs.icon }}</span>
+                        <span style="font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; color:{{ fs.color }};">{{ fs.value }}</span>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="display:flex; align-items:center; gap:16px; font-size:12px; margin-bottom:8px;">
+                  <span style="display:flex; align-items:center; gap:6px; color:#5E5F5D;"><span style="width:10px; height:10px; border-radius:3px; background:#B8E640;"></span>Inflow</span>
+                  <span style="display:flex; align-items:center; gap:6px; color:#5E5F5D;"><span style="width:10px; height:10px; border-radius:3px; background:#4C4C46;"></span>Outflow</span>
+                  <span style="display:flex; align-items:center; gap:6px; color:#5E5F5D;"><span style="width:12px; height:3px; border-radius:2px; background:#E2E6E1;"></span>Cumulative net</span>
+                  <div style="margin-left:auto; display:flex; gap:16px;">
+                    <sc-for list="{{ flowTotals }}" as="ft" hint-placeholder-count="2">
+                      <span style="font-size:12px; color:#5E5F5D;">{{ ft.label }} <span style="font-weight:700; color:#E2E6E1; font-variant-numeric:tabular-nums;">{{ ft.value }}</span></span>
+                    </sc-for>
+                  </div>
+                </div>
+                <div>{{ flowChart }}</div>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:16px;">
+              <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; padding:22px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+                  <div style="font-size:14px; font-weight:600;">On-chain info</div>
+                  <span class="dig-chip" style="font-size:12px; color:var(--accent,#D5FF2F); font-weight:600; cursor:pointer; padding:3px 8px; border-radius:8px;">Explore →</span>
+                </div>
+                <sc-for list="{{ poolOnchain }}" as="oi" hint-placeholder-count="5">
+                  <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid #262624;">
+                    <span style="font-size:12.5px; color:#5E5F5D;">{{ oi.label }}</span>
+                    <span style="font-size:12.5px; font-weight:600; color:#E2E6E1;">{{ oi.value }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <sc-if value="{{ poolIsAmm }}" hint-placeholder-val="">
+              <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; padding:22px;">
+                <sc-for list="{{ poolReserves }}" as="r" hint-placeholder-count="2">
+                  <div style="margin-bottom:16px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; font-size:13px; margin-bottom:7px;">
+                      <span style="display:flex;align-items:center;gap:8px;font-weight:600;"><span style="width:22px;height:22px;border-radius:7px;background:{{ r.tint }};color:{{ r.color }};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;">{{ r.mark }}</span>{{ r.asset }}</span>
+                      <span style="font-variant-numeric:tabular-nums; color:#5E5F5D;">{{ r.amount }}</span>
+                    </div>
+                    <div style="height:7px; background:#2C2C29; border-radius:5px; overflow:hidden;"><div style="height:100%; width:{{ r.pct }}; background:{{ r.color }}; border-radius:5px;"></div></div>
+                  </div>
+                </sc-for>
+              </div>
+              </sc-if>
+              <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; padding:22px;">
+                <div style="font-size:14px; font-weight:600; margin-bottom:6px;">Your position</div>
+                <sc-if value="{{ poolHasPosition }}" hint-placeholder-val="{{ true }}">
+                  <div style="font-size:30px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums;">{{ poolPositionValue }}</div>
+                  <div style="font-size:13px; color:#2E9E63; font-weight:600; margin-top:2px;">+{{ poolPositionEarned }} earned · {{ pool.apy }} APY</div>
+                  <div style="display:flex; gap:9px; margin-top:16px;">
+                    <button class="dig-btn" onClick="{{ openActionForPool }}" style="flex:1; height:40px; border-radius:11px; background:var(--accent,#D5FF2F); color:#252525; border:none; font-family:inherit; font-weight:700; font-size:13px; cursor:pointer;">{{ poolPrimaryAction }}</button>
+                    <button class="dig-ghost" onClick="{{ openActionWithdraw }}" style="flex:1; height:40px; border-radius:11px; background:#262624; border:1px solid #2F2F2C; color:#5E5F5D; font-family:inherit; font-weight:600; font-size:13px; cursor:pointer;">{{ poolSecondaryAction }}</button>
+                  </div>
+                </sc-if>
+              </div>
+              <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; padding:22px;">
+                <div style="font-size:14px; font-weight:600; margin-bottom:12px;">Risk signals</div>
+                <sc-for list="{{ poolRisks }}" as="rk" hint-placeholder-count="3">
+                  <div style="display:flex; align-items:center; gap:10px; padding:7px 0;">
+                    <span style="width:8px; height:8px; border-radius:50%; background:{{ rk.color }};"></span>
+                    <span style="font-size:13px; color:#5E5F5D;">{{ rk.label }}</span>
+                    <span style="margin-left:auto; font-size:12px; font-weight:600; color:{{ rk.color }};">{{ rk.value }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          <sc-if value="{{ poolHasAssets }}" hint-placeholder-val="">
+          <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; padding:22px 24px; margin-top:16px; overflow-x:auto;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+              <div style="font-size:14px; font-weight:600;">Reserves &amp; rates</div>
+              <span style="font-size:12px; color:#5E5F5D;">Per-asset on-chain state · normalized</span>
+            </div>
+            <div style="min-width:720px;">
+              <div style="display:grid; grid-template-columns:1.3fr 0.8fr 1.3fr 1.3fr 0.9fr 1.4fr 1fr 1fr; padding:10px 4px; font-size:11px; font-weight:600; color:#5E5F5D; letter-spacing:.04em; text-transform:uppercase; border-bottom:1px solid #2C2C29;">
+                <div>Asset</div><div style="text-align:right;">Price</div><div style="text-align:right;">Supplied</div><div style="text-align:right;">Borrowed</div><div style="text-align:right;">Backstop</div><div style="text-align:right;">Supply cap</div><div style="text-align:right;">Supply APY</div><div style="text-align:right;">Borrow APY</div>
+              </div>
+              <sc-for list="{{ poolAssets }}" as="a" hint-placeholder-count="3">
+                <div style="display:grid; grid-template-columns:1.3fr 0.8fr 1.3fr 1.3fr 0.9fr 1.4fr 1fr 1fr; align-items:center; padding:13px 4px; border-bottom:1px solid #262624; font-variant-numeric:tabular-nums;">
+                  <div style="display:flex; align-items:center; gap:9px;"><span style="width:26px; height:26px; border-radius:8px; background:{{ a.tint }}; color:{{ a.color }}; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px;">{{ a.asset }}</span><span style="font-size:13.5px; font-weight:600;">{{ a.asset }}</span></div>
+                  <div style="text-align:right; font-size:13px; color:#B0AA9E;">{{ a.price }}</div>
+                  <div style="text-align:right; font-size:13px; color:#E2E6E1;">{{ a.supplied }}</div>
+                  <div style="text-align:right; font-size:13px; color:#B0AA9E;">{{ a.borrowed }}</div>
+                  <div style="text-align:right; font-size:13px; color:#B0AA9E;">{{ a.backstop }}</div>
+                  <div style="text-align:right; font-size:13px; color:#5E5F5D;">{{ a.cap }}</div>
+                  <div style="text-align:right; font-size:13px; font-weight:600; color:#2E9E63;">{{ a.supplyApy }}</div>
+                  <div style="text-align:right; font-size:13px; font-weight:600; color:#E0603E;">{{ a.borrowApy }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          </sc-if>
+        </div>
+        </sc-if>
+
+        <!-- ============ PORTFOLIO ============ -->
+        <sc-if value="{{ isPortfolio }}" hint-placeholder-val="">
+        <div style="animation:digFade .35s ease both;">
+          <div style="display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap;">
+            <sc-for list="{{ walletCards }}" as="w" hint-placeholder-count="3">
+              <div onClick="{{ w.onClick }}" style="{{ w.cardStyle }}">
+                <div style="display:flex; align-items:center; gap:9px;">
+                  <span style="width:9px; height:9px; border-radius:50%; background:{{ w.dot }};"></span>
+                  <span style="font-size:13px; font-weight:600;">{{ w.label }}</span>
+                  <span style="margin-left:auto; font-size:11.5px; color:#5E5F5D; font-family:'Geist Mono',monospace;">{{ w.short }}</span>
+                </div>
+                <div style="font-size:26px; font-weight:700; margin-top:12px; letter-spacing:-.02em; font-variant-numeric:tabular-nums;">{{ w.value }}</div>
+                <div style="font-size:12.5px; font-weight:600; margin-top:2px; color:{{ w.changeColor }};">{{ w.change }} · 24h</div>
+              </div>
+            </sc-for>
+            <div class="dig-card-h" onClick="{{ openAddWallet }}" style="width:150px; border:1.5px dashed #34342E; border-radius:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; cursor:pointer; color:#5E5F5D; transition:all .15s;">
+              <span style="font-size:22px;">+</span><span style="font-size:13px; font-weight:600;">Add wallet</span>
+            </div>
+          </div>
+          <sc-if value="{{ hasBreakdown }}" hint-placeholder-val="{{ true }}">
+          <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; padding:20px 22px; margin-bottom:16px;">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px;">
+              <div style="font-size:14px; font-weight:600;">Breakdown · {{ breakdownScope }}</div>
+              <div style="font-size:20px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums;">{{ breakdownTotal }}</div>
+            </div>
+            <div style="display:flex; height:14px; border-radius:7px; overflow:hidden; background:#2C2C29;">
+              <sc-for list="{{ breakdownSegs }}" as="bd" hint-placeholder-count="4">
+                <div style="{{ bd.segStyle }}"></div>
+              </sc-for>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:16px 26px; margin-top:16px;">
+              <sc-for list="{{ breakdownSegs }}" as="bd" hint-placeholder-count="4">
+                <div style="display:flex; align-items:center; gap:9px;">
+                  <span style="width:10px; height:10px; border-radius:3px; background:{{ bd.color }};"></span>
+                  <div>
+                    <div style="font-size:13px; font-weight:600;">{{ bd.label }} <span style="color:#5E5F5D; font-weight:500;">{{ bd.pct }}</span></div>
+                    <div style="font-size:11.5px; color:#5E5F5D;">{{ bd.venue }} · {{ bd.wallet }} · {{ bd.value }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          </sc-if>
+          <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; overflow:hidden;">
+            <div style="display:flex; align-items:center; padding:16px 20px; border-bottom:1px solid #2C2C29;">
+              <div style="font-size:14px; font-weight:600;">{{ posScopeTitle }}</div>
+              <span style="margin-left:12px; font-size:12px; color:#5E5F5D;">{{ posCountLabel }}</span>
+              <button class="dig-ghost" onClick="{{ refreshBalances }}" style="margin-left:auto; height:34px; padding:0 13px; border-radius:10px; background:#262624; border:1px solid #2F2F2C; color:#5E5F5D; font-family:inherit; font-weight:600; font-size:12.5px; cursor:pointer; display:flex; align-items:center; gap:7px;">
+                <span style="{{ refreshSpin }}">{{ refreshIcon }}</span> {{ refreshLabel }}
+              </button>
+            </div>
+            <div style="display:grid; grid-template-columns:2fr 1.3fr 1fr 1fr 1fr 90px; padding:11px 20px; font-size:11px; font-weight:600; color:#5E5F5D; letter-spacing:.04em; text-transform:uppercase; border-bottom:1px solid #2C2C29;">
+              <div>Position</div><div>Wallet</div>
+              <sc-for list="{{ posCols }}" as="col" hint-placeholder-count="3">
+                <div onClick="{{ col.onClick }}" style="{{ col.style }}">{{ col.label }}</div>
+              </sc-for>
+              <div></div>
+            </div>
+            <sc-for list="{{ allPositions }}" as="pos" hint-placeholder-count="6">
+              <div class="dig-row" style="display:grid; grid-template-columns:2fr 1.3fr 1fr 1fr 1fr 90px; align-items:center; padding:13px 20px; border-bottom:1px solid #2C2C29; transition:background .12s;">
+                <div style="display:flex; align-items:center; gap:11px;">
+                  <span style="width:30px; height:30px; border-radius:9px; background:{{ pos.tint }}; color:{{ pos.color }}; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px;">{{ pos.mark }}</span>
+                  <div><div style="font-size:14px; font-weight:600;">{{ pos.pair }}</div><div style="font-size:11.5px; color:#5E5F5D;">{{ pos.venue }}</div></div>
+                </div>
+                <div style="display:flex; align-items:center; gap:7px; font-size:13px; color:#5E5F5D;"><span style="width:7px;height:7px;border-radius:50%;background:{{ pos.walletDot }};"></span>{{ pos.wallet }}</div>
+                <div style="text-align:right; font-size:14px; font-weight:600; font-variant-numeric:tabular-nums;">{{ pos.value }}</div>
+                <div style="text-align:right; font-size:14px; font-weight:600; color:#2E9E63;">{{ pos.apy }}</div>
+                <div style="text-align:right; font-size:13px; font-weight:600; color:{{ pos.changeColor }};">{{ pos.change }}</div>
+                <div style="text-align:right;"><span class="dig-chip" onClick="{{ pos.onManage }}" style="font-size:12px; font-weight:600; color:#E2E6E1; cursor:pointer; padding:5px 10px; border-radius:8px;">Manage</span></div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; overflow:hidden; margin-top:16px;">
+            <div style="display:flex; align-items:center; padding:16px 20px; border-bottom:1px solid #2C2C29;">
+              <div style="font-size:14px; font-weight:600;">{{ activityScopeTitle }}</div>
+              <span style="margin-left:12px; font-size:12px; color:#5E5F5D;">{{ activityCount }}</span>
+              <span style="margin-left:auto; font-size:12px; color:#5E5F5D;">Deposits · withdrawals · swaps · claims</span>
+            </div>
+            <sc-for list="{{ activityRows }}" as="ac" hint-placeholder-count="6">
+              <div class="dig-row" style="display:grid; grid-template-columns:1.7fr 1.3fr 1.4fr 1fr 90px; align-items:center; padding:13px 20px; border-bottom:1px solid #2C2C29; transition:background .12s;">
+                <div style="display:flex; align-items:center; gap:11px;">
+                  <span style="width:30px; height:30px; border-radius:9px; flex-shrink:0; background:#242422; color:#8A857B; display:flex; align-items:center; justify-content:center;">{{ ac.icon }}</span>
+                  <div><div style="font-size:14px; font-weight:600;">{{ ac.label }}</div><div style="font-size:11.5px; color:#5E5F5D;">{{ ac.venue }} · {{ ac.time }}</div></div>
+                </div>
+                <div style="font-size:13px; color:#B7B3AB; font-variant-numeric:tabular-nums;">{{ ac.detail }}</div>
+                <div style="display:flex; align-items:center; gap:7px; font-size:13px; color:#5E5F5D;"><span style="width:7px;height:7px;border-radius:50%;background:{{ ac.walletDot }};"></span>{{ ac.wallet }}</div>
+                <div style="text-align:right; font-size:14px; font-weight:700; color:{{ ac.valueColor }}; font-variant-numeric:tabular-nums;">{{ ac.signedValue }}</div>
+                <div style="text-align:right;"><span class="dig-chip" style="font-size:11.5px; font-weight:600; color:#8A857B; cursor:pointer; padding:5px 9px; border-radius:8px; font-family:'Geist Mono',monospace;">{{ ac.tx }}</span></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ============ ALERTS ============ -->
+        <sc-if value="{{ isAlerts }}" hint-placeholder-val="">
+        <div style="animation:digFade .35s ease both;">
+          <div style="display:grid; grid-template-columns:1.5fr 1fr; gap:16px; align-items:start;">
+            <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; overflow:hidden;">
+              <div style="display:flex; align-items:center; padding:16px 20px; border-bottom:1px solid #2C2C29;">
+                <div style="font-size:14px; font-weight:600;">Activity feed</div>
+                <div style="display:flex; gap:6px; margin-left:14px;">
+                  <sc-for list="{{ alertFilters }}" as="f" hint-placeholder-count="3">
+                    <span class="{{ f.cls }}" onClick="{{ f.onClick }}" style="{{ f.style }}">{{ f.label }}</span>
+                  </sc-for>
+                </div>
+                <button class="dig-btn" onClick="{{ openCreateAlert }}" style="margin-left:auto; height:34px; padding:0 14px; border-radius:10px; background:var(--accent,#D5FF2F); color:#252525; border:none; font-family:inherit; font-weight:700; font-size:12.5px; cursor:pointer;">+ New rule</button>
+              </div>
+              <sc-for list="{{ alertFeed }}" as="a" hint-placeholder-count="6">
+                <div style="display:flex; gap:13px; padding:15px 20px; border-bottom:1px solid #2C2C29; background:{{ a.bg }};">
+                  <span style="width:36px; height:36px; flex-shrink:0; border-radius:10px; background:{{ a.tint }}; color:{{ a.color }}; display:flex; align-items:center; justify-content:center;">{{ a.icon }}</span>
+                  <div style="flex:1; min-width:0;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span style="font-size:14px; font-weight:600; color:#E2E6E1;">{{ a.title }}</span>
+                      <span style="font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; padding:1px 7px; border-radius:20px; background:{{ a.tint }}; color:{{ a.color }};">{{ a.severity }}</span>
+                      <sc-if value="{{ a.isNew }}" hint-placeholder-val="">
+                        <span style="width:7px; height:7px; border-radius:50%; background:var(--accent,#D5FF2F);"></span>
+                      </sc-if>
+                    </div>
+                    <div style="font-size:13px; color:#5E5F5D; margin-top:3px; line-height:1.45;">{{ a.desc }}</div>
+                    <div style="font-size:12px; color:#5E5F5D; margin-top:6px;">{{ a.venue }} · {{ a.time }}</div>
+                  </div>
+                  <sc-if value="{{ a.actionable }}" hint-placeholder-val="">
+                    <button class="dig-btn" onClick="{{ a.onAct }}" style="align-self:center; height:34px; padding:0 14px; border-radius:10px; background:var(--accent,#D5FF2F); color:#141414; border:none; font-family:inherit; font-weight:600; font-size:12.5px; cursor:pointer; white-space:nowrap;">{{ a.actionLabel }}</button>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#1E1E1E; border:1px solid #2F2F2C; border-radius:18px; padding:20px 22px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                <div style="font-size:14px; font-weight:600;">Your alert rules</div>
+                <span style="font-size:12px; color:#5E5F5D;">{{ ruleCount }} active</span>
+              </div>
+              <sc-for list="{{ alertRules }}" as="r" hint-placeholder-count="4">
+                <div style="padding:14px 0; border-bottom:1px solid #2C2C29;">
+                  <div style="display:flex; align-items:center; gap:9px;">
+                    <span style="width:8px; height:8px; border-radius:50%; background:{{ r.color }};"></span>
+                    <span style="font-size:13.5px; font-weight:600;">{{ r.name }}</span>
+                    <div onClick="{{ r.onToggle }}" style="margin-left:auto; width:36px; height:20px; border-radius:20px; background:{{ r.toggleBg }}; position:relative; cursor:pointer; transition:background .2s;">
+                      <span style="position:absolute; top:2px; left:{{ r.knobLeft }}; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.2); transition:left .2s;"></span>
+                    </div>
+                  </div>
+                  <div style="font-size:12px; color:#5E5F5D; margin-top:5px; margin-left:17px; font-family:'Geist Mono',monospace;">{{ r.condition }}</div>
+                </div>
+              </sc-for>
+              <button class="dig-ghost" onClick="{{ openCreateAlert }}" style="width:100%; margin-top:14px; height:40px; border-radius:11px; background:#262624; border:1px solid #2F2F2C; color:#5E5F5D; font-family:inherit; font-weight:600; font-size:13px; cursor:pointer;">+ Create rule</button>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ===================== MODALS ===================== -->
+  <sc-if value="{{ modalOpen }}" hint-placeholder-val="">
+    <div onClick="{{ closeModal }}" style="position:fixed; inset:0; background:rgba(38,36,32,.34); backdrop-filter:blur(3px); z-index:50; display:flex; align-items:center; justify-content:center; padding:24px; animation:digOverlay .2s ease;">
+      <div onClick="{{ stop }}" style="{{ modalWidthStyle }} background:#1E1E1E; border-radius:20px; box-shadow:0 30px 80px -30px rgba(38,36,32,.5); animation:digSheet .3s cubic-bezier(.2,.8,.2,1) both; max-height:90vh; overflow:hidden; display:flex; flex-direction:column;">
+
+        <!-- CONNECT / ADD WALLET -->
+        <sc-if value="{{ isConnectModal }}" hint-placeholder-val="">
+          <div style="padding:24px 26px 22px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+              <div style="font-size:18px; font-weight:700;">{{ connectTitle }}</div>
+              <span class="dig-chip" onClick="{{ closeModal }}" style="cursor:pointer; color:#5E5F5D; font-size:20px; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:8px;">×</span>
+            </div>
+            <div style="font-size:13px; color:#5E5F5D; margin-bottom:20px;">{{ connectSub }}</div>
+            <sc-for list="{{ walletProviders }}" as="wp" hint-placeholder-count="4">
+              <div class="dig-row" onClick="{{ wp.onPick }}" style="display:flex; align-items:center; gap:13px; padding:14px 15px; border:1px solid #2F2F2C; border-radius:13px; cursor:pointer; margin-bottom:9px; transition:background .12s;">
+                <span style="width:38px; height:38px; border-radius:11px; background:{{ wp.tint }}; color:{{ wp.color }}; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px;">{{ wp.mark }}</span>
+                <div><div style="font-size:14px; font-weight:600;">{{ wp.name }}</div><div style="font-size:12px; color:#5E5F5D;">{{ wp.desc }}</div></div>
+                <span style="margin-left:auto; color:#6A665E; font-size:18px;">›</span>
+              </div>
+            </sc-for>
+            <div style="display:flex; align-items:center; gap:10px; margin:16px 0;">
+              <div style="flex:1; height:1px; background:#2C2C29;"></div><span style="font-size:11px; color:#5E5F5D; font-weight:600;">OR WATCH-ONLY</span><div style="flex:1; height:1px; background:#2C2C29;"></div>
+            </div>
+            <div style="display:flex; gap:9px;">
+              <input placeholder="Paste a G… Stellar address" value="{{ watchInput }}" onInput="{{ onWatchInput }}" style="flex:1; height:44px; padding:0 14px; border:1px solid #2F2F2C; border-radius:12px; font-family:'Geist Mono',monospace; font-size:13px; background:#242422; color:#E2E6E1; outline:none;">
+              <button class="dig-btn" onClick="{{ addWatchWallet }}" style="height:44px; padding:0 18px; border-radius:12px; background:var(--accent,#D5FF2F); color:#141414; border:none; font-family:inherit; font-weight:600; font-size:13px; cursor:pointer;">Track</button>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; margin-top:16px; font-size:12px; color:#5E5F5D;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5E5F5D" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"></path></svg>
+              Non-custodial — Dig never sees your keys. Watch-only can't sign.
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- CREATE ALERT -->
+        <sc-if value="{{ isAlertModal }}" hint-placeholder-val="">
+          <div style="padding:24px 26px 26px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:2px;">
+              <div style="font-size:18px; font-weight:700;">New alert rule</div>
+              <span class="dig-chip" onClick="{{ closeModal }}" style="cursor:pointer; color:#5E5F5D; font-size:20px; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:8px;">×</span>
+            </div>
+            <div style="font-size:13px; color:#5E5F5D; margin-bottom:22px;">Get notified in-app the moment on-chain state crosses your threshold.</div>
+
+            <div style="font-size:12px; font-weight:600; color:#5E5F5D; margin-bottom:9px;">1 · What to watch</div>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-bottom:20px;">
+              <sc-for list="{{ alertScopes }}" as="sc" hint-placeholder-count="3">
+                <div onClick="{{ sc.onPick }}" style="{{ sc.style }}">
+                  <span>{{ sc.icon }}</span>
+                  <div style="font-size:13px; font-weight:600; margin-top:8px;">{{ sc.label }}</div>
+                  <div style="font-size:11.5px; color:#5E5F5D; margin-top:2px;">{{ sc.sub }}</div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="font-size:12px; font-weight:600; color:#5E5F5D; margin-bottom:9px;">2 · Which {{ alertScopeNoun }}</div>
+            <div class="dig-scroll" style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:20px; max-height:150px; overflow-y:auto;">
+              <sc-for list="{{ alertTargets }}" as="tg" hint-placeholder-count="4">
+                <div onClick="{{ tg.onPick }}" style="{{ tg.style }}">
+                  <span style="{{ tg.markStyle }}"></span>
+                  <div style="min-width:0;">
+                    <div style="{{ tg.labelStyle }}">{{ tg.label }}</div>
+                    <div style="font-size:11px; color:#5E5F5D;">{{ tg.sub }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="font-size:12px; font-weight:600; color:#5E5F5D; margin-bottom:9px;">3 · Condition</div>
+            <div style="display:flex; gap:9px; margin-bottom:14px;">
+              <div style="flex:1;">
+                <div class="dig-scroll" style="display:flex; gap:6px; flex-wrap:wrap;">
+                  <sc-for list="{{ alertMetrics }}" as="m" hint-placeholder-count="4">
+                    <span onClick="{{ m.onPick }}" style="{{ m.style }}">{{ m.label }}</span>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px; padding:16px 18px; background:#1C1C1A; border:1px solid #2C2C29; border-radius:13px; margin-bottom:20px; flex-wrap:wrap;">
+              <span style="font-size:13.5px; color:#5E5F5D;">Notify me when</span>
+              <span style="font-size:13.5px; font-weight:700; color:var(--accent,#D5FF2F);">{{ selectedTargetLabel }}</span>
+              <span style="font-size:13.5px; color:#5E5F5D;">·</span>
+              <span style="font-size:13.5px; font-weight:600; color:#E2E6E1;">{{ selectedMetricLabel }}</span>
+              <div style="display:flex; gap:5px;">
+                <sc-for list="{{ alertOperators }}" as="op" hint-placeholder-count="3">
+                  <span onClick="{{ op.onPick }}" style="{{ op.style }}">{{ op.label }}</span>
+                </sc-for>
+              </div>
+              <input value="{{ alertThreshold }}" onInput="{{ onThresholdInput }}" style="width:96px; height:36px; padding:0 12px; border:1px solid #34342E; border-radius:9px; font-family:'Geist Mono',monospace; font-size:14px; font-weight:600; text-align:right; background:#1C1C1A; color:#E2E6E1; outline:none;">
+              <span style="font-size:13.5px; font-weight:600; color:#5E5F5D;">{{ thresholdUnit }}</span>
+            </div>
+
+            <div style="font-size:12px; font-weight:600; color:#5E5F5D; margin-bottom:9px;">4 · Severity</div>
+            <div style="display:flex; gap:9px; margin-bottom:24px;">
+              <sc-for list="{{ alertSeverities }}" as="sv" hint-placeholder-count="3">
+                <div onClick="{{ sv.onPick }}" style="{{ sv.style }}"><span style="width:8px;height:8px;border-radius:50%;background:{{ sv.dot }};"></span>{{ sv.label }}</div>
+              </sc-for>
+            </div>
+
+            <div style="display:flex; gap:11px;">
+              <button class="dig-ghost" onClick="{{ closeModal }}" style="flex:1; height:46px; border-radius:12px; background:#262624; border:1px solid #2F2F2C; color:#5E5F5D; font-family:inherit; font-weight:600; font-size:14px; cursor:pointer;">Cancel</button>
+              <button class="dig-btn" onClick="{{ saveAlert }}" style="flex:2; height:46px; border-radius:12px; background:var(--accent,#D5FF2F); color:#252525; border:none; font-family:inherit; font-weight:700; font-size:14px; cursor:pointer;">Create alert rule</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ACTION FLOW -->
+        <sc-if value="{{ isActionModal }}" hint-placeholder-val="">
+          <div style="display:flex; flex-direction:column; min-height:0;">
+            <!-- header + steps -->
+            <div style="padding:22px 26px 0;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+                <div style="display:flex; align-items:center; gap:11px;">
+                  <span style="width:34px; height:34px; border-radius:10px; background:{{ pool.tint }}; color:{{ pool.color }}; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px;">{{ pool.mark }}</span>
+                  <div><div style="font-size:16px; font-weight:700;">{{ actionTitle }}</div><div style="font-size:12px; color:#5E5F5D;">{{ pool.pair }} · {{ pool.venue }}</div></div>
+                </div>
+                <span class="dig-chip" onClick="{{ closeModal }}" style="cursor:pointer; color:#5E5F5D; font-size:20px; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:8px;">×</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:0; margin-bottom:4px;">
+                <sc-for list="{{ actionSteps }}" as="st" hint-placeholder-count="3">
+                  <div style="display:flex; align-items:center; flex:{{ st.flex }};">
+                    <span style="{{ st.dotStyle }}">{{ st.num }}</span>
+                    <span style="{{ st.labelStyle }}">{{ st.label }}</span>
+                    <sc-if value="{{ st.hasLine }}" hint-placeholder-val="{{ true }}"><span style="flex:1; height:2px; background:{{ st.lineColor }}; margin:0 10px; border-radius:2px;"></span></sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div class="dig-scroll" style="padding:20px 26px 0; overflow-y:auto;">
+
+              <!-- STEP 1: configure -->
+              <sc-if value="{{ isActStep1 }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex; gap:8px; margin-bottom:16px;">
+                  <sc-for list="{{ actionTypes }}" as="at" hint-placeholder-count="2">
+                    <div onClick="{{ at.onPick }}" style="{{ at.style }}">{{ at.label }}</div>
+                  </sc-for>
+                </div>
+                <div style="border:1px solid #2F2F2C; border-radius:14px; padding:18px; margin-bottom:14px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between; font-size:12px; color:#5E5F5D; margin-bottom:8px;">
+                    <span>{{ amountLabel }}</span><span>Balance: {{ walletBalance }}</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <input value="{{ actionAmount }}" onInput="{{ onAmountInput }}" style="flex:1; border:none; outline:none; font-size:30px; font-weight:700; font-family:'IBM Plex Sans'; color:#E2E6E1; background:transparent; min-width:0;">
+                    <div style="display:flex; align-items:center; gap:7px; background:#262624; padding:7px 12px; border-radius:11px;">
+                      <span style="width:22px;height:22px;border-radius:7px;background:{{ pool.tint }};color:{{ pool.color }};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;">{{ actionAssetMark }}</span>
+                      <span style="font-size:14px; font-weight:600;">{{ actionAsset }}</span>
+                    </div>
+                  </div>
+                  <div style="display:flex; gap:6px; margin-top:14px;">
+                    <sc-for list="{{ amountPresets }}" as="pr" hint-placeholder-count="4">
+                      <span onClick="{{ pr.onPick }}" class="dig-chip" style="flex:1; text-align:center; padding:7px 0; background:#262624; border-radius:9px; font-size:12.5px; font-weight:600; color:#5E5F5D; cursor:pointer;">{{ pr.label }}</span>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:1px; background:#2C2C29; border-radius:12px; overflow:hidden; margin-bottom:6px;">
+                  <sc-for list="{{ actionPreview }}" as="pv" hint-placeholder-count="3">
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:11px 15px; background:#242422;">
+                      <span style="font-size:13px; color:#5E5F5D;">{{ pv.label }}</span>
+                      <span style="font-size:13px; font-weight:600; color:{{ pv.color }}; font-variant-numeric:tabular-nums;">{{ pv.value }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <!-- STEP 2: review XDR / txrep -->
+              <sc-if value="{{ isActStep2 }}" hint-placeholder-val="">
+                <div style="display:flex; align-items:center; gap:9px; padding:12px 15px; background:#12301F; border:1px solid #12301F; border-radius:12px; margin-bottom:16px;">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2E9E63" stroke-width="2.2"><path d="M20 6L9 17l-5-5"></path></svg>
+                  <span style="font-size:13px; color:#2E7A50; font-weight:500;">Simulated successfully · footprint &amp; fees resolved via <span style="font-family:'Geist Mono',monospace;">simulateTransaction</span></span>
+                </div>
+                <div style="font-size:12px; font-weight:600; color:#5E5F5D; margin-bottom:9px;">Human-readable summary (SEP-11 txrep)</div>
+                <div style="display:flex; flex-direction:column; gap:9px; margin-bottom:18px;">
+                  <sc-for list="{{ txrepOps }}" as="op" hint-placeholder-count="3">
+                    <div style="display:flex; gap:12px; padding:14px 15px; border:1px solid #2F2F2C; border-radius:12px;">
+                      <span style="width:26px; height:26px; flex-shrink:0; border-radius:8px; background:{{ op.tint }}; color:{{ op.color }}; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">{{ op.i }}</span>
+                      <div style="flex:1;">
+                        <div style="font-size:13.5px; font-weight:600; color:#E2E6E1;">{{ op.title }}</div>
+                        <div style="font-size:12.5px; color:#5E5F5D; margin-top:2px; font-family:'Geist Mono',monospace;">{{ op.detail }}</div>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:1px; background:#2C2C29; border-radius:12px; overflow:hidden; margin-bottom:16px;">
+                  <sc-for list="{{ feeBreakdown }}" as="f" hint-placeholder-count="3">
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:11px 15px; background:#242422;">
+                      <span style="font-size:13px; color:#5E5F5D;">{{ f.label }}</span>
+                      <span style="font-size:13px; font-weight:600; color:#E2E6E1; font-variant-numeric:tabular-nums;">{{ f.value }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div onClick="{{ toggleXdr }}" class="dig-chip" style="display:flex; align-items:center; gap:7px; font-size:12.5px; color:#5E5F5D; font-weight:600; cursor:pointer; padding:6px 8px; border-radius:8px; margin:0 -8px 8px;">
+                  <span>{{ xdrCaret }}</span> Raw XDR envelope
+                </div>
+                <sc-if value="{{ xdrOpen }}" hint-placeholder-val="">
+                  <div class="dig-scroll" style="font-family:'Geist Mono',monospace; font-size:11px; line-height:1.6; color:#5E5F5D; background:#1C1C1A; border:1px solid #2C2C29; border-radius:11px; padding:14px; word-break:break-all; max-height:110px; overflow-y:auto;">{{ xdrString }}</div>
+                </sc-if>
+              </sc-if>
+
+              <!-- STEP 3: sign -->
+              <sc-if value="{{ isActStep3 }}" hint-placeholder-val="">
+                <div style="text-align:center; padding:14px 0 22px;">
+                  <sc-if value="{{ signing }}" hint-placeholder-val="{{ true }}">
+                    <div style="width:66px; height:66px; margin:6px auto 0; border-radius:50%; border:3px solid #37372F; border-top-color:var(--accent,#D5FF2F); animation:digSpin .9s linear infinite;"></div>
+                    <div style="font-size:16px; font-weight:700; margin-top:20px;">Waiting for signature…</div>
+                    <div style="font-size:13px; color:#5E5F5D; margin-top:5px;">Approve the transaction in Freighter to continue.</div>
+                    <div style="display:inline-flex; align-items:center; gap:10px; margin-top:20px; padding:11px 16px; background:#1C1C1A; border:1px solid #2C2C29; border-radius:12px;">
+                      <span style="width:30px; height:30px; border-radius:9px; background:#2E3A14; color:#252525; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;">F</span>
+                      <div style="text-align:left;"><div style="font-size:13px; font-weight:600;">Freighter</div><div style="font-size:11.5px; color:#5E5F5D; font-family:'Geist Mono',monospace;">{{ signingAddress }}</div></div>
+                    </div>
+                    <div style="margin-top:22px;"><span class="dig-chip" onClick="{{ backToReview }}" style="font-size:13px; color:#5E5F5D; font-weight:600; cursor:pointer; padding:6px 10px; border-radius:8px;">Cancel signing</span></div>
+                  </sc-if>
+                </div>
+              </sc-if>
+
+              <!-- STEP 4: success -->
+              <sc-if value="{{ isActStep4 }}" hint-placeholder-val="">
+                <div style="text-align:center; padding:14px 0 22px;">
+                  <div style="width:66px; height:66px; margin:6px auto 0; border-radius:50%; background:#12301F; display:flex; align-items:center; justify-content:center;">
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2E9E63" stroke-width="2.6"><path d="M20 6L9 17l-5-5"></path></svg>
+                  </div>
+                  <div style="font-size:18px; font-weight:700; margin-top:18px;">Transaction confirmed</div>
+                  <div style="font-size:13px; color:#5E5F5D; margin-top:5px;">Included in ledger — portfolio updating from the event stream.</div>
+                  <div style="display:inline-flex; align-items:center; gap:8px; margin-top:18px; padding:10px 15px; background:#1C1C1A; border:1px solid #2C2C29; border-radius:11px; font-family:'Geist Mono',monospace; font-size:12px; color:#5E5F5D;">
+                    {{ txHash }} <span style="color:var(--accent,#D5FF2F); font-weight:600; cursor:pointer;" class="dig-chip">↗ Explorer</span>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+
+            <!-- footer -->
+            <sc-if value="{{ actionHasFooter }}" hint-placeholder-val="{{ true }}">
+              <div style="padding:16px 26px 22px; border-top:1px solid #2C2C29; display:flex; gap:11px; margin-top:8px;">
+                <sc-if value="{{ actionCanBack }}" hint-placeholder-val="">
+                  <button class="dig-ghost" onClick="{{ actionBack }}" style="flex:1; height:48px; border-radius:12px; background:#262624; border:1px solid #2F2F2C; color:#5E5F5D; font-family:inherit; font-weight:600; font-size:14px; cursor:pointer;">Back</button>
+                </sc-if>
+                <button class="dig-btn" onClick="{{ actionNext }}" style="flex:2; height:48px; border-radius:12px; background:{{ actionCtaBg }}; color:#252525; border:none; font-family:inherit; font-weight:700; font-size:14px; cursor:pointer;">{{ actionCtaLabel }}</button>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:&quot;820px&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#D5FF2F&quot;,&quot;options&quot;:[&quot;#D5FF2F&quot;,&quot;#5CE6B4&quot;,&quot;#63A7FF&quot;,&quot;#FF8A5C&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Brand&quot;,&quot;label&quot;:&quot;Accent color&quot;},&quot;defaultScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dash&quot;,&quot;protocols&quot;,&quot;portfolio&quot;,&quot;alerts&quot;],&quot;default&quot;:&quot;dash&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Layout&quot;,&quot;label&quot;:&quot;Landing screen&quot;},&quot;showBridge&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Layout&quot;,&quot;label&quot;:&quot;Show bridge monitoring&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() {
+    const ds = this.props.defaultScreen;
+    if (ds && ds !== 'dash' && this.state.screen === 'dash') this.setState({ screen: ds });
+    this._applyAccent();
+  }
+  componentDidUpdate() { this._applyAccent(); }
+  _applyAccent() {
+    const el = this._root; if (el) el.style.setProperty('--accent', this.props.accent || '#D5FF2F');
+  }
+  rootRef = (el) => { this._root = el; this._applyAccent(); };
+
+  state = {
+    screen: 'dash',
+    range: '1M',
+    flowRange: '24H',
+    bridgeRange: '7D',
+    bridgeChain: 'all',
+    bridgeTab: 'routes',
+    bridgeSort: { key: 'net', dir: 'desc' },
+    flowSort: { key: 'time', dir: 'desc' },
+    bridgeHover: null,
+    heroHover: null,
+    poolFilter: 'all',
+    poolSort: { key: 'tvl', dir: 'desc' },
+    walletFilter: 'all',
+    posSort: { key: 'value', dir: 'desc' },
+    alertFilter: 'all',
+    modal: null,          // 'connect' | 'addWallet' | 'alert' | 'action'
+    connected: false,
+    watchInput: '',
+    selectedPoolId: 'blend-usdc',
+    // alert builder
+    alertScope: 'venue',
+    alertTarget: 'blend-usdc',
+    alertMetric: 'apy',
+    alertOp: 'lt',
+    alertThreshold: '4.5',
+    alertSeverity: 'warning',
+    // action flow
+    actionStep: 1,
+    actionType: 'supply',
+    actionAmount: '2,500',
+    xdrOpen: false,
+    signing: false,
+    // rule toggles
+    rulesOn: { r1: true, r2: true, r3: false, r4: true },
+    refreshing: false,
+    refreshedAt: 'now',
+  };
+
+  ACCENT = 'var(--accent,#D5FF2F)';
+  LIME = 'var(--accent,#D5FF2F)';
+
+  LOGOS = {
+    blend: '<img src="logo-blend.svg" alt="" style="width:66%; height:66%; object-fit:contain; filter:brightness(0) invert(1);">',
+    aqua: '<img src="logo-aquarius.png" alt="" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;">',
+    soro: '<img src="logo-soroswap.svg" alt="" style="width:88%; height:88%; object-fit:contain;">',
+    native: '<svg width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.6 6.6L21 11l-6.4 2.4L12 20l-2.6-6.6L3 11l6.4-2.4z"/></svg>',
+  };
+
+  parseNum(v) {
+    if (v == null) return null;
+    let str = String(v).replace(/[$,%\s]/g, '');
+    if (str === '' || str === '—') return null;
+    let mult = 1;
+    if (/k$/i.test(str)) { mult = 1e3; str = str.slice(0, -1); }
+    else if (/m$/i.test(str)) { mult = 1e6; str = str.slice(0, -1); }
+    else if (/b$/i.test(str)) { mult = 1e9; str = str.slice(0, -1); }
+    const n = parseFloat(str);
+    return isNaN(n) ? null : n * mult;
+  }
+
+  protoLogo(v) {
+    const t = (v || '').toLowerCase();
+    if (t.includes('blend')) return this.LOGOS.blend;
+    if (t.includes('aquar') || t.includes('aqua')) return this.LOGOS.aqua;
+    if (t.includes('soro')) return this.LOGOS.soro;
+    if (t.includes('native')) return this.LOGOS.native;
+    return '';
+  }
+
+  POOLS = {
+    'blend-usdc': { category:'lending', mark:'B', tint:'#17233A', color:'#2E6FD6', pair:'Blend — Fixed Pool', venue:'Blend V2', type:'Lending market', tvl:'$180.6M', liquidity:'$140.7M', supplied:'$180.0M', supplyApy:'2.01%', borrowApy:'11.04%', apy:'2.01%', vol:'$2.1M', util:'71%', contract:'CAJJZS…BXBD', updated:'6 Jul 2026, 17:15',
+      reserves:[
+        { asset:'EURC', price:'$1.16', supplied:'2,709,941.65', borrowed:'1,943,581.66', backstop:'2.91', cap:'1,000,000,000', supplyApy:'6.20%', borrowApy:'10.31%', tint:'#171E30', color:'#4E68D4' },
+        { asset:'XLM', price:'$0.20', supplied:'621,835,191.01', borrowed:'1,223,948.53', backstop:'28.28', cap:'10,000,000,000', supplyApy:'0.00%', borrowApy:'0.10%', tint:'#2E3A14', color:'var(--accent,#D5FF2F)' },
+        { asset:'USDC', price:'$1.00', supplied:'53,376,501.86', borrowed:'36,715,509.24', backstop:'58.95', cap:'1,000,000,000', supplyApy:'6.41%', borrowApy:'11.17%', tint:'#17233A', color:'#2E6FD6' },
+      ] },
+    'blend-orbit': { category:'lending', mark:'B', tint:'#17233A', color:'#2E6FD6', pair:'Blend — Orbit Pool', venue:'Blend V2', type:'Lending market', tvl:'$286.9k', liquidity:'$212.4k', supplied:'$286.9k', supplyApy:'3.40%', borrowApy:'9.85%', apy:'3.40%', vol:'$41.2k', util:'62%', contract:'CBOR8T…9K2P', updated:'6 Jul 2026, 17:15',
+      reserves:[
+        { asset:'USDC', price:'$1.00', supplied:'184,220.44', borrowed:'112,880.10', backstop:'1.20', cap:'50,000,000', supplyApy:'3.40%', borrowApy:'9.85%', tint:'#17233A', color:'#2E6FD6' },
+        { asset:'XLM', price:'$0.20', supplied:'512,004.02', borrowed:'88,140.55', backstop:'0.42', cap:'500,000,000', supplyApy:'0.10%', borrowApy:'1.20%', tint:'#2E3A14', color:'var(--accent,#D5FF2F)' },
+      ] },
+    'aqua-pyusd-usdc': { category:'amm', mark:'A', tint:'#0F302C', color:'#159A8C', pair:'PYUSD / USDC', venue:'Aquarius', type:'AMM pool', tvl:'$8.0M', apy:'14.3%', vol:'$1.5k', fees:'$1.54', swaps:'54', events:'111', util:'—', contract:'CDMH53…7SUW', updated:'6 Jul 2026, 17:15' },
+    'aqua-native-solvbtc': { category:'amm', mark:'A', tint:'#0F302C', color:'#159A8C', pair:'native / SolvBTC', venue:'Aquarius', type:'AMM pool', tvl:'$6.0M', apy:'9.10%', vol:'$3.2k', fees:'$3.28', swaps:'82', events:'171', util:'—', contract:'CDA9K1…QW3E', updated:'6 Jul 2026, 17:15' },
+    'aqua-native-usdc': { category:'amm', mark:'A', tint:'#0F302C', color:'#159A8C', pair:'native / USDC', venue:'Aquarius', type:'AMM pool', tvl:'$4.9M', apy:'11.2%', vol:'$2.1k', fees:'$2.14', swaps:'63', events:'128', util:'—', contract:'CDX7P2…LM4A', updated:'6 Jul 2026, 17:15' },
+    'soro-xlm-usdc': { category:'amm', mark:'S', tint:'#37231A', color:'#D86A3E', pair:'XLM / USDC', venue:'Soroswap', type:'AMM pair', tvl:'$6.7M', apy:'11.7%', vol:'$2.9M', fees:'$8.7k', swaps:'1,204', events:'2,410', util:'—', contract:'CSORO2…8F4Q', updated:'6 Jul 2026, 17:15' },
+    'native-xlm-usdc': { category:'amm', mark:'N', tint:'#241633', color:'#7B45D6', pair:'XLM / USDC', venue:'Stellar Native DEX', type:'Classic AMM pool', tvl:'$4.8M', apy:'3.90%', vol:'$1.6k', fees:'$4.69', swaps:'1,887', events:'1,887', util:'—', contract:'0b8aaf…71f4', updated:'6 Jul 2026, 17:19' },
+    'native-xlm-eurc': { category:'amm', mark:'N', tint:'#241633', color:'#7B45D6', pair:'XLM / EURC', venue:'Stellar Native DEX', type:'Classic AMM pool', tvl:'$232.0k', apy:'2.10%', vol:'$0.4k', fees:'$1.10', swaps:'420', events:'420', util:'—', contract:'0f21c9…9a02', updated:'6 Jul 2026, 17:19' },
+  };
+
+  go = (s) => this.setState({ screen: s, modal: null });
+  stop = (e) => { e.stopPropagation(); };
+  closeModal = () => this.setState({ modal: null, signing: false, actionStep: 1, xdrOpen: false });
+
+  openConnect = () => { if (this.state.connected) { this.setState({ modal: 'connect' }); } else { this.setState({ modal: 'connect' }); } };
+  openAddWallet = () => this.setState({ modal: 'connect' });
+  openCreateAlert = () => this.setState({ modal: 'alert' });
+  openCreateAlertForPool = () => this.setState({ modal: 'alert', alertScope: 'venue', alertTarget: this.state.selectedPoolId, alertMetric: 'apy' });
+  openAlertsBell = () => this.setState({ screen: 'alerts', modal: null });
+
+  selectPool = (id) => this.setState({ screen: 'pool', selectedPoolId: id, modal: null });
+  openActionForPool = () => { const p = this.POOLS[this.state.selectedPoolId] || {}; const lending = (p.category || (/blend/i.test(p.venue||'')?'lending':'amm')) === 'lending'; this.setState({ modal: 'action', actionStep: 1, actionType: lending?'supply':'swap', signing: false, xdrOpen: false }); };
+  openActionWithdraw = () => { const p = this.POOLS[this.state.selectedPoolId] || {}; const lending = (p.category || (/blend/i.test(p.venue||'')?'lending':'amm')) === 'lending'; this.setState({ modal: 'action', actionStep: 1, actionType: lending?'withdraw':'deposit', signing: false, xdrOpen: false }); };
+
+  addWatchWallet = () => { this.setState({ modal: null, watchInput: '' }); };
+  pickProvider = () => { this.setState({ connected: true, modal: null }); };
+  onWatchInput = (e) => this.setState({ watchInput: e.target.value });
+
+  refreshBalances = () => {
+    if (this.state.refreshing) return;
+    this.setState({ refreshing: true });
+    setTimeout(() => this.setState({ refreshing: false, refreshedAt: 'just now' }), 1400);
+  };
+
+  toggleRule = (k) => this.setState(s => ({ rulesOn: { ...s.rulesOn, [k]: !s.rulesOn[k] } }));
+  onThresholdInput = (e) => this.setState({ alertThreshold: e.target.value });
+  onAmountInput = (e) => this.setState({ actionAmount: e.target.value });
+  toggleXdr = () => this.setState(s => ({ xdrOpen: !s.xdrOpen }));
+
+  actionNext = () => {
+    const st = this.state.actionStep;
+    if (st === 1) this.setState({ actionStep: 2 });
+    else if (st === 2) { this.setState({ actionStep: 3, signing: true }); setTimeout(() => { if (this.state.actionStep === 3) this.setState({ signing: false, actionStep: 4 }); }, 2600); }
+    else if (st === 4) this.closeModal();
+  };
+  actionBack = () => this.setState(s => ({ actionStep: Math.max(1, s.actionStep - 1), signing: false }));
+  backToReview = () => this.setState({ actionStep: 2, signing: false });
+
+  // ---- sparkline / chart builders (data viz) ----
+  spark(seed, color, w, h) {
+    const pts = []; let v = 50;
+    for (let i = 0; i < 28; i++) { v += (Math.sin(i * seed) + Math.cos(i * 0.7 + seed)) * 6 + (i * 0.4); pts.push(v); }
+    const min = Math.min(...pts), max = Math.max(...pts), rng = (max - min) || 1;
+    const step = w / (pts.length - 1);
+    const line = pts.map((p, i) => `${(i * step).toFixed(1)},${(h - ((p - min) / rng) * (h - 6) - 3).toFixed(1)}`).join(' ');
+    const area = `0,${h} ${line} ${w},${h}`;
+    const gid = 'g' + String(seed).replace('.', '');
+    return `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity="0.16"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs><polygon points="${area}" fill="url(#${gid})"/><polyline points="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+
+  bigChart(lineColor, fillColor) {
+    fillColor = fillColor || lineColor;
+    const w = 640, h = 150; const pts = []; let v = 60;
+    for (let i = 0; i < 60; i++) { v += (Math.sin(i * 0.5) * 5) + (Math.cos(i * 0.23) * 7) + 1.1; pts.push(v); }
+    const min = Math.min(...pts), max = Math.max(...pts), rng = (max - min) || 1;
+    const step = w / (pts.length - 1);
+    const line = pts.map((p, i) => `${(i * step).toFixed(1)},${(h - ((p - min) / rng) * (h - 14) - 7).toFixed(1)}`).join(' ');
+    const area = `0,${h} ${line} ${w},${h}`;
+    return `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="hero" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${fillColor}" stop-opacity="0.55"/><stop offset="1" stop-color="${fillColor}" stop-opacity="0"/></linearGradient></defs><polygon points="${area}" fill="url(#hero)"/><polyline points="${line}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+
+  heroSeries(range) {
+    const cfg = {
+      '24H': { n: 24, freq: 0.7, amp: 6, drift: 0.5, startVal: 80488 },
+      '1W':  { n: 28, freq: 0.5, amp: 9, drift: 0.9, startVal: 76210 },
+      '1M':  { n: 30, freq: 0.4, amp: 11, drift: 1.1, startVal: 71040 },
+      '1Y':  { n: 24, freq: 0.28, amp: 14, drift: 1.8, startVal: 52880 },
+    }[range] || { n: 30, freq: 0.5, amp: 10, drift: 1.1, startVal: 71040 };
+    const pts = []; let v = 60;
+    for (let i = 0; i < cfg.n; i++) { v += (Math.sin(i * cfg.freq) * cfg.amp) + (Math.cos(i * cfg.freq * 0.46) * cfg.amp * 0.7) + cfg.drift; pts.push(v); }
+    const min = Math.min(...pts), max = Math.max(...pts), rng = (max - min) || 1;
+    return { pts, min, max, rng, n: pts.length, startVal: cfg.startVal, endVal: 82330,
+      unit: range==='24H' ? 'h' : (range==='1Y' ? 'mo' : 'd') };
+  }
+
+  heroSummary(range) {
+    const ser = this.heroSeries(range);
+    const delta = ser.endVal - ser.startVal, pct = ser.startVal ? (delta/ser.startVal*100) : 0;
+    return {
+      value: '$' + ser.endVal.toLocaleString('en-US'),
+      change: (delta>=0?'+':'−') + '$' + Math.abs(delta).toLocaleString('en-US') + ' · ' + (delta>=0?'+':'−') + Math.abs(pct).toFixed(1) + '%',
+      changeColor: delta>=0 ? '#2E9E63' : '#E0603E',
+    };
+  }
+
+  heroChartEl(lineColor, fillColor, range) {
+    const w = 640, h = 150;
+    const ser = this.heroSeries(range);
+    const pts = ser.pts, n = ser.n, min = ser.min, rng = ser.rng;
+    const step = w / (n - 1);
+    const coords = pts.map((p, i) => ({ xPct: (i / (n - 1)) * 100, yPct: ((h - ((p - min) / rng) * (h - 14) - 7) / h) * 100 }));
+    const line = pts.map((p, i) => `${(i * step).toFixed(1)},${(h - ((p - min) / rng) * (h - 14) - 7).toFixed(1)}`).join(' ');
+    const area = `0,${h} ${line} ${w},${h}`;
+    const svg = `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="hero" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${fillColor}" stop-opacity="0.55"/><stop offset="1" stop-color="${fillColor}" stop-opacity="0"/></linearGradient></defs><polygon points="${area}" fill="url(#hero)"/><polyline points="${line}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const endVal = ser.endVal, loVal = ser.startVal;
+    const norm = (p) => (p - min) / rng;
+    const first = loVal + norm(pts[0]) * (endVal - loVal);
+    const data = pts.map((p, i) => {
+      const val = loVal + norm(p) * (endVal - loVal);
+      const delta = val - first, pct = first ? (delta / first * 100) : 0;
+      const dl = (n - 1 - i);
+      return {
+        value: '$' + Math.round(val).toLocaleString('en-US'),
+        change: (delta >= 0 ? '+' : '−') + '$' + Math.abs(Math.round(delta)).toLocaleString('en-US') + ' · ' + (delta >= 0 ? '+' : '−') + Math.abs(pct).toFixed(1) + '%',
+        changeColor: delta >= 0 ? '#2E9E63' : '#E0603E',
+        when: dl === 0 ? 'Now' : (dl + ser.unit + ' ago'),
+      };
+    });
+    const hi = this.state.heroHover, cE = React.createElement;
+    const overlay = data.map((d, i) => cE('div', {
+      key: i, onMouseEnter: () => this.setState({ heroHover: i }),
+      style: { flex: 1, height: '100%', cursor: 'crosshair' },
+    }));
+    let tip = null, dot = null, guide = null;
+    if (hi != null && data[hi]) {
+      const c = coords[hi], d = data[hi];
+      guide = cE('div', { style: { position: 'absolute', top: 0, bottom: 0, left: c.xPct + '%', width: 1, background: '#37372F', pointerEvents: 'none' } });
+      dot = cE('div', { style: { position: 'absolute', left: c.xPct + '%', top: c.yPct + '%', width: 10, height: 10, borderRadius: '50%', background: lineColor, border: '2px solid #1E1E1E', transform: 'translate(-50%,-50%)', pointerEvents: 'none', boxShadow: '0 0 0 3px rgba(213,255,47,0.15)' } });
+      const flip = hi > n * 0.6;
+      tip = cE('div', { style: {
+        position: 'absolute', left: c.xPct + '%', top: -6,
+        transform: `translate(${flip ? '-100%' : '0'}, -100%)`, marginLeft: flip ? -8 : 8,
+        pointerEvents: 'none', zIndex: 5, background: '#161615', border: '1px solid #37372F',
+        borderRadius: 11, padding: '9px 12px', minWidth: 132, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' } },
+        cE('div', { style: { fontSize: 11, color: '#5E5F5D', fontWeight: 600 } }, d.when),
+        cE('div', { style: { fontSize: 17, fontWeight: 700, color: '#E2E6E1', marginTop: 2, fontVariantNumeric: 'tabular-nums' } }, d.value),
+        cE('div', { style: { fontSize: 12, fontWeight: 600, color: d.changeColor, marginTop: 2 } }, d.change));
+    }
+    return cE('div', { style: { position: 'relative', width: '100%' }, onMouseLeave: () => this.setState({ heroHover: null }) },
+      cE('span', { dangerouslySetInnerHTML: { __html: svg }, style: { display: 'block', width: '100%', lineHeight: 0 } }),
+      guide, dot,
+      cE('div', { style: { position: 'absolute', inset: 0, display: 'flex' } }, ...overlay),
+      tip);
+  }
+
+  poolChartSvg() {
+    const w = 700, h = 190; const bars = 30; const bw = w / bars;
+    let line = []; let v = 60;
+    let barsHtml = '';
+    for (let i = 0; i < bars; i++) {
+      const vol = 30 + Math.abs(Math.sin(i * 0.6) * 55) + Math.random() * 10;
+      const bh = (vol / 110) * (h * 0.55);
+      barsHtml += `<rect x="${(i * bw + 3).toFixed(1)}" y="${(h - bh).toFixed(1)}" width="${(bw - 6).toFixed(1)}" height="${bh.toFixed(1)}" rx="3" fill="#37372F"/>`;
+      v += Math.sin(i * 0.5) * 6 + 2.2; line.push(v);
+    }
+    const min = Math.min(...line), max = Math.max(...line), rng = (max - min) || 1;
+    const step = w / (line.length - 1);
+    const lp = line.map((p, i) => `${(i * step).toFixed(1)},${(h - ((p - min) / rng) * (h - 30) - 15).toFixed(1)}`).join(' ');
+    return `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${barsHtml}<polyline points="${lp}" fill="none" stroke="#E2E6E1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+
+  flowSvg(seed) {
+    const w = 700, h = 200, n = 30; const bw = w / n; const mid = h * 0.5;
+    let bars = ''; const net = []; let run = 0;
+    for (let i = 0; i < n; i++) {
+      const inflow = 22 + Math.abs(Math.sin(i * 0.5 + seed) * 44) + ((i * seed * 7) % 13);
+      const outflow = 20 + Math.abs(Math.cos(i * 0.42 + seed) * 40) + ((i * seed * 5) % 11);
+      const inH = (inflow / 95) * (mid - 12);
+      const outH = (outflow / 95) * (h - mid - 12);
+      const x = (i * bw + 3).toFixed(1), bwF = (bw - 6).toFixed(1);
+      bars += `<rect x="${x}" y="${(mid - inH).toFixed(1)}" width="${bwF}" height="${inH.toFixed(1)}" rx="2.5" fill="#B8E640"/>`;
+      bars += `<rect x="${x}" y="${mid.toFixed(1)}" width="${bwF}" height="${outH.toFixed(1)}" rx="2.5" fill="#4C4C46"/>`;
+      run += inflow - outflow; net.push(run);
+    }
+    const mn = Math.min(...net), mx = Math.max(...net), rng = (mx - mn) || 1;
+    const step = w / (net.length - 1);
+    const lp = net.map((p, i) => `${(i * step).toFixed(1)},${(h - 12 - ((p - mn) / rng) * (h - 26)).toFixed(1)}`).join(' ');
+    return `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><line x1="0" y1="${mid}" x2="${w}" y2="${mid}" stroke="#37372F" stroke-width="1" stroke-dasharray="4 5"/>${bars}<polyline points="${lp}" fill="none" stroke="#E2E6E1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+
+  bridgeSvg(seed) {
+    return this.buildBridgeChart(seed).svg;
+  }
+
+  buildBridgeChart(seed) {
+    const w = 680, h = 160, n = 22, bw = w / n, mid = h * 0.62;
+    let bars = ''; const net = []; const cols = []; let run = 0;
+    for (let i = 0; i < n; i++) {
+      const inflow = 30 + Math.abs(Math.sin(i * 0.5 + seed) * 46) + ((i * seed * 7) % 14);
+      const outflow = 8 + Math.abs(Math.cos(i * 0.44 + seed) * 15) + ((i * seed * 3) % 7);
+      const inH = (inflow / 95) * (mid - 8);
+      const outH = (outflow / 55) * (h - mid - 8);
+      const x = (i * bw + 3).toFixed(1), bwF = (bw - 6).toFixed(1);
+      bars += `<rect x="${x}" y="${(mid - inH).toFixed(1)}" width="${bwF}" height="${inH.toFixed(1)}" rx="2.5" fill="#B8E640"/>`;
+      bars += `<rect x="${x}" y="${mid.toFixed(1)}" width="${bwF}" height="${outH.toFixed(1)}" rx="2.5" fill="#4C4C46"/>`;
+      run += inflow - outflow; net.push(run);
+      cols.push({ inflow: (inflow * 9).toFixed(0), outflow: (outflow * 9).toFixed(0), net: run });
+    }
+    const mn = Math.min(...net), mx = Math.max(...net), rng = (mx - mn) || 1, step = w / (net.length - 1);
+    const lp = net.map((p, i) => `${(i * step).toFixed(1)},${(h - 12 - ((p - mn) / rng) * (h - 26)).toFixed(1)}`).join(' ');
+    const svg = `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><line x1="0" y1="${mid}" x2="${w}" y2="${mid}" stroke="#37372F" stroke-width="1" stroke-dasharray="4 5"/>${bars}<polyline points="${lp}" fill="none" stroke="#E2E6E1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const fmtK = (v) => '$' + (v/1000).toFixed(1) + 'M';
+    const data = cols.map((c, i) => ({
+      inflow: fmtK(+c.inflow), outflow: fmtK(+c.outflow),
+      net: (c.net < 0 ? '−' : '+') + '$' + (Math.abs(c.net) * 9 / 1000).toFixed(2) + 'M',
+      hoursAgo: (n - i) + 'h ago',
+    }));
+    return { svg, data, n };
+  }
+
+  bridgeChartEl(seed, chartH) {
+    const { svg, data, n } = this.buildBridgeChart(seed);
+    const hi = this.state.bridgeHover;
+    const cE = React.createElement;
+    const cols = data.map((d, i) => cE('div', {
+      key: i,
+      onMouseEnter: () => this.setState({ bridgeHover: i }),
+      style: { flex: 1, height: '100%', cursor: 'crosshair',
+        background: hi === i ? 'rgba(255,255,255,0.05)' : 'transparent' },
+    }));
+    let tip = null;
+    if (hi != null && data[hi]) {
+      const d = data[hi];
+      const leftPct = ((hi + 0.5) / n) * 100;
+      const flip = hi > n * 0.6;
+      const row = (label, val, dot) => cE('div', { style: { display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, marginTop: 4 } },
+        cE('span', { style: { width: 8, height: 8, borderRadius: 2, background: dot, flexShrink: 0 } }),
+        cE('span', { style: { color: '#8A857B' } }, label),
+        cE('span', { style: { marginLeft: 'auto', fontWeight: 700, color: '#E2E6E1', fontVariantNumeric: 'tabular-nums' } }, val));
+      tip = cE('div', { style: {
+        position: 'absolute', top: -6, left: leftPct + '%',
+        transform: `translate(${flip ? '-100%' : '0'}, -100%)`,
+        marginLeft: flip ? -8 : 8, pointerEvents: 'none', zIndex: 5,
+        background: '#161615', border: '1px solid #37372F', borderRadius: 11,
+        padding: '10px 12px', minWidth: 150, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' } },
+        cE('div', { style: { fontSize: 11, color: '#5E5F5D', fontWeight: 600, marginBottom: 2 } }, d.hoursAgo),
+        row('Inflow', d.inflow, '#B8E640'),
+        row('Outflow', d.outflow, '#4C4C46'),
+        row('Net', d.net, '#E2E6E1'));
+    }
+    const marker = (hi != null) ? cE('div', { style: {
+      position: 'absolute', top: 0, bottom: 0, left: ((hi + 0.5) / n) * 100 + '%',
+      width: 1, background: '#5E5F5D', pointerEvents: 'none' } }) : null;
+    return cE('div', {
+      style: { position: 'relative', width: '100%' },
+      onMouseLeave: () => this.setState({ bridgeHover: null }),
+    },
+      cE('span', { dangerouslySetInnerHTML: { __html: svg }, style: { display: 'block', width: '100%', lineHeight: 0 } }),
+      marker,
+      cE('div', { style: { position: 'absolute', inset: 0, display: 'flex' } }, ...cols),
+      tip);
+  }
+
+  bridgeHubSvg() {
+    const cx = 280, cy = 168, w = 560, h = 336;
+    const nodes = [
+      { mark:'E', name:'Ethereum', net:'+$1.4M', share:45, color:'#4E68D4', x:96, y:78 },
+      { mark:'B', name:'BNB Chain', net:'+$0.8M', share:26, color:'#B98A00', x:96, y:258 },
+      { mark:'A', name:'Arbitrum', net:'+$0.6M', share:19, color:'#2E6FD6', x:464, y:78 },
+      { mark:'P', name:'Polygon', net:'+$0.3M', share:10, color:'#7B45D6', x:464, y:258 },
+    ];
+    let edges = '', dots = '', labels = '';
+    nodes.forEach((n, i) => {
+      const sw = (3 + n.share / 5).toFixed(1);
+      const mx = (n.x + cx) / 2, my = (n.y + cy) / 2;
+      const cxp = mx + (cx - mx) * 0.3, cyp = my;
+      const d = `M ${n.x} ${n.y} Q ${cxp} ${cyp} ${cx} ${cy}`;
+      edges += `<path d="${d}" fill="none" stroke="#C7E877" stroke-width="${sw}" stroke-linecap="round" opacity="0.6"/>`;
+      edges += `<path d="${d}" fill="none" stroke="#8FBE1C" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="9 13"><animate attributeName="stroke-dashoffset" from="22" to="0" dur="${(1.1 + i * 0.18).toFixed(2)}s" repeatCount="indefinite"/></path>`;
+    });
+    nodes.forEach(n => {
+      dots += `<circle cx="${n.x}" cy="${n.y}" r="25" fill="#fff" stroke="${n.color}" stroke-width="2"/>`;
+      dots += `<text x="${n.x}" y="${n.y + 5}" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-size="15" font-weight="700" fill="${n.color}">${n.mark}</text>`;
+      const below = n.y > cy; const ly = below ? n.y + 44 : n.y - 34;
+      labels += `<text x="${n.x}" y="${ly}" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-size="13" font-weight="600" fill="#E2E6E1">${n.name}</text>`;
+      labels += `<text x="${n.x}" y="${ly + 17}" text-anchor="middle" font-family="Geist Mono,monospace" font-size="11.5" font-weight="600" fill="#2E9E63">${n.net} \u00b7 ${n.share}%</text>`;
+    });
+    const center = `<circle cx="${cx}" cy="${cy}" r="42" fill="#252525"/><text x="${cx}" y="${cy - 3}" text-anchor="middle" font-size="22" fill="var(--accent,#D5FF2F)">\u2726</text><text x="${cx}" y="${cy + 17}" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-size="11" font-weight="700" fill="#fff">Stellar</text>`;
+    return `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}">${edges}${center}${dots}${labels}</svg>`;
+  }
+
+  icons = {
+    grid: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+    layers: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2l9 5-9 5-9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/></svg>',
+    wallet: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18"/><circle cx="17" cy="14" r="1.3" fill="currentColor" stroke="none"/></svg>',
+    bell: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
+    drop: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg>',
+    trend: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>',
+    heart: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20l-1.5-1.4C5 13.6 2 10.9 2 7.5A4.5 4.5 0 0 1 12 5a4.5 4.5 0 0 1 10 2.5c0 3.4-3 6.1-8.5 11.1z"/></svg>',
+    refresh: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v5h-5"/></svg>',
+  };
+
+  navIcon(k) { return this.icons[k]; }
+
+  renderVals() {
+    const s = this.state;
+    const acc = this.props.accent || '#D5FF2F';
+    const A = this.ACCENT;
+    const H = (x) => React.createElement('span', { dangerouslySetInnerHTML: { __html: x }, style: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 0 } });
+    const HB = (x) => React.createElement('span', { dangerouslySetInnerHTML: { __html: x }, style: { display: 'block', width: '100%', lineHeight: 0 } });
+    const basePool = this.POOLS[s.selectedPoolId] || this.POOLS['blend-usdc'];
+    const pool = { ...basePool, mark: H(this.protoLogo(basePool.venue)) };
+
+    const titles = {
+      dash: ['Dashboard', 'Every position, pool and flow — in one live view'],
+      protocols: ['Protocols', 'Where Stellar liquidity lives, side by side'],
+      pool: [pool.pair, pool.venue + ' · live on-chain state'],
+      portfolio: ['Portfolio', 'Your wallets, working across Stellar DeFi'],
+      alerts: ['Alerts', 'Catch every move before it moves the market'],
+    };
+    const [screenTitle, screenSub] = titles[s.screen] || titles.dash;
+
+    // sidebar nav
+    const navDef = [
+      { key: 'dash', label: 'Dashboard', icon: 'grid' },
+      { key: 'protocols', label: 'Protocols', icon: 'layers' },
+      { key: 'portfolio', label: 'Portfolio', icon: 'wallet' },
+      { key: 'alerts', label: 'Alerts', icon: 'bell', badge: '3' },
+    ];
+    const navMain = navDef.map(n => {
+      const on = s.screen === n.key || (n.key === 'protocols' && s.screen === 'pool');
+      return {
+        label: n.label, badge: n.badge || '', icon: H(this.navIcon(n.icon)),
+        cls: on ? 'dig-navon' : 'dig-nav',
+        onClick: () => this.go(n.key),
+        style: `display:flex; align-items:center; gap:11px; padding:9px 10px; border-radius:10px; cursor:pointer; font-size:13.5px; font-weight:${on?600:500}; color:${on?'#E2E6E1':'#5E5F5D'}; background:${on?'#2A2A27':'transparent'}; transition:background .12s; margin-bottom:2px;`,
+      };
+    });
+
+    const walletsNav = [
+      { label: 'Main', dot: '#63A7FF', short: 'GDX…7QF' },
+      { label: 'Cold storage', dot: '#2E9E63', short: 'GBM…K2A' },
+      { label: 'Trading', dot: '#D86A3E', short: 'GCU…9PL' },
+    ].map(w => ({ ...w, onOpen: () => this.setState({ screen:'portfolio', walletFilter:w.label, modal:null }) }));
+
+    // ---- dashboard data ----
+    const portfolioBreakdown = [
+      { label: 'Lending', value: '$41,280', color: '#2E6FD6' },
+      { label: 'Liquidity', value: '$28,940', color: '#159A8C' },
+      { label: 'Idle', value: '$12,110', color: '#6A665E' },
+    ];
+    const rangeTabs = ['24H','1W','1M','1Y'].map(r => ({
+      label: r,
+      cls: 'dig-chip',
+      onClick: () => this.setState({ range: r }),
+      style: `font-size:11.5px; font-weight:600; padding:4px 9px; border-radius:8px; cursor:pointer; color:${s.range===r?'#E2E6E1':'#5E5F5D'}; background:${s.range===r?'#2A2A27':'transparent'};`,
+    }));
+    const heroSummary = this.heroSummary(s.range);
+
+    const dashAlerts = [
+      { title: 'Health factor near threshold', venue: 'Blend · USDC Lending', time: '2m ago', icon: H(this.icons.heart), tint:'#371C16', color:'#D0522E' },
+      { title: 'XLM/USDC volume spike +240%', venue: 'Aquarius', time: '18m ago', icon: H(this.icons.trend), tint:'#34290F', color:'#C98A1E' },
+      { title: 'Large netflow out of pool', venue: 'Soroswap · EURC/USDC', time: '1h ago', icon: H(this.icons.drop), tint:'#17233A', color:'#2E6FD6' },
+    ];
+
+    const networkStats = [
+      { label: 'Stellar DeFi TVL', value: '$214.6M', delta: '+3.2% 7d', color:'#2E9E63' },
+      { label: '24h volume', value: '$38.1M', delta: '+12.4%', color:'#2E9E63' },
+      { label: 'Active pools', value: '142', delta: '+4 this week', color:'#5E5F5D' },
+      { label: 'Your net APY', value: '9.4%', delta: 'blended', color:'#5E5F5D' },
+    ];
+
+    const protoDef = [
+      { id:'blend-usdc', name:'Blend', category:'Lending', mark:'B', tint:'#17233A', color:'#2E6FD6', tvl:'$180.6M', vol:'$8.4M', change:'+4.1%', changeColor:'#2E9E63', poolCount:3, seed:0.5 },
+      { id:'aqua-pyusd-usdc', name:'Aquarius', category:'AMM + rewards', mark:'A', tint:'#0F302C', color:'#159A8C', tvl:'$21.1M', vol:'$14.2M', change:'+7.8%', changeColor:'#2E9E63', poolCount:4, seed:0.9 },
+      { id:'soro-xlm-usdc', name:'Soroswap', category:'AMM', mark:'S', tint:'#37231A', color:'#D86A3E', tvl:'$31.4M', vol:'$9.1M', change:'-1.9%', changeColor:'#D0522E', poolCount:7, seed:1.3 },
+      { id:'native-xlm-usdc', name:'Stellar Native DEX', category:'Classic AMM', mark:'N', tint:'#241633', color:'#7B45D6', tvl:'$5.6M', vol:'$1.6k', change:'+0.4%', changeColor:'#2E9E63', poolCount:7, seed:1.1 },
+    ];
+    const protocols = protoDef.map(p => ({
+      ...p,
+      mark: H(this.protoLogo(p.name)),
+      onOpen: () => this.selectPool(p.id),
+      spark: H(this.spark(p.seed, p.color, 300, 46)),
+    }));
+
+    const positions = [
+      { pair:'USDC Lending', venue:'Blend V2', value:'$24,180', apy:'6.82%', mark:'B', tint:'#17233A', color:'#2E6FD6' },
+      { pair:'XLM / USDC', venue:'Aquarius', value:'$18,640', apy:'14.3%', mark:'A', tint:'#0F302C', color:'#159A8C' },
+      { pair:'XLM / USDC', venue:'Soroswap', value:'$9,720', apy:'11.7%', mark:'S', tint:'#37231A', color:'#D86A3E' },
+    ].map(p => ({ ...p, mark: H(this.protoLogo(p.venue)), onManage: () => this.selectPool('blend-usdc') }));
+
+    // ---- bridge flow monitoring (Deliverable 3 · Allbridge) ----
+    const bridgeIcon = H('<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10M8 9l4 4 4-4"/><path d="M4 21h16M4 21v-4M20 21v-4"/></svg>');
+    const bridgeRanges = ['24H','7D','30D'].map(r => ({
+      label: r, cls: 'dig-chip',
+      onClick: () => this.setState({ bridgeRange: r }),
+      style: `font-size:11.5px; font-weight:600; padding:4px 9px; border-radius:8px; cursor:pointer; color:${s.bridgeRange===r?'#E2E6E1':'#5E5F5D'}; background:${s.bridgeRange===r?'#2A2A27':'transparent'};`,
+    }));
+    const bridgeStatMap = {
+      all:        { in:'+$4.2M', out:'−$1.1M', net:'+$3.1M', seed:0.9 },
+      'Ethereum': { in:'+$1.9M', out:'−$0.5M', net:'+$1.4M', seed:0.4 },
+      'BNB Chain':{ in:'+$1.1M', out:'−$0.3M', net:'+$0.8M', seed:1.2 },
+      'Arbitrum': { in:'+$0.8M', out:'−$0.2M', net:'+$0.6M', seed:1.7 },
+      'Polygon':  { in:'+$0.4M', out:'−$0.7M', net:'−$0.3M', seed:2.3 },
+    };
+    const bStat = bridgeStatMap[s.bridgeChain] || bridgeStatMap.all;
+    const bridgeStats = [
+      { label:'Inflow · 24h', value:bStat.in, color:'#2E9E63' },
+      { label:'Outflow · 24h', value:bStat.out, color:'#D0522E' },
+      { label:'Net · 24h', value:bStat.net, color: /^[−-]/.test(bStat.net) ? '#E0603E' : '#E2E6E1' },
+    ];
+    const bridgeScopeLabel = s.bridgeChain==='all' ? 'All routes → Stellar' : (s.bridgeChain + ' → Stellar');
+    const bridgeScopeActive = s.bridgeChain !== 'all';
+    const bridgeClearScope = () => this.setState({ bridgeChain: 'all' });
+    const bridgeChains = [
+      { name:'Inflow', color:'#B8E640' },
+      { name:'Outflow', color:'#4C4C46' },
+      { name:'Cumulative net', color:'#E2E6E1' },
+    ];
+    const bridgeArrow = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>';
+    const bridgeRoutesRaw = [
+      { chain:'Ethereum', via:'Allbridge Core', mark:'E', tint:'#171E30', color:'#4E68D4', inflow:'$1.9M', outflow:'$0.5M', net:'+$1.4M', share:'45%', status:'Live', statusColor:'#2E9E63' },
+      { chain:'BNB Chain', via:'Allbridge Core', mark:'B', tint:'#34290F', color:'#B98A00', inflow:'$1.1M', outflow:'$0.3M', net:'+$0.8M', share:'26%', status:'Live', statusColor:'#2E9E63' },
+      { chain:'Arbitrum', via:'Allbridge Core', mark:'A', tint:'#17233A', color:'#2E6FD6', inflow:'$0.8M', outflow:'$0.2M', net:'+$0.6M', share:'19%', status:'Live', statusColor:'#2E9E63' },
+      { chain:'Polygon', via:'Allbridge Core', mark:'P', tint:'#241633', color:'#7B45D6', inflow:'$0.4M', outflow:'$0.7M', net:'−$0.3M', share:'10%', status:'Live', statusColor:'#2E9E63' },
+    ];
+    const brSortKey = s.bridgeSort.key, brDir = s.bridgeSort.dir==='asc' ? 1 : -1;
+    const bridgeRoutesSorted = [...bridgeRoutesRaw].sort((a,b) => {
+      if (brSortKey==='chain') return a.chain.localeCompare(b.chain) * brDir;
+      const av=this.parseNum(a[brSortKey]), bv=this.parseNum(b[brSortKey]);
+      if (av==null&&bv==null) return 0; if (av==null) return 1; if (bv==null) return -1;
+      return (av-bv)*brDir;
+    });
+    const bridgeList = bridgeRoutesSorted.map(b => ({
+      ...b,
+      netColor: /^[−-]/.test(b.net) ? '#E0603E' : '#E2E6E1',
+      flowStatus: /^[−-]/.test(b.net) ? 'Net outflow' : 'Net inflow',
+      flowStatusColor: /^[−-]/.test(b.net) ? '#E0603E' : '#2E9E63',
+      flowStatusIcon: H(/^[−-]/.test(b.net)
+        ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M17 7L7 17"/></svg>'
+        : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 17H7V7"/><path d="M7 17L17 7"/></svg>'),
+      arrow: H(bridgeArrow),
+      onClick: () => this.setState(st => ({ bridgeChain: st.bridgeChain === b.chain ? 'all' : b.chain })),
+      rowStyle: `display:grid; grid-template-columns:2.2fr 1fr 1fr 1fr 0.8fr 0.9fr; align-items:center; padding:12px 8px; border-bottom:1px solid #2C2C29; cursor:pointer; border-radius:10px; transition:background .12s; background:${s.bridgeChain===b.chain ? '#242422' : 'transparent'}; box-shadow:${s.bridgeChain===b.chain ? 'inset 2px 0 0 var(--accent,#D5FF2F)' : 'none'};`,
+    }));
+    const brColDefs = [ ['chain','Route','left'], ['inflow','Inflow 24h','right'], ['outflow','Outflow 24h','right'], ['net','Net','right'], ['share','Share','right'] ];
+    const bridgeRouteCols = brColDefs.map(([k,l,al]) => {
+      const active = s.bridgeSort.key===k;
+      return { label: l + (active ? (s.bridgeSort.dir==='asc'?' ↑':' ↓') : ''),
+        onClick: () => this.setState(st => ({ bridgeSort: { key:k, dir:(st.bridgeSort.key===k && st.bridgeSort.dir==='desc')?'asc':'desc' } })),
+        style: `text-align:${al}; cursor:pointer; user-select:none; color:${active?'#E2E6E1':'#5E5F5D'};` };
+    });
+    const bridgeSeed = bStat.seed + ({ '24H':-0.3, '7D':0, '30D':0.6 }[s.bridgeRange] || 0);
+
+    // ---- recent bridge flows (history) ----
+    const bridgeFlowsRaw = [
+      { chain:'Ethereum', mark:'E', tint:'#171E30', color:'#4E68D4', dir:'in',  asset:'USDC', amount:'$420K', mins:3,   time:'3m ago',  tx:'0x8f…a41c' },
+      { chain:'BNB Chain', mark:'B', tint:'#34290F', color:'#B98A00', dir:'in',  asset:'USDT', amount:'$180K', mins:12,  time:'12m ago', tx:'0x3b…9e07' },
+      { chain:'Arbitrum', mark:'A', tint:'#17233A', color:'#2E6FD6', dir:'out', asset:'USDC', amount:'$96K',  mins:27,  time:'27m ago', tx:'0xc1…4d22' },
+      { chain:'Ethereum', mark:'E', tint:'#171E30', color:'#4E68D4', dir:'in',  asset:'ETH',  amount:'$310K', mins:41,  time:'41m ago', tx:'0x7a…b0f8' },
+      { chain:'Polygon', mark:'P', tint:'#241633', color:'#7B45D6', dir:'in',  asset:'USDC', amount:'$54K',  mins:60,  time:'1h ago',  tx:'0x2e…77aa' },
+      { chain:'BNB Chain', mark:'B', tint:'#34290F', color:'#B98A00', dir:'out', asset:'USDT', amount:'$88K',  mins:120, time:'2h ago',  tx:'0x9d…1c53' },
+      { chain:'Arbitrum', mark:'A', tint:'#17233A', color:'#2E6FD6', dir:'in',  asset:'ARB',  amount:'$132K', mins:180, time:'3h ago',  tx:'0x5f…e290' },
+      { chain:'Ethereum', mark:'E', tint:'#171E30', color:'#4E68D4', dir:'in',  asset:'USDC', amount:'$275K', mins:300, time:'5h ago',  tx:'0xb4…6a1d' },
+    ];
+    const bridgeFlowsScope = bridgeFlowsRaw.filter(f => s.bridgeChain==='all' || f.chain===s.bridgeChain);
+    const flSortKey = s.flowSort.key, flDir = s.flowSort.dir==='asc' ? 1 : -1;
+    const bridgeFlowsSorted = [...bridgeFlowsScope].sort((a,b) => {
+      if (flSortKey==='chain') return a.chain.localeCompare(b.chain) * flDir;
+      if (flSortKey==='asset') return a.asset.localeCompare(b.asset) * flDir;
+      if (flSortKey==='dir') return a.dir.localeCompare(b.dir) * flDir;
+      if (flSortKey==='time') return (a.mins-b.mins) * flDir;
+      const av=this.parseNum(a[flSortKey]), bv=this.parseNum(b[flSortKey]);
+      if (av==null&&bv==null) return 0; if (av==null) return 1; if (bv==null) return -1;
+      return (av-bv)*flDir;
+    });
+    const inArrow = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>';
+    const outArrow = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
+    const flowArrow = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>';
+    const bridgeFlows = bridgeFlowsSorted.map(f => ({
+      ...f,
+      dirIcon: H(f.dir==='in' ? inArrow : outArrow),
+      arrow: H(flowArrow),
+      dirLabel: f.dir==='in' ? 'Inflow' : 'Outflow',
+      dirBg: f.dir==='in' ? '#12301F' : '#2C2C29',
+      dirColor: f.dir==='in' ? '#2E9E63' : '#8A857B',
+      signedAmount: (f.dir==='in' ? '+' : '−') + f.amount,
+      amountColor: f.dir==='in' ? '#2E9E63' : '#B7B3AB',
+    }));
+    const bridgeFlowsTitle = s.bridgeChain==='all' ? 'Recent bridge flows' : ('Recent bridge flows · ' + s.bridgeChain);
+    const bridgeFlowsCount = bridgeFlowsScope.length + (bridgeFlowsScope.length>1 ? ' transfers' : ' transfer');
+    const flColDefs = [ ['chain','Source','left'], ['dir','Direction','left'], ['asset','Asset','left'], ['amount','Amount','right'], ['time','Time','right'], ['tx','Tx','right'] ];
+    const bridgeFlowCols = flColDefs.map(([k,l,al]) => {
+      const active = s.flowSort.key===k;
+      return { label: l + (active ? (s.flowSort.dir==='asc'?' ↑':' ↓') : ''),
+        onClick: () => this.setState(st => ({ flowSort: { key:k, dir:(st.flowSort.key===k && st.flowSort.dir==='desc')?'asc':'desc' } })),
+        style: `text-align:${al}; cursor:pointer; user-select:none; color:${active?'#E2E6E1':'#5E5F5D'};` };
+    });
+    const bridgeTabs = [ ['routes','Routes'], ['flows','Recent flows'] ].map(([k,l]) => ({
+      label:l,
+      onClick: () => this.setState({ bridgeTab:k }),
+      style: `font-size:12.5px; font-weight:600; padding:6px 14px; border-radius:9px; cursor:pointer; color:${s.bridgeTab===k?'#141414':'#5E5F5D'}; background:${s.bridgeTab===k?'var(--accent,#D5FF2F)':'transparent'};`,
+    }));
+    const bridgeShowRoutes = s.bridgeTab === 'routes';
+    const bridgeShowFlows = s.bridgeTab === 'flows';
+
+    // ---- protocols screen: pools ----
+    const poolFilterDef = [ ['all','All'], ['blend','Blend'], ['aquarius','Aquarius'], ['soroswap','Soroswap'], ['native','Native DEX'] ];
+    const poolFilters = poolFilterDef.map(([k,l]) => ({
+      label: l, cls: 'dig-chip',
+      onClick: () => this.setState({ poolFilter: k }),
+      style: `font-size:12px; font-weight:600; padding:5px 12px; border-radius:9px; cursor:pointer; color:${s.poolFilter===k?'#141414':'#5E5F5D'}; background:${s.poolFilter===k?'var(--accent,#D5FF2F)':'#262624'};`,
+    }));
+    const allPoolRows = Object.entries(this.POOLS).map(([id,p]) => ({ id, ...p, feesDisp: p.fees || '—', mark: H(this.protoLogo(p.venue)), onOpen: () => this.selectPool(id) }));
+    const matchedPools = allPoolRows.filter(p => s.poolFilter==='all' || p.venue.toLowerCase().includes(s.poolFilter));
+    const sortKey = s.poolSort.key, sortDir = s.poolSort.dir === 'asc' ? 1 : -1;
+    const filteredPools = [...matchedPools].sort((a,b) => {
+      const av = this.parseNum(sortKey==='fees'?a.fees:a[sortKey]), bv = this.parseNum(sortKey==='fees'?b.fees:b[sortKey]);
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return (av - bv) * sortDir;
+    });
+    const poolCountLabel = filteredPools.length + ' pools';
+    const poolColDefs = [ ['tvl','TVL'], ['apy','APY'], ['vol','24h vol'], ['fees','Fees 24h'], ['util','Util.'] ];
+    const poolCols = poolColDefs.map(([k,l]) => {
+      const active = s.poolSort.key === k;
+      return {
+        label: l + (active ? (s.poolSort.dir==='asc' ? ' \u2191' : ' \u2193') : ''),
+        onClick: () => this.setState(st => ({ poolSort: { key: k, dir: (st.poolSort.key===k && st.poolSort.dir==='desc') ? 'asc' : 'desc' } })),
+        style: `text-align:right; cursor:pointer; user-select:none; color:${active ? '#E2E6E1' : '#5E5F5D'};`,
+      };
+    });
+
+    // ---- pool detail ----
+    const poolIsLending = (pool.category || (pool.venue.includes('Blend') ? 'lending' : 'amm')) === 'lending';
+    const poolActionLabel = poolIsLending ? 'Supply / Withdraw' : 'Swap / Provide';
+    const poolPrimaryAction = poolIsLending ? 'Supply' : 'Swap';
+    const poolSecondaryAction = poolIsLending ? 'Withdraw' : 'Add liquidity';
+    const poolStats = poolIsLending ? [
+      { label:'Liquidity', value: pool.liquidity || pool.tvl, color:'#E2E6E1' },
+      { label:'Total supplied', value: pool.supplied || pool.tvl, color:'#E2E6E1' },
+      { label:'Supply APY', value: pool.supplyApy || pool.apy, color:'#2E9E63' },
+      { label:'Borrow APY', value: pool.borrowApy || '—', color:'#E0603E' },
+    ] : [
+      { label:'TVL', value: pool.tvl, color:'#E2E6E1' },
+      { label:'Volume 24h', value: pool.vol, color:'#E2E6E1' },
+      { label:'Fees 24h', value: pool.fees || '—', color:'#2E9E63' },
+      { label:'Swaps 24h', value: pool.swaps || '—', color:'#E2E6E1' },
+      { label:'Events 24h', value: pool.events || '—', color:'#5E5F5D' },
+    ];
+    const poolDesc = poolIsLending
+      ? "This lending pool lets users supply and borrow assets on Stellar's Soroban smart-contract platform. Interest rates adjust dynamically based on utilization."
+      : "This AMM pool provides decentralized token swaps on Stellar. Liquidity providers earn fees proportional to their share of the pool.";
+    const poolOnchain = [
+      { label:'Protocol', value: pool.venue, mono:false },
+      { label:'Type', value: poolIsLending ? 'Lending' : 'AMM', mono:false },
+      { label:'Chain', value: 'stellar-mainnet', mono:false },
+      { label:'Contract', value: pool.contract || 'CAJJZS…BXBD', mono:true },
+      { label:'Updated', value: pool.updated || '6 Jul 2026, 17:15', mono:false },
+    ];
+    const poolAssets = pool.reserves || [];
+    const poolReserves = [
+      { asset:'USDC', mark:'$', tint:'#17233A', color:'#2E6FD6', amount:'12.4M', pct:'62%' },
+      { asset:'XLM', mark:'✦', tint:'#2E3A14', color:'var(--accent,#D5FF2F)', amount:'6.0M', pct:'38%' },
+    ];
+    const poolRisks = [
+      { label:'Data freshness', value:'Fresh · 4s', color:'#2E9E63' },
+      { label:'Utilization', value:'Healthy', color:'#2E9E63' },
+      { label:'Oracle (Reflector)', value:'Nominal', color:'#2E9E63' },
+      { label:'Trustline flags', value:'None', color:'#5E5F5D' },
+    ];
+
+    // ---- inflows / outflows ----
+    const arrowUp = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+    const arrowDown = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
+    const flowRanges = ['24H','7D','30D'].map(r => ({
+      label: r, cls: 'dig-chip',
+      onClick: () => this.setState({ flowRange: r }),
+      style: `font-size:11.5px; font-weight:600; padding:4px 9px; border-radius:8px; cursor:pointer; color:${s.flowRange===r?'#E2E6E1':'#5E5F5D'}; background:${s.flowRange===r?'#2A2A27':'transparent'};`,
+    }));
+    const flowStats = [
+      { label:'Net · 1h', value:'+$142K', color:'#2E9E63', tint:'#12301F', icon:H(arrowUp) },
+      { label:'Net · 24h', value:'\u2212$1.2M', color:'#D0522E', tint:'#371C16', icon:H(arrowDown) },
+      { label:'Net · 7d', value:'+$3.4M', color:'#2E9E63', tint:'#12301F', icon:H(arrowUp) },
+    ];
+    const flowTotals = [
+      { label:'Total inflow', value:'$8.7M', dot:'#B8E640' },
+      { label:'Total outflow', value:'$9.9M', dot:'#4C4C46' },
+    ];
+    const flowSeed = { '24H':0.6, '7D':1.1, '30D':1.7 }[s.flowRange] || 0.6;
+
+    // ---- portfolio ----
+    const walletDefs = [
+      { label:'Main', short:'GDX…7QF', value:'$52,410', change:'+2.1%', changeColor:'#2E9E63', dot:'#63A7FF' },
+      { label:'Cold storage', short:'GBM…K2A', value:'$21,880', change:'+0.4%', changeColor:'#2E9E63', dot:'#2E9E63' },
+      { label:'Trading', short:'GCU…9PL', value:'$8,040', change:'-1.2%', changeColor:'#D0522E', dot:'#D86A3E' },
+    ];
+    const walletCards = walletDefs.map(w => ({
+      ...w,
+      onClick: () => this.setState(st => ({ walletFilter: st.walletFilter === w.label ? 'all' : w.label })),
+      cardStyle: `flex:1; min-width:220px; background:#1E1E1E; border:1.5px solid ${s.walletFilter===w.label ? 'var(--accent,#D5FF2F)' : '#2F2F2C'}; border-radius:16px; padding:18px 20px; cursor:pointer; transition:border-color .15s;`,
+    }));
+    const allPositionsRaw = [
+      { pair:'USDC Lending', venue:'Blend V2', wallet:'Main', walletDot:'#63A7FF', value:'$24,180', apy:'6.82%', change:'+0.3%', changeColor:'#2E9E63', mark:'B', tint:'#17233A', color:'#2E6FD6' },
+      { pair:'XLM / USDC', venue:'Aquarius', wallet:'Main', walletDot:'#63A7FF', value:'$18,640', apy:'14.3%', change:'+1.8%', changeColor:'#2E9E63', mark:'A', tint:'#0F302C', color:'#159A8C' },
+      { pair:'XLM / USDC', venue:'Soroswap', wallet:'Trading', walletDot:'#D86A3E', value:'$9,720', apy:'11.7%', change:'-0.6%', changeColor:'#D0522E', mark:'S', tint:'#37231A', color:'#D86A3E' },
+      { pair:'XLM Lending', venue:'Blend V2', wallet:'Cold storage', walletDot:'#2E9E63', value:'$12,100', apy:'4.10%', change:'+0.1%', changeColor:'#2E9E63', mark:'B', tint:'#17233A', color:'#2E6FD6' },
+      { pair:'AQUA / USDC', venue:'Aquarius', wallet:'Main', walletDot:'#63A7FF', value:'$5,420', apy:'22.6%', change:'+3.4%', changeColor:'#2E9E63', mark:'A', tint:'#0F302C', color:'#159A8C' },
+    ].map(p => ({ ...p, mark: H(this.protoLogo(p.venue)), onManage: () => this.selectPool('blend-usdc') }));
+    const scopePositions = allPositionsRaw.filter(p => s.walletFilter==='all' || p.wallet===s.walletFilter);
+    const posK = s.posSort.key, posDir = s.posSort.dir==='asc' ? 1 : -1;
+    const allPositions = [...scopePositions].sort((a,b) => {
+      const av = this.parseNum(a[posK]), bv = this.parseNum(b[posK]);
+      if (av==null && bv==null) return 0; if (av==null) return 1; if (bv==null) return -1;
+      return (av-bv)*posDir;
+    });
+    const posColDefs = [ ['value','Value'], ['apy','APY'], ['change','24h'] ];
+    const posCols = posColDefs.map(([k,l]) => {
+      const active = s.posSort.key===k;
+      return {
+        label: l + (active ? (s.posSort.dir==='asc' ? ' \u2191' : ' \u2193') : ''),
+        onClick: () => this.setState(st => ({ posSort: { key:k, dir:(st.posSort.key===k && st.posSort.dir==='desc') ? 'asc' : 'desc' } })),
+        style: `text-align:right; cursor:pointer; user-select:none; color:${active ? '#E2E6E1' : '#5E5F5D'};`,
+      };
+    });
+    const bdTotalNum = scopePositions.reduce((acc,p) => acc + (this.parseNum(p.value)||0), 0);
+    const lastIdx = scopePositions.length - 1;
+    const breakdownSegs = scopePositions.map((p,i) => {
+      const v = this.parseNum(p.value) || 0;
+      const pct = bdTotalNum ? (v/bdTotalNum*100) : 0;
+      return { label:p.pair, venue:p.venue, wallet:p.wallet, value:p.value, color:p.color, pct: Math.round(pct)+'%',
+        segStyle: `width:${pct.toFixed(2)}%; background:${p.color}; ${i<lastIdx ? 'box-shadow:inset -2px 0 0 #1E1E1E;' : ''}` };
+    });
+    const breakdownTotal = '$' + bdTotalNum.toLocaleString('en-US');
+    const posScopeTitle = s.walletFilter==='all' ? 'Positions across all wallets' : ('Positions · ' + s.walletFilter);
+    const breakdownScope = s.walletFilter==='all' ? 'All wallets' : s.walletFilter;
+    const posCountLabel = scopePositions.length + (scopePositions.length>1 ? ' positions' : ' position');
+
+    // ---- portfolio activity (transactions) ----
+    const icArrowDown = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>';
+    const icArrowUp = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
+    const icSwap = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13M14 5l3 3-3 3"/><path d="M20 16H7M10 13l-3 3 3 3"/></svg>';
+    const icClaim = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 5.2L20 9l-4 4 1 6-5-2.8L7 19l1-6-4-4 5.6-.8z"/></svg>';
+    const actMeta = {
+      supply:   { label:'Supply',   icon:icArrowUp,   dir:'out' },
+      withdraw: { label:'Withdraw', icon:icArrowDown, dir:'in' },
+      deposit:  { label:'Deposit',  icon:icArrowUp,   dir:'out' },
+      borrow:   { label:'Borrow',   icon:icArrowDown, dir:'in' },
+      repay:    { label:'Repay',    icon:icArrowUp,   dir:'out' },
+      swap:     { label:'Swap',     icon:icSwap,      dir:'neutral' },
+      claim:    { label:'Claim',    icon:icClaim,     dir:'in' },
+    };
+    const activityRaw = [
+      { kind:'supply',   wallet:'Main',         walletDot:'#63A7FF', venue:'Blend V2', detail:'2,000 USDC', value:'$2,000', time:'12m ago',  tx:'a3f9\u20264c21' },
+      { kind:'claim',    wallet:'Main',         walletDot:'#63A7FF', venue:'Aquarius', detail:'184.2 AQUA', value:'$41.6',  time:'1h ago',   tx:'b81e\u2026props' },
+      { kind:'swap',     wallet:'Trading',      walletDot:'#D86A3E', venue:'Soroswap', detail:'1,500 XLM \u2192 298 USDC', value:'$298', time:'3h ago', tx:'c07d\u20269f55' },
+      { kind:'withdraw', wallet:'Trading',      walletDot:'#D86A3E', venue:'Soroswap', detail:'640 USDC', value:'$640',   time:'5h ago',   tx:'d1a2\u20267e08' },
+      { kind:'deposit',  wallet:'Main',         walletDot:'#63A7FF', venue:'Aquarius', detail:'3,100 XLM / 620 USDC', value:'$1,240', time:'8h ago', tx:'e5b6\u202611aa' },
+      { kind:'borrow',   wallet:'Cold storage', walletDot:'#2E9E63', venue:'Blend V2', detail:'900 USDC', value:'$900',   time:'yesterday',tx:'f9c4\u202603de' },
+      { kind:'repay',    wallet:'Cold storage', walletDot:'#2E9E63', venue:'Blend V2', detail:'450 USDC', value:'$450',   time:'yesterday',tx:'0a7f\u2026bb92' },
+      { kind:'supply',   wallet:'Main',         walletDot:'#63A7FF', venue:'Blend V2', detail:'5,000 USDC', value:'$5,000', time:'2d ago',  tx:'1c8e\u2026d470' },
+    ];
+    const activityScope = activityRaw.filter(a => s.walletFilter==='all' || a.wallet===s.walletFilter);
+    const activityRows = activityScope.map(a => {
+      const m = actMeta[a.kind];
+      const sign = m.dir==='in' ? '+' : (m.dir==='out' ? '\u2212' : '');
+      const valueColor = m.dir==='in' ? '#2E9E63' : '#E2E6E1';
+      return { ...a, label:m.label, icon:H(m.icon), valueColor,
+        signedValue: sign + a.value };
+    });
+    const activityCount = activityScope.length + (activityScope.length>1 ? ' transactions' : ' transaction');
+    const activityScopeTitle = s.walletFilter==='all' ? 'Activity · all wallets' : ('Activity · ' + s.walletFilter);
+
+    // ---- alerts ----
+    const alertFilterDef = [ ['all','All'], ['critical','Critical'], ['activity','Activity'] ];
+    const alertFilters = alertFilterDef.map(([k,l]) => ({
+      label: l, cls: 'dig-chip',
+      onClick: () => this.setState({ alertFilter: k }),
+      style: `font-size:12px; font-weight:600; padding:4px 11px; border-radius:8px; cursor:pointer; color:${s.alertFilter===k?'#141414':'#5E5F5D'}; background:${s.alertFilter===k?'var(--accent,#D5FF2F)':'transparent'};`,
+    }));
+    const feedDef = [
+      { title:'Health factor near liquidation', desc:'Your Blend USDC position health factor dropped to 1.18, below your 1.25 alert threshold.', venue:'Blend · USDC Lending', time:'2m ago', severity:'Critical', tint:'#371C16', color:'#D0522E', icon:this.icons.heart, isNew:true, cat:'critical', actionable:true, actionLabel:'Add collateral' },
+      { title:'Volume spike +240%', desc:'XLM/USDC 1h volume is 3.4× its 24h average — possible arbitrage or large swap activity.', venue:'Aquarius', time:'18m ago', severity:'Warning', tint:'#34290F', color:'#C98A1E', icon:this.icons.trend, isNew:true, cat:'activity', actionable:false },
+      { title:'Large netflow out of pool', desc:'$1.2M net outflow from EURC/USDC over the last hour, ~9% of pool TVL.', venue:'Soroswap · EURC/USDC', time:'1h ago', severity:'Warning', tint:'#17233A', color:'#2E6FD6', icon:this.icons.drop, isNew:true, cat:'activity', actionable:false },
+      { title:'APY dropped below 5%', desc:'Blend USDC supply APY fell to 4.82%, crossing your 5.00% rule.', venue:'Blend · USDC Lending', time:'3h ago', severity:'Info', tint:'#12301F', color:'#2E9E63', icon:this.icons.trend, isNew:false, cat:'activity', actionable:true, actionLabel:'Rebalance' },
+      { title:'Wallet balance change', desc:'Trading wallet received 4,200 XLM from an external address.', venue:'Wallet · GCU…9PL', time:'5h ago', severity:'Info', tint:'#2E3A14', color:'#252525', icon:this.icons.wallet, isNew:false, cat:'activity', actionable:false },
+      { title:'Data source stale', desc:'Soroswap adapter missed 2 snapshot cycles — metrics may be delayed. Auto-recovered.', venue:'System', time:'8h ago', severity:'Info', tint:'#2C2C29', color:'#5E5F5D', icon:this.icons.refresh, isNew:false, cat:'activity', actionable:false },
+    ];
+    const alertFeed = feedDef
+      .filter(a => s.alertFilter==='all' || a.cat===s.alertFilter)
+      .map(a => ({ ...a, icon: H(a.icon), bg: a.isNew ? '#242422' : '#1E1E1E', onAct: () => this.setState({ screen:'pool', selectedPoolId:'blend-usdc', modal:'action', actionStep:1, actionType:'supply' }) }));
+
+    const ruleDef = [
+      { key:'r1', name:'Blend health factor', condition:'health_factor < 1.25 · Blend USDC', color:'#D0522E' },
+      { key:'r2', name:'APY floor', condition:'apy < 5.00% · pct_change 24h', color:'#C98A1E' },
+      { key:'r3', name:'Netflow watch', condition:'netflow_1h > $500K · all pools', color:'#2E6FD6' },
+      { key:'r4', name:'Wallet inbound', condition:'balance_change > 1,000 XLM · Trading', color:'#252525' },
+    ];
+    const alertRules = ruleDef.map(r => {
+      const on = s.rulesOn[r.key];
+      return { ...r, onToggle: () => this.toggleRule(r.key), toggleBg: on ? A : '#34342E', knobLeft: on ? '18px' : '2px' };
+    });
+    const ruleCount = Object.values(s.rulesOn).filter(Boolean).length;
+
+    // ---- connect modal ----
+    const walletProviders = [
+      { name:'Freighter', desc:'Browser extension', mark:'F', tint:'#2E3A14', color:'var(--accent,#D5FF2F)', onPick:this.pickProvider },
+      { name:'xBull', desc:'Web & mobile', mark:'x', tint:'#17233A', color:'#2E6FD6', onPick:this.pickProvider },
+      { name:'Albedo', desc:'Web signer', mark:'A', tint:'#0F302C', color:'#159A8C', onPick:this.pickProvider },
+      { name:'WalletConnect', desc:'Scan with mobile wallet', mark:'W', tint:'#37231A', color:'#D86A3E', onPick:this.pickProvider },
+    ];
+
+    // ---- alert builder ----
+    const scopeDef = [ ['venue','Pool / venue','A specific market', this.icons.layers], ['wallet','Wallet','Balance & exposure', this.icons.wallet], ['protocol','Protocol','Whole venue', this.icons.grid] ];
+    // per-scope targets
+    const venueTargets = Object.entries(this.POOLS).map(([id,p]) => {
+      const short = /native/i.test(p.venue) ? 'Native DEX' : p.venue.replace(' V2','');
+      return { id, label: p.pair, sub: short, tint:p.tint, color:p.color };
+    });
+    const walletTargets = [
+      { id:'Main', label:'Main', sub:'GDX\u20267QF', tint:'#171E30', color:'#63A7FF' },
+      { id:'Cold storage', label:'Cold storage', sub:'GBM\u2026K2A', tint:'#12301F', color:'#2E9E63' },
+      { id:'Trading', label:'Trading', sub:'GCU\u20269PL', tint:'#37231A', color:'#D86A3E' },
+      { id:'all', label:'All wallets', sub:'Consolidated', tint:'#2E3A14', color:'var(--accent,#D5FF2F)' },
+    ];
+    const protocolTargets = [
+      { id:'Blend', label:'Blend', sub:'Lending', tint:'#17233A', color:'#2E6FD6' },
+      { id:'Aquarius', label:'Aquarius', sub:'AMM + rewards', tint:'#0F302C', color:'#159A8C' },
+      { id:'Soroswap', label:'Soroswap', sub:'AMM', tint:'#37231A', color:'#D86A3E' },
+      { id:'Stellar Native DEX', label:'Stellar Native DEX', sub:'Classic AMM', tint:'#241633', color:'#7B45D6' },
+    ];
+    // per-scope metrics (conditions differ by what you watch)
+    const metricsByScope = {
+      venue: [ ['apy','APY'], ['tvl','TVL delta'], ['util','Utilization'], ['netflow','Netflow'], ['price','Price'] ],
+      wallet: [ ['balance','Balance change'], ['exposure','Net exposure'], ['health','Health factor'], ['posvalue','Position value'] ],
+      protocol: [ ['tvl','TVL delta'], ['volume','Volume spike'], ['netflow','Netflow'], ['health','Protocol health'] ],
+    };
+    const targetsByScope = { venue: venueTargets, wallet: walletTargets, protocol: protocolTargets };
+    const scopeNoun = { venue:'pool', wallet:'wallet', protocol:'protocol' };
+    const alertScopes = scopeDef.map(([k,l,sub,icon]) => ({
+      label:l, sub, icon: H(icon),
+      onPick: () => this.setState({ alertScope:k, alertTarget: targetsByScope[k][0].id, alertMetric: metricsByScope[k][0][0] }),
+      style: `padding:14px; border-radius:13px; cursor:pointer; text-align:left; border:1.5px solid ${s.alertScope===k?A:'#2F2F2C'}; background:${s.alertScope===k?'#202312':'#242422'}; color:${s.alertScope===k?A:'#5E5F5D'}; transition:all .12s;`,
+    }));
+    // resolve current target (guard against stale ids after scope switch)
+    const curTargets = targetsByScope[s.alertScope] || venueTargets;
+    const activeTargetId = curTargets.some(t => t.id===s.alertTarget) ? s.alertTarget : curTargets[0].id;
+    const alertTargets = curTargets.map(t => ({
+      label: t.label, sub: t.sub, markStyle: `width:24px; height:24px; flex-shrink:0; border-radius:7px; background:${t.tint}; box-shadow:inset 0 0 0 1.5px ${t.color};`,
+      onPick: () => this.setState({ alertTarget: t.id }),
+      style: `display:flex; align-items:center; gap:9px; padding:8px 11px 8px 8px; border-radius:11px; cursor:pointer; border:1.5px solid ${activeTargetId===t.id?A:'#2F2F2C'}; background:${activeTargetId===t.id?'#202312':'#242422'};`,
+      labelStyle: `font-size:12.5px; font-weight:600; color:${activeTargetId===t.id?'#E2E6E1':'#B7B3AB'};`,
+    }));
+    const alertScopeNoun = scopeNoun[s.alertScope];
+    const selectedTarget = curTargets.find(t => t.id===activeTargetId) || curTargets[0];
+    const selectedTargetLabel = selectedTarget.label;
+    const metricDef = metricsByScope[s.alertScope] || metricsByScope.venue;
+    const activeMetric = metricDef.some(([k]) => k===s.alertMetric) ? s.alertMetric : metricDef[0][0];
+    const alertMetrics = metricDef.map(([k,l]) => ({
+      label:l,
+      onPick: () => this.setState({ alertMetric:k }),
+      style: `font-size:12.5px; font-weight:600; padding:7px 13px; border-radius:9px; cursor:pointer; border:1px solid ${activeMetric===k?A:'#2F2F2C'}; color:${activeMetric===k?A:'#5E5F5D'}; background:${activeMetric===k?'#202312':'#242422'};`,
+    }));
+    const metricLabels = { apy:'APY', health:'Health factor', netflow:'1h netflow', tvl:'TVL', util:'Utilization', price:'Price', balance:'Balance', exposure:'Net exposure', posvalue:'Position value', volume:'24h volume' };
+    const selectedMetricLabel = metricLabels[activeMetric];
+    const opDef = [ ['lt','falls below'], ['gt','rises above'], ['pct','changes by'] ];
+    const alertOperators = opDef.map(([k,l]) => ({
+      label:l,
+      onPick: () => this.setState({ alertOp:k }),
+      style: `font-size:12.5px; font-weight:600; padding:6px 11px; border-radius:8px; cursor:pointer; color:${s.alertOp===k?'#141414':'#5E5F5D'}; background:${s.alertOp===k?A:'#37372F'};`,
+    }));
+    const unitMap = { apy:'%', health:'', netflow:'$', tvl:'%', util:'%', price:'$', balance:'%', exposure:'$', posvalue:'$', volume:'%' };
+    const thresholdUnit = s.alertOp==='pct' ? '%' : (unitMap[activeMetric] || '');
+    const sevDef = [ ['info','Info','#2E9E63'], ['warning','Warning','#C98A1E'], ['critical','Critical','#D0522E'] ];
+    const alertSeverities = sevDef.map(([k,l,dot]) => ({
+      label:l, dot,
+      onPick: () => this.setState({ alertSeverity:k }),
+      style: `flex:1; display:flex; align-items:center; justify-content:center; gap:7px; padding:11px; border-radius:11px; cursor:pointer; font-size:13px; font-weight:600; border:1.5px solid ${s.alertSeverity===k?dot:'#2F2F2C'}; color:${s.alertSeverity===k?'#E2E6E1':'#5E5F5D'}; background:${s.alertSeverity===k?'#242422':'#242422'};`,
+    }));
+    this.saveAlert = () => this.setState({ modal:null, screen:'alerts' });
+
+    // ---- action flow (type- & pool-aware) ----
+    const rawPair = (pool.pair || '').replace(/native/gi, 'XLM');
+    const pairParts = rawPair.split('/').map(x => x.trim()).filter(Boolean);
+    const assetA = (pairParts[0] && !/lending|pool/i.test(pairParts[0])) ? pairParts[0].split(' ')[0] : 'USDC';
+    const assetB = pairParts[1] ? pairParts[1].split(' ')[0] : (assetA === 'USDC' ? 'XLM' : 'USDC');
+    const actTypeDef = poolIsLending
+      ? [ ['supply','Supply'], ['withdraw','Withdraw'] ]
+      : [ ['swap','Swap'], ['deposit','Add liquidity'], ['remove','Remove liquidity'] ];
+    const activeActionType = actTypeDef.some(([k]) => k===s.actionType) ? s.actionType : actTypeDef[0][0];
+    const actCfg = {
+      supply:   { title:'Supply',           amt:'Amount to supply' },
+      withdraw: { title:'Withdraw',         amt:'Amount to withdraw' },
+      swap:     { title:'Swap',             amt:'You pay' },
+      deposit:  { title:'Add liquidity',    amt:'Amount to deposit' },
+      remove:   { title:'Remove liquidity', amt:'Amount to remove' },
+    };
+    const curAct = actCfg[activeActionType];
+    const actionTitle = curAct.title;
+    const actionAsset = assetA, actionAssetMark = '$';
+    const walletBalance = poolIsLending ? '8,420 USDC' : ('12,500 ' + assetA);
+    const actionTypes = actTypeDef.map(([k,l]) => ({
+      label:l,
+      onPick: () => this.setState({ actionType:k }),
+      style: `flex:1; text-align:center; padding:10px; border-radius:11px; cursor:pointer; font-size:13.5px; font-weight:600; color:${activeActionType===k?'#E2E6E1':'#5E5F5D'}; background:${activeActionType===k?'#2A2A27':'#262624'}; border:1.5px solid ${activeActionType===k?A:'transparent'};`,
+    }));
+    const amountPresets = ['25%','50%','75%','Max'].map(l => ({ label:l, onPick: () => this.setState({ actionAmount: l==='Max'?'8,420':(l==='25%'?'2,105':(l==='50%'?'4,210':'6,315')) }) }));
+    const actionPreview = activeActionType==='swap' ? [
+      { label:'You pay', value: s.actionAmount + ' ' + assetA, color:'#E2E6E1' },
+      { label:'You receive', value: '\u2248 ' + s.actionAmount + ' ' + assetB, color:'#E2E6E1' },
+      { label:'Rate', value: '1 ' + assetA + ' = 0.99 ' + assetB, color:'#B7B3AB' },
+      { label:'Price impact', value:'0.12%', color:'#2E9E63' },
+    ] : activeActionType==='deposit' ? [
+      { label:'You deposit', value: s.actionAmount + ' ' + assetA + ' + ' + assetB, color:'#E2E6E1' },
+      { label:'Pool share', value:'0.42%', color:'#E2E6E1' },
+      { label:'Pool APR', value: pool.apy, color:'#2E9E63' },
+      { label:'Est. yearly fees', value:'+$1,204', color:'#2E9E63' },
+    ] : activeActionType==='remove' ? [
+      { label:'You remove', value: s.actionAmount + ' LP', color:'#E2E6E1' },
+      { label:'You receive', value: assetA + ' + ' + assetB, color:'#E2E6E1' },
+      { label:'Pool share after', value:'0.00%', color:'#B7B3AB' },
+    ] : activeActionType==='withdraw' ? [
+      { label:'You withdraw', value: s.actionAmount + ' ' + assetA, color:'#E2E6E1' },
+      { label:'Remaining position', value:'$21,510', color:'#E2E6E1' },
+      { label:'Supply APY', value: pool.apy, color:'#2E9E63' },
+    ] : [
+      { label:'You supply', value: s.actionAmount + ' ' + assetA, color:'#E2E6E1' },
+      { label:'New position', value:'$27,510', color:'#E2E6E1' },
+      { label:'Supply APY', value: pool.apy, color:'#2E9E63' },
+      { label:'Est. yearly yield', value:'+$1,876', color:'#2E9E63' },
+    ];
+    const amountLabel = curAct.amt;
+    const venueShort = /blend/i.test(pool.venue) ? 'Blend' : (/aquar/i.test(pool.venue) ? 'Aquarius' : (/soro/i.test(pool.venue) ? 'Soroswap' : 'DEX'));
+    const txrepByType = {
+      supply: [
+        { i:'1', title:'ChangeTrust \u2014 '+assetA, detail:'Establish trustline \u00b7 limit max', tint:'#17233A', color:'#2E6FD6' },
+        { i:'2', title:'InvokeHostFunction \u2014 Blend submit()', detail:'supply \u00b7 '+s.actionAmount+' '+assetA+' \u2192 pool CB7Q\u20264F2', tint:'#2E3A14', color:'var(--accent,#D5FF2F)' },
+      ],
+      withdraw: [
+        { i:'1', title:'InvokeHostFunction \u2014 Blend submit()', detail:'withdraw \u00b7 '+s.actionAmount+' '+assetA+' \u2190 pool CB7Q\u20264F2', tint:'#2E3A14', color:'var(--accent,#D5FF2F)' },
+      ],
+      swap: [
+        { i:'1', title:'InvokeHostFunction \u2014 '+venueShort+' swap()', detail:'swap \u00b7 '+s.actionAmount+' '+assetA+' \u2192 '+assetB+' \u00b7 pool CB7Q\u20264F2', tint:'#2E3A14', color:'var(--accent,#D5FF2F)' },
+      ],
+      deposit: [
+        { i:'1', title:'InvokeHostFunction \u2014 '+venueShort+' add_liquidity()', detail:'deposit \u00b7 '+assetA+' + '+assetB+' \u2192 pool CB7Q\u20264F2', tint:'#2E3A14', color:'var(--accent,#D5FF2F)' },
+      ],
+      remove: [
+        { i:'1', title:'InvokeHostFunction \u2014 '+venueShort+' remove_liquidity()', detail:'burn '+s.actionAmount+' LP \u2190 pool CB7Q\u20264F2', tint:'#2E3A14', color:'var(--accent,#D5FF2F)' },
+      ],
+    };
+    const txrepOps = txrepByType[activeActionType] || txrepByType.supply;
+    const feeBreakdown = [
+      { label:'Inclusion fee', value:'0.00001 XLM' },
+      { label:'Soroban resource fee', value:'0.0428 XLM' },
+      { label:'Safety margin (50%)', value:'0.0214 XLM' },
+      { label:'Max total fee', value:'0.0642 XLM' },
+    ];
+    const xdrString = 'AAAAAgAAAABr7QF2hK9mZ3xT4pWqLc0d8sVn2eYb…kf0AAAABAAAAAAAAAAEAAAAHc3VibWl0AAAAAAEAAAAB' +
+      'GdX7QF2hK9mZ3xT4pWqLc0d8sVn2eYbkf0 pQ1rStUvWxYz012345AAAAAAAAAAAAAAAAAAAAAAAAAB…';
+
+    // action step chrome
+    const stepNames = ['Configure','Review','Sign'];
+    const curStep = s.actionStep >= 4 ? 3 : s.actionStep;
+    const actionSteps = stepNames.map((nm,i) => {
+      const idx = i+1; const done = curStep>idx || s.actionStep===4; const active = curStep===idx;
+      return {
+        num: done ? '✓' : idx, label: nm, flex: i<2 ? '1' : '0',
+        hasLine: i<2,
+        lineColor: (curStep>idx) ? A : '#2C2C29',
+        dotStyle: `width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; ${done?`background:${A};color:#141414;`:(active?`background:${A};color:#141414;`:'background:#2C2C29;color:#5E5F5D;')}`,
+        labelStyle: `font-size:12.5px; font-weight:600; margin-left:8px; white-space:nowrap; color:${(done||active)?'#E2E6E1':'#5E5F5D'};`,
+      };
+    });
+
+    const actionHasFooter = s.actionStep!==3;
+    const actionCanBack = s.actionStep===2;
+    const actionCtaLabel = s.actionStep===1 ? 'Review transaction' : (s.actionStep===2 ? 'Sign in wallet' : 'Done');
+    const actionCtaBg = this.LIME;
+
+    // modal flags
+    const modalOpen = !!s.modal;
+    const isConnectModal = s.modal==='connect';
+    const isAlertModal = s.modal==='alert';
+    const isActionModal = s.modal==='action';
+    const modalWidthStyle = isActionModal ? 'width:460px;' : (isAlertModal ? 'width:540px;' : 'width:420px;');
+
+    return {
+      screenTitle, screenSub,
+      connectLabel: s.connected ? 'GDX…7QF' : 'Connect wallet',
+      isDash: s.screen==='dash', isProtocols: s.screen==='protocols', isPool: s.screen==='pool', isPortfolio: s.screen==='portfolio', isAlerts: s.screen==='alerts',
+      rootRef: this.rootRef, showBridge: this.props.showBridge !== false,
+      navMain, walletsNav,
+      openAddWallet:this.openAddWallet, openConnect:this.openConnect, openAlertsBell:this.openAlertsBell,
+      openCreateAlert:this.openCreateAlert, openCreateAlertForPool:this.openCreateAlertForPool,
+      goAlerts:() => this.go('alerts'), goProtocols:() => this.go('protocols'), goPortfolio:() => this.go('portfolio'),
+      // dashboard
+      walletCount:3, walletCards, allPositions, posCols, posScopeTitle, posCountLabel,
+      breakdownSegs, breakdownTotal, breakdownScope, hasBreakdown: breakdownSegs.length > 0,
+      activityRows, activityCount, activityScopeTitle,
+      portfolioValue: heroSummary.value, portfolioChange: heroSummary.change, portfolioChangeColor: heroSummary.changeColor,
+      portfolioBreakdown, rangeTabs, dashAlerts, networkStats, protocols, positions,
+      heroChart: this.heroChartEl('#252525', acc, s.range),
+      bridgeIcon, bridgeRanges, bridgeStats, bridgeChains, bridgeList, bridgeChart: this.bridgeChartEl(bridgeSeed, 160), bridgeHub: H(this.bridgeHubSvg()),
+      bridgeFlows, bridgeFlowsTitle, bridgeFlowsCount, bridgeTabs, bridgeShowRoutes, bridgeShowFlows, bridgeRouteCols, bridgeFlowCols, bridgeScopeLabel, bridgeScopeActive, bridgeClearScope,
+      // protocols
+      poolFilters, filteredPools, poolCountLabel, poolCols,
+      // pool
+      pool, poolStats, poolReserves, poolRisks,
+      poolIsLending, poolDesc, poolOnchain, poolAssets, poolHasAssets: poolAssets.length > 0, poolIsAmm: !poolIsLending,
+      poolActionLabel, poolPrimaryAction, poolSecondaryAction,
+      poolChart: HB(this.poolChartSvg()),
+      flowRanges, flowStats, flowTotals, flowChart: HB(this.flowSvg(flowSeed)),
+      poolHasPosition:true, poolPositionValue:'$24,180', poolPositionEarned:'$1,204',
+      openActionForPool:this.openActionForPool, openActionWithdraw:this.openActionWithdraw,
+      // portfolio
+      allPositions,
+      refreshBalances:this.refreshBalances,
+      refreshLabel: s.refreshing ? 'Refreshing…' : 'Refresh balances',
+      refreshIcon: H(this.icons.refresh),
+      refreshSpin: s.refreshing ? 'display:inline-flex;animation:digSpin .9s linear infinite;' : 'display:inline-flex;',
+      // alerts
+      alertFilters, alertFeed, alertRules, ruleCount,
+      // modal
+      modalOpen, closeModal:this.closeModal, stop:this.stop, modalWidthStyle,
+      isConnectModal, isAlertModal, isActionModal,
+      // connect
+      connectTitle:'Connect a wallet', connectSub:'Sign in with any Stellar wallet, or track a public address read-only.',
+      walletProviders, watchInput:s.watchInput, onWatchInput:this.onWatchInput, addWatchWallet:this.addWatchWallet,
+      // alert builder
+      alertScopes, alertTargets, alertScopeNoun, selectedTargetLabel, alertMetrics, selectedMetricLabel, alertOperators, alertThreshold:s.alertThreshold, onThresholdInput:this.onThresholdInput, thresholdUnit, alertSeverities, saveAlert:this.saveAlert,
+      // action
+      actionTitle, actionSteps, actionTypes, actionType:s.actionType,
+      isActStep1:s.actionStep===1, isActStep2:s.actionStep===2, isActStep3:s.actionStep===3, isActStep4:s.actionStep===4,
+      amountLabel, actionAmount:s.actionAmount, onAmountInput:this.onAmountInput, actionAsset, actionAssetMark, walletBalance, amountPresets, actionPreview,
+      txrepOps, feeBreakdown, xdrOpen:s.xdrOpen, toggleXdr:this.toggleXdr, xdrCaret: s.xdrOpen?'▾':'▸', xdrString,
+      signing:s.signing, signingAddress:'GDX7QF…K2A9PL', backToReview:this.backToReview,
+      txHash:'a3f9…d21c',
+      actionHasFooter, actionCanBack, actionBack:this.actionBack, actionNext:this.actionNext, actionCtaLabel, actionCtaBg,
+    };
+  }
+}
+</script>
+<script>
+(async () => {
+  if (!document.title || !document.title.trim()) document.title = "Dig Stellar";
+  // Prepend so page-supplied @page / break rules (deck-stage's margin:0,
+  // author CSS) keep source-order precedence over the baseline.
+  const baseCss = document.createElement('style');
+  baseCss.textContent = "@media print {\n  figure, table { break-inside: avoid; }\n  *, *::before, *::after {\n    print-color-adjust: exact; -webkit-print-color-adjust: exact;\n    backdrop-filter: none !important; -webkit-backdrop-filter: none !important;\n    animation-delay: -99s !important; animation-duration: .001s !important;\n    animation-iteration-count: 1 !important; animation-fill-mode: both !important;\n    animation-play-state: running !important; transition-duration: 0s !important;\n  }\n}";
+  document.head.prepend(baseCss);
+  if (document.readyState === 'loading') {
+    await new Promise((r) => document.addEventListener('DOMContentLoaded', r, { once: true }));
+  }
+  let ds = document.querySelector('deck-stage');
+  // whenDefined never resolves when nothing registers the element, so only
+  // await it when a <deck-stage> tag exists (and race a timeout regardless).
+  if (ds && !customElements.get('deck-stage')) {
+    try {
+      await Promise.race([
+        customElements.whenDefined('deck-stage'),
+        new Promise((r) => setTimeout(r, 3000)),
+      ]);
+    } catch (e) {}
+    ds = document.querySelector('deck-stage');
+  }
+  // dc-runtime assigns window.DCLogic at init and mounts into #dc-root on
+  // DOMContentLoaded; settle on that subtree so React has rendered before
+  // print(). Non-DC pages fall through to weighing body.
+  const isDc = !ds && 'DCLogic' in window;
+  const settleRoot = ds || (isDc ? document.getElementById('dc-root') : null) || document.body;
+  if (settleRoot) {
+    // Weigh only content children — skip script/style/template so inline
+    // Babel/CSS doesn't register as stable "content" before the framework
+    // has mounted anything.
+    const MEDIA = 'img,svg,canvas,video,picture,iframe,embed,object';
+    const weigh = () => {
+      let text = 0, media = 0;
+      for (const c of settleRoot.children) {
+        const t = c.tagName;
+        if (t === 'SCRIPT' || t === 'STYLE' || t === 'TEMPLATE') continue;
+        text += (c.textContent || '').trim().length;
+        media += c.querySelectorAll(MEDIA).length + (c.matches(MEDIA) ? 1 : 0);
+      }
+      return text + media * 100;
+    };
+    // "Non-zero and stable" alone is not sufficient to mean rendered: generic
+    // body can carry a static shell while async main content is pending, and
+    // #dc-root can carry the root DC's static text while child refs are still
+    // .sc-placeholder boxes. Gate generic on readyState 'complete', and never
+    // accept stability while a dc-runtime placeholder is present.
+    const isGeneric = settleRoot === document.body;
+    const deadline = Date.now() + 15000;
+    let last = -1, stable = 0;
+    while (Date.now() < deadline) {
+      const n = weigh();
+      const ready =
+        (!isGeneric || document.readyState === 'complete') &&
+        !settleRoot.querySelector('.sc-placeholder');
+      if (n > 0 && n === last && ready) { if (++stable >= 2) break; } else { stable = 0; }
+      last = n;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+  // Project support.js may predate runtime default-seeding; push via bridge.
+  if (isDc && window.__dcSetProps && window.__dcRootName) {
+    try {
+      const dpEl = document.querySelector('script[data-dc-script]');
+      const meta = JSON.parse((dpEl && dpEl.getAttribute('data-props')) || '{}');
+      const bag = {};
+      for (const k in meta)
+        if (k[0] !== '$' && meta[k] && meta[k].default !== undefined)
+          bag[k] = meta[k].default;
+      if (Object.keys(bag).length) {
+        window.__dcSetProps(window.__dcRootName(), bag);
+        await new Promise((r) => setTimeout(r, 50));
+      }
+    } catch (e) {}
+  }
+  // Reveal content gated on scroll or visibility before printing. Lazy <img>,
+  // IntersectionObserver fade-ins, and collapsed <details> don't render while
+  // off-screen, so a long page would print with them blank or closed. Open
+  // every <details>, force native-lazy images eager, and scroll the document
+  // through its full height to trip lazy-load + IO; then wait (bounded) for the
+  // newly-triggered images. Inert for deck-stage (slides aren't scroll-gated).
+  try {
+    for (const d of document.querySelectorAll('details')) d.open = true;
+    for (const img of document.querySelectorAll('img[loading="lazy"]'))
+      img.loading = 'eager';
+    const scroller = document.scrollingElement || document.documentElement;
+    const full = Math.max(scroller.scrollHeight, document.body.scrollHeight);
+    const step = window.innerHeight || 800;
+    for (let y = 0; y <= full; y += step) {
+      window.scrollTo(0, y);
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    window.scrollTo(0, 0);
+    await Promise.race([
+      Promise.all(
+        [...document.images].map((img) =>
+          img.complete
+            ? null
+            : new Promise((res) => {
+                img.addEventListener('load', res, { once: true });
+                img.addEventListener('error', res, { once: true });
+              })
+        )
+      ),
+      new Promise((r) => setTimeout(r, 4000)),
+    ]);
+  } catch (e) {}
+  try { await document.fonts.ready; } catch (e) {}
+  // Jump every animation to its end state so print() never captures a slide
+  // mid-entrance. Ordering matters: the 0s-transition style must be live
+  // BEFORE data-deck-active is set so attribute-keyed transitions don't
+  // start a (now-0s) run from the pre-active base.
+  const st = document.createElement('style');
+  st.textContent = '*,*::before,*::after{animation-delay:-99s !important;animation-duration:.001s !important;animation-iteration-count:1 !important;animation-fill-mode:both !important;animation-play-state:running !important;transition-duration:0s !important}';
+  document.head.appendChild(st);
+  for (const d of document.querySelectorAll('deck-stage')) {
+    for (const c of d.children) {
+      const t = c.tagName;
+      if (t === 'SCRIPT' || t === 'STYLE' || t === 'TEMPLATE') continue;
+      c.setAttribute('data-deck-active', '');
+    }
+  }
+  // Re-append deck-stage's @page last so no author @page can add a margin and
+  // spill each full-bleed slide onto two sheets. Backstop for old copies.
+  if (ds) {
+    let pg = document.getElementById('deck-stage-print-page');
+    if (!pg) {
+      pg = document.createElement('style');
+      pg.textContent = '@page{size:' + (+ds.getAttribute('width') || 1920) +
+        'px ' + (+ds.getAttribute('height') || 1080) + 'px;margin:0}';
+    }
+    document.body.appendChild(pg);
+  }
+  try {
+    const sweep = () => {
+      for (const a of document.getAnimations()) {
+        try { a.finish(); } catch (e) {
+          try { a.currentTime = (a.effect && a.effect.getComputedTiming().duration) || 0; a.pause(); } catch (e2) {}
+        }
+      }
+    };
+    sweep();
+    await new Promise((r) => requestAnimationFrame(r));
+    sweep();
+    await new Promise((r) => requestAnimationFrame(r));
+  } catch (e) {}
+  // Size the PDF page to the rendered design unless the file opted into
+  // standard paper via @page{size:letter|A4|…}. Decks own their own @page.
+  // Wrappers (body, …) lose padding+margin so the frame sits at (0,0); the
+  // frame itself loses only margin — its padding is INSIDE the measured
+  // rect and must stay, or content shifts and leaves a gap at bottom/right.
+  var __m = null;
+  try { __m = (() => {
+  var STAMP = true;
+  var docEl = document.documentElement;
+  var doc = { width: docEl.scrollWidth, height: docEl.scrollHeight };
+
+  var ds = document.querySelector('deck-stage');
+  if (ds) {
+    var dw = Number(ds.getAttribute('width')) || 1920;
+    var dh = Number(ds.getAttribute('height')) || 1080;
+    var n = typeof ds.length === 'number' ? ds.length : ds.children.length;
+    var idx = typeof ds.index === 'number' ? ds.index : 0;
+    var frames = [];
+    for (var i = 0; i < n; i++) frames.push({ left: 0, top: 0, width: dw, height: dh });
+    return { kind: 'deck', source: 'declared', doc: doc, frames: frames,
+      authored: frames.map(function(){return{width:true,height:true}}),
+      deck: { width: dw, height: dh, slideCount: n, index: idx },
+      signals: { paperPage: false, pxPage: false } };
+  }
+
+  // Declared kind: a doc-page tag names the kind outright, so no signal
+  // heuristics run (like the deck branch above, signals report false —
+  // they describe inferred classifications only). The tag alone is not
+  // trusted: the element must have upgraded (shadowRoot present), so a
+  // leftover tag whose script was deleted falls through to the heuristics
+  // that handle plain markup.
+  var stageSx = window.scrollX || 0, stageSy = window.scrollY || 0;
+  var dp = document.querySelector('doc-page');
+  if (dp && dp.shadowRoot) {
+    // Crop to the sheet, not the host — the desk around it is screen-only
+    // chrome that must not land in PNG exports.
+    var sheet = dp.shadowRoot.querySelector('.sheet');
+    var sr = (sheet || dp).getBoundingClientRect();
+    return { kind: 'paper-doc', source: 'declared', doc: doc,
+      frames: [{ left: sr.left + stageSx, top: sr.top + stageSy,
+        width: sr.width, height: sr.height }],
+      authored: [{ width: false, height: false }],
+      signals: { paperPage: false, pxPage: false } };
+  }
+  var paperPage = false, pxPage = false;
+  var eachRule = function (fn) {
+    for (var s = 0; s < document.styleSheets.length; s++) {
+      var rs; try { rs = document.styleSheets[s].cssRules; } catch (e) { continue; }
+      for (var r = 0; r < rs.length; r++) {
+        fn(rs[r]);
+        if (rs[r].cssRules) for (var n = 0; n < rs[r].cssRules.length; n++) fn(rs[r].cssRules[n]);
+      }
+    }
+  };
+  eachRule(function (r) {
+    if (r.type !== 6) return;
+    var m = /\bsize\s*:\s*([^;}]+)/i.exec(r.cssText || '');
+    if (!m) return;
+    if (/\b(letter|a[3-5]|legal|ledger)\b/i.test(m[1])) paperPage = true;
+    if (/\d+(?:\.\d+)?px\b/i.test(m[1])) pxPage = true;
+  });
+  var signals = { paperPage: paperPage, pxPage: pxPage };
+
+  var pxVal = function (v) {
+    var m = /^(\d+(?:\.\d+)?)px$/.exec(v || ''); return m ? +m[1] : 0;
+  };
+  var authoredPx = function (el, prop) {
+    if (pxVal(el.style[prop])) return true;
+    var attr = el.getAttribute(prop);
+    if (attr && /^\d+$/.test(attr)) return true;
+    var hit = false;
+    eachRule(function (r) {
+      if (hit || r.type !== 1 || !r.style) return;
+      try { if (el.matches(r.selectorText) && pxVal(r.style[prop])) hit = true; } catch (e) {}
+    });
+    return hit;
+  };
+
+  var el = document.body, rootPxW = false;
+  for (;;) {
+    var kids = [];
+    for (var c = 0; c < el.children.length; c++) {
+      var t = el.children[c].tagName;
+      if (t !== 'SCRIPT' && t !== 'STYLE' && t !== 'TEMPLATE') kids.push(el.children[c]);
+    }
+    if (kids.length !== 1 || !(kids[0] instanceof HTMLElement)) break;
+    if (STAMP) el.setAttribute('data-om-frame-wrap', '');
+    el = kids[0];
+    rootPxW = authoredPx(el, 'width');
+    if (rootPxW) break;
+  }
+  if (!rootPxW) rootPxW = authoredPx(el, 'width');
+
+  // @page{size:letter} alone is a flowing doc; with a px-width root it's a
+  // fixed sheet pretending to be paper — fall through and size to render.
+  if (paperPage && !rootPxW) {
+    return { kind: 'paper-doc', source: 'inferred', doc: doc, signals: signals,
+      frames: [{ left: 0, top: 0, width: doc.width, height: doc.height }],
+      authored: [{ width: false, height: false }] };
+  }
+
+  var sx = window.scrollX || 0, sy = window.scrollY || 0;
+  var rectOf = function (e) {
+    var r = e.getBoundingClientRect();
+    var oy; try { oy = getComputedStyle(e).overflowY; } catch (err) {}
+    var h = oy === 'visible' ? Math.max(r.height, e.scrollHeight || 0) : r.height;
+    return { left: r.left + sx, top: r.top + sy, width: r.width, height: h };
+  };
+
+  // Multi-frame: ≥2 visible non-fixed children, each with authored px width
+  // AND height, all within ±2px of each other. Off unless the page opts in
+  // via data-om-multi-frame on the stop element — guards against card grids
+  // and pricing tables that match the geometry but aren't separate canvases.
+  if (el.hasAttribute('data-om-multi-frame')) {
+    var cands = [];
+    for (var k = 0; k < el.children.length; k++) {
+      var ch = el.children[k];
+      var cs; try { cs = getComputedStyle(ch); } catch (e) { continue; }
+      if (cs.display === 'none' || cs.visibility === 'hidden' || cs.position === 'fixed') continue;
+      var rc = rectOf(ch);
+      if (rc.width < 2 || rc.height < 2) continue;
+      if (!authoredPx(ch, 'width') || !authoredPx(ch, 'height')) continue;
+      cands.push(rc);
+    }
+    if (cands.length >= 2) {
+      var w0 = cands[0].width, h0 = cands[0].height, ok = true;
+      for (var q = 1; q < cands.length; q++)
+        if (Math.abs(cands[q].width - w0) > 2 || Math.abs(cands[q].height - h0) > 2) ok = false;
+      if (ok) return { kind: 'multi-frame', source: 'inferred', doc: doc, signals: signals,
+        frames: cands, authored: cands.map(function(){return{width:true,height:true}}) };
+    }
+  }
+
+  if (STAMP) el.setAttribute('data-om-frame', '');
+  return { kind: 'single-canvas', source: 'inferred', doc: doc, signals: signals,
+    frames: [rectOf(el)],
+    authored: [{ width: rootPxW, height: authoredPx(el, 'height') }] };
+})(); } catch (e) {}
+  var frame = null;
+  if (__m && __m.kind === 'single-canvas') {
+    var f = __m.frames && __m.frames[0];
+    if (f && f.width >= 200 && f.height >= 200) {
+      frame = f;
+      var fst = document.createElement('style');
+      fst.textContent = '@media print{@page{size:' + Math.ceil(f.width) + 'px ' +
+        Math.ceil(f.height) + 'px;margin:0}' +
+        'html,body,[data-om-frame-wrap]{padding:0!important;margin:0!important;background:none!important}' +
+        '[data-om-frame]{margin:0!important}}';
+      document.body.appendChild(fst);
+    }
+  }
+  // Relax break-inside on oversized elements. An element taller than a
+  // printable page can't honor break-inside: avoid — browsers either overflow
+  // it or push it whole to the next page, leaving a blank gap, then break it
+  // anyway at an arbitrary point. After the final layout (content revealed,
+  // animations jumped), find elements taller than a page that still compute
+  // break-inside: avoid and reset them to auto, so the browser breaks them at
+  // their children's boundaries instead (children keep their own avoid). PAGE_PX
+  // is a conservative portrait estimate at 96 CSS px/in — Letter/A4 usable
+  // height minus our 0.5in margins — so only clearly-oversized elements are
+  // touched and under-page elements still stay whole. Skipped for decks (slides
+  // are sized to the page) and for fixed-size canvases (frame set, or an author
+  // px-based @page) — runs as before for flowing docs on letter/A4.
+  try {
+    if (!ds && !frame && !(__m && __m.signals && __m.signals.pxPage)) {
+      const PAGE_PX = 1024;
+      // Our print defaults add a real @page margin only when the source has
+      // no @page of its own; computed style can't tell us (it reports screen
+      // media), so read the injected rule directly.
+      const defaults = document.querySelector('style[data-omelette-print-defaults]');
+      const pageInset = /@page\s*\{[^}]*margin/.test(defaults ? defaults.textContent || '' : '');
+      const SEL = 'section,article,figure,table,pre,blockquote,[class~="card" i],[class~="page" i],[class~="sheet" i]';
+      for (const el of document.body.querySelectorAll(SEL)) {
+        if (el instanceof HTMLElement && el.offsetHeight > PAGE_PX) {
+          el.setAttribute('data-om-oversized', '');
+          // Fake-paged docs simulate sheets with over-tall break-after:page
+          // boxes; honoring the break spills half-blank pages and ends a
+          // colored box mid-sheet. Flow them, and (only when we own the page
+          // inset) drop the redundant padding/background via the rule below.
+          const cs = getComputedStyle(el);
+          if (cs.breakAfter === 'page' || cs.pageBreakAfter === 'always') {
+            el.setAttribute('data-om-fakepage', '');
+          }
+        }
+      }
+      const ost = document.createElement('style');
+      ost.textContent = '@media print{' +
+        '[data-om-oversized]{break-inside:auto !important;page-break-inside:auto !important}' +
+        '[data-om-fakepage]{break-after:auto !important;page-break-after:auto !important}' +
+        (pageInset ? '[data-om-fakepage]{padding:0 !important;background:none !important}' : '') +
+        '}';
+      document.head.appendChild(ost);
+    }
+  } catch (e) {}
+  // macOS Preview renders Skia-PDF Luminosity soft-masks as opaque grey boxes;
+  // swap the CSS that triggers them for Preview-safe forms.
+  try {
+    for (const el of document.body.querySelectorAll('*')) {
+      const cs = getComputedStyle(el);
+
+      if (cs.boxShadow !== 'none' && cs.filter === 'none') {
+        const outs = [], kept = [];
+        for (const s of cs.boxShadow.split(/,(?![^(]*[)])/)) {
+          const t = s.trim();
+          const m = t.match(/^(rgba?[(][^)]+[)]) (-?[0-9.]+px) (-?[0-9.]+px) ([0-9.]+px) -?[0-9.]+px$/);
+          if (m && parseFloat(m[4]) > 0) outs.push('drop-shadow(' + m[2] + ' ' + m[3] + ' ' + m[4] + ' ' + m[1] + ')');
+          else kept.push(t);
+        }
+        if (outs.length) {
+          el.style.setProperty('filter', outs.join(' '), 'important');
+          el.style.setProperty('box-shadow', kept.join(', ') || 'none', 'important');
+        }
+      }
+
+      const mask = cs.maskImage && cs.maskImage !== 'none' ? cs.maskImage : cs.webkitMaskImage;
+      if (mask && mask !== 'none' && cs.filter === 'none') el.style.setProperty('filter', 'opacity(1)', 'important');
+    }
+  } catch (e) {}
+  setTimeout(() => { try { window.print(); } catch (e) {} }, 200);
+})();
+</script>
+</body>
+</html>

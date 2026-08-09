@@ -57,6 +57,27 @@ export function useNetworkStats() {
   const loading = ref(true)
   const error = ref<string | null>(null)
 
+  // Freshness + a few raw numerics the design dashboard hero reads directly
+  // (the `stats` list is pre-formatted strings; the hero wants the numbers).
+  const updatedAt = ref<string | null>(null)
+  const isStale = ref<boolean | null>(null)
+  const staleAfterSeconds = ref<number | null>(null)
+  const raw = ref<{
+    stellarTvlUsd: number | null
+    xlmPriceUsd: number | null
+    xlmPriceChange24hPct: number | null
+    stableMcapUsd: number | null
+    usdcSupplyUsd: number | null
+    protocolCount: number | null
+  }>({
+    stellarTvlUsd: null,
+    xlmPriceUsd: null,
+    xlmPriceChange24hPct: null,
+    stableMcapUsd: null,
+    usdcSupplyUsd: null,
+    protocolCount: null,
+  })
+
   function patch(title: string, value: string, change: string) {
     const stat = stats.value.find((item) => item.title === title)
     if (stat) {
@@ -71,6 +92,18 @@ export function useNetworkStats() {
 
     try {
       const data = await fetchNetworkStats()
+
+      updatedAt.value = data.updatedAt ?? null
+      isStale.value = data.isStale ?? null
+      staleAfterSeconds.value = data.staleAfterSeconds ?? null
+      raw.value = {
+        stellarTvlUsd: data.stellarTvlUsd,
+        xlmPriceUsd: data.xlmPriceUsd,
+        xlmPriceChange24hPct: data.xlmPriceChange24hPct,
+        stableMcapUsd: data.stableMcapUsd,
+        usdcSupplyUsd: data.usdcSupplyUsd,
+        protocolCount: data.protocolCount,
+      }
 
       patch(
         'XLM Price',
@@ -124,5 +157,14 @@ export function useNetworkStats() {
 
   onMounted(fetchAll)
 
-  return { stats, loading, error, refresh: fetchAll }
+  return {
+    stats,
+    loading,
+    error,
+    refresh: fetchAll,
+    updatedAt,
+    isStale,
+    staleAfterSeconds,
+    raw,
+  }
 }

@@ -46,12 +46,17 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   whitelist; first real swaps executed both directions). The KPI window (50+ wallets / 200+ txs)
   is open.
 - Closest tranche-critical targets: T3-D2 KPIs (adoption — distribution push starts now), Lot A2
-  (Blend deposit mainnet; testnet-proven `a842f370…`), T3-D3 (sidebar redesign + observability +
-  reference packaging).
+  (Blend deposit mainnet; testnet-proven `a842f370…`), T3-D3 (**Lot C design-handoff port DONE** —
+  shell + 5 views + modals on real data, `/v1/pools/:slug/flows` + `/series` added; observability +
+  reference packaging still open).
 - Biggest current risk: **the T3-D2 KPIs** — they cannot be built, only accumulated; every day of
   the open window counts.
 - Main execution goal: KPI push + A2 + T3-D3, converging on the Aug 15 internal target.
-- Last updated: 2026-08-04
+- T3-D3 note (2026-08-05): the full UI port to the co-founder's Claude Design handoff landed green
+  (web build + 49 tests + api build; captures in `docs/evidence/lot-c/`). Remaining T3-D3: RPC
+  latency/error metrics endpoints + CI/CD, and the final demo/reference packaging. Liquidity actions
+  (Lot D) intentionally deferred — Add/Remove-liquidity tabs ship present-but-disabled.
+- Last updated: 2026-08-05
 
 ---
 
