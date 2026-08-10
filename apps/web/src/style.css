@@ -38,7 +38,7 @@
   --dig-text: #E2E6E1;      /* primary text */
   --dig-text-2: #B7B3AB;    /* secondary text */
   --dig-muted: #8A857B;     /* muted */
-  --dig-faint: #5E5F5D;     /* labels / faint */
+  --dig-faint: #909189;     /* labels / faint — F1: AA-contrast (was #5E5F5D, ~2.4:1; now ≥4.7:1 on all dig surfaces) */
   --dig-accent: #D5FF2F;    /* lime accent */
   --dig-green: #2E9E63;     /* positive */
   --dig-red: #E0603E;       /* negative */
@@ -57,10 +57,23 @@ body {
 
 .font-mono-geist { font-family: 'Geist Mono', monospace; }
 
-/* Scrollbars inside dig surfaces */
-.dig-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
-.dig-scroll::-webkit-scrollbar-thumb { background: #34342E; border-radius: 10px; border: 3px solid var(--dig-bg); }
-.dig-scroll::-webkit-scrollbar-track { background: transparent; }
+/* Scrollbars — F1: global, consistent with the --dig-* tokens.
+   Applied to every overflow container (sidebar, tables, modals, feeds) so no
+   container falls back to the raw OS scrollbar. Existing .dig-scroll markup now
+   inherits this global styling (its old dedicated rule is folded in here). */
+* {
+  scrollbar-width: thin;                          /* Firefox */
+  scrollbar-color: #3A3A34 transparent;           /* Firefox: thumb, track */
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #34342E;
+  border-radius: 10px;
+  border: 2px solid var(--dig-bg);                /* inset look against dark surfaces */
+}
+::-webkit-scrollbar-thumb:hover { background: #45453D; }
+::-webkit-scrollbar-corner { background: transparent; }
 
 /* Design-system animations (mirrors the handoff keyframes) */
 @keyframes digPulse   { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
