@@ -9,6 +9,7 @@ import { useView } from '../../composables/useView'
 import { venueTheme } from '../../data/venueTheme'
 import { displayPoolName, formatUsd } from '../../utils/format'
 import type { PoolListItem } from '../../types/protocol'
+import BrandLogo from '../common/BrandLogo.vue'
 
 const { pools, loadingProtocols, error, reload } = useProtocol()
 const { openPool } = useView()
@@ -34,7 +35,7 @@ const KIND_LABEL: Record<PoolKind, string> = { lending: 'Lending', vault: 'Vault
 // ── per-protocol summary cards ───────────────────────────────────────────────
 const protocolCards = computed(() => {
   interface Acc {
-    id: string; name: string; kind: PoolKind; tvl: number; vol: number; fees: number
+    id: string; name: string; kind: PoolKind; logoUrl: string | null; tvl: number; vol: number; fees: number
     count: number; stale: boolean; topPool: string
     // TVL-weighted APY accumulators (only over pools where the metric applies).
     sApyW: number; sTvl: number; bApyW: number; bTvl: number
@@ -46,7 +47,7 @@ const protocolCards = computed(() => {
     const tvl = p.metrics.tvlUsd ?? 0
     const cur =
       map.get(id) ??
-      { id, name: p.protocol.name, kind, tvl: 0, vol: 0, fees: 0, count: 0, stale: false, topPool: p.id, sApyW: 0, sTvl: 0, bApyW: 0, bTvl: 0 }
+      { id, name: p.protocol.name, kind, logoUrl: p.protocol.logoUrl ?? null, tvl: 0, vol: 0, fees: 0, count: 0, stale: false, topPool: p.id, sApyW: 0, sTvl: 0, bApyW: 0, bTvl: 0 }
     cur.tvl += tvl
     if (kind === 'amm') {
       cur.vol += p.metrics.volume24hUsd ?? 0
@@ -144,6 +145,7 @@ const rows = computed(() => {
         id: p.id,
         pair: displayPoolName(p.name),
         venue: p.protocol.name,
+        logoUrl: p.protocol.logoUrl ?? null,
         theme: venueTheme(p.protocol.id),
         tvl: formatUsd(p.metrics.tvlUsd),
         apy: pctRatio(p.metrics.supplyApy),
@@ -193,10 +195,7 @@ function arrow(k: SortKey): string {
           @click="openPool(c.topPool)"
         >
           <div class="flex items-center gap-[12px]">
-            <span class="w-[42px] h-[42px] rounded-[12px] flex items-center justify-center font-bold text-[19px]" :style="{ background: c.theme.tint, color: c.theme.color }">
-              <img v-if="c.theme.logo" :src="c.theme.logo" alt="" class="w-[60%] h-[60%] object-contain" />
-              <template v-else>{{ c.theme.letter }}</template>
-            </span>
+            <BrandLogo :primary="c.logoUrl" :fallback="c.theme.logo" :letter="c.theme.letter" :tint="c.theme.tint" :color="c.theme.color" :size="42" :radius="12" :font-size="19" :img-scale="0.6" />
             <div class="min-w-0">
               <div class="text-[16px] font-bold flex items-center gap-[7px]">
                 {{ c.name }}
@@ -255,10 +254,7 @@ function arrow(k: SortKey): string {
               @click="openPool(r.id)"
             >
               <div class="flex items-center gap-[11px] min-w-0">
-                <span class="w-[30px] h-[30px] rounded-[9px] flex items-center justify-center font-bold text-[12px] flex-shrink-0" :style="{ background: r.theme.tint, color: r.theme.color }">
-                  <img v-if="r.theme.logo" :src="r.theme.logo" alt="" class="w-[62%] h-[62%] object-contain" />
-                  <template v-else>{{ r.theme.letter }}</template>
-                </span>
+                <BrandLogo :primary="r.logoUrl" :fallback="r.theme.logo" :letter="r.theme.letter" :tint="r.theme.tint" :color="r.theme.color" :size="30" :radius="9" :font-size="12" :img-scale="0.62" />
                 <div class="min-w-0">
                   <div class="text-[14px] font-semibold truncate flex items-center gap-[6px]">
                     {{ r.pair }}

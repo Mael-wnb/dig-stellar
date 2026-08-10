@@ -72,6 +72,7 @@ type ProtocolRow = {
   name: string;
   chain: string;
   venue_type: string;
+  logo_url: string | null;
   tvl_usd: unknown;
   volume_24h_usd: unknown;
   fees_24h_usd: unknown;
@@ -88,6 +89,7 @@ type PoolListRow = {
   protocol_slug: string;
   protocol_name: string;
   protocol_type: string;
+  protocol_logo_url: string | null;
   chain: string;
   tvl_usd: unknown;
   volume_24h_usd: unknown;
@@ -108,6 +110,7 @@ type PoolDetailRow = {
   protocol_slug: string;
   protocol_name: string;
   protocol_type: string;
+  protocol_logo_url: string | null;
   chain: string;
   tvl_usd: unknown;
   volume_24h_usd: unknown;
@@ -126,6 +129,7 @@ type ReserveRow = {
   asset_id: string;
   symbol: string | null;
   name: string | null;
+  logo_url: string | null;
   decimals: unknown;
   d_supply_scaled: unknown;
   b_supply_scaled: unknown;
@@ -180,6 +184,7 @@ export class StellarService {
         v.name,
         v.chain,
         v.venue_type,
+        v.logo_url,
         pm.tvl_usd,
         pm.volume_24h_usd,
         pm.fees_24h_usd,
@@ -196,6 +201,7 @@ export class StellarService {
       name: row.name,
       type: row.venue_type,
       chain: row.chain,
+      logoUrl: row.logo_url ?? null,
       tvlUsd: toNumber(row.tvl_usd),
       volume24hUsd: toNumber(row.volume_24h_usd) ?? 0,
       fees24hUsd: toNumber(row.fees_24h_usd) ?? 0,
@@ -243,6 +249,7 @@ export class StellarService {
         v.slug as protocol_slug,
         v.name as protocol_name,
         v.venue_type as protocol_type,
+        v.logo_url as protocol_logo_url,
         v.chain,
         pml.tvl_usd,
         pml.volume_24h_usd,
@@ -266,6 +273,7 @@ export class StellarService {
         e.slug as entity_slug,
         a.id as asset_id,
         a.symbol,
+        a.logo_url,
         ea.role
       from entity_assets ea
       join entities e on e.id = ea.entity_id
@@ -275,12 +283,18 @@ export class StellarService {
       entity_slug: string;
       asset_id: string;
       symbol: string | null;
+      logo_url: string | null;
       role: string;
     }>;
 
     const tokensByEntity = new Map<
       string,
-      Array<{ assetId: string; symbol: string | null; role: string }>
+      Array<{
+        assetId: string;
+        symbol: string | null;
+        logoUrl: string | null;
+        role: string;
+      }>
     >();
 
     for (const row of tokenRows) {
@@ -290,6 +304,7 @@ export class StellarService {
       tokensByEntity.get(row.entity_slug)!.push({
         assetId: row.asset_id,
         symbol: row.symbol,
+        logoUrl: row.logo_url ?? null,
         role: row.role,
       });
     }
@@ -302,6 +317,7 @@ export class StellarService {
         id: row.protocol_slug,
         name: row.protocol_name,
         type: row.protocol_type,
+        logoUrl: row.protocol_logo_url ?? null,
       },
       chain: row.chain,
       contractAddress: row.contract_address,
@@ -333,6 +349,7 @@ export class StellarService {
           v.slug as protocol_slug,
           v.name as protocol_name,
           v.venue_type as protocol_type,
+          v.logo_url as protocol_logo_url,
           v.chain,
           pml.tvl_usd,
           pml.volume_24h_usd,
@@ -365,6 +382,7 @@ export class StellarService {
           a.id as asset_id,
           rs.symbol,
           rs.name,
+          a.logo_url,
           rs.decimals,
           rs.d_supply_scaled,
           rs.b_supply_scaled,
@@ -442,6 +460,7 @@ export class StellarService {
                 assetId: row.asset_id,
                 symbol: row.symbol,
                 name: row.name,
+                logoUrl: row.logo_url ?? null,
                 decimals: toNumber(row.decimals),
                 priceUsd,
                 reserve,
@@ -456,6 +475,7 @@ export class StellarService {
             id: pool.protocol_slug,
             name: pool.protocol_name,
             type: 'amm',
+            logoUrl: pool.protocol_logo_url ?? null,
           },
           chain: pool.chain,
           type: pool.entity_type,
@@ -478,6 +498,7 @@ export class StellarService {
         assetId: row.asset_id,
         symbol: row.symbol,
         name: row.name,
+        logoUrl: row.logo_url ?? null,
         decimals: toNumber(row.decimals),
         priceUsd: toNumber(row.price_usd),
         supplied: toNumber(row.b_supply_scaled),
@@ -497,6 +518,7 @@ export class StellarService {
           id: pool.protocol_slug,
           name: pool.protocol_name,
           type: 'lending',
+          logoUrl: pool.protocol_logo_url ?? null,
         },
         chain: pool.chain,
         type: pool.entity_type,

@@ -16,6 +16,7 @@ import { useView } from '../../composables/useView'
 import { useSharedWallets } from '../../composables/useSharedWallets'
 import { useModals } from '../../composables/useModals'
 import { venueTheme } from '../../data/venueTheme'
+import BrandLogo from '../common/BrandLogo.vue'
 import {
   displayPoolName,
   displaySymbol,
@@ -180,6 +181,7 @@ const reserveBars = computed(() => {
     const share = total > 0 ? (usd / total) * 100 : 0
     return {
       symbol: displaySymbol(t.symbol),
+      logoUrl: t.logoUrl ?? null,
       amount: formatUsd(usd),
       pct: `${share.toFixed(0)}%`,
       width: `${share.toFixed(2)}%`,
@@ -397,13 +399,7 @@ function openAction() {
           <!-- Header card -->
           <div class="rounded-[18px] p-[24px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
             <div class="flex items-center gap-[14px] flex-wrap">
-              <span
-                class="w-[46px] h-[46px] rounded-[13px] flex items-center justify-center font-bold text-[19px] flex-shrink-0"
-                :style="{ background: theme.tint, color: theme.color }"
-              >
-                <img v-if="theme.logo" :src="theme.logo" alt="" class="w-[60%] h-[60%] object-contain" />
-                <template v-else>{{ theme.letter }}</template>
-              </span>
+              <BrandLogo :primary="pool.protocol?.logoUrl" :fallback="theme.logo" :letter="theme.letter" :tint="theme.tint" :color="theme.color" :size="46" :radius="13" :font-size="19" :img-scale="0.6" />
               <div class="min-w-0">
                 <div class="text-[22px] font-bold tracking-[-0.02em] truncate">{{ pairName }}</div>
                 <div class="text-[13px]" style="color: var(--dig-faint)">
@@ -608,7 +604,10 @@ function openAction() {
           >
             <div v-for="(r, i) in reserveBars" :key="i" class="mb-[16px] last:mb-0">
               <div class="flex items-center justify-between text-[13px] mb-[7px]">
-                <span class="flex items-center gap-[8px] font-semibold">{{ r.symbol }}</span>
+                <span class="flex items-center gap-[8px] font-semibold">
+                  <BrandLogo :primary="r.logoUrl" :letter="(r.symbol || '•').charAt(0)" tint="#242422" color="#B7B3AB" :size="20" :radius="6" :font-size="10" :img-scale="0.72" />
+                  {{ r.symbol }}
+                </span>
                 <span class="tabular-nums" style="color: var(--dig-faint)">{{ r.amount }}</span>
               </div>
               <div class="h-[7px] rounded-[5px] overflow-hidden" style="background: var(--dig-line-soft)">
@@ -683,7 +682,12 @@ function openAction() {
           </thead>
           <tbody>
             <tr v-for="r in pool.reserves" :key="r.assetId" style="border-top: 1px solid #262624">
-              <td class="py-[13px] font-semibold">{{ displaySymbol(r.symbol) }}</td>
+              <td class="py-[13px] font-semibold">
+                <span class="flex items-center gap-[8px]">
+                  <BrandLogo :primary="r.logoUrl" :letter="(displaySymbol(r.symbol) || '•').charAt(0)" tint="#242422" color="#B7B3AB" :size="22" :radius="6" :font-size="11" :img-scale="0.72" />
+                  {{ displaySymbol(r.symbol) }}
+                </span>
+              </td>
               <td class="py-[13px] text-right" style="color: var(--dig-text-2)">{{ formatUsd(r.priceUsd) }}</td>
               <td class="py-[13px] text-right">{{ formatCount(r.supplied) }}</td>
               <td class="py-[13px] text-right" style="color: var(--dig-text-2)">{{ formatCount(r.borrowed) }}</td>

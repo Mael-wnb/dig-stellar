@@ -15,6 +15,7 @@ import { useBridge } from '../../composables/useBridge'
 import { useView } from '../../composables/useView'
 import { useModals } from '../../composables/useModals'
 import { venueTheme } from '../../data/venueTheme'
+import BrandLogo from '../common/BrandLogo.vue'
 import { formatUsd, formatPct, relativeTime } from '../../utils/format'
 
 import FreshnessChip from '../FreshnessChip.vue'
@@ -66,10 +67,10 @@ const statTiles = computed(() => [
 
 // ── protocol totals ──────────────────────────────────────────────────────────
 const protocolRows = computed(() => {
-  const map = new Map<string, { id: string; name: string; type: string; tvl: number; count: number; stale: boolean; topPool: string }>()
+  const map = new Map<string, { id: string; name: string; type: string; logoUrl: string | null; tvl: number; count: number; stale: boolean; topPool: string }>()
   for (const p of pools.value) {
     const id = p.protocol.id
-    const cur = map.get(id) ?? { id, name: p.protocol.name, type: p.protocol.type, tvl: 0, count: 0, stale: false, topPool: p.id }
+    const cur = map.get(id) ?? { id, name: p.protocol.name, type: p.protocol.type, logoUrl: p.protocol.logoUrl ?? null, tvl: 0, count: 0, stale: false, topPool: p.id }
     cur.tvl += p.metrics.tvlUsd ?? 0
     cur.count += 1
     if (p.isStale === true) cur.stale = true
@@ -202,10 +203,7 @@ const {
         class="dig-row flex items-center gap-[12px] px-[8px] py-[12px] rounded-[11px] cursor-pointer -mx-[8px] w-[calc(100%+16px)] text-left"
         @click="openPool(p.topPool)"
       >
-        <span class="w-[34px] h-[34px] rounded-[10px] flex items-center justify-center font-bold text-[15px]" :style="{ background: p.theme.tint, color: p.theme.color }">
-          <img v-if="p.theme.logo" :src="p.theme.logo" alt="" class="w-[60%] h-[60%] object-contain" />
-          <template v-else>{{ p.theme.letter }}</template>
-        </span>
+        <BrandLogo :primary="p.logoUrl" :fallback="p.theme.logo" :letter="p.theme.letter" :tint="p.theme.tint" :color="p.theme.color" :size="34" :radius="10" :font-size="15" :img-scale="0.6" />
         <div>
           <div class="text-[14px] font-semibold flex items-center gap-[7px]">
             {{ p.name }}

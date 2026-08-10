@@ -6,6 +6,7 @@ create table if not exists venues (
   name text not null,
   chain text not null,
   venue_type text not null,
+  logo_url text,                         -- F3 (Lot F): backend-served brand logo; null → UI monogram
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -35,6 +36,7 @@ create table if not exists assets (
   symbol text,
   name text,
   decimals integer,
+  logo_url text,                         -- F3 (Lot F): backend-served asset logo; null → UI monogram
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

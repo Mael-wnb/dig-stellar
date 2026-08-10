@@ -4,12 +4,16 @@ export interface ProtocolSummary {
     id: string
     name: string
     type: string
+    // F3 (Lot F): backend-served venue logo. Null/absent → UI monogram fallback.
+    logoUrl?: string | null
   }
-  
+
   export interface PoolTokenSummary {
     assetId: string | null
     symbol: string | null
     role?: string
+    // F3 (Lot F): backend-served asset logo. Null/absent → UI monogram fallback.
+    logoUrl?: string | null
 
     // Populated for AMM pool detail (reserve breakdown). Absent in pool lists.
     name?: string | null
@@ -54,6 +58,8 @@ export interface ProtocolSummary {
     symbol: string
     name: string
     decimals: number
+    // F3 (Lot F): backend-served asset logo. Null/absent → UI monogram fallback.
+    logoUrl?: string | null
     priceUsd?: number | null
   
     reserve?: number | null
