@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   UnprocessableEntityException,
@@ -117,6 +118,72 @@ function toI128(amount: string, decimals: number): bigint {
 /** True for the native-asset ref ('XLM' or 'native'). */
 function isNativeRef(ref: AssetRef): boolean {
   return ref.code === 'XLM' || ref.code === 'native';
+}
+
+// ── F2: spendable-balance preflight ────────────────────────────────────────
+// Stellar locks part of an account's XLM (base + subentry reserves) and part of
+// any balance (selling liabilities). A send amount above the *spendable* figure
+// makes a swap/deposit fail on-chain (pathPaymentStrictSendUnderfunded) even though
+// the raw balance looks sufficient. We preflight it so such a tx can't be signed.
+
+/** Base reserve per account entry, in XLM. */
+export const BASE_RESERVE_XLM = 0.5;
+/** Fee/rounding headroom left free when sending native XLM, in XLM. */
+export const XLM_FEE_BUFFER = 0.01;
+
+/** Minimal Horizon-balance shape the spendable computation needs. */
+export interface SpendableBalanceLine {
+  asset_type: string; // 'native' | 'credit_alphanum4' | 'credit_alphanum12' | ...
+  asset_code?: string;
+  asset_issuer?: string;
+  balance: string;
+  selling_liabilities?: string;
+}
+
+/** Minimal Horizon-account shape the spendable computation needs. */
+export interface SpendableAccountView {
+  balances: SpendableBalanceLine[];
+  subentryCount: number;
+}
+
+/** The send asset, reduced to what the spendable computation compares on. */
+export interface SpendableAsset {
+  isNative: boolean;
+  code?: string;
+  issuer?: string;
+}
+
+/**
+ * Spendable balance of the send asset, honoring Stellar reserves & liabilities.
+ *   native XLM: balance − (2 + subentries) × 0.5 reserve − selling_liabilities − fee buffer
+ *   classic   : balance − selling_liabilities
+ * Clamped at 0. Returns 0 when the account holds none of the asset (no trustline /
+ * unfunded). Pure and SDK-free so it is unit-testable directly.
+ */
+export function computeSpendable(
+  account: SpendableAccountView,
+  send: SpendableAsset,
+): number {
+  if (send.isNative) {
+    const native = account.balances.find((b) => b.asset_type === 'native');
+    if (!native) return 0;
+    const minBalance = (2 + account.subentryCount) * BASE_RESERVE_XLM;
+    return Math.max(
+      0,
+      parseFloat(native.balance) -
+        minBalance -
+        parseFloat(native.selling_liabilities ?? '0') -
+        XLM_FEE_BUFFER,
+    );
+  }
+  const line = account.balances.find(
+    (b) => b.asset_code === send.code && b.asset_issuer === send.issuer,
+  );
+  if (!line) return 0;
+  return Math.max(
+    0,
+    parseFloat(line.balance) - parseFloat(line.selling_liabilities ?? '0'),
+  );
 }
 
 /**
@@ -256,12 +323,15 @@ export class ActionsService {
     // the client signs + confirms it on-chain, then re-requests this build (which can
     // now be simulated). This is what makes the 2-step honest — the deposit is never
     // built, signed, or submitted while the trustline is missing.
+    //
+    // Load the Horizon account once — it feeds both the USDC trustline gate and the
+    // F2 spendable preflight below. Null when it can't be loaded (fail-safe per check).
+    const horizonAccount = await this.loadHorizonAccount(address, network);
+
     if (asset === 'USDC') {
-      const hasTrustline = await this.hasClassicTrustline(
-        address,
-        cfg.usdcClassic,
-        this.horizonFor(network),
-      );
+      const hasTrustline = horizonAccount
+        ? this.hasTrustlineOnAccount(horizonAccount, cfg.usdcClassic)
+        : false;
       if (!hasTrustline) {
         const ctTx = new TransactionBuilder(
           new Account(address, seqBeforeBuild),
@@ -284,6 +354,15 @@ export class ActionsService {
           fee: { inclusion: inclusionFee, resource: 0, total: inclusionFee },
         };
       }
+    }
+
+    // F2 preflight: the deposit moves the send asset — native XLM, or the classic
+    // USDC the SAC wraps (its trustline is guaranteed present by the gate above).
+    // Reject an amount above spendable with a clean 400 before the costly simulation.
+    // Fail-open when the account couldn't be loaded (no regression).
+    if (horizonAccount) {
+      const depositAsset = asset === 'XLM' ? Asset.native() : cfg.usdcClassic;
+      this.assertSpendable(horizonAccount, depositAsset, amount, asset);
     }
 
     // Build the Blend SupplyCollateral operation (base64 XDR → xdr.Operation).
@@ -365,27 +444,86 @@ export class ActionsService {
   }
 
   /**
-   * Classic-trustline check via Horizon — the source of truth for what Contract #13
-   * ("trustline entry is missing") tests. `rpc.getAssetBalance` throws on a missing
-   * trustline, which is easy to mis-handle; Horizon's balances list is unambiguous.
-   * Returns false if the account can't be loaded (treated as "needs a trustline").
+   * Loads the account from Horizon (balances + subentry count) for the trustline
+   * gate and the F2 spendable preflight. Returns null when the account can't be
+   * loaded (unfunded / not found / Horizon hiccup) — callers decide the fail-safe:
+   * the trustline gate treats null as "needs a trustline"; the spendable preflight
+   * treats null as "can't measure → don't block" (fail-open, no regression).
    */
-  private async hasClassicTrustline(
+  private async loadHorizonAccount(
     address: string,
-    asset: Asset,
-    horizonServer: Horizon.Server,
-  ): Promise<boolean> {
+    network: ActionNetwork,
+  ): Promise<Horizon.AccountResponse | null> {
     try {
-      const account = await horizonServer.loadAccount(address);
-      return account.balances.some(
-        (b) =>
-          'asset_code' in b &&
-          b.asset_code === asset.getCode() &&
-          'asset_issuer' in b &&
-          b.asset_issuer === asset.getIssuer(),
-      );
+      return await this.horizonFor(network).loadAccount(address);
     } catch {
-      return false;
+      return null;
+    }
+  }
+
+  /**
+   * Classic-trustline check from an already-loaded Horizon account — the source of
+   * truth for what Contract #13 ("trustline entry is missing") tests. Horizon's
+   * balances list is unambiguous (unlike rpc.getAssetBalance, which throws on a
+   * missing trustline and is easy to mis-handle).
+   */
+  private hasTrustlineOnAccount(
+    account: Horizon.AccountResponse,
+    asset: Asset,
+  ): boolean {
+    return account.balances.some(
+      (b) =>
+        'asset_code' in b &&
+        b.asset_code === asset.getCode() &&
+        'asset_issuer' in b &&
+        b.asset_issuer === asset.getIssuer(),
+    );
+  }
+
+  /** Adapts a Horizon account to the SDK-free shape computeSpendable consumes. */
+  private toSpendableView(
+    account: Horizon.AccountResponse,
+  ): SpendableAccountView {
+    return {
+      subentryCount: account.subentry_count,
+      balances: account.balances.map((b) => ({
+        asset_type: b.asset_type,
+        asset_code: 'asset_code' in b ? b.asset_code : undefined,
+        asset_issuer: 'asset_issuer' in b ? b.asset_issuer : undefined,
+        balance: b.balance,
+        selling_liabilities:
+          'selling_liabilities' in b ? b.selling_liabilities : '0',
+      })),
+    };
+  }
+
+  /**
+   * F2 preflight: throws a clean 400 (INSUFFICIENT_SPENDABLE_BALANCE) when the send
+   * amount exceeds what the account can actually spend once Stellar reserves and
+   * selling liabilities are subtracted. This is what stops an underfunded swap/deposit
+   * from ever reaching the signing step. `label` is the human asset code for the message.
+   */
+  private assertSpendable(
+    account: Horizon.AccountResponse,
+    sendAsset: Asset,
+    requested: string,
+    label: string,
+  ): void {
+    const native = sendAsset.isNative();
+    const spendable = computeSpendable(this.toSpendableView(account), {
+      isNative: native,
+      code: native ? undefined : sendAsset.getCode(),
+      issuer: native ? undefined : sendAsset.getIssuer(),
+    });
+    if (parseFloat(requested) > spendable) {
+      const available = spendable.toFixed(7);
+      throw new BadRequestException({
+        code: 'INSUFFICIENT_SPENDABLE_BALANCE',
+        message: `Insufficient spendable ${label} balance: ${available} available — the rest is reserved by the Stellar network`,
+        asset: label,
+        spendable: available,
+        requested,
+      });
     }
   }
 
@@ -415,21 +553,31 @@ export class ActionsService {
       );
     }
 
+    // Load the Horizon account once: it feeds both the F2 spendable preflight and
+    // the destination-trustline gate (INV-5.1). Null when the account can't be
+    // loaded — each check applies its own fail-safe below.
+    const horizonAccount = await this.loadHorizonAccount(address, network);
+
+    // F2 preflight: reject a send that exceeds the spendable send-asset balance
+    // (reserves + selling liabilities) with a clean 400 — before any XDR is built,
+    // so the underfunded failure mode can't reach signing. Fail-open when the
+    // account couldn't be loaded (no regression vs. today's behavior).
+    if (horizonAccount) {
+      this.assertSpendable(horizonAccount, sendAsset, amount, fromLabel);
+    }
+
     // Check destination trustline. XLM (native) never needs one.
-    // Horizon is the authoritative source for classic trustlines — same helper
-    // the Blend deposit gate uses. The previous rpc.getAssetBalance-based check
-    // misreported existing trustlines as missing, re-bundling a redundant
-    // ChangeTrust into the envelope (security-invariants INV-5.1: ChangeTrust
+    // Horizon is the authoritative source for classic trustlines. The previous
+    // rpc.getAssetBalance-based check misreported existing trustlines as missing,
+    // re-bundling a redundant ChangeTrust into the envelope (INV-5.1: ChangeTrust
     // must be present IFF the trustline is genuinely missing). A Horizon load
-    // failure returns false → we bundle the ChangeTrust: redundant is a no-op,
-    // missing guarantees op_no_trust.
+    // failure (null) → we bundle the ChangeTrust: redundant is a no-op, missing
+    // guarantees op_no_trust.
     let needsTrustline = false;
     if (!isNativeRef(toAsset)) {
-      needsTrustline = !(await this.hasClassicTrustline(
-        address,
-        destAsset,
-        this.horizonFor(network),
-      ));
+      needsTrustline = horizonAccount
+        ? !this.hasTrustlineOnAccount(horizonAccount, destAsset)
+        : true;
     }
 
     const builder = new TransactionBuilder(account, {

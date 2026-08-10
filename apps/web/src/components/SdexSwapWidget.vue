@@ -216,6 +216,31 @@ function readApiError(err: unknown, fallback: string): string {
   return err.message || fallback;
 }
 
+/**
+ * Friendly copy for a failed swap build. The API's spendable preflight (F2) returns
+ * a 400 with code INSUFFICIENT_SPENDABLE_BALANCE + the spendable amount — render it
+ * honestly rather than dumping the raw JSON. Other errors fall back to their message.
+ */
+function friendlyBuildError(err: unknown): string {
+  if (err instanceof Error) {
+    try {
+      const body = JSON.parse(err.message) as {
+        code?: string;
+        spendable?: string;
+        message?: string;
+      };
+      if (body.code === "INSUFFICIENT_SPENDABLE_BALANCE") {
+        const avail = body.spendable != null ? displayBalance(body.spendable) : "0";
+        return `Insufficient balance: ${avail} ${fromCode.value} available — the rest is reserved by the Stellar network.`;
+      }
+      if (typeof body.message === "string") return body.message;
+    } catch {
+      // not JSON
+    }
+  }
+  return err instanceof Error ? err.message : "Swap failed.";
+}
+
 // Live quote on any change to (from, to, amount), debounced. A 422 (no direct
 // liquidity for this direction) is a clean "empty" state, never a raw error.
 let quoteTimer: ReturnType<typeof setTimeout> | undefined;
@@ -352,7 +377,7 @@ async function onSwap() {
       status.value = "error";
     }
   } catch (err: unknown) {
-    errorMessage.value = err instanceof Error ? err.message : "Swap failed.";
+    errorMessage.value = friendlyBuildError(err);
     status.value = "error";
   }
 }
