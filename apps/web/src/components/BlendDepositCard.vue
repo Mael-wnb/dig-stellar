@@ -85,6 +85,10 @@ const status = ref<DepositStatus>("idle");
 const stepLabel = ref("");
 const txHash = ref("");
 const errorMessage = ref("");
+// True only when a SUBMITTED transaction failed on-chain (vs a pre-sign build /
+// validation / simulation error, which never reaches the network). Drives the
+// honest "failed atomically — no funds moved" copy (F4).
+const failedOnChain = ref(false);
 
 const isConnected = computed(() => !!connectedAddress.value);
 const isMainnet = computed(() => network.value === "mainnet");
@@ -205,6 +209,7 @@ async function rpcCall(method: string, params: unknown): Promise<any> {
 async function submitAndConfirm(signedXdr: string): Promise<string> {
   const sent = await rpcCall("sendTransaction", { transaction: signedXdr });
   if (sent.status === "ERROR") {
+    failedOnChain.value = true;
     throw new Error(sent.errorResultXdr || "RPC rejected the transaction.");
   }
   const hash: string = sent.hash;
@@ -216,6 +221,7 @@ async function submitAndConfirm(signedXdr: string): Promise<string> {
     const got = await rpcCall("getTransaction", { hash });
     if (got.status === "SUCCESS") return hash;
     if (got.status === "FAILED") {
+      failedOnChain.value = true;
       throw new Error(`Transaction failed on-chain (${hash}).`);
     }
   }
@@ -235,6 +241,7 @@ async function onDeposit() {
   txHash.value = "";
   errorMessage.value = "";
   stepLabel.value = "";
+  failedOnChain.value = false;
 
   const address = connectedAddress.value;
   const passphrase = toWalletNetwork(network.value);
@@ -308,6 +315,7 @@ function reset() {
   txHash.value = "";
   errorMessage.value = "";
   stepLabel.value = "";
+  failedOnChain.value = false;
 }
 </script>
 
@@ -483,6 +491,13 @@ function reset() {
         class="bg-[#202020] border border-[rgba(255,123,123,0.3)] rounded-md p-3 text-[11px] flex flex-col gap-1"
       >
         <span class="text-[#ff7b7b] font-semibold">Deposit failed</span>
+        <span
+          v-if="failedOnChain"
+          class="text-[#9a9b99]"
+        >
+          The transaction failed atomically on-chain — no funds were moved. Only the
+          network fee was consumed.
+        </span>
         <span class="text-[#9a9b99] break-all">{{ errorMessage }}</span>
         <button type="button" class="text-[#9a9b99] hover:text-[#d5ff2f] w-fit mt-1" @click="reset">
           Try again

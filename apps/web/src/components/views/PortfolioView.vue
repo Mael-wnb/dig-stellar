@@ -16,6 +16,8 @@ import { useModals } from '../../composables/useModals'
 import { useConnectFlow } from '../../composables/useConnectFlow'
 import { formatUsd } from '../../utils/format'
 import type { WalletItem } from '../../types/wallet'
+import EmptyPortfolioState from '../common/EmptyPortfolioState.vue'
+import GetStartedCard from '../common/GetStartedCard.vue'
 
 const { userId } = useAppUser()
 const { openPool } = useView()
@@ -127,6 +129,13 @@ const positions = computed<PositionRow[]>(() => {
   return rows.sort((a, b) => b.suppliedUsd - a.suppliedUsd)
 })
 
+// Whether ANY tracked wallet has a position, independent of the scope filter.
+// Drives the get-started card vs the positions panel so that filtering to an
+// empty wallet doesn't resurrect the onboarding card when positions exist elsewhere.
+const hasAnyPosition = computed(() =>
+  wallets.value.some((w) => (w.pools ?? []).length > 0),
+)
+
 // Grouped view (by wallet) — same rows, bucketed.
 const grouped = computed(() => {
   const map = new Map<string, { wallet: string; dot: string; rows: PositionRow[] }>()
@@ -162,14 +171,8 @@ const scopeTitle = computed(() => {
 
 <template>
   <div class="max-w-[1180px] mx-auto px-[26px] py-[26px] flex flex-col gap-[16px]" style="animation: digFade .35s ease both">
-    <!-- Empty / connect state -->
-    <div v-if="!userId || (!hasWallets && !overviewLoading)" class="rounded-[18px] p-[40px] text-center" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
-      <div class="text-[16px] font-semibold">No wallets tracked yet</div>
-      <div class="text-[13px] mt-[6px] mb-[18px]" style="color: var(--dig-faint)">Connect a signer wallet to see balances and Blend positions. Watch-only addresses can be added too.</div>
-      <button type="button" class="dig-btn h-[42px] px-[20px] rounded-[12px] text-[13px] font-bold cursor-pointer" style="background: var(--dig-accent); color: #141414; border: none" @click="openConnect">
-        Connect wallet
-      </button>
-    </div>
+    <!-- Empty / connect state (no wallet connected) -->
+    <EmptyPortfolioState v-if="!userId || (!hasWallets && !overviewLoading)" @connect="openConnect" />
 
     <template v-else>
       <!-- Summary: liquid kept distinct from DeFi supplied/borrowed -->
@@ -267,6 +270,10 @@ const scopeTitle = computed(() => {
         </button>
       </div>
 
+      <!-- Get-started card: wallet connected, no positions yet. Disappears as
+           soon as a position exists (positions.length > 0). -->
+      <GetStartedCard v-if="!hasAnyPosition && !overviewLoading" />
+
       <!-- Breakdown (by-position value share) -->
       <div v-if="breakdown.segs.length" class="rounded-[18px] p-[20px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
         <div class="flex items-baseline justify-between mb-[14px]">
@@ -287,8 +294,9 @@ const scopeTitle = computed(() => {
         </div>
       </div>
 
-      <!-- Your open positions -->
-      <div class="rounded-[18px] overflow-hidden" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
+      <!-- Your open positions (only once there is at least one; the get-started
+           card above stands in for the empty state) -->
+      <div v-if="hasAnyPosition" class="rounded-[18px] overflow-hidden" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
         <div class="flex items-center px-[20px] py-[16px] gap-[12px] flex-wrap" style="border-bottom: 1px solid var(--dig-line-soft)">
           <div class="text-[14px] font-semibold">{{ scopeTitle }}</div>
           <span class="text-[12px]" style="color: var(--dig-faint)">{{ positions.length }} positions</span>

@@ -144,6 +144,10 @@ type SwapStatus = "idle" | "loading" | "success" | "error";
 const status = ref<SwapStatus>("idle");
 const txHash = ref("");
 const errorMessage = ref("");
+// True only when a SUBMITTED transaction failed on-chain (vs a pre-sign build /
+// validation / preflight error, which never reaches the network). Drives the
+// honest "failed atomically — no funds moved" copy (F4). Pairs with F2.
+const failedOnChain = ref(false);
 
 const isConnected = computed(() => !!connectedAddress.value);
 const isMainnet = computed(() => network.value === "mainnet");
@@ -327,6 +331,7 @@ async function onSwap() {
   status.value = "loading";
   txHash.value = "";
   errorMessage.value = "";
+  failedOnChain.value = false;
 
   try {
     // 1. Build the unsigned XDR server-side (never exposes any key).
@@ -371,9 +376,12 @@ async function onSwap() {
       status.value = "success";
       loadBalances(); // reflect the new balances
     } else {
+      // Submitted, but the network rejected/failed it — an atomic on-chain
+      // failure, so no funds moved (at most the base fee was charged).
       errorMessage.value =
         result.errorResultXdr ||
         `Transaction failed (status: ${result.status ?? "unknown"}).`;
+      failedOnChain.value = true;
       status.value = "error";
     }
   } catch (err: unknown) {
@@ -386,6 +394,7 @@ function reset() {
   status.value = "idle";
   txHash.value = "";
   errorMessage.value = "";
+  failedOnChain.value = false;
 }
 </script>
 
@@ -555,6 +564,13 @@ function reset() {
         class="bg-[#202020] border border-[rgba(255,123,123,0.3)] rounded-md p-3 text-[11px] flex flex-col gap-1"
       >
         <span class="text-[#ff7b7b] font-semibold">Swap failed</span>
+        <span
+          v-if="failedOnChain"
+          class="text-[#9a9b99]"
+        >
+          The transaction failed atomically on-chain — no funds were moved. At most
+          the base network fee (~0.00001 XLM) was charged.
+        </span>
         <span class="text-[#9a9b99] break-all">{{ errorMessage }}</span>
         <button type="button" class="text-[#9a9b99] hover:text-[#d5ff2f] w-fit mt-1" @click="reset">
           Try again
