@@ -74,6 +74,21 @@ price`; non-Blend keeps a "building history" note — no synthesized curves). Th
 flags regime are preserved byte-for-byte; Add/Remove-liquidity tabs are present-but-disabled ("soon",
 Lot D). Legacy `DigDashboard.vue` / `DashboardHeader.vue` removed. Evidence: `docs/evidence/lot-c/`.
 
+**T3-D3 (Lot F — advisor-feedback polish) landed on top of the Lot C port.** Traced to a 2026-08-10
+mainnet advisor review + a real failed user swap (`docs/evidence/lot-f/`): **F1** raised `--dig-faint`
+to clear WCAG AA (≥4.5:1) on the dark cards and added global `--dig-*` scrollbar styling. **F2** added an
+API spendable-balance preflight (Horizon reserves + selling liabilities) on the swap build and Blend
+deposit build — an over-spend now returns a clean `400 INSUFFICIENT_SPENDABLE_BALANCE` the widget renders
+honestly, so the underfunded failure mode (real tx `a3acf8fa…`) can no longer reach signing. **F3** serves
+real venue/asset logos from a nullable `logo_url` (v1 raw-SQL, seeded via `bootstrap:logos`) exposed on
+`/v1/protocols` + `/v1/pools`, with a `BrandLogo` fallback chain (backend → bundled → monogram) so a dead
+URL never shows a broken image. **F4** replaced the hollow portfolio empty states — a no-wallet
+`EmptyPortfolioState` (value prop + Connect CTA) and a connected-but-empty `GetStartedCard` (fund / real
+swap / real Blend deposit with the pool's live supply APY + freshness, honest variable-not-projected copy,
+Mainnet real-funds + 100 XLM cap, non-custodial line) — plus honest failed-tx copy in both action widgets
+("failed atomically — no funds moved", worded per classic vs Soroban fee). Validators + flags regime
+untouched throughout. Evidence: `docs/evidence/lot-f/`.
+
 **QA pass (post-port) fixes.** A headless-CDP QA sweep (all 5 views + modals, 1440/1280px, API-down, connected/disconnected) found no console errors, exceptions, or overflow. Fixes applied: (a) sidebar footer always names the data plane ("Live · Stellar mainnet") — the signing selector no longer flips it; (b) the notifications bell dropdown restyled to the design's "Activity feed"; (c) retry buttons on the protocols/pool-detail API-down states and honest empty states on the dashboard protocols summary + bridge (`—`, not `+$0`); (d) the action modal's network selector is kept for both swap and Blend deposits. **Wallet management (T2-D1: refresh / set active signer / set primary / activate-deactivate / delete) was ported from the legacy `WalletSection` into `PortfolioView`** (per-card ⋯ menu) before removing the now-orphaned legacy components (`WalletSection`, `WalletAlertsPanel`, `PoolDetail`, `PoolTabs`, `ProtocolTabs`, `PoolTable`, `StellarMetrics`, `NetworkStats`, `HeroBanner`, `Dashboard`). The SDEX-swap / Blend-deposit widgets and XDR validators were not touched.
 
 **Honest per-type metrics on Protocols (post-QA).** 24h volume/fees are structurally N/A for lending

@@ -56,7 +56,13 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   (web build + 49 tests + api build; captures in `docs/evidence/lot-c/`). Remaining T3-D3: RPC
   latency/error metrics endpoints + CI/CD, and the final demo/reference packaging. Liquidity actions
   (Lot D) intentionally deferred — Add/Remove-liquidity tabs ship present-but-disabled.
-- Last updated: 2026-08-05
+- T3-D3 note (2026-08-11): **Lot F (advisor-feedback polish) landed** — F1 AA-contrast `--dig-faint`
+  + global scrollbars, F2 API spendable-balance preflight (`400 INSUFFICIENT_SPENDABLE_BALANCE`) on
+  swap + Blend deposit, F3 backend-served venue/asset logos with safe fallback, F4 designed no-wallet
+  + get-started empty states + honest failed-tx copy. All steps green (web build + 49 tests);
+  validators/flags regime untouched. Captures in `docs/evidence/lot-f/`. Remaining T3-D3 unchanged:
+  RPC latency/error metrics endpoints + CI/CD + final demo/reference packaging.
+- Last updated: 2026-08-11
 
 ---
 
