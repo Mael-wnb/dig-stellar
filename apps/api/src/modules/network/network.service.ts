@@ -35,6 +35,34 @@ type NetworkStatsRow = {
   protocol_count: unknown;
 };
 
+// G4 (Lot G / T3-D3): network TVL history read from network_tvl_snapshots (G0).
+export type NetworkTvlPoint = {
+  t: string; // hour bucket, ISO
+  tvlUsd: number;
+  protocolCount: number;
+};
+
+export type NetworkTvlSeriesResponse = {
+  series: NetworkTvlPoint[];
+  meta: {
+    source: 'snapshots';
+    from: string; // window start (ISO) = to − 7d
+    to: string; // window end (ISO) = now
+    // Earliest snapshot ever stored — drives the honest "building history since"
+    // note while the 7d window isn't yet fully covered. null before the first row.
+    firstSnapshotAt: string | null;
+    // true while history is younger than the window (curve still filling in).
+    partial: boolean;
+    bucket: 'hour';
+  };
+};
+
+type TvlBucketRow = {
+  bucket: unknown;
+  tvl_usd: unknown;
+  protocol_count: unknown;
+};
+
 @Injectable()
 export class NetworkService {
   constructor(private readonly prisma: PrismaService) {}
@@ -94,6 +122,65 @@ export class NetworkService {
       updatedAt: this.toIsoString(row.as_of),
       isStale: computeFreshness(row.as_of).isStale,
       staleAfterSeconds: staleAfterSeconds(),
+    };
+  }
+
+  // Network TVL 7-day series (G4). On-read aggregation over G0's
+  // network_tvl_snapshots — no external calls. Hourly buckets: the latest
+  // snapshot in each hour represents that hour's TVL. Missing hours are simply
+  // absent from the series (gaps stay gaps — the chart never interpolates).
+  async getTvlSeries(): Promise<NetworkTvlSeriesResponse> {
+    const WINDOW_DAYS = 7;
+    const to = new Date();
+    const from = new Date(to.getTime() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+    // One row per hour that has data: distinct on the hour bucket, keeping the
+    // latest snapshot within it (as_of desc). Ordered oldest→newest for drawing.
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `
+      select distinct on (date_trunc('hour', as_of))
+        date_trunc('hour', as_of) as bucket,
+        tvl_usd,
+        protocol_count
+      from network_tvl_snapshots
+      where as_of >= $1::timestamptz
+      order by date_trunc('hour', as_of) asc, as_of desc
+      `,
+      from.toISOString(),
+    )) as TvlBucketRow[];
+
+    const series: NetworkTvlPoint[] = [];
+    for (const row of rows) {
+      const t = this.toIsoString(row.bucket);
+      const tvlUsd = this.toFiniteNumber(row.tvl_usd);
+      if (t === null || tvlUsd === null) continue; // never emit a broken point
+      series.push({
+        t,
+        tvlUsd,
+        protocolCount: this.toFiniteNumber(row.protocol_count) ?? 0,
+      });
+    }
+
+    const firstRows = (await this.prisma.$queryRawUnsafe(
+      `select min(as_of) as first from network_tvl_snapshots`,
+    )) as Array<{ first: unknown }>;
+    const firstSnapshotAt = this.toIsoString(firstRows[0]?.first ?? null);
+
+    // Partial while history began after the window opened (or there is none yet)
+    // — i.e. the 7-day curve isn't fully backed by data. Drives the honest note.
+    const partial =
+      firstSnapshotAt === null || new Date(firstSnapshotAt).getTime() > from.getTime();
+
+    return {
+      series,
+      meta: {
+        source: 'snapshots',
+        from: from.toISOString(),
+        to: to.toISOString(),
+        firstSnapshotAt,
+        partial,
+        bucket: 'hour',
+      },
     };
   }
 

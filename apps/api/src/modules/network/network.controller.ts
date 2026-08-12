@@ -10,4 +10,10 @@ export class NetworkController {
   getNetworkStats() {
     return this.networkService.getNetworkStats();
   }
+
+  // G4 (Lot G): network TVL 7-day series from network_tvl_snapshots (G0).
+  @Get('tvl-series')
+  getTvlSeries() {
+    return this.networkService.getTvlSeries();
+  }
 }

@@ -22,9 +22,20 @@ import { formatUsd, formatPct, relativeTime } from '../../utils/format'
 
 import FreshnessChip from '../FreshnessChip.vue'
 import BridgeSection from '../bridge/BridgeSection.vue'
+import NetworkTvlChart from '../NetworkTvlChart.vue'
+import { useNetworkTvl } from '../../composables/useNetworkTvl'
 
 const { setView, openPool } = useView()
 const { requestAlert, openAction } = useModals()
+
+// G4: network TVL 7-day curve for the hero (served from G0 snapshots).
+const {
+  series: tvlSeries,
+  meta: tvlMeta,
+  loading: tvlLoading,
+  error: tvlError,
+  load: loadTvl,
+} = useNetworkTvl()
 
 // Compact dashboard entry points → the shared ActionModal (same ctx shape the
 // get-started card uses). The modal renders the real, self-gated widgets and
@@ -145,8 +156,10 @@ const {
           </button>
         </div>
 
-        <!-- G4 chart slot — the network-TVL 7d curve (from network_tvl_snapshots)
-             renders here; see docs/lot-g-dashboard-polish.md. -->
+        <!-- G4: network-TVL 7d curve (from network_tvl_snapshots). -->
+        <div class="mt-[20px]">
+          <NetworkTvlChart :series="tvlSeries" :meta="tvlMeta" :loading="tvlLoading" :error="tvlError" @retry="loadTvl" />
+        </div>
       </div>
 
       <div class="rounded-[18px] p-[22px] flex flex-col" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
