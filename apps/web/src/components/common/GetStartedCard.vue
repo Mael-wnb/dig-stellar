@@ -10,12 +10,18 @@
 // earnings; on Mainnet a real-funds warning + the 100 XLM launch cap are shown;
 // a non-custodial line is always present. The parent hides this card as soon as
 // a position exists — no sponsored placement of any kind.
+//
+// H2 (Lot H): `compact` renders the SAME three actions and copy at panel
+// density — tiles stacked vertically, no own card chrome — for embedding in
+// the dashboard "Your positions" panel. No forked variant, one component.
 import { computed, onMounted, ref } from 'vue'
 import { fetchPools } from '../../api/pools'
 import type { PoolListItem } from '../../types/protocol'
 import { useModals } from '../../composables/useModals'
 import { useNetwork } from '../../composables/useNetwork'
 import FreshnessChip from '../FreshnessChip.vue'
+
+const props = withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
 
 const { openAction } = useModals()
 const { network } = useNetwork()
@@ -72,9 +78,12 @@ function depositBlend() {
 </script>
 
 <template>
-  <div class="rounded-[18px] p-[24px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
+  <div
+    :class="props.compact ? '' : 'rounded-[18px] p-[24px]'"
+    :style="props.compact ? undefined : 'background: var(--dig-surface); border: 1px solid var(--dig-line)'"
+  >
     <div class="flex items-baseline justify-between flex-wrap gap-[8px]">
-      <div class="text-[16px] font-bold tracking-[-0.02em]">Get started</div>
+      <div class="font-bold tracking-[-0.02em]" :class="props.compact ? 'text-[14px]' : 'text-[16px]'">Get started</div>
       <div class="text-[12px]" style="color: var(--dig-faint)">
         Your wallet is connected — here's how to open your first position.
       </div>
@@ -90,7 +99,7 @@ function depositBlend() {
       A 100 XLM per-transaction cap applies during the launch period.
     </div>
 
-    <div class="grid gap-[12px] mt-[16px]" style="grid-template-columns: repeat(3, 1fr)">
+    <div class="grid gap-[12px] mt-[16px]" :style="{ gridTemplateColumns: props.compact ? '1fr' : 'repeat(3, 1fr)' }">
       <!-- 1. Fund — plain copy, no on-ramp -->
       <div class="rounded-[14px] p-[16px] flex flex-col" style="background: var(--dig-surface-2); border: 1px solid var(--dig-line-soft)">
         <div class="text-[13px] font-bold">Fund your wallet</div>

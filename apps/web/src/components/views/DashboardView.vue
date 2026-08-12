@@ -22,6 +22,7 @@ import { formatUsd, formatPct, relativeTime } from '../../utils/format'
 
 import FreshnessChip from '../FreshnessChip.vue'
 import BridgeSection from '../bridge/BridgeSection.vue'
+import YourPositionsPanel from '../common/YourPositionsPanel.vue'
 import NetworkTvlChart from '../NetworkTvlChart.vue'
 import { useNetworkTvl } from '../../composables/useNetworkTvl'
 
@@ -203,7 +204,9 @@ const {
       </div>
     </div>
 
-    <!-- Protocols summary -->
+    <!-- Protocols (half-width) + compact "Your positions" recap (H2, Lot H).
+         The two panels stack below ~1100px; grid stretch keeps them same height. -->
+    <div class="grid gap-[16px] grid-cols-1 min-[1100px]:grid-cols-2 items-stretch">
     <div class="rounded-[18px] p-[20px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
       <div class="flex items-center justify-between mb-[8px]">
         <div class="text-[14px] font-semibold">Protocols</div>
@@ -236,6 +239,9 @@ const {
           <div class="text-[12px]" style="color: var(--dig-faint)">TVL</div>
         </div>
       </button>
+    </div>
+
+    <YourPositionsPanel />
     </div>
 
     <!-- Bridge -->

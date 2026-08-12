@@ -15,6 +15,7 @@ import { useAppUser } from '../../composables/useAppUser'
 import { useModals } from '../../composables/useModals'
 import { useConnectFlow } from '../../composables/useConnectFlow'
 import { formatUsd } from '../../utils/format'
+import { hfDisplay as hf } from '../../utils/health'
 import type { WalletItem } from '../../types/wallet'
 import EmptyPortfolioState from '../common/EmptyPortfolioState.vue'
 import GetStartedCard from '../common/GetStartedCard.vue'
@@ -87,14 +88,6 @@ function toggleScope(id: string) {
 
 // by-wallet / by-position view of the same positions.
 const viewMode = ref<'position' | 'wallet'>('position')
-
-function hf(hf: number | null): { label: string; color: string } {
-  if (hf === null || !Number.isFinite(hf)) return { label: 'No borrow', color: 'var(--dig-faint)' }
-  const label = `HF ${hf.toFixed(2)}`
-  if (hf >= 1.5) return { label, color: 'var(--dig-green)' }
-  if (hf >= 1.2) return { label, color: 'var(--dig-amber)' }
-  return { label, color: 'var(--dig-red)' }
-}
 
 interface PositionRow {
   key: string
