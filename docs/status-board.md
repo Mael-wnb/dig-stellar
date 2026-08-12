@@ -62,7 +62,17 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   + get-started empty states + honest failed-tx copy. All steps green (web build + 49 tests);
   validators/flags regime untouched. Captures in `docs/evidence/lot-f/`. Remaining T3-D3 unchanged:
   RPC latency/error metrics endpoints + CI/CD + final demo/reference packaging.
-- Last updated: 2026-08-11
+- T3-D3 note (2026-08-12): **Lot G (dashboard & protocols polish) landed** — traced to a founder
+  product review. G0 network-TVL persistence (new `network_tvl_snapshots`, one point per refresh cycle;
+  deployed — prod confirmed 4 points 15:03→15:48 UTC). G1 bridge chain logos (top-7 by volume, safe
+  fallback) + clickable network-aware tx hashes + rigid 3-slot protocol cards. G2 hero dedupe + inline
+  actions section → compact Swap/Deposit button on the existing `ActionModal` (flags/validators
+  byte-identical, swap ≤2 clicks). G3 adaptive per-tab columns on the all-pools table (no half-dash
+  rows, N/A-aware sort). G4 hero 7-day network-TVL curve from `GET /v1/network/tvl-series` (snapshots
+  path per the recon verdict — honest gaps + "building history since" note). All steps green (web build
+  + 49 tests + api build); validators/flags untouched. Captures in `docs/evidence/lot-g/`. Remaining
+  T3-D3 unchanged: RPC latency/error metrics endpoints + CI/CD + final demo/reference packaging.
+- Last updated: 2026-08-12
 
 ---
 
@@ -98,7 +108,7 @@ T1-D3 criteria.
 |---|---|---:|---|---|---|---|
 | D1 — Mainnet Deployment & Freshness Tracking | Done in prod | 95% | High | **Both criteria met, deployed to prod Aug 4 (Lot B).** (1) All 5 named protocols live on real Mainnet data — **DeFindex integrated into the v1 pipeline** (venue + 3 vaults enumerated from `GET /vault/discover`: Meru ≈$18.1M, Beans USDC ≈$507k, Beans EURC ≈$200k; ≈$18.8M aggregate, avg APY ≈7.1%; `protocolCount = 5`; yield-vault detail variant in the UI). (2) Freshness first-class: `isStale` + `staleAfterSeconds` on every `/v1/*` payload (read-time, threshold 45 min = 3× cron), FreshnessChip + stale badges in the UI, standardized exponential-backoff retries on every refresh step. Evidence in `docs/evidence/lot-b/`. Full prod `job:refresh` clean in ~3 min | **Demo capture** for the claim (only non-build item) | Capture the T3-D1 demo (5 protocols + stale drill) |
 | D2 — Non-Custodial Mainnet Actions | Substantially done — swaps live | 60% | Medium | **Mainnet swaps LIVE from the dashboard** (ungated Aug 2): first real executions in both directions (1 XLM→USDC; USDC→XLM `eeeae199…`). Security regime verified in prod: kill-switch (403 by default), server-enforced 100 XLM cap, issuer-verified 5-pair whitelist (XLM↔USDC/EURC/AQUA/yXLM/PYUSD — look-alike "XRP" rejected), client-side pre-sign XDR validation (fail closed), in-wallet signing only. Execution feedback UI with network-aware explorer links. Contract: `docs/security-invariants.md`; evidence: `docs/evidence/mainnet-ungating-2026-08-02.md` + `pair-vetting-2026-08-01.md`. Blend deposit already E2E-proven on **testnet** (`a842f370…`) | **KPIs** (50+ wallets / 200+ txs — window open, needs distribution) + **Lot A2** (Blend deposit mainnet) | KPI push now; A2 brief → implement |
-| D3 — Observability, UI/UX Polish & Reference Handoff | Early | 25% | Low | `docker-compose.yml` (Postgres+Redis) as local-dev stack; `/health` liveness; modular architecture; docs corpus grown (security-invariants + `docs/evidence/` with vetting/ungating/lot-b captures) | Real RPC latency/error metrics; **sidebar UX redesign** (user-directed polish scope); packaged SDF reference implementation; final report w/ adoption metrics (depends on T3-D2 KPIs) | Sidebar redesign + metrics endpoints |
+| D3 — Observability, UI/UX Polish & Reference Handoff | In progress | 45% | Medium | **UI/UX-polish component substantially landed** across Lots C/F/G (design-handoff port → shell + 5 views + modals; advisor-feedback F1–F5; founder-review G0–G4: TVL history + chain logos + clickable tx hashes + adaptive pools table + hero dedupe/compact actions + network-TVL hero chart) — all green (web build + 49 tests + api build), captures in `docs/evidence/lot-{c,f,g}/`. Plus `docker-compose.yml` local-dev stack, `/health` liveness, modular architecture, grown docs corpus | Real RPC latency/error metrics + CI/CD (still manual VPS deploy); packaged SDF reference implementation; final report w/ adoption metrics (depends on T3-D2 KPIs) | Observability (RPC latency/error metrics) + CI/CD, then reference packaging |
 
 ---
 

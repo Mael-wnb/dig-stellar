@@ -101,6 +101,24 @@ measured zero on an applicable metric still shows `0`/`0%`. Sorting treats N/A a
 bottom), not as `0`. Confined to `ProtocolsView.vue`; dashboard protocol rows show only TVL so needed
 no change. Evidence: `docs/evidence/lot-c/qa-protocols-per-type-metrics.png`.
 
+**T3-D3 (Lot G — dashboard & protocols polish) landed on top of Lot F.** Traced to a 2026-08-12
+founder product review (`docs/evidence/lot-g/`). **G1** — bridge source chains render bundled brand
+marks through `BrandLogo` (the top-7 by flow volume: BAS/POL/ETH/SOL/ARB/BSC/CEL, with a monogram-safe
+fallback for the tail); every rendered tx hash links to stellar.expert, network-aware (`lib/explorer.ts`,
+bridge feed + swap/deposit success panels); protocol summary cards normalized to a rigid 3-slot grid.
+**G2** — the hero was deduped (XLM price / stablecoin mcap / protocol count removed — the four stat tiles
+already carry them) and the inline Testnet/Mainnet actions section replaced by a compact hero Swap /
+Deposit button pair opening the **existing** `ActionModal` (which self-gates and now hosts the sole
+`NetworkToggle`); flags regime + XDR validators byte-identical, a swap reachable in ≤2 clicks. **G3** —
+the all-pools table drives its columns off the active protocol tab: "All" is generic (Pool · Protocol ·
+TVL · a type-aware Key metric), a selected protocol shows its full type-specific columns (lending:
+TVL/supply/borrow/util; AMM: TVL/vol/fees/swaps; vault: TVL/APY), N/A-aware sorting with **no structural
+half-dash rows**. **G4** — a 7-day network-TVL curve in the hero (`NetworkTvlChart`, reusing the
+BridgeChart SVG + tooltip pattern) served from the new `GET /v1/network/tvl-series`; honest gaps (never
+interpolated) and a "building history since &lt;date&gt;" note while the window is partial, backed by G0
+(see §2/§3). All steps green (web build + 49 tests + api build); validators/flags untouched. Evidence:
+`docs/evidence/lot-g/`.
+
 Working: real dashboard structure, protocol browsing, pool detail views, wallet connection UX,
 multi-wallet portfolio UX, backend-driven data in the important flows, a public beta on real Mainnet
 data. Display polish landed this session: native token rendered as "XLM" (display-only helpers, DB
@@ -137,7 +155,10 @@ by persistent `userId`, protocol/pool routes serving real indexed data via `/v1/
 indexer step `73-network-stats-refresh` via `job:refresh`) — no live external fetch per request;
 `protocolCount` is now a live count (= 4). The `actions/` module exposes the transaction builder
 (`/v1/actions/sdex/swap`, `/v1/actions/sdex/quote`, `/v1/actions/blend/deposit`). Inactive entities
-are excluded from `/v1/pools` (and 404 on `/v1/pools/:slug`) so dead pools never surface.
+are excluded from `/v1/pools` (and 404 on `/v1/pools/:slug`) so dead pools never surface. **`GET
+/v1/network/tvl-series` (G4, Lot G)** serves the hero's 7-day TVL curve — on-read hourly buckets (latest
+snapshot per hour) over up to 7d from the new `network_tvl_snapshots` table (written by the indexer, §3),
+gaps kept as gaps (no interpolation), `meta: { source: 'snapshots', from, to, firstSnapshotAt, partial }`.
 
 Partial / weak: health/operational endpoints incomplete; freshness not yet exposed systematically
 across routes. On `/v1/network/stats`: two fields (`activeWallets`, `dexVolume24hUsd`) come back `null`
@@ -159,7 +180,11 @@ two missing fields; (3) return a clean 400 instead of 500 when an action body is
 Working: Horizon + Soroban ingestion; protocol adapters in `lib/protocols/`; canonical refresh chain
 `job:refresh` → 72 → 71 → per-protocol steps; persistence of asset prices, pool/reserve snapshots,
 pool + protocol metrics (now including stellar-native in the protocol-level aggregation); wallet
-balance snapshot generation; runs on a 15-minute cron on the VPS. Inactive entities (archived Soroban
+balance snapshot generation; runs on a 15-minute cron on the VPS. **G0 (Lot G)** appends one
+`network_tvl_snapshots` row at the tail of step 7 (`70-protocol-persist-metrics.ts`): `sum(
+protocol_metrics_latest.tvl_usd)` + protocol count, `as_of` truncated to the minute and upserted
+(idempotent per run) — one network-TVL history point per refresh cycle, read by `/v1/network/tvl-series`
+(§2). Additive raw-SQL migration `stellar_v1_network_tvl.sql`; Prisma untouched. Inactive entities (archived Soroban
 contracts whose on-chain reads 404) are soft-disabled (`is_active=false`) and skipped by the refresh
 instead of aborting the whole job. URL construction for Validation Cloud preserves the `/v1/<key>`
 base path (the `joinUrl` helper) — this fixed a cascading refresh failure earlier this session.
