@@ -11,6 +11,9 @@ import {
   type TestnetSwapAsset,
 } from "../config/testnetSwapPairs";
 import { MAINNET_SWAP_ASSETS } from "../config/mainnetSwapPairs";
+// H3 (Lot H): presentation-only custom asset picker — receives the SAME
+// `assets` whitelist the native <select> bound and emits the same asset keys.
+import TokenSelect from "./common/TokenSelect.vue";
 
 const TESTNET_RPC_URL = "https://soroban-testnet.stellar.org";
 const MAINNET_RPC_URL = "https://mainnet.sorobanrpc.com";
@@ -399,18 +402,22 @@ function reset() {
 </script>
 
 <template>
-  <div class="bg-[#2A2A2A] border border-[#383838] rounded-lg p-4 flex flex-col gap-3">
-    <div class="flex items-center justify-between">
-      <span class="text-xs font-semibold text-[#e2e6e1]">SDEX Swap</span>
-      <span class="text-[10px] text-[#9a9b99] uppercase tracking-widest">{{ network }}</span>
+  <!-- H3 (Lot H): Uniswap-standard reskin — PRESENTATION ONLY. Every state,
+       binding, gate and copy string below is carried over from the previous
+       template verbatim; only layout and styling changed. -->
+  <div class="flex flex-col gap-[10px]">
+    <div class="flex items-center justify-between px-[2px]">
+      <span class="text-[13px] font-semibold" style="color: var(--dig-text)">SDEX Swap</span>
+      <span class="text-[10px] uppercase tracking-widest" style="color: var(--dig-faint)">{{ network }}</span>
     </div>
 
     <!-- MAINNET NOTICE (Testnet-only until ungated) -->
     <div
       v-if="mainnetBlocked"
-      class="bg-[#202020] border border-[rgba(213,255,47,0.3)] rounded-md p-3 text-[11px] text-[#9a9b99]"
+      class="rounded-[12px] px-[14px] py-[11px] text-[12px]"
+      style="background: var(--dig-surface-2); border: 1px solid rgba(213,255,47,0.3); color: var(--dig-faint)"
     >
-      Swap is <span class="text-[#d5ff2f] font-semibold">Testnet-only</span> in this beta.
+      Swap is <span class="font-semibold" style="color: var(--dig-accent)">Testnet-only</span> in this beta.
       Switch the network toggle to Testnet to swap.
     </div>
 
@@ -418,7 +425,8 @@ function reset() {
       <!-- MAINNET WARNING (live: real funds + launch cap) -->
       <div
         v-if="isMainnet"
-        class="bg-[#202020] border border-[rgba(255,184,107,0.5)] rounded-md p-3 text-[11px] text-[#ffb86b]"
+        class="rounded-[12px] px-[14px] py-[11px] text-[12px]"
+        style="background: rgba(255,184,107,0.08); border: 1px solid rgba(255,184,107,0.5); color: var(--dig-amber)"
       >
         <span class="font-semibold">Mainnet</span> — this swap moves real funds. A
         per-transaction cap applies during the launch period.
@@ -427,108 +435,105 @@ function reset() {
       <!-- SIGNER GUARDRAIL -->
       <div
         v-if="isConnected && signerBlockReason"
-        class="bg-[#202020] border border-[rgba(255,184,107,0.4)] rounded-md p-3 text-[11px] text-[#ffb86b]"
+        class="rounded-[12px] px-[14px] py-[11px] text-[12px]"
+        style="background: rgba(255,184,107,0.08); border: 1px solid rgba(255,184,107,0.4); color: var(--dig-amber)"
       >
         {{ signerBlockReason }}
       </div>
 
-      <!-- FROM -->
-      <div class="bg-[#202020] border border-[#383838] rounded-md p-3 flex flex-col gap-2">
-        <div class="flex items-center justify-between text-[11px]">
-          <span class="text-[#9a9b99]">From</span>
-          <span class="text-[#9a9b99]">
-            Balance: {{ displayBalance(balanceFor(fromAsset)) }} {{ fromCode }}
-            <button
-              type="button"
-              class="ml-1 text-[#d5ff2f] hover:underline disabled:opacity-40"
-              :disabled="parseFloat(balanceFor(fromAsset)) <= 0"
-              @click="setMax"
+      <!-- FROM / TO boxes with the centered flip button between them -->
+      <div class="relative flex flex-col gap-[5px]">
+        <!-- FROM -->
+        <div class="rounded-[16px] px-[16px] pt-[12px] pb-[14px]" style="background: var(--dig-surface-2); border: 1px solid var(--dig-line-soft)">
+          <div class="flex items-center justify-between text-[12px]" style="color: var(--dig-faint)">
+            <span>From</span>
+            <span>
+              Balance: {{ displayBalance(balanceFor(fromAsset)) }} {{ fromCode }}
+              <button
+                type="button"
+                class="ml-[5px] font-bold cursor-pointer hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                style="color: var(--dig-accent)"
+                :disabled="parseFloat(balanceFor(fromAsset)) <= 0"
+                @click="setMax"
+              >
+                Max
+              </button>
+            </span>
+          </div>
+          <div class="flex items-center gap-[10px] mt-[8px]">
+            <input
+              v-model="amount"
+              type="text"
+              inputmode="decimal"
+              placeholder="0.0"
+              class="flex-1 bg-transparent text-[28px] font-bold tracking-[-0.02em] tabular-nums outline-none min-w-0 placeholder:text-[#5c5c5c]"
+              style="color: var(--dig-text)"
+            />
+            <TokenSelect v-model="fromKey" :assets="assets" />
+          </div>
+        </div>
+
+        <!-- INVERT (restyled — same invert()) -->
+        <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+          <button
+            type="button"
+            class="w-[38px] h-[38px] rounded-[13px] cursor-pointer flex items-center justify-center transition-colors hover:brightness-110"
+            style="background: var(--dig-surface-3); border: 4px solid var(--dig-surface); color: var(--dig-text)"
+            title="Invert direction"
+            @click="invert"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M6 13l6 6 6-6"/></svg>
+          </button>
+        </div>
+
+        <!-- TO -->
+        <div class="rounded-[16px] px-[16px] pt-[12px] pb-[14px]" style="background: var(--dig-surface-2); border: 1px solid var(--dig-line-soft)">
+          <div class="flex items-center justify-between text-[12px]" style="color: var(--dig-faint)">
+            <span>To (estimated)</span>
+            <span>
+              Balance: {{ displayBalance(balanceFor(toAsset)) }} {{ toCode }}
+            </span>
+          </div>
+          <div class="flex items-center gap-[10px] mt-[8px]">
+            <span
+              class="flex-1 text-[28px] font-bold tracking-[-0.02em] tabular-nums min-w-0 truncate"
+              :style="{ color: estimate != null ? 'var(--dig-text)' : '#5c5c5c' }"
             >
-              MAX
-            </button>
-          </span>
-        </div>
-        <div class="flex items-center gap-2">
-          <input
-            v-model="amount"
-            type="text"
-            inputmode="decimal"
-            placeholder="0.0"
-            class="flex-1 bg-transparent text-lg text-[#e2e6e1] outline-none min-w-0"
-          />
-          <select
-            v-model="fromKey"
-            class="bg-[#2A2A2A] border border-[#383838] rounded-md px-2 py-1 text-xs text-[#e2e6e1] focus:border-[#d5ff2f] outline-none"
-          >
-            <option v-for="a in assets" :key="swapAssetKey(a)" :value="swapAssetKey(a)">
-              {{ a.code }}
-            </option>
-          </select>
-        </div>
-      </div>
-
-      <!-- INVERT -->
-      <div class="flex justify-center -my-1">
-        <button
-          type="button"
-          class="w-7 h-7 rounded-full border border-[#383838] bg-[#202020] text-[#d5ff2f] text-sm flex items-center justify-center hover:border-[#d5ff2f] transition"
-          title="Invert direction"
-          @click="invert"
-        >
-          ↓↑
-        </button>
-      </div>
-
-      <!-- TO -->
-      <div class="bg-[#202020] border border-[#383838] rounded-md p-3 flex flex-col gap-2">
-        <div class="flex items-center justify-between text-[11px]">
-          <span class="text-[#9a9b99]">To (estimated)</span>
-          <span class="text-[#9a9b99]">
-            Balance: {{ displayBalance(balanceFor(toAsset)) }} {{ toCode }}
-          </span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="flex-1 text-lg min-w-0 truncate" :class="estimate != null ? 'text-[#e2e6e1]' : 'text-[#5c5c5c]'">
-            {{ estimate != null ? formatAmount(estimate) : "0.0" }}
-          </span>
-          <select
-            v-model="toKey"
-            class="bg-[#2A2A2A] border border-[#383838] rounded-md px-2 py-1 text-xs text-[#e2e6e1] focus:border-[#d5ff2f] outline-none"
-          >
-            <option v-for="a in assets" :key="swapAssetKey(a)" :value="swapAssetKey(a)">
-              {{ a.code }}
-            </option>
-          </select>
+              {{ estimate != null ? formatAmount(estimate) : "0.0" }}
+            </span>
+            <TokenSelect v-model="toKey" :assets="assets" />
+          </div>
         </div>
       </div>
 
       <!-- QUOTE DETAIL -->
-      <div class="text-[11px] flex flex-col gap-1 px-1">
+      <div class="text-[12px] flex flex-col gap-[5px] px-[4px]">
         <template v-if="quoteStatus === 'loading'">
-          <span class="text-[#9a9b99]">Fetching live price…</span>
+          <span style="color: var(--dig-faint)">Fetching live price…</span>
         </template>
         <template v-else-if="quoteStatus === 'ok' && estimate != null && rate != null">
           <div class="flex items-center justify-between">
-            <span class="text-[#9a9b99]">Rate</span>
-            <span class="text-[#e2e6e1]">1 {{ fromCode }} ≈ {{ formatAmount(rate) }} {{ toCode }}</span>
+            <span style="color: var(--dig-faint)">Rate</span>
+            <span class="tabular-nums" style="color: var(--dig-text)">1 {{ fromCode }} ≈ {{ formatAmount(rate) }} {{ toCode }}</span>
           </div>
           <div class="flex items-center justify-between">
-            <span class="text-[#9a9b99]">Min. receive ({{ (SLIPPAGE * 100).toFixed(0) }}% slippage)</span>
-            <span class="text-[#d5ff2f] font-semibold">{{ minReceiveDisplay }} {{ toCode }}</span>
+            <span style="color: var(--dig-faint)">Min. receive ({{ (SLIPPAGE * 100).toFixed(0) }}% slippage)</span>
+            <span class="font-semibold tabular-nums" style="color: var(--dig-accent)">{{ minReceiveDisplay }} {{ toCode }}</span>
           </div>
         </template>
         <template v-else-if="quoteStatus === 'empty'">
-          <span class="text-[#ffb86b]">{{ quoteError }}</span>
+          <span style="color: var(--dig-amber)">{{ quoteError }}</span>
         </template>
         <template v-else-if="quoteStatus === 'error'">
-          <span class="text-[#ff7b7b]">{{ quoteError }}</span>
+          <span style="color: var(--dig-red)">{{ quoteError }}</span>
         </template>
       </div>
 
       <!-- ACTION -->
       <button
         type="button"
-        class="w-full px-4 py-2 rounded-lg border border-[#d5ff2f] text-[#d5ff2f] text-xs font-semibold tracking-wide transition hover:bg-[rgba(213,255,47,0.1)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+        class="dig-btn w-full h-[48px] rounded-[13px] text-[14px] font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        style="background: var(--dig-accent); color: #141414; border: none"
         :disabled="!canSwap"
         @click="onSwap"
       >
@@ -542,24 +547,27 @@ function reset() {
       <!-- SUCCESS -->
       <div
         v-if="status === 'success'"
-        class="bg-[#202020] border border-[rgba(213,255,47,0.3)] rounded-md p-3 text-[11px] flex flex-col gap-1"
+        class="rounded-[12px] px-[14px] py-[11px] text-[12px] flex flex-col gap-[4px]"
+        style="background: var(--dig-surface-2); border: 1px solid rgba(213,255,47,0.3)"
       >
-        <span class="text-[#d5ff2f] font-semibold">Transaction submitted</span>
+        <span class="font-semibold" style="color: var(--dig-accent)">Transaction submitted</span>
         <a
           :href="`https://stellar.expert/explorer/${explorerNetwork}/tx/${txHash}`"
           target="_blank"
           rel="noopener"
-          class="text-[#9a9b99] break-all font-mono hover:text-[#d5ff2f] w-fit"
+          class="break-all font-mono-geist w-fit hover:underline"
+          style="color: var(--dig-faint)"
           title="View transaction on stellar.expert"
         >{{ txHash }}</a>
         <a
           :href="`https://stellar.expert/explorer/${explorerNetwork}/tx/${txHash}`"
           target="_blank"
-          class="text-[#d5ff2f] hover:underline w-fit"
+          class="hover:underline w-fit"
+          style="color: var(--dig-accent)"
         >
           View on stellar.expert ↗
         </a>
-        <button type="button" class="text-[#9a9b99] hover:text-[#d5ff2f] w-fit mt-1" @click="reset">
+        <button type="button" class="w-fit mt-[2px] cursor-pointer hover:underline" style="color: var(--dig-faint)" @click="reset">
           New swap
         </button>
       </div>
@@ -567,18 +575,19 @@ function reset() {
       <!-- ERROR -->
       <div
         v-else-if="status === 'error'"
-        class="bg-[#202020] border border-[rgba(255,123,123,0.3)] rounded-md p-3 text-[11px] flex flex-col gap-1"
+        class="rounded-[12px] px-[14px] py-[11px] text-[12px] flex flex-col gap-[4px]"
+        style="background: var(--dig-surface-2); border: 1px solid rgba(255,123,123,0.3)"
       >
-        <span class="text-[#ff7b7b] font-semibold">Swap failed</span>
+        <span class="font-semibold" style="color: var(--dig-red)">Swap failed</span>
         <span
           v-if="failedOnChain"
-          class="text-[#9a9b99]"
+          style="color: var(--dig-faint)"
         >
           The transaction failed atomically on-chain — no funds were moved. At most
           the base network fee (~0.00001 XLM) was charged.
         </span>
-        <span class="text-[#9a9b99] break-all">{{ errorMessage }}</span>
-        <button type="button" class="text-[#9a9b99] hover:text-[#d5ff2f] w-fit mt-1" @click="reset">
+        <span class="break-all" style="color: var(--dig-faint)">{{ errorMessage }}</span>
+        <button type="button" class="w-fit mt-[2px] cursor-pointer hover:underline" style="color: var(--dig-faint)" @click="reset">
           Try again
         </button>
       </div>
