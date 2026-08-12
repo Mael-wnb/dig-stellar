@@ -104,10 +104,14 @@ export interface ProtocolSummary {
 
   export interface PoolFlows {
     slug: string
-    // false → the pool has no deposit/withdraw event coverage; hide the section.
+    // false → the pool has no MEASURABLE deposit/withdraw event coverage
+    // (H4: flow events with computable USD); hide the section.
     covered: boolean
     window: '24h' | '7d' | '30d'
     days: number
+    // First day (YYYY-MM-DD) with a measurable flow event — the honest start
+    // of the series (event backfill is bounded by Soroban RPC retention).
+    coverageSince: string | null
     series: PoolFlowsSeriesPoint[]
     totals: {
       inflowUsd: number

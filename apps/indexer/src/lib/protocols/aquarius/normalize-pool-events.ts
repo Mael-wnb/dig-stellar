@@ -96,6 +96,60 @@ import {
     };
   }
   
+  // H4 (Lot H, T3-D3): liquidity add/remove amount extraction.
+  // Verified against live mainnet events (probe 2026-08-12):
+  //   topics = [event_name, token0, token1]  (the pool's two token contracts)
+  //   value  = [amount0, amount1, lp_shares] (amounts in pool token order;
+  //            single-sided deposits carry a real 0 on the untouched leg)
+  // Row convention: leg 0 → token_in fields, leg 1 → token_out fields — the
+  // flows API classifies inflow/outflow by event_key and prices USD as the max
+  // of the two legs (the established approximation), so the in/out naming is
+  // storage layout, not direction semantics. lp_shares is not persisted.
+  function extractLiquidityRow(params: {
+    event: AquariusFetchEventsResult['decodedEvents'][number];
+    token0: string;
+    token1: string;
+    decimals0: number;
+    decimals1: number;
+  }) {
+    const { event, token0, token1, decimals0, decimals1 } = params;
+
+    const topics = Array.isArray(event.decodedTopics) ? event.decodedTopics : [];
+    const decodedValue = Array.isArray(event.decodedValue) ? event.decodedValue : [];
+
+    // Prefer the token order the event itself declares; fall back to pool state.
+    const leg0Token = typeof topics[1] === 'string' ? topics[1] : token0;
+    const leg1Token = typeof topics[2] === 'string' ? topics[2] : token1;
+
+    const amount0Raw = decodedValue[0] !== undefined ? String(decodedValue[0]) : null;
+    const amount1Raw = decodedValue[1] !== undefined ? String(decodedValue[1]) : null;
+
+    const leg0Decimals =
+      leg0Token === token0 ? decimals0 :
+      leg0Token === token1 ? decimals1 :
+      null;
+    const leg1Decimals =
+      leg1Token === token0 ? decimals0 :
+      leg1Token === token1 ? decimals1 :
+      null;
+
+    return {
+      callerAddress: null,
+      tokenIn: leg0Token,
+      tokenOut: leg1Token,
+      tokenAmountInRaw: amount0Raw,
+      tokenAmountOutRaw: amount1Raw,
+      tokenAmountInScaled: scale(amount0Raw, leg0Decimals),
+      tokenAmountOutScaled: scale(amount1Raw, leg1Decimals),
+      feeAmountRaw: null,
+      feeAmountScaled: null,
+      reserve0Raw: null,
+      reserve1Raw: null,
+      reserve0Scaled: null,
+      reserve1Scaled: null,
+    };
+  }
+
   export function normalizeAquariusPoolEvents(params: {
     poolState: AquariusPoolState;
     poolEvents: AquariusFetchEventsResult;
@@ -152,6 +206,14 @@ import {
       } else if (eventName === 'update_reserves') {
         extracted = extractUpdateReservesRow({
           event,
+          decimals0,
+          decimals1,
+        });
+      } else if (eventName === 'deposit_liquidity' || eventName === 'withdraw_liquidity') {
+        extracted = extractLiquidityRow({
+          event,
+          token0: poolState.token0,
+          token1: poolState.token1,
           decimals0,
           decimals1,
         });

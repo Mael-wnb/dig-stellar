@@ -105,6 +105,28 @@ export function normalizeSoroswapPairEvents(params: {
       reserve1Scaled = scale(reserve1Raw, decimals1);
     }
 
+    // H4 (Lot H, T3-D3): liquidity add/remove amount extraction. Soroswap-core
+    // pair events carry snake_case map values (the same convention swap/sync
+    // use above): deposit/withdraw → { amount_0, amount_1, new_reserve_0,
+    // new_reserve_1 }. No such event existed in RPC retention at probe time
+    // (2026-08-12), so extraction is defensive: a missing field stays null and
+    // the row simply doesn't grant flow coverage. Row convention matches the
+    // Aquarius liquidity rows: leg 0 → token_in fields, leg 1 → token_out
+    // fields (storage layout, not direction — the flows API classifies by
+    // event_key and prices USD as the max of the two legs).
+    if (subEventName === 'deposit' || subEventName === 'withdraw') {
+      tokenIn = pairState.token0;
+      tokenOut = pairState.token1;
+      tokenAmountInRaw = getStringField(decodedValueRecord, 'amount_0');
+      tokenAmountOutRaw = getStringField(decodedValueRecord, 'amount_1');
+      tokenAmountInScaled = scale(tokenAmountInRaw, decimals0);
+      tokenAmountOutScaled = scale(tokenAmountOutRaw, decimals1);
+      reserve0Raw = getStringField(decodedValueRecord, 'new_reserve_0');
+      reserve1Raw = getStringField(decodedValueRecord, 'new_reserve_1');
+      reserve0Scaled = scale(reserve0Raw, decimals0);
+      reserve1Scaled = scale(reserve1Raw, decimals1);
+    }
+
     return {
       venueSlug: 'soroswap',
       entitySlug: pairState.entitySlug,

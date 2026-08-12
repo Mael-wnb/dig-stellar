@@ -528,7 +528,9 @@ function openAction() {
             <div class="flex items-start justify-between mb-[16px]">
               <div>
                 <div class="text-[14px] font-semibold">Inflows &amp; outflows</div>
-                <div class="text-[12px] mt-[2px]" style="color: var(--dig-faint)">Deposits vs withdrawals · derived from the event stream</div>
+                <div class="text-[12px] mt-[2px]" style="color: var(--dig-faint)">
+                  Deposits vs withdrawals · derived from the event stream<span v-if="flows.coverageSince"> · coverage since {{ flows.coverageSince }}</span>
+                </div>
               </div>
               <div class="flex gap-[6px]">
                 <button

@@ -29,6 +29,22 @@ function nameFor(a: TestnetSwapAsset): string {
   return ASSET_NAME[a.code] ?? a.code
 }
 
+// Static logo URLs from the same source F3 seeded into the assets table
+// (Trustwallet assets repo — USDC/EURC/PYUSD match the DB rows verbatim; XLM
+// is the repo's canonical Stellar mark). Cosmetic only: a dead URL falls back
+// to the monogram via BrandLogo's error chain; unmapped codes (AQUA, yXLM)
+// keep the monogram.
+const TW = 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains'
+const ASSET_LOGO: Record<string, string> = {
+  XLM: `${TW}/stellar/info/logo.png`,
+  USDC: `${TW}/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png`,
+  EURC: `${TW}/ethereum/assets/0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c/logo.png`,
+  PYUSD: `${TW}/ethereum/assets/0x6c3ea9036406852006290770BEdFcAbA0e23A0e8/logo.png`,
+}
+function logoFor(a: TestnetSwapAsset): string | null {
+  return ASSET_LOGO[a.code] ?? null
+}
+
 const open = ref(false)
 // Open upward when the space below the trigger can't fit the panel (e.g. the
 // To selector near the bottom of ActionModal) — otherwise it clips.
@@ -77,7 +93,7 @@ function onKeydown(e: KeyboardEvent) {
       aria-haspopup="listbox"
       @click="toggle"
     >
-      <BrandLogo :letter="selected.code.slice(0, 1)" tint="#242422" color="#B7B3AB" :size="24" :radius="999" :font-size="11" />
+      <BrandLogo :primary="logoFor(selected)" :letter="selected.code.slice(0, 1)" tint="#242422" color="#B7B3AB" :size="24" :radius="999" :font-size="11" :img-scale="1" />
       <span class="text-[14px] font-bold" style="color: var(--dig-text)">{{ selected.code }}</span>
       <svg
         width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -103,7 +119,7 @@ function onKeydown(e: KeyboardEvent) {
         class="dig-row flex items-center gap-[10px] px-[8px] py-[7px] rounded-[10px] cursor-pointer text-left"
         @click="pick(a)"
       >
-        <BrandLogo :letter="a.code.slice(0, 1)" tint="#242422" color="#B7B3AB" :size="28" :radius="999" :font-size="12" />
+        <BrandLogo :primary="logoFor(a)" :letter="a.code.slice(0, 1)" tint="#242422" color="#B7B3AB" :size="28" :radius="999" :font-size="12" :img-scale="1" />
         <span class="min-w-0">
           <span class="block text-[13px] font-bold leading-[1.2]" style="color: var(--dig-text)">{{ a.code }}</span>
           <span class="block text-[11px] truncate" style="color: var(--dig-faint)">{{ nameFor(a) }}</span>

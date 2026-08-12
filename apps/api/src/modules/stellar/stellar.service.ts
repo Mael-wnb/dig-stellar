@@ -162,15 +162,38 @@ const FLOW_WINDOW_DAYS: Record<string, number> = {
 };
 const DEFAULT_FLOW_WINDOW = '7d';
 // Coverage predicate: liquidity deposit/withdraw event families (Aquarius
-// deposit_liquidity/withdraw_liquidity, Blend POOL:deposit/exit_pool, and the
-// generic add_liquidity/remove_liquidity). Kept in one place so the coverage
-// count and the bucketing classification never drift.
+// deposit_liquidity/withdraw_liquidity, Soroswap deposit/withdraw, Blend
+// POOL:deposit/exit_pool, and the generic add_liquidity/remove_liquidity).
+// Kept in one place so the coverage count and the bucketing classification
+// never drift.
 const FLOW_FAMILY_SQL = `
   event_key ilike '%deposit%'
   or event_key ilike '%withdraw%'
   or event_key ilike '%add_liquidity%'
   or event_key ilike '%remove_liquidity%'
   or event_key ilike '%exit_pool%'
+`;
+// H4 (Lot H): the Lot C hide rule, refined. "Covered" now means the pipeline
+// can actually MEASURE flows for this pool: ≥1 flow-family event whose USD is
+// computable (a non-null scaled amount on a priced asset). Amount-less rows
+// (the pre-H4 Aquarius liquidity rows, whose raw values were dropped and are
+// unrepairable beyond RPC retention) no longer grant coverage — they produced
+// the permanent-$0 sections. Requires the `ne` alias on normalized_events.
+const FLOW_COMPUTABLE_SQL = `
+  (
+    (ne.token_amount_in_scaled is not null
+      and exists (select 1 from asset_prices ap where ap.asset_id = ne.token_in_asset_id))
+    or
+    (ne.token_amount_out_scaled is not null
+      and exists (select 1 from asset_prices ap where ap.asset_id = ne.token_out_asset_id))
+  )
+`;
+// H4: rows from the superseded one-day Blend backfill (numbered script 28,
+// 2026-03-19 only) are excluded from flows entirely — they are not produced by
+// the live pipeline (Blend's adapter is state-only) and were wrongly granting
+// blend-fixed-pool a forever-$0 "covered" section.
+const FLOW_LEGACY_SOURCE_SQL = `
+  coalesce(ne.metadata->>'source', '') <> '28-blend-events-scaled'
 `;
 
 @Injectable()
@@ -560,10 +583,13 @@ export class StellarService {
   // the same max-of-legs approximation the indexer uses (prices are only a few
   // days deep, so latest-price is the honest best-effort, not historical-exact).
   //
-  // "covered" is data-driven: a pool is covered only if it has ≥1 deposit/
-  // withdraw-family event ever. AMMs that emit only swaps/syncs (Soroswap) and
-  // pools with no Soroban events (stellar-native, DeFindex) come back
-  // covered=false so the UI hides the section rather than showing zeros.
+  // "covered" is data-driven (refined in H4): a pool is covered only if it has
+  // ≥1 flow-family event with COMPUTABLE USD (non-null amount on a priced
+  // asset), excluding the superseded 2026-03 Blend backfill. AMMs that emit
+  // only swaps/syncs, pools with no Soroban events (stellar-native, DeFindex),
+  // Blend (state-only adapter), and pools whose flow rows predate amount
+  // extraction all come back covered=false so the UI hides the section rather
+  // than showing zeros. `coverageSince` dates the first measurable event.
   async getPoolFlows(poolSlug: string, window?: string) {
     const resolvedWindow =
       window && FLOW_WINDOW_INTERVALS[window] ? window : DEFAULT_FLOW_WINDOW;
@@ -578,17 +604,24 @@ export class StellarService {
       throw new NotFoundException(`Pool not found: ${poolSlug}`);
     }
 
-    // Coverage: any deposit/withdraw-family event ever for this pool.
+    // Coverage (H4): ≥1 flow-family event with computable USD, excluding the
+    // superseded legacy backfill. Also returns when measurable coverage began,
+    // so the UI can be honest that the series only starts there (bounded by
+    // Soroban getEvents retention ≈ 7 days at the time the extraction landed).
     const coverageRows = (await this.prisma.$queryRawUnsafe(
       `
-      select count(*)::int as n
-      from normalized_events
-      where entity_id = $1::uuid
+      select count(*)::int as n,
+             to_char(min(ne.occurred_at) at time zone 'UTC', 'YYYY-MM-DD') as since
+      from normalized_events ne
+      where ne.entity_id = $1::uuid
         and (${FLOW_FAMILY_SQL})
+        and ${FLOW_LEGACY_SOURCE_SQL}
+        and ${FLOW_COMPUTABLE_SQL}
       `,
       entityId
-    )) as Array<{ n: number }>;
+    )) as Array<{ n: number; since: string | null }>;
     const covered = (toNumber(coverageRows[0]?.n) ?? 0) > 0;
+    const coverageSince = coverageRows[0]?.since ?? null;
 
     if (!covered) {
       return {
@@ -596,6 +629,7 @@ export class StellarService {
         covered: false,
         window: resolvedWindow,
         days: FLOW_WINDOW_DAYS[resolvedWindow],
+        coverageSince: null,
         series: [],
         totals: {
           inflowUsd: 0,
@@ -641,6 +675,11 @@ export class StellarService {
         ) pout on true
         where ne.entity_id = $1::uuid
           and ne.occurred_at > now() - $2::interval
+          and ${FLOW_LEGACY_SOURCE_SQL}
+          and (
+            not (${FLOW_FAMILY_SQL.replace(/event_key/g, 'ne.event_key')})
+            or ${FLOW_COMPUTABLE_SQL}
+          )
       ) t
       where family <> 'other'
       group by day, family
@@ -696,6 +735,7 @@ export class StellarService {
       covered: true,
       window: resolvedWindow,
       days,
+      coverageSince,
       series,
       totals: {
         inflowUsd: Number(inflowUsd.toFixed(2)),
