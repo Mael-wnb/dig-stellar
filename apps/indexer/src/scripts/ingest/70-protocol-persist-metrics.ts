@@ -108,6 +108,43 @@ async function persistProtocol(
   });
 }
 
+// G0 (Lot G / T3-D3): leave one network-TVL point behind on every refresh cycle.
+// History accumulates — it cannot be reconstructed later without historized
+// prices — so this runs at the tail of step 7, once protocol_metrics_latest is
+// fully rewritten. The row is the sum over protocol_metrics_latest.tvl_usd (the
+// exact figure the dashboard hero shows) plus the count of protocols folded in.
+// Idempotent per run: as_of is truncated to the minute and upserted, so a
+// re-run of the same cycle overwrites its point rather than duplicating it.
+async function persistNetworkTvlSnapshot(
+  client: ReturnType<typeof createPgClient>
+) {
+  const res = await client.query(
+    `
+    insert into network_tvl_snapshots (as_of, tvl_usd, protocol_count)
+    select
+      date_trunc('minute', now()),
+      coalesce(sum(pm.tvl_usd), 0),
+      count(*)
+    from protocol_metrics_latest pm
+    on conflict (as_of) do update set
+      tvl_usd = excluded.tvl_usd,
+      protocol_count = excluded.protocol_count
+    returning as_of, tvl_usd, protocol_count
+    `
+  );
+
+  const row = res.rows[0] as
+    | { as_of: Date; tvl_usd: string; protocol_count: number }
+    | undefined;
+
+  console.log({
+    networkTvlSnapshot: true,
+    asOf: row?.as_of,
+    tvlUsd: row ? Number(row.tvl_usd) : null,
+    protocolCount: row?.protocol_count ?? null,
+  });
+}
+
 async function main() {
   const client = createPgClient();
   await client.connect();
@@ -118,6 +155,8 @@ async function main() {
     await persistProtocol(client, 'aquarius');
     await persistProtocol(client, 'stellar-native');
     await persistProtocol(client, 'defindex');
+
+    await persistNetworkTvlSnapshot(client);
   } finally {
     await client.end();
   }
