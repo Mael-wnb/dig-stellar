@@ -1,0 +1,83 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  :root{--dig-surface:#242422;--dig-line:#33332f;--dig-line-soft:#2c2c29;--dig-faint:#8a857b;
+        --dig-text:#e2e6e1;--dig-green:#5fbf7f;--dig-accent:#d5ff2f;--dig-surface-3:#2c2c29}
+  body{margin:0;background:#1c1c1c;font-family:-apple-system,system-ui,sans-serif;padding:24px;color:var(--dig-text)}
+  h1{font-size:14px;margin:0 0 14px}h2{font-size:12px;color:var(--dig-faint);font-weight:600;margin:20px 0 8px}
+  .tbl{border-radius:16px;overflow:hidden;background:var(--dig-surface);border:1px solid var(--dig-line);width:860px}
+  .tabs{display:flex;gap:6px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--dig-line-soft)}
+  .tab{font-size:12px;font-weight:600;padding:5px 12px;border-radius:9px;background:var(--dig-surface-3);color:var(--dig-faint)}
+  .tab.on{background:var(--dig-accent);color:#141414}
+  .cnt{margin-left:auto;font-size:12px;color:var(--dig-faint)}
+  .hd{display:grid;align-items:center;padding:11px 20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--dig-faint);border-bottom:1px solid var(--dig-line-soft)}
+  .row{display:grid;align-items:center;padding:13px 20px;border-bottom:1px solid var(--dig-line-soft)}
+  .pool{display:flex;align-items:center;gap:11px}
+  .chip{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0}
+  .pname{font-size:14px;font-weight:600}
+  .r{text-align:right;font-size:14px;font-variant-numeric:tabular-nums}
+  .muted{color:var(--dig-faint)}.strong{font-weight:600}.green{color:var(--dig-green)}
+  .keylbl{font-size:10.5px;color:var(--dig-faint);line-height:1.1}
+  .active{color:var(--dig-text)!important}
+  .chev{text-align:right;color:#6a665e}
+</style></head><body>
+  <h1>G3 — All-pools table: adaptive columns per tab (no half-dash rows)</h1>
+
+  <h2>“All” tab — generic: Pool · Protocol · TVL · Key metric (type-aware) · ›</h2>
+  <div class="tbl">
+    <div class="tabs"><span class="tab on">All</span><span class="tab">Blend</span><span class="tab">Soroswap</span><span class="tab">Aquarius</span><span class="tab">DeFindex</span><span class="cnt">4 pools</span></div>
+    <div class="hd" style="grid-template-columns:2fr 1.2fr 1fr 1.4fr 40px">
+      <div>Pool</div><div>Protocol</div><div class="r active">TVL ↓</div><div class="r">Key metric</div><div></div>
+    </div>
+    <div class="row" style="grid-template-columns:2fr 1.2fr 1fr 1.4fr 40px">
+      <div class="pool"><span class="chip" style="background:#17233A;color:#2E6FD6">B</span><span class="pname">USDC</span></div>
+      <div class="strong" style="font-size:13.5px">Blend</div><div class="r strong active">$120.4M</div>
+      <div class="r"><div class="strong green">4.12%</div><div class="keylbl">Supply APY</div></div><div class="chev">›</div>
+    </div>
+    <div class="row" style="grid-template-columns:2fr 1.2fr 1fr 1.4fr 40px">
+      <div class="pool"><span class="chip" style="background:#241633;color:#7B45D6">◎</span><span class="pname">XLM / USDC</span></div>
+      <div class="strong" style="font-size:13.5px">Stellar DEX</div><div class="r strong active">$22.1M</div>
+      <div class="r"><div class="strong active">$0.8M</div><div class="keylbl">24h vol</div></div><div class="chev">›</div>
+    </div>
+    <div class="row" style="grid-template-columns:2fr 1.2fr 1fr 1.4fr 40px">
+      <div class="pool"><span class="chip" style="background:#37231A;color:#D86A3E">S</span><span class="pname">XLM / USDC</span></div>
+      <div class="strong" style="font-size:13.5px">Soroswap</div><div class="r strong active">$18.0M</div>
+      <div class="r"><div class="strong active">$1.2M</div><div class="keylbl">24h vol</div></div><div class="chev">›</div>
+    </div>
+    <div class="row" style="grid-template-columns:2fr 1.2fr 1fr 1.4fr 40px">
+      <div class="pool"><span class="chip" style="background:#221A10;color:#F59E0B">D</span><span class="pname">USDC vault</span></div>
+      <div class="strong" style="font-size:13.5px">DeFindex</div><div class="r strong active">$9.8M</div>
+      <div class="r"><div class="strong green">6.30%</div><div class="keylbl">APY</div></div><div class="chev">›</div>
+    </div>
+  </div>
+
+  <h2>“Blend” selected (lending) — TVL · Supply APY · Borrow APY · Utilization</h2>
+  <div class="tbl">
+    <div class="tabs"><span class="tab">All</span><span class="tab on">Blend</span><span class="tab">Soroswap</span><span class="cnt">2 pools</span></div>
+    <div class="hd" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 40px">
+      <div>Pool</div><div class="r active">TVL ↓</div><div class="r">Supply APY</div><div class="r">Borrow APY</div><div class="r">Utilization</div><div></div>
+    </div>
+    <div class="row" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 40px">
+      <div class="pool"><span class="chip" style="background:#17233A;color:#2E6FD6">B</span><span class="pname">USDC</span></div>
+      <div class="r strong active">$120.4M</div><div class="r green strong">4.12%</div><div class="r muted">7.80%</div><div class="r muted">64%</div><div class="chev">›</div>
+    </div>
+    <div class="row" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 40px">
+      <div class="pool"><span class="chip" style="background:#17233A;color:#2E6FD6">B</span><span class="pname">XLM</span></div>
+      <div class="r strong active">$60.0M</div><div class="r green strong">2.90%</div><div class="r muted">6.10%</div><div class="r muted">41%</div><div class="chev">›</div>
+    </div>
+  </div>
+
+  <h2>“Soroswap” selected (AMM) — TVL · 24h vol · 24h fees · 24h swaps</h2>
+  <div class="tbl">
+    <div class="tabs"><span class="tab">All</span><span class="tab">Blend</span><span class="tab on">Soroswap</span><span class="cnt">2 pools</span></div>
+    <div class="hd" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 40px">
+      <div>Pool</div><div class="r active">TVL ↓</div><div class="r">24h vol</div><div class="r">24h fees</div><div class="r">24h swaps</div><div></div>
+    </div>
+    <div class="row" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 40px">
+      <div class="pool"><span class="chip" style="background:#37231A;color:#D86A3E">S</span><span class="pname">XLM / USDC</span></div>
+      <div class="r strong active">$18.0M</div><div class="r muted">$1.2M</div><div class="r muted">$3.6K</div><div class="r muted">412</div><div class="chev">›</div>
+    </div>
+    <div class="row" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 40px">
+      <div class="pool"><span class="chip" style="background:#37231A;color:#D86A3E">S</span><span class="pname">AQUA / USDC</span></div>
+      <div class="r strong active">$2.1M</div><div class="r muted">$90K</div><div class="r muted">$270</div><div class="r muted">33</div><div class="chev">›</div>
+    </div>
+  </div>
+</body></html>

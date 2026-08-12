@@ -3,11 +3,11 @@
 // Per-protocol summary cards + a sortable, filterable all-pools table, all from
 // the real /v1/pools data. Lot B freshness carries over as per-pool stale badges
 // and a per-protocol stale dot (restyled, not removed). Rows open the pool view.
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useProtocol } from '../../composables/useProtocol'
 import { useView } from '../../composables/useView'
 import { venueTheme } from '../../data/venueTheme'
-import { displayPoolName, formatUsd } from '../../utils/format'
+import { displayPoolName, formatUsd, formatCount } from '../../utils/format'
 import type { PoolListItem } from '../../types/protocol'
 import BrandLogo from '../common/BrandLogo.vue'
 import PairLogo from '../common/PairLogo.vue'
@@ -109,9 +109,26 @@ const filters = computed(() => [
   ...protocolCards.value.map((c) => ({ key: c.id, label: c.name })),
 ])
 
-type SortKey = 'tvl' | 'apy' | 'vol' | 'fees' | 'util'
+// G3: adaptive columns per tab. "All" is generic (Protocol · TVL · a single
+// type-aware Key metric); selecting a protocol tab shows that type's full column
+// set. No more half-dash rows: a column only appears where every row in view can
+// fill it.
+type SortKey = 'tvl' | 'apy' | 'borrow' | 'vol' | 'fees' | 'swaps' | 'util' | 'key'
 const sortKey = ref<SortKey>('tvl')
 const sortDir = ref<'asc' | 'desc'>('desc')
+
+// The selected protocol's kind (null on "All"). Every pool in a venue shares a kind.
+const selectedKind = computed<PoolKind | null>(() => {
+  if (filter.value === 'all') return null
+  return protocolCards.value.find((c) => c.id === filter.value)?.kind ?? null
+})
+
+// Switching tabs swaps the column set, so a sort key from the old set may no longer
+// exist — reset to TVL (present in every set and comparable across all types).
+watch(filter, () => {
+  sortKey.value = 'tvl'
+  sortDir.value = 'desc'
+})
 
 function toggleSort(k: SortKey) {
   if (sortKey.value === k) sortDir.value = sortDir.value === 'desc' ? 'asc' : 'desc'
@@ -128,24 +145,50 @@ function util(p: PoolListItem): number | null {
   return (b / s) * 100
 }
 
+// The single metric surfaced on the "All" tab, chosen by type: lending → Supply
+// APY, vault → APY, amm → 24h volume. Carries its own per-row label + sort value
+// so the mixed column never pretends an APY and a volume are comparable numbers.
+function keyMetric(p: PoolListItem): { value: string; label: string; sort: number | null } {
+  if (poolKind(p) === 'amm') {
+    return { value: formatUsd(p.metrics.volume24hUsd), label: '24h vol', sort: p.metrics.volume24hUsd ?? null }
+  }
+  const apy = p.metrics.supplyApy
+  return { value: pctRatio(apy), label: poolKind(p) === 'lending' ? 'Supply APY' : 'APY', sort: apy ?? null }
+}
+
 // Sort keys mirror display applicability: N/A metrics are `null` so they sort as
 // absent (bottom) rather than as a spurious 0.
 function metricVal(p: PoolListItem, k: SortKey): number | null {
-  const amm = poolKind(p) === 'amm'
+  const kind = poolKind(p)
   switch (k) {
     case 'tvl': return p.metrics.tvlUsd ?? null
     case 'apy': return p.metrics.supplyApy ?? null
-    case 'vol': return amm ? (p.metrics.volume24hUsd ?? null) : null
-    case 'fees': return amm ? (p.metrics.fees24hUsd ?? null) : null
-    case 'util': return poolKind(p) === 'lending' ? util(p) : null
+    case 'borrow': return kind === 'lending' ? (p.metrics.borrowApy ?? null) : null
+    case 'vol': return kind === 'amm' ? (p.metrics.volume24hUsd ?? null) : null
+    case 'fees': return kind === 'amm' ? (p.metrics.fees24hUsd ?? null) : null
+    case 'swaps': return kind === 'amm' ? (p.metrics.swaps24h ?? null) : null
+    case 'util': return kind === 'lending' ? util(p) : null
+    case 'key': return keyMetric(p).sort
   }
 }
+
+// Fixed group order for the "All" key-metric sort — see rows() below.
+const KIND_ORDER: Record<PoolKind, number> = { lending: 0, amm: 1, vault: 2 }
 
 const rows = computed(() => {
   const list = pools.value.filter((p) => filter.value === 'all' || p.protocol.id === filter.value)
   const dir = sortDir.value === 'asc' ? 1 : -1
+  // On "All", sorting the Key-metric column groups by type first, then sorts each
+  // group by its own metric — APY and volume are ranked within their kind, never
+  // against each other. TVL (and every protocol-tab sort) is a plain comparison.
+  const groupByKind = filter.value === 'all' && sortKey.value === 'key'
   return [...list]
     .sort((a, b) => {
+      if (groupByKind) {
+        const ka = KIND_ORDER[poolKind(a)]
+        const kb = KIND_ORDER[poolKind(b)]
+        if (ka !== kb) return ka - kb
+      }
       const av = metricVal(a, sortKey.value)
       const bv = metricVal(b, sortKey.value)
       if (av === null && bv === null) return 0
@@ -155,8 +198,8 @@ const rows = computed(() => {
     })
     .map((p) => {
       const kind = poolKind(p)
-      const amm = kind === 'amm'
       const u = util(p)
+      const km = keyMetric(p)
       return {
         id: p.id,
         pair: displayPoolName(p.name),
@@ -168,27 +211,66 @@ const rows = computed(() => {
         assets: kind === 'amm' ? assetMarks(p).slice(0, 2) : kind === 'vault' ? assetMarks(p).slice(0, 1) : [],
         tvl: formatUsd(p.metrics.tvlUsd),
         apy: pctRatio(p.metrics.supplyApy),
-        // Volume/fees apply to AMMs only; "—" (not $0) elsewhere. A measured 0 on
-        // an AMM stays "$0" (formatUsd(0) === "$0").
-        vol: amm ? formatUsd(p.metrics.volume24hUsd) : '—',
-        fees: amm ? formatUsd(p.metrics.fees24hUsd) : '—',
+        borrow: pctRatio(p.metrics.borrowApy),
+        vol: formatUsd(p.metrics.volume24hUsd),
+        fees: formatUsd(p.metrics.fees24hUsd),
+        swaps: formatCount(p.metrics.swaps24h),
         // Utilization applies to lending only; a real 0% borrow stays "0%".
-        util: kind === 'lending' ? (u === null ? '—' : `${u.toFixed(0)}%`) : '—',
+        util: u === null ? '—' : `${u.toFixed(0)}%`,
+        keyValue: km.value,
+        keyLabel: km.label,
         stale: p.isStale === true,
       }
     })
 })
 
-const COLS: Array<{ key: SortKey; label: string }> = [
-  { key: 'tvl', label: 'TVL' },
-  { key: 'apy', label: 'APY' },
-  { key: 'vol', label: '24h vol' },
-  { key: 'fees', label: 'Fees 24h' },
-  { key: 'util', label: 'Util.' },
-]
+// Column set per tab. `value` cols read row[field]; `protocol` shows the venue;
+// `key` shows the value + its per-row label. Only columns every visible row can
+// fill are present — that is what kills the half-dash rows.
+type ColType = 'value' | 'protocol' | 'key'
+interface Col { key: SortKey | null; label: string; field?: string; align: 'left' | 'right'; type: ColType }
 
-function arrow(k: SortKey): string {
-  if (sortKey.value !== k) return ''
+const columns = computed<Col[]>(() => {
+  switch (selectedKind.value) {
+    case 'lending':
+      return [
+        { key: 'tvl', label: 'TVL', field: 'tvl', align: 'right', type: 'value' },
+        { key: 'apy', label: 'Supply APY', field: 'apy', align: 'right', type: 'value' },
+        { key: 'borrow', label: 'Borrow APY', field: 'borrow', align: 'right', type: 'value' },
+        { key: 'util', label: 'Utilization', field: 'util', align: 'right', type: 'value' },
+      ]
+    case 'amm':
+      return [
+        { key: 'tvl', label: 'TVL', field: 'tvl', align: 'right', type: 'value' },
+        { key: 'vol', label: '24h vol', field: 'vol', align: 'right', type: 'value' },
+        { key: 'fees', label: '24h fees', field: 'fees', align: 'right', type: 'value' },
+        { key: 'swaps', label: '24h swaps', field: 'swaps', align: 'right', type: 'value' },
+      ]
+    case 'vault':
+      return [
+        { key: 'tvl', label: 'TVL', field: 'tvl', align: 'right', type: 'value' },
+        { key: 'apy', label: 'APY', field: 'apy', align: 'right', type: 'value' },
+      ]
+    default: // "All" — generic
+      return [
+        { key: null, label: 'Protocol', align: 'left', type: 'protocol' },
+        { key: 'tvl', label: 'TVL', field: 'tvl', align: 'right', type: 'value' },
+        { key: 'key', label: 'Key metric', align: 'right', type: 'key' },
+      ]
+  }
+})
+
+// Grid track sizing: Pool (wide) · each column · chevron. Protocol/Key metric get
+// a touch more room than a plain numeric column.
+const gridTemplate = computed(
+  () =>
+    `2fr ${columns.value
+      .map((c) => (c.type === 'key' ? '1.4fr' : c.type === 'protocol' ? '1.2fr' : '1fr'))
+      .join(' ')} 40px`,
+)
+
+function arrow(k: SortKey | null): string {
+  if (k === null || sortKey.value !== k) return ''
   return sortDir.value === 'asc' ? ' ↑' : ' ↓'
 }
 </script>
@@ -260,16 +342,19 @@ function arrow(k: SortKey): string {
 
         <div class="overflow-x-auto">
           <div class="min-w-[720px]">
-            <div class="grid items-center px-[20px] py-[11px] text-[11px] font-semibold uppercase tracking-[0.04em]" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 40px; color: var(--dig-faint); border-bottom: 1px solid var(--dig-line-soft)">
+            <div class="grid items-center px-[20px] py-[11px] text-[11px] font-semibold uppercase tracking-[0.04em]" :style="{ gridTemplateColumns: gridTemplate, color: 'var(--dig-faint)', borderBottom: '1px solid var(--dig-line-soft)' }">
               <div>Pool</div>
-              <button v-for="col in COLS" :key="col.key" type="button" class="text-right cursor-pointer select-none uppercase" :style="{ color: sortKey === col.key ? 'var(--dig-text)' : 'var(--dig-faint)' }" @click="toggleSort(col.key)">{{ col.label }}{{ arrow(col.key) }}</button>
+              <template v-for="col in columns" :key="col.label">
+                <button v-if="col.key" type="button" class="cursor-pointer select-none uppercase bg-transparent" :style="{ textAlign: col.align, color: sortKey === col.key ? 'var(--dig-text)' : 'var(--dig-faint)' }" @click="toggleSort(col.key)">{{ col.label }}{{ arrow(col.key) }}</button>
+                <div v-else :style="{ textAlign: col.align }">{{ col.label }}</div>
+              </template>
               <div></div>
             </div>
             <div
               v-for="r in rows"
               :key="r.id"
               class="dig-row grid items-center px-[20px] py-[13px] cursor-pointer"
-              style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 40px; border-bottom: 1px solid var(--dig-line-soft)"
+              :style="{ gridTemplateColumns: gridTemplate, borderBottom: '1px solid var(--dig-line-soft)' }"
               @click="openPool(r.id)"
             >
               <div class="flex items-center gap-[11px] min-w-0">
@@ -287,14 +372,20 @@ function arrow(k: SortKey): string {
                     {{ r.pair }}
                     <span v-if="r.stale" class="text-[9px] font-bold uppercase px-[5px] py-[1px] rounded-[6px]" style="color: var(--dig-amber); background: rgba(201,138,30,0.12)">Stale</span>
                   </div>
-                  <div class="text-[11.5px]" style="color: var(--dig-faint)">{{ r.venue }}</div>
                 </div>
               </div>
-              <div class="text-right text-[14px] font-semibold tabular-nums">{{ r.tvl }}</div>
-              <div class="text-right text-[14px] font-semibold tabular-nums" style="color: var(--dig-green)">{{ r.apy }}</div>
-              <div class="text-right text-[14px] tabular-nums" style="color: var(--dig-faint)">{{ r.vol }}</div>
-              <div class="text-right text-[14px] tabular-nums" style="color: var(--dig-faint)">{{ r.fees }}</div>
-              <div class="text-right text-[13px] tabular-nums" style="color: var(--dig-faint)">{{ r.util }}</div>
+              <template v-for="col in columns" :key="col.label">
+                <!-- Protocol (All tab): venue name -->
+                <div v-if="col.type === 'protocol'" class="text-[13.5px] font-semibold truncate" style="color: var(--dig-text)">{{ r.venue }}</div>
+                <!-- Key metric (All tab): value + its per-row label, so the mixed column stays honest -->
+                <div v-else-if="col.type === 'key'" class="text-right">
+                  <div class="text-[14px] font-semibold tabular-nums" :style="{ color: r.keyLabel === '24h vol' ? 'var(--dig-text)' : 'var(--dig-green)' }">{{ r.keyValue }}</div>
+                  <div class="text-[10.5px] leading-tight" style="color: var(--dig-faint)">{{ r.keyLabel }}</div>
+                </div>
+                <!-- Value column: read the row field; TVL/APY styled, others muted -->
+                <div v-else class="text-[14px] tabular-nums" :class="col.align === 'right' ? 'text-right' : ''"
+                     :style="{ color: col.field === 'apy' ? 'var(--dig-green)' : col.field === 'tvl' ? 'var(--dig-text)' : 'var(--dig-faint)', fontWeight: (col.field === 'tvl' || col.field === 'apy') ? 600 : 400 }">{{ col.field ? (r as any)[col.field] : '' }}</div>
+              </template>
               <div class="text-right" style="color: #6A665E">›</div>
             </div>
           </div>
