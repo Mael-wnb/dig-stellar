@@ -124,7 +124,11 @@ function submit() {
 </script>
 
 <template>
-  <!-- overlay -->
+  <!-- overlay — teleported to <body>: the alerts view wrapper keeps a transform
+       (digFade, fill-mode both), which would otherwise become the containing
+       block for this fixed overlay and center it in the content column instead
+       of the viewport. -->
+  <Teleport to="body">
   <div
     class="fixed inset-0 z-50 flex items-center justify-center p-6"
     style="background:rgba(38,36,32,.34); backdrop-filter:blur(3px); animation:digOverlay .2s ease;"
@@ -134,7 +138,7 @@ function submit() {
       class="bg-[#1E1E1E] rounded-[20px] flex flex-col max-h-[90vh] overflow-hidden w-full max-w-[560px] text-[#E2E6E1]"
       style="box-shadow:0 30px 80px -30px rgba(38,36,32,.5); animation:digSheet .3s cubic-bezier(.2,.8,.2,1) both;"
     >
-      <div class="px-[26px] pt-6 pb-[26px] overflow-y-auto">
+      <div class="dig-scroll px-[26px] pt-6 pb-[26px] overflow-y-auto">
         <div class="flex items-center justify-between mb-0.5">
           <h2 class="text-lg font-bold">New alert rule</h2>
           <button
@@ -267,4 +271,5 @@ function submit() {
       </div>
     </div>
   </div>
+  </Teleport>
 </template>

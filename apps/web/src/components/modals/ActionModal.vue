@@ -30,6 +30,9 @@ const activeTab = ref('primary')
 </script>
 
 <template>
+  <!-- Teleported to <body> so a transformed/animated ancestor can never become
+       the containing block for the fixed overlay (H1). -->
+  <Teleport to="body">
   <div
     class="fixed inset-0 z-[50] flex items-center justify-center p-[24px]"
     style="background: rgba(38,36,32,0.34); backdrop-filter: blur(3px); animation: digOverlay .2s ease"
@@ -97,4 +100,5 @@ const activeTab = ref('primary')
       </div>
     </div>
   </div>
+  </Teleport>
 </template>

@@ -48,6 +48,9 @@ async function onTrack() {
 </script>
 
 <template>
+  <!-- Teleported to <body> so a transformed/animated ancestor can never become
+       the containing block for the fixed overlay (H1). -->
+  <Teleport to="body">
   <div
     class="fixed inset-0 z-[50] flex items-center justify-center p-[24px]"
     style="background: rgba(38,36,32,0.34); backdrop-filter: blur(3px); animation: digOverlay .2s ease"
@@ -57,7 +60,7 @@ async function onTrack() {
       class="w-[420px] rounded-[20px] max-h-[90vh] overflow-hidden flex flex-col"
       style="background: var(--dig-surface); box-shadow: 0 30px 80px -30px rgba(38,36,32,0.5); animation: digSheet .3s cubic-bezier(.2,.8,.2,1) both"
     >
-      <div class="p-[24px_26px_22px]" style="padding: 24px 26px 22px">
+      <div class="dig-scroll overflow-y-auto" style="padding: 24px 26px 22px">
         <div class="flex items-center justify-between mb-[4px]">
           <div class="text-[18px] font-bold">Connect a wallet</div>
           <button type="button" class="dig-chip cursor-pointer text-[20px] w-[30px] h-[30px] flex items-center justify-center rounded-[8px]" style="color: var(--dig-faint)" @click="emit('close')">×</button>
@@ -119,4 +122,5 @@ async function onTrack() {
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
