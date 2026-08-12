@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  :root{--dig-surface:#242422;--dig-line:#33332f;--dig-faint:#8a857b;--dig-text:#e2e6e1;
+        --dig-green:#5fbf7f;--dig-red:#e0603e;--dig-accent:#d5ff2f}
+  body{margin:0;background:#1c1c1c;font-family:-apple-system,system-ui,sans-serif;padding:26px;color:var(--dig-text)}
+  h1{font-size:14px;margin:0 0 3px}h2{font-size:12px;color:var(--dig-faint);font-weight:600;margin:22px 0 12px}
+  .strip{display:flex;gap:16px;overflow:hidden}
+  .card{flex-shrink:0;width:300px;border-radius:18px;padding:22px;background:var(--dig-surface);border:1px solid var(--dig-line)}
+  .head{display:flex;align-items:center;gap:12px}
+  .chip{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:19px}
+  .name{font-size:16px;font-weight:700}.type{font-size:12px;color:var(--dig-faint)}
+  .m-before{display:flex;gap:22px;margin-top:20px}
+  .m-after{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px}
+  .lbl{font-size:12px;color:var(--dig-faint)}.val{font-size:18px;font-weight:700;margin-top:2px}
+  .tag{display:inline-block;font-size:10px;padding:2px 7px;border-radius:6px;margin-left:8px;vertical-align:middle}
+</style></head><body>
+  <h1>G1.3 — Protocol summary cards: ragged → rigid 3-slot grid</h1>
+
+  <h2>BEFORE — flex row, variable slot count (vault has only 2; baselines drift)</h2>
+  <div class="strip" id="before"></div>
+
+  <h2>AFTER — grid-cols-3, exactly three aligned slots on every card</h2>
+  <div class="strip" id="after"></div>
+
+  <script>
+    const cards=[
+      {id:'blend',n:'Blend',t:'#17233A',c:'#2E6FD6',l:'B',type:'Lending · 4 pools',
+       m:[['TVL','$188.4M',''],['Avg supply APY','4.12%','g'],['Avg borrow APY','7.80%','r']]},
+      {id:'soroswap',n:'Soroswap',t:'#37231A',c:'#D86A3E',l:'S',type:'AMM · 12 pools',
+       m:[['TVL','$24.1M',''],['24h vol','$1.2M',''],['Fees 24h','$3.6K','']]},
+      {id:'defindex',n:'DeFindex',t:'#221A10',c:'#F59E0B',l:'D',type:'Vault · 1 pools',
+       before:[['TVL','$9.8M',''],['Avg APY','6.30%','g']],
+       m:[['TVL','$9.8M',''],['Avg APY','6.30%','g'],['Pools','1','']]},
+    ]
+    const col=x=>x==='g'?'var(--dig-green)':x==='r'?'var(--dig-red)':'var(--dig-text)'
+    const slot=([l,v,x])=>`<div style="min-width:0"><div class="lbl">${l}</div><div class="val" style="color:${col(x)}">${v}</div></div>`
+    const card=(k,mode)=>{const ms=(mode==='before'&&k.before)?k.before:k.m
+      return `<div class="card"><div class="head"><div class="chip" style="background:${k.t};color:${k.c}">${k.l}</div>
+        <div><div class="name">${k.n}</div><div class="type">${k.type}</div></div></div>
+        <div class="${mode==='before'?'m-before':'m-after'}">${ms.map(slot).join('')}</div></div>`}
+    document.getElementById('before').innerHTML=cards.map(k=>card(k,'before')).join('')
+    document.getElementById('after').innerHTML=cards.map(k=>card(k,'after')).join('')
+  </script>
+</body></html>

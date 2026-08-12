@@ -80,7 +80,9 @@ const protocolCards = computed(() => {
     .map((c) => {
       const avgSupplyApy = c.sTvl > 0 ? c.sApyW / c.sTvl : null
       const avgBorrowApy = c.bTvl > 0 ? c.bApyW / c.bTvl : null
-      // Metrics shown after TVL, per type (never volume/fees on lending/vault).
+      // Rigid 3-slot grid: TVL (rendered first) + exactly two type-specific slots,
+      // so every card aligns on the same baselines regardless of type. Never
+      // volume/fees on lending/vault; vault fills its third slot with pool count.
       const metrics =
         c.kind === 'lending'
           ? [
@@ -88,7 +90,10 @@ const protocolCards = computed(() => {
               { label: 'Avg borrow APY', value: pctRatio(avgBorrowApy), color: 'var(--dig-red)' },
             ]
           : c.kind === 'vault'
-            ? [{ label: 'Avg APY', value: pctRatio(avgSupplyApy), color: 'var(--dig-green)' }]
+            ? [
+                { label: 'Avg APY', value: pctRatio(avgSupplyApy), color: 'var(--dig-green)' },
+                { label: 'Pools', value: String(c.count), color: 'var(--dig-text)' },
+              ]
             : [
                 { label: '24h vol', value: formatUsd(c.vol), color: 'var(--dig-text)' },
                 { label: 'Fees 24h', value: formatUsd(c.fees), color: 'var(--dig-text)' },
@@ -218,14 +223,14 @@ function arrow(k: SortKey): string {
               <div class="text-[12px]" style="color: var(--dig-faint)">{{ c.typeLabel }} · {{ c.count }} pools</div>
             </div>
           </div>
-          <div class="flex gap-[22px] mt-[20px]">
-            <div>
-              <div class="text-[12px]" style="color: var(--dig-faint)">TVL</div>
-              <div class="text-[18px] font-bold mt-[2px] tabular-nums">{{ formatUsd(c.tvl) }}</div>
+          <div class="grid grid-cols-3 gap-[14px] mt-[20px]">
+            <div class="min-w-0">
+              <div class="text-[12px] truncate" style="color: var(--dig-faint)">TVL</div>
+              <div class="text-[18px] font-bold mt-[2px] tabular-nums truncate">{{ formatUsd(c.tvl) }}</div>
             </div>
-            <div v-for="m in c.metrics" :key="m.label">
-              <div class="text-[12px]" style="color: var(--dig-faint)">{{ m.label }}</div>
-              <div class="text-[18px] font-bold mt-[2px] tabular-nums" :style="{ color: m.color }">{{ m.value }}</div>
+            <div v-for="m in c.metrics" :key="m.label" class="min-w-0">
+              <div class="text-[12px] truncate" style="color: var(--dig-faint)">{{ m.label }}</div>
+              <div class="text-[18px] font-bold mt-[2px] tabular-nums truncate" :style="{ color: m.color }">{{ m.value }}</div>
             </div>
           </div>
         </div>

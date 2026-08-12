@@ -2,9 +2,11 @@
 // apps/web/src/components/bridge/BridgeRoutesTable.vue
 // SCF T2-D3 — per-chain routes table (Paul DA). Clicking a row scopes the whole section to
 // that chain; headers sort. Dumb: data + sort state in, `sort`/`scope` events out.
+// G1 (Lot G): chain identity renders through BrandLogo (bundled mark → monogram).
+import BrandLogo from '../common/BrandLogo.vue'
 
 interface RouteRow {
-  chain: string; mark: string; tint: string; color: string
+  chain: string; mark: string; tint: string; color: string; logo: string | null
   inflowUsd: number; outflowUsd: number; netUsd: number; share: number // share 0–100
 }
 defineProps<{
@@ -45,8 +47,8 @@ const arrow = (key: string, sort: { key: string; dir: string }) => (sort.key ===
             :style="activeChain === r.chain ? 'background:#242422; box-shadow:inset 2px 0 0 #D5FF2F;' : 'background:transparent;'"
             @click="emit('scope', r.chain)">
       <span class="flex items-center gap-[11px]">
-        <span class="w-[30px] h-[30px] rounded-[9px] flex items-center justify-center font-bold text-[12px] flex-shrink-0"
-              :style="{ background: r.tint, color: r.color }">{{ r.mark }}</span>
+        <BrandLogo :fallback="r.logo" :letter="r.mark" :tint="r.tint" :color="r.color"
+                   :size="30" :radius="9" :font-size="12" :img-scale="0.62" />
         <span class="flex items-center gap-1.5 text-[13.5px] font-semibold text-[#e2e6e1]">
           {{ r.chain }} <span class="text-[#6E6A62]">→</span> <span class="text-[#B7B3AB]">Stellar</span>
         </span>

@@ -545,7 +545,13 @@ function reset() {
         class="bg-[#202020] border border-[rgba(213,255,47,0.3)] rounded-md p-3 text-[11px] flex flex-col gap-1"
       >
         <span class="text-[#d5ff2f] font-semibold">Transaction submitted</span>
-        <span class="text-[#9a9b99] break-all font-mono">{{ txHash }}</span>
+        <a
+          :href="`https://stellar.expert/explorer/${explorerNetwork}/tx/${txHash}`"
+          target="_blank"
+          rel="noopener"
+          class="text-[#9a9b99] break-all font-mono hover:text-[#d5ff2f] w-fit"
+          title="View transaction on stellar.expert"
+        >{{ txHash }}</a>
         <a
           :href="`https://stellar.expert/explorer/${explorerNetwork}/tx/${txHash}`"
           target="_blank"

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 // apps/web/src/components/bridge/BridgeFlowsFeed.vue
 // SCF T2-D3 — recent bridge flows feed (Paul DA). Dumb: flows + sort in, `sort` out.
+// G1 (Lot G): chain identity via BrandLogo; tx hash links to stellar.expert.
+import BrandLogo from '../common/BrandLogo.vue'
+import { stellarExpertTxUrl } from '../../lib/explorer'
 
 interface FlowRow {
-  id: string; chain: string; mark: string; tint: string; color: string
+  id: string; chain: string; mark: string; tint: string; color: string; logo: string | null
   dir: 'in' | 'out'; asset: string; amountUsd: number; occurredAt: string; txHash: string
 }
 defineProps<{
@@ -48,8 +51,8 @@ const arrow = (key: string, sort: { key: string; dir: string }) => (sort.key ===
          class="grid items-center px-2 py-[11px] border-b border-[#2C2C29]"
          style="grid-template-columns:1.8fr 1fr 0.9fr 1fr 0.9fr 0.9fr;">
       <span class="flex items-center gap-[11px]">
-        <span class="w-7 h-7 rounded-[8px] flex-shrink-0 flex items-center justify-center font-bold text-[11px]"
-              :style="{ background: f.tint, color: f.color }">{{ f.mark }}</span>
+        <BrandLogo :fallback="f.logo" :letter="f.mark" :tint="f.tint" :color="f.color"
+                   :size="28" :radius="8" :font-size="11" :img-scale="0.62" />
         <span class="flex items-center gap-1.5 text-[13px] font-semibold text-[#e2e6e1]">
           {{ f.chain }} <span class="text-[#6E6A62]">→</span> <span class="text-[#B7B3AB]">Stellar</span>
         </span>
@@ -65,7 +68,11 @@ const arrow = (key: string, sort: { key: string; dir: string }) => (sort.key ===
             :style="{ color: f.dir === 'in' ? '#2E9E63' : '#B7B3AB' }">{{ (f.dir === 'in' ? '+' : '−') + fmtUsd(f.amountUsd) }}</span>
       <span class="text-right text-[12.5px] text-[#5E5F5D] tabular-nums">{{ relTime(f.occurredAt) }}</span>
       <span class="text-right">
-        <span class="text-[11px] font-semibold text-[#5E5F5D] px-2 py-1 rounded-[7px]" style="font-family:'Geist Mono',monospace;">{{ shortTx(f.txHash) }}</span>
+        <a v-if="f.txHash" :href="stellarExpertTxUrl(f.txHash)" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1 text-[11px] font-semibold text-[#8A857B] hover:text-[#d5ff2f] px-2 py-1 rounded-[7px] no-underline transition-colors"
+           style="font-family:'Geist Mono',monospace;" title="View transaction on stellar.expert"
+           @click.stop>{{ shortTx(f.txHash) }} <span class="text-[9px] not-italic">↗</span></a>
+        <span v-else class="text-[11px] font-semibold text-[#5E5F5D] px-2 py-1">—</span>
       </span>
     </div>
     <p v-if="!flows.length" class="text-[12.5px] text-[#5E5F5D] py-6 text-center">No flows in this window.</p>

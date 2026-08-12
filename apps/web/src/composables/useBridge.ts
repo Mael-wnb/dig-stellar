@@ -39,8 +39,40 @@ const WINDOW_MS: Record<BridgeWindow, number> = {
 const seriesDaysFor = (w: BridgeWindow): number => (w === '30d' ? 30 : 7)
 
 // ── chain identity ───────────────────────────────────────────────────────────
-// Real Allbridge source chains (not Paul's mock ETH/BNB/ARB). mark is a 1-letter
-// glyph (chain initial); tint/color are per-chain accents with a neutral fallback.
+// Real Allbridge source chains (not Paul's mock ETH/BNB/ARB). tint/color are
+// per-chain accents with a neutral fallback; `logo` is a bundled brand mark
+// rendered through BrandLogo, with the 1-letter monogram (`mark`) as the safe
+// fallback for any chain we don't ship an SVG for (never a broken image).
+//
+// G1 (Lot G / T3-D3): bundled marks for the chains actually present in
+// /v1/bridge/* — the top 7 by flow volume observed in bridge_flows
+// (BAS, POL, ETH, SOL, ARB, BSC, CEL). Anything else falls back to the
+// monogram, never a broken image. Simplified brand glyphs authored in-house —
+// swap for official brand-kit SVGs later. Sources:
+//   Solana   https://solana.com/branding
+//   Polygon  https://polygon.technology/brand-kit
+//   Base     https://github.com/base-org/brand-kit
+//   Celo     https://celo.org/brand
+//   Ethereum https://ethereum.org/en/assets
+//   BNB      https://www.bnbchain.org/en/brand-guidelines
+//   Arbitrum https://arbitrum.foundation/brandkit
+import solanaLogo from '@/assets/chains/solana.svg'
+import polygonLogo from '@/assets/chains/polygon.svg'
+import baseLogo from '@/assets/chains/base.svg'
+import celoLogo from '@/assets/chains/celo.svg'
+import ethereumLogo from '@/assets/chains/ethereum.svg'
+import bnbLogo from '@/assets/chains/bnb.svg'
+import arbitrumLogo from '@/assets/chains/arbitrum.svg'
+
+const CHAIN_LOGO: Record<string, string> = {
+  SOL: solanaLogo,
+  POL: polygonLogo,
+  BAS: baseLogo,
+  CEL: celoLogo,
+  ETH: ethereumLogo,
+  BSC: bnbLogo,
+  ARB: arbitrumLogo,
+}
 const CHAIN_TINT: Record<string, { tint: string; color: string }> = {
   ETH: { tint: '#1E2340', color: '#8AA0E6' },
   BSC: { tint: '#332B10', color: '#E6B93B' },
@@ -59,9 +91,18 @@ const CHAIN_TINT: Record<string, { tint: string; color: string }> = {
   STX: { tint: '#241A33', color: '#8E7BE0' },
   LIN: { tint: '#222831', color: '#9DB0C7' },
 }
-function chainStyle(chain: string): { mark: string; tint: string; color: string } {
+function chainStyle(chain: string): {
+  mark: string
+  tint: string
+  color: string
+  logo: string | null
+} {
   const s = CHAIN_TINT[chain] ?? { tint: '#242422', color: '#9a9b99' }
-  return { mark: (chain?.[0] ?? '?').toUpperCase(), ...s }
+  return {
+    mark: (chain?.[0] ?? '?').toUpperCase(),
+    logo: CHAIN_LOGO[chain] ?? null,
+    ...s,
+  }
 }
 
 const num = (v: number | null | undefined): number =>
@@ -82,6 +123,7 @@ export interface BridgeRouteRow {
   mark: string
   tint: string
   color: string
+  logo: string | null
   inflowUsd: number
   outflowUsd: number
   netUsd: number
@@ -93,6 +135,7 @@ export interface BridgeFlowRow {
   mark: string
   tint: string
   color: string
+  logo: string | null
   dir: 'in' | 'out'
   asset: string
   amountUsd: number
