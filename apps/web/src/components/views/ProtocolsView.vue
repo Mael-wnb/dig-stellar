@@ -10,8 +10,19 @@ import { venueTheme } from '../../data/venueTheme'
 import { displayPoolName, formatUsd } from '../../utils/format'
 import type { PoolListItem } from '../../types/protocol'
 import BrandLogo from '../common/BrandLogo.vue'
+import PairLogo from '../common/PairLogo.vue'
 
 const { pools, loadingProtocols, error, reload } = useProtocol()
+
+// F5 (Lot F): pair-asset marks for a pool. AMM → both legs; vault → underlying.
+// Symbol/logoUrl come from /v1/pools (F3); an absent logo falls back to the
+// symbol monogram inside BrandLogo.
+function assetMarks(p: PoolListItem): Array<{ primary: string | null; letter: string }> {
+  return (p.tokens ?? []).map((t) => ({
+    primary: t.logoUrl ?? null,
+    letter: (t.symbol || '•').charAt(0).toUpperCase(),
+  }))
+}
 const { openPool } = useView()
 
 function pctRatio(v?: number | null): string {
@@ -147,6 +158,9 @@ const rows = computed(() => {
         venue: p.protocol.name,
         logoUrl: p.protocol.logoUrl ?? null,
         theme: venueTheme(p.protocol.id),
+        // F5: overlapped pair marks for AMM (2 legs) / vault (1 underlying);
+        // lending keeps the single protocol logo below.
+        assets: kind === 'amm' ? assetMarks(p).slice(0, 2) : kind === 'vault' ? assetMarks(p).slice(0, 1) : [],
         tvl: formatUsd(p.metrics.tvlUsd),
         apy: pctRatio(p.metrics.supplyApy),
         // Volume/fees apply to AMMs only; "—" (not $0) elsewhere. A measured 0 on
@@ -254,7 +268,15 @@ function arrow(k: SortKey): string {
               @click="openPool(r.id)"
             >
               <div class="flex items-center gap-[11px] min-w-0">
-                <BrandLogo :primary="r.logoUrl" :fallback="r.theme.logo" :letter="r.theme.letter" :tint="r.theme.tint" :color="r.theme.color" :size="30" :radius="9" :font-size="12" :img-scale="0.62" />
+                <PairLogo
+                  v-if="r.assets.length"
+                  :assets="r.assets"
+                  :size="30"
+                  :radius="9"
+                  :font-size="12"
+                  :img-scale="0.62"
+                />
+                <BrandLogo v-else :primary="r.logoUrl" :fallback="r.theme.logo" :letter="r.theme.letter" :tint="r.theme.tint" :color="r.theme.color" :size="30" :radius="9" :font-size="12" :img-scale="0.62" />
                 <div class="min-w-0">
                   <div class="text-[14px] font-semibold truncate flex items-center gap-[6px]">
                     {{ r.pair }}

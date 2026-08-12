@@ -17,6 +17,7 @@ import { useSharedWallets } from '../../composables/useSharedWallets'
 import { useModals } from '../../composables/useModals'
 import { venueTheme } from '../../data/venueTheme'
 import BrandLogo from '../common/BrandLogo.vue'
+import PairLogo from '../common/PairLogo.vue'
 import {
   displayPoolName,
   displaySymbol,
@@ -61,6 +62,25 @@ function underlyingSymbol(p: PoolDetailData): string | null {
 const pairName = computed(() =>
   pool.value ? displayPoolName(pool.value.name) : '',
 )
+
+// F5 (Lot F): header pair marks. AMM → both legs; vault → underlying (falling
+// back to the symbol parsed from the pool name when tokens aren't served).
+// Lending keeps the single protocol logo (headerAssets stays empty).
+const headerAssets = computed<Array<{ primary: string | null; letter: string }>>(() => {
+  const p = pool.value
+  if (!p) return []
+  const marks = (p.tokens ?? []).map((t) => ({
+    primary: t.logoUrl ?? null,
+    letter: (t.symbol || '•').charAt(0).toUpperCase(),
+  }))
+  if (isAmm.value) return marks.slice(0, 2)
+  if (isVault.value) {
+    if (marks.length) return marks.slice(0, 1)
+    const sym = underlyingSymbol(p)
+    return sym ? [{ primary: null, letter: sym.charAt(0).toUpperCase() }] : []
+  }
+  return []
+})
 
 // ── stat strip (type-variant) ───────────────────────────────────────────────
 const stats = computed(() => {
@@ -399,7 +419,15 @@ function openAction() {
           <!-- Header card -->
           <div class="rounded-[18px] p-[24px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
             <div class="flex items-center gap-[14px] flex-wrap">
-              <BrandLogo :primary="pool.protocol?.logoUrl" :fallback="theme.logo" :letter="theme.letter" :tint="theme.tint" :color="theme.color" :size="46" :radius="13" :font-size="19" :img-scale="0.6" />
+              <PairLogo
+                v-if="headerAssets.length"
+                :assets="headerAssets"
+                :size="46"
+                :radius="13"
+                :font-size="19"
+                :img-scale="0.6"
+              />
+              <BrandLogo v-else :primary="pool.protocol?.logoUrl" :fallback="theme.logo" :letter="theme.letter" :tint="theme.tint" :color="theme.color" :size="46" :radius="13" :font-size="19" :img-scale="0.6" />
               <div class="min-w-0">
                 <div class="text-[22px] font-bold tracking-[-0.02em] truncate">{{ pairName }}</div>
                 <div class="text-[13px]" style="color: var(--dig-faint)">
