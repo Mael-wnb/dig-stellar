@@ -72,6 +72,26 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   path per the recon verdict — honest gaps + "building history since" note). All steps green (web build
   + 49 tests + api build); validators/flags untouched. Captures in `docs/evidence/lot-g/`. Remaining
   T3-D3 unchanged: RPC latency/error metrics endpoints + CI/CD + final demo/reference packaging.
+- T3-D3 note (2026-08-12, evening): **Lot H (second polish pass) landed — code-complete, VPS deploy
+  pending** (indexer + api touched; founder deploys with build + PM2 restart). Traced to the second
+  founder product review. **H0** flows recon: the permanent-$0 "Inflows & outflows" root-caused to
+  amount-less Aquarius liquidity rows + a stale one-day legacy Blend backfill wrongly granting
+  coverage — the Lot C hide rule itself worked (report: `docs/evidence/lot-h/h0-flows-recon.md`).
+  **H1** all modals teleport to `<body>` — the alert modal opened off-viewport (top −130px at
+  1280×720) under a transform-carrying ancestor; every modal verified fully visible at 720p.
+  **H2** dashboard: protocols box half-width + compact "Your positions" panel reusing the F4 state
+  machinery via `compact` props (no forks), the shared wallets/overview store (no new fetch), liquid
+  vs DeFi supplied/borrowed kept distinct, top-3 Blend positions with the shared HF colour rule;
+  stacks below 1100px. **H3** Uniswap-standard swap reskin, presentation-only — custom `TokenSelect`
+  over the SAME asset whitelist; script diff = one import, validators/flags/whitelists 0 lines
+  changed, template binding sets proven identical. **H4** measurable flows coverage: covered = ≥1
+  flow-family event with computable USD, excluding the superseded `28-blend-events-scaled` backfill
+  (Blend hides; no permanent-$0 section anywhere) + Aquarius/Soroswap liquidity-amount extraction
+  (Aquarius shape probe-verified live; upsert repaired in-retention rows) + `coverageSince` honest
+  window copy. All green (web build + 49 tests + api build). Captures in `docs/evidence/lot-h/`.
+  Post-deploy: one-time per-pool Aquarius event backfill (`LEDGER_LOOKBACK=115000
+  MAX_EVENT_PAGES=200`) to capture the full ~7d RPC retention. Remaining T3-D3 unchanged: RPC
+  latency/error metrics endpoints + CI/CD + final demo/reference packaging.
 - Last updated: 2026-08-12
 
 ---
@@ -108,7 +128,7 @@ T1-D3 criteria.
 |---|---|---:|---|---|---|---|
 | D1 — Mainnet Deployment & Freshness Tracking | Done in prod | 95% | High | **Both criteria met, deployed to prod Aug 4 (Lot B).** (1) All 5 named protocols live on real Mainnet data — **DeFindex integrated into the v1 pipeline** (venue + 3 vaults enumerated from `GET /vault/discover`: Meru ≈$18.1M, Beans USDC ≈$507k, Beans EURC ≈$200k; ≈$18.8M aggregate, avg APY ≈7.1%; `protocolCount = 5`; yield-vault detail variant in the UI). (2) Freshness first-class: `isStale` + `staleAfterSeconds` on every `/v1/*` payload (read-time, threshold 45 min = 3× cron), FreshnessChip + stale badges in the UI, standardized exponential-backoff retries on every refresh step. Evidence in `docs/evidence/lot-b/`. Full prod `job:refresh` clean in ~3 min | **Demo capture** for the claim (only non-build item) | Capture the T3-D1 demo (5 protocols + stale drill) |
 | D2 — Non-Custodial Mainnet Actions | Substantially done — swaps live | 60% | Medium | **Mainnet swaps LIVE from the dashboard** (ungated Aug 2): first real executions in both directions (1 XLM→USDC; USDC→XLM `eeeae199…`). Security regime verified in prod: kill-switch (403 by default), server-enforced 100 XLM cap, issuer-verified 5-pair whitelist (XLM↔USDC/EURC/AQUA/yXLM/PYUSD — look-alike "XRP" rejected), client-side pre-sign XDR validation (fail closed), in-wallet signing only. Execution feedback UI with network-aware explorer links. Contract: `docs/security-invariants.md`; evidence: `docs/evidence/mainnet-ungating-2026-08-02.md` + `pair-vetting-2026-08-01.md`. Blend deposit already E2E-proven on **testnet** (`a842f370…`) | **KPIs** (50+ wallets / 200+ txs — window open, needs distribution) + **Lot A2** (Blend deposit mainnet) | KPI push now; A2 brief → implement |
-| D3 — Observability, UI/UX Polish & Reference Handoff | In progress | 45% | Medium | **UI/UX-polish component substantially landed** across Lots C/F/G (design-handoff port → shell + 5 views + modals; advisor-feedback F1–F5; founder-review G0–G4: TVL history + chain logos + clickable tx hashes + adaptive pools table + hero dedupe/compact actions + network-TVL hero chart) — all green (web build + 49 tests + api build), captures in `docs/evidence/lot-{c,f,g}/`. Plus `docker-compose.yml` local-dev stack, `/health` liveness, modular architecture, grown docs corpus | Real RPC latency/error metrics + CI/CD (still manual VPS deploy); packaged SDF reference implementation; final report w/ adoption metrics (depends on T3-D2 KPIs) | Observability (RPC latency/error metrics) + CI/CD, then reference packaging |
+| D3 — Observability, UI/UX Polish & Reference Handoff | In progress | 45% | Medium | **UI/UX-polish component substantially landed** across Lots C/F/G/H (design-handoff port → shell + 5 views + modals; advisor-feedback F1–F5; founder-review G0–G4: TVL history + chain logos + clickable tx hashes + adaptive pools table + hero dedupe/compact actions + network-TVL hero chart; founder-review-2 H0–H4: modal teleport fix, dashboard "Your positions" panel, Uniswap-standard swap reskin, measurable flows coverage + Aquarius/Soroswap liquidity-amount extraction — **H deploy pending**) — all green (web build + 49 tests + api build), captures in `docs/evidence/lot-{c,f,g,h}/`. Plus `docker-compose.yml` local-dev stack, `/health` liveness, modular architecture, grown docs corpus | Real RPC latency/error metrics + CI/CD (still manual VPS deploy); packaged SDF reference implementation; final report w/ adoption metrics (depends on T3-D2 KPIs) | Deploy Lot H (build + PM2 restart + Aquarius event backfill), then observability (RPC latency/error metrics) + CI/CD, then reference packaging |
 
 ---
 

@@ -119,6 +119,43 @@ interpolated) and a "building history since &lt;date&gt;" note while the window 
 (see §2/§3). All steps green (web build + 49 tests + api build); validators/flags untouched. Evidence:
 `docs/evidence/lot-g/`.
 
+**T3-D3 (Lot H — second polish pass) landed on top of Lot G — code-complete, VPS deploy pending
+(indexer + api touched).** Traced to a 2026-08-12 evening founder product review
+(`docs/lot-h-polish-2.md`; evidence `docs/evidence/lot-h/`). **H0** — read-only flows recon
+(`docs/evidence/lot-h/h0-flows-recon.md`): the permanent-$0 "Inflows & outflows" was root-caused to
+(a) Aquarius liquidity rows persisted with NULL amounts (the normalizer only extracted
+trade/update_reserves) and (b) a stale one-day legacy Blend backfill (`28-blend-events-scaled`,
+2026-03-19) wrongly granting coverage — the Lot C hide rule itself worked; 66 of 73 pools hid
+correctly. **H1** — every modal (`AlertRuleModal`, `ActionModal`, `ConnectModal`) now teleports to
+`<body>`: the alerts view wrapper keeps a computed `transform` (digFade, fill-mode both), which made
+it the containing block for the fixed overlay — the "New alert" modal centered in the content column
+instead of the viewport (measured top −130px at 1280×720). All three modals verified fully visible at
+720p; `ConnectModal` gains inner scroll so `max-h-[90vh]` degrades to scrolling, never clipping.
+**H2** — dashboard layout: the protocols box drops to half width (rows unchanged) beside a new
+compact **"Your positions" panel** (`common/YourPositionsPanel.vue`) that reuses the F4 state
+machinery — `compact` props on `EmptyPortfolioState` / `GetStartedCard` (parameterized, not forked),
+the shared `useSharedWallets` store (no new endpoint, no duplicate fetch), the same state predicates
+as `PortfolioView`. Positions state keeps liquid total and DeFi supplied/borrowed DISTINCT (standing
+rule), shows top-3 Blend positions with the shared HF colour rule (extracted to `utils/health.ts`,
+one source of truth with the Portfolio), and links to the Portfolio; the two panels stack below
+1100px. All three states captured with real data. **H3** — the swap widget reskinned to the
+Uniswap-standard layout, **presentation only**: a new `common/TokenSelect.vue` (BrandLogo chip +
+symbol button opening a styled listbox with logo/symbol/name, Esc + click-outside close, drop-up
+when space-constrained, F3-sourced static logos with monogram fallback) replaces the native
+`<select>` — it receives the SAME whitelist array and emits the same asset keys; large amount
+fields, balance + Max line from existing widget state (no new fetches), centered flip button, quote
+rows / mainnet notice / signer guardrail / success / error panels restyled with the F2
+insufficient-balance and F4 failed-atomically copy verbatim. Review gate held: script diff = the
+`TokenSelect` import only; validators + whitelists 0 lines changed; the template's
+`v-if`/`v-model`/`@click`/`:disabled` binding sets mechanically proven identical. Verified live
+inside `ActionModal` (real testnet quote 10 XLM → 17.897 USDC, flip re-quotes). The Blend deposit
+card needed no incidental changes. **H4** — flows made honest end-to-end (see §2/§3): with the new
+predicate Blend + amount-less pools hide, the two Aquarius pools with measurable events render real
+dollars, and the header carries "coverage since &lt;date&gt;" honest-window copy. All steps green
+(web build + 49 tests + api build; one pre-existing legacy `app.controller.spec` failure verified
+failing at HEAD, unrelated). Post-deploy: one-time per-pool Aquarius event backfill
+(`LEDGER_LOOKBACK=115000 MAX_EVENT_PAGES=200`) to capture the full ~7d RPC retention.
+
 Working: real dashboard structure, protocol browsing, pool detail views, wallet connection UX,
 multi-wallet portfolio UX, backend-driven data in the important flows, a public beta on real Mainnet
 data. Display polish landed this session: native token rendered as "XLM" (display-only helpers, DB
@@ -159,6 +196,13 @@ are excluded from `/v1/pools` (and 404 on `/v1/pools/:slug`) so dead pools never
 /v1/network/tvl-series` (G4, Lot G)** serves the hero's 7-day TVL curve — on-read hourly buckets (latest
 snapshot per hour) over up to 7d from the new `network_tvl_snapshots` table (written by the indexer, §3),
 gaps kept as gaps (no interpolation), `meta: { source: 'snapshots', from, to, firstSnapshotAt, partial }`.
+**`GET /v1/pools/:slug/flows` coverage refined (H4, Lot H)**: `covered` now means the pipeline can
+MEASURE flows — ≥1 flow-family event with computable USD (non-null scaled amount on a priced asset),
+excluding the superseded `28-blend-events-scaled` legacy backfill (whose rows carry amounts, so the
+USD test alone would not have hidden Blend); the aggregation applies the same filters, and the
+response adds `coverageSince` (first measurable event day) so the UI dates the window honestly. Net
+effect: Blend + amount-less pools hide the section; pools un-hide organically as measurable liquidity
+events arrive (§3).
 
 Partial / weak: health/operational endpoints incomplete; freshness not yet exposed systematically
 across routes. On `/v1/network/stats`: two fields (`activeWallets`, `dexVolume24hUsd`) come back `null`
@@ -184,7 +228,16 @@ balance snapshot generation; runs on a 15-minute cron on the VPS. **G0 (Lot G)**
 `network_tvl_snapshots` row at the tail of step 7 (`70-protocol-persist-metrics.ts`): `sum(
 protocol_metrics_latest.tvl_usd)` + protocol count, `as_of` truncated to the minute and upserted
 (idempotent per run) — one network-TVL history point per refresh cycle, read by `/v1/network/tvl-series`
-(§2). Additive raw-SQL migration `stellar_v1_network_tvl.sql`; Prisma untouched. Inactive entities (archived Soroban
+(§2). Additive raw-SQL migration `stellar_v1_network_tvl.sql`; Prisma untouched. **H4 (Lot H)**: the
+Aquarius and Soroswap event normalizers now extract liquidity add/remove amounts into
+`normalized_events` — Aquarius `deposit_liquidity`/`withdraw_liquidity` (shape probe-verified against
+live mainnet events: `value = [amount0, amount1, lp_shares]`, single-sided deposits keep an honest 0
+leg) and Soroswap `deposit`/`withdraw` (defensive per the contract's snake_case map convention; none
+existed in RPC retention to verify against). Same idempotent persist — and because it is an upsert on
+`(contract_address, event_id)`, a re-ingest within retention REPAIRS previously amount-less rows (16
+Aquarius rows repaired locally). Amounts are priced downstream via `asset_prices` like the bridge;
+backfill is bounded by Soroban `getEvents` retention (~7 days). Blend event ingestion intentionally
+stays out (state-only adapter; its pool hides the flows section per the H4 predicate, §2). Inactive entities (archived Soroban
 contracts whose on-chain reads 404) are soft-disabled (`is_active=false`) and skipped by the refresh
 instead of aborting the whole job. URL construction for Validation Cloud preserves the `/v1/<key>`
 base path (the `joinUrl` helper) — this fixed a cascading refresh failure earlier this session.
