@@ -1,0 +1,54 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  :root{--dig-surface:#242422;--dig-line:#33332f;--dig-faint:#8a857b;--dig-text:#e2e6e1;
+        --dig-accent:#d5ff2f;--dig-surface-3:#2c2c29}
+  body{margin:0;background:#1c1c1c;font-family:-apple-system,system-ui,sans-serif;padding:26px;color:var(--dig-text)}
+  h1{font-size:14px;margin:0 0 3px}h2{font-size:12px;color:var(--dig-faint);font-weight:600;margin:20px 0 12px}
+  .hero{width:640px;border-radius:18px;padding:24px;background:var(--dig-surface);border:1px solid var(--dig-line)}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:14px}
+  .lbl{font-size:13px;font-weight:500;color:var(--dig-faint)}
+  .chip{font-size:11px;font-weight:600;color:#6fbf7f;background:#1a2a1e;border:1px solid #2a3a2e;padding:3px 9px;border-radius:20px}
+  .tvlrow{display:flex;align-items:flex-end;gap:14px;margin-top:8px}
+  .tvl{font-size:42px;font-weight:700;letter-spacing:-.03em}.tvlsub{font-size:13px;color:var(--dig-faint);margin-bottom:10px}
+  .stats{display:flex;gap:28px;margin-top:20px}
+  .s .k{font-size:12px;color:var(--dig-faint)}.s .v{font-size:17px;font-weight:600;margin-top:3px}.s .d{font-size:12px;font-weight:600;color:#5fbf7f}
+  .btns{display:flex;gap:10px;margin-top:20px}
+  .btn{height:38px;padding:0 16px;border-radius:11px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;cursor:pointer;border:none}
+  .prim{background:var(--dig-accent);color:#141414}.ghost{background:var(--dig-surface-3);border:1px solid var(--dig-line);color:var(--dig-text)}
+  .slot{margin-top:18px;height:70px;border:1px dashed #3a3a36;border-radius:12px;display:flex;align-items:center;justify-content:center;
+        font-size:11px;color:#6e6a62}
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;width:640px;margin-top:12px}
+  .tile{border-radius:14px;padding:14px 16px;background:var(--dig-surface);border:1px solid var(--dig-line)}
+  .tile .k{font-size:11px;color:var(--dig-faint)}.tile .v{font-size:20px;font-weight:700;margin-top:5px}.tile .d{font-size:11px;color:var(--dig-faint);margin-top:3px}
+  .note{font-size:11px;color:#6e6a62;margin-top:6px}
+</style></head><body>
+  <h1>G2 — Hero dedupe + inline actions section → compact Swap/Deposit</h1>
+
+  <h2>BEFORE — hero repeats XLM price / Stablecoin MCap / Protocols (also in the tiles)</h2>
+  <div class="hero">
+    <div class="top"><span class="lbl">Stellar DeFi · network</span><span class="chip">● fresh · 2m ago</span></div>
+    <div class="tvlrow"><span class="tvl">$231.6M</span><span class="tvlsub">total TVL</span></div>
+    <div class="stats">
+      <div class="s"><div class="k">XLM price</div><div class="v">$0.1180</div><div class="d">+1.24%</div></div>
+      <div class="s"><div class="k">Stablecoin MCap</div><div class="v">$412.0M</div></div>
+      <div class="s"><div class="k">Protocols</div><div class="v">5</div></div>
+    </div>
+  </div>
+
+  <h2>AFTER — hero keeps TVL + freshness + (G4 chart slot); dup stats dropped; compact actions added</h2>
+  <div class="hero">
+    <div class="top"><span class="lbl">Stellar DeFi · network</span><span class="chip">● fresh · 2m ago</span></div>
+    <div class="tvlrow"><span class="tvl">$231.6M</span><span class="tvlsub">total TVL</span></div>
+    <div class="btns">
+      <button class="btn prim"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10h14l-4-4"/><path d="M17 14H3l4 4"/></svg>Swap</button>
+      <button class="btn ghost"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 21h16"/></svg>Deposit</button>
+    </div>
+    <div class="slot">G4 chart slot — network TVL 7d curve renders here</div>
+  </div>
+  <div class="tiles">
+    <div class="tile"><div class="k">XLM price</div><div class="v">$0.1180</div><div class="d" style="color:#5fbf7f">+1.24%</div></div>
+    <div class="tile"><div class="k">Stablecoin MCap</div><div class="v">$412.0M</div><div class="d">live</div></div>
+    <div class="tile"><div class="k">USDC supply</div><div class="v">$180.2M</div><div class="d">live</div></div>
+    <div class="tile"><div class="k">Protocols tracked</div><div class="v">5</div><div class="d">venues</div></div>
+  </div>
+  <div class="note">↑ the four tiles already carry XLM price / Stablecoin MCap / Protocols — the hero no longer duplicates them.</div>
+</body></html>

@@ -87,8 +87,9 @@ const activeTab = ref('primary')
           </div>
           <!-- The swap is gated per-network; expose the network selector here so
                the widget's "switch to Testnet" instruction is actionable from
-               the modal (the only other toggle lives on the dashboard). Signing
-               scope only — does not change the Mainnet portfolio/data plane. -->
+               the modal. Since G2 removed the dashboard's inline actions section,
+               this is the network toggle for the action flow. Signing scope only
+               — does not change the Mainnet portfolio/data plane. -->
           <NetworkToggle />
         </div>
         <BlendDepositCard v-if="ctx.kind === 'lending'" />

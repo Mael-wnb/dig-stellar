@@ -4,13 +4,15 @@
 //  • hero + stat strip from /v1/network/stats (with Lot B freshness),
 //  • protocol totals (aggregated from /v1/pools),
 //  • alerts summary (real notifications),
-//  • the Testnet/Mainnet actions section — behaviour + flags regime UNCHANGED,
+//  • a compact Swap/Deposit entry point → the shared ActionModal (G2, Lot G),
 //  • the bridge section (existing useBridge data), restyled.
+// G2 removed the inline Testnet/Mainnet actions section; the actions themselves
+// (SdexSwapWidget / BlendDepositCard) are unchanged and now reached only through
+// ActionModal, which self-gates + hosts the NetworkToggle. Flags regime untouched.
 import { computed, onMounted } from 'vue'
 import { useNetworkStats } from '../../composables/useNetworkStats'
 import { useProtocol } from '../../composables/useProtocol'
 import { useNotifications } from '../../composables/useNotifications'
-import { useNetwork } from '../../composables/useNetwork'
 import { useBridge } from '../../composables/useBridge'
 import { useView } from '../../composables/useView'
 import { useModals } from '../../composables/useModals'
@@ -19,13 +21,20 @@ import BrandLogo from '../common/BrandLogo.vue'
 import { formatUsd, formatPct, relativeTime } from '../../utils/format'
 
 import FreshnessChip from '../FreshnessChip.vue'
-import NetworkToggle from '../NetworkToggle.vue'
-import SdexSwapWidget from '../SdexSwapWidget.vue'
-import BlendDepositCard from '../BlendDepositCard.vue'
 import BridgeSection from '../bridge/BridgeSection.vue'
 
 const { setView, openPool } = useView()
-const { requestAlert } = useModals()
+const { requestAlert, openAction } = useModals()
+
+// Compact dashboard entry points → the shared ActionModal (same ctx shape the
+// get-started card uses). The modal renders the real, self-gated widgets and
+// owns the NetworkToggle; a swap is one click from here.
+function openSwap() {
+  openAction({ slug: 'sdex-swap', name: 'Swap XLM ↔ USDC', venue: 'Stellar DEX', kind: 'amm' })
+}
+function openDeposit() {
+  openAction({ slug: 'blend', name: 'Blend pool', venue: 'Blend', kind: 'lending' })
+}
 
 // Create-alert modal lives on the alerts view (owns the create logic) — request
 // it, then navigate.
@@ -84,12 +93,6 @@ const protocolRows = computed(() => {
 // ── alerts summary (real notifications) ──────────────────────────────────────
 const recentAlerts = computed(() => notifications.value.slice(0, 3))
 
-// ── actions section (flags regime UNCHANGED — copied verbatim) ───────────────
-const { network } = useNetwork()
-const MAINNET_ACTIONS_ENABLED = import.meta.env.VITE_ACTIONS_MAINNET_ENABLED === 'true'
-const actionsLive = computed(() => network.value === 'testnet' || MAINNET_ACTIONS_ENABLED)
-const isMainnetLive = computed(() => network.value === 'mainnet' && MAINNET_ACTIONS_ENABLED)
-
 // ── bridge (existing data) ───────────────────────────────────────────────────
 const {
   window: bridgeWindow,
@@ -125,21 +128,25 @@ const {
           <div class="text-[42px] font-bold tracking-[-0.03em] tabular-nums">{{ heroTvl }}</div>
           <div class="text-[13px] mb-[10px]" style="color: var(--dig-faint)">total TVL</div>
         </div>
-        <div class="flex gap-[28px] mt-[20px]">
-          <div>
-            <div class="text-[12px]" style="color: var(--dig-faint)">XLM price</div>
-            <div class="text-[17px] font-semibold mt-[3px] tabular-nums">{{ netRaw.xlmPriceUsd !== null ? `$${netRaw.xlmPriceUsd.toFixed(4)}` : '—' }}</div>
-            <div class="text-[12px] font-semibold" :style="{ color: xlmChangeColor }">{{ xlmChange }}</div>
-          </div>
-          <div>
-            <div class="text-[12px]" style="color: var(--dig-faint)">Stablecoin MCap</div>
-            <div class="text-[17px] font-semibold mt-[3px] tabular-nums">{{ formatUsd(netRaw.stableMcapUsd) }}</div>
-          </div>
-          <div>
-            <div class="text-[12px]" style="color: var(--dig-faint)">Protocols</div>
-            <div class="text-[17px] font-semibold mt-[3px] tabular-nums">{{ netRaw.protocolCount ?? '—' }}</div>
-          </div>
+
+        <!-- G2: the inline Testnet/Mainnet actions section was removed; a swap is
+             one click from here via the shared ActionModal (self-gated widgets +
+             own NetworkToggle). The XLM price / Stablecoin MCap / Protocols stats
+             that used to sit here are dropped — the four tiles below already show
+             them. -->
+        <div class="flex items-center gap-[10px] mt-[20px]">
+          <button type="button" class="dig-btn h-[38px] px-[16px] rounded-[11px] text-[13px] font-semibold cursor-pointer flex items-center gap-[7px]" style="background: var(--dig-accent); color: #141414; border: none" @click="openSwap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10h14l-4-4"/><path d="M17 14H3l4 4"/></svg>
+            Swap
+          </button>
+          <button type="button" class="dig-ghost h-[38px] px-[16px] rounded-[11px] text-[13px] font-semibold cursor-pointer flex items-center gap-[7px]" style="background: var(--dig-surface-3); border: 1px solid var(--dig-line); color: var(--dig-text)" @click="openDeposit">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 21h16"/></svg>
+            Deposit
+          </button>
         </div>
+
+        <!-- G4 chart slot — the network-TVL 7d curve (from network_tvl_snapshots)
+             renders here; see docs/lot-g-dashboard-polish.md. -->
       </div>
 
       <div class="rounded-[18px] p-[22px] flex flex-col" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
@@ -216,24 +223,6 @@ const {
           <div class="text-[12px]" style="color: var(--dig-faint)">TVL</div>
         </div>
       </button>
-    </div>
-
-    <!-- Actions section — flags regime + testnet/mainnet behaviour UNCHANGED -->
-    <div class="rounded-[18px] p-[22px] flex flex-col gap-[14px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
-      <div class="flex items-center justify-between gap-[12px] flex-wrap">
-        <div class="flex flex-col">
-          <span class="text-[14px] font-semibold">{{ isMainnetLive ? 'Mainnet actions' : 'Testnet actions' }}</span>
-          <span class="text-[12px]" style="color: var(--dig-faint)">Non-custodial transaction builder — the network selector applies to signing only</span>
-        </div>
-        <NetworkToggle />
-      </div>
-      <template v-if="actionsLive">
-        <SdexSwapWidget />
-        <BlendDepositCard />
-      </template>
-      <div v-else class="rounded-[12px] p-[14px] text-[12px]" style="background: var(--dig-surface-2); border: 1px solid rgba(213,255,47,0.25); color: var(--dig-muted)">
-        Switch the selector to <span class="font-semibold" style="color: var(--dig-accent)">Testnet</span> to access the swap builder. Your portfolio stays on Mainnet.
-      </div>
     </div>
 
     <!-- Bridge -->
