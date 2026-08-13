@@ -520,7 +520,9 @@ Near-term: this shape is fine for the beta and the Tranche 2 claim. CI/CD and ob
 7. Architectural separation (web / api / indexer)
 
 ## 11. Most fragile right now
-1. Freshness/stale/retry operationalization + observability (T3)
+1. Freshness/stale/retry operationalization + observability (T3) — *narrowed 2026-08-13 by Lot E
+   E1+E2 (enriched `/health`, `rpc_metrics_runs`/`refresh_step_runs`, `GET /v1/ops/metrics`),
+   local-proven; VPS deploy + `stellar_v1_ops_metrics.sql` apply pending*
 2. Deployment maturity / CI-CD (T3)
 3. Transaction builder breadth: SDEX swap + Blend testnet deposit both proven on-chain from the UI
    (deposit tx `a842f370…`); mainnet execution remains T3-D2

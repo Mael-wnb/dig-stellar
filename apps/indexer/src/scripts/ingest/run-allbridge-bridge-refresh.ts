@@ -1,4 +1,7 @@
 // apps/indexer/src/scripts/ingest/run-allbridge-bridge-refresh.ts
+// E2 (Lot E): install RPC latency/error capture BEFORE any HTTP-touching import.
+import '../../lib/ops-capture';
+
 import 'dotenv/config';
 
 import { saveJson } from '../discovery/00-common';

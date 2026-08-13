@@ -25,7 +25,9 @@ psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1.sql
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_metrics.sql
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_bridge.sql   # Allbridge bridge flows (T2-D3)
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v2_multiwallet.sql   # incl. T2-D1 is_active_signer column + singleton index, + Gap B wallet_pool_health table
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v3_alerting.sql   # D2 alerting (apply AFTER v1 + v2): alert_rules, alert_rule_state, notifications
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_network_tvl.sql   # G0 (T3-D3): network_tvl_snapshots — one TVL point per refresh cycle
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_ops_metrics.sql   # E2 (Lot E — T3-D3): rpc_metrics_runs + refresh_step_runs
 # Allbridge needs its venue + USDC asset seeded once before the first refresh:
 pnpm -C apps/indexer tsx src/scripts/bootstrap/allbridge-upsert-core.ts
 ```

@@ -1,4 +1,7 @@
 // apps/indexer/src/scripts/ingest/62-price-reference-assets.ts
+// E2 (Lot E): install RPC latency/error capture BEFORE any HTTP-touching import.
+import '../../lib/ops-capture';
+
 import { nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
 import { inferStablePrice } from '../shared/pricing';

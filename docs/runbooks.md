@@ -43,6 +43,13 @@ pnpm -C apps/api build        # nest build
 ```
 Restart `start:dev` after changing a service/module so the new code is loaded.
 
+**Version stamp (E1 — Lot E).** `GET /health` reports `version` from the `GIT_SHA` env var.
+On the VPS, export it when (re)starting the API after a deploy so the running version is visible:
+```bash
+export GIT_SHA=$(git rev-parse --short HEAD)   # then: pm2 restart api --update-env
+```
+Unset, `/health` reports `"version": "unknown"` — that means the deploy procedure was skipped.
+
 ### Run indexer scripts (`apps/indexer`)
 Runner is `tsx` (no build step).
 ```bash
@@ -145,11 +152,13 @@ psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stella
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v2_multiwallet.sql
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v3_alerting.sql   # D2 alerting: alert_rules, alert_rule_state, notifications (depends on v1 entities + v2 user_wallets)
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_network_tvl.sql   # G0 (T3-D3): network_tvl_snapshots — one TVL point per refresh cycle (written at tail of step 7)
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_ops_metrics.sql   # E2 (Lot E — T3-D3): rpc_metrics_runs + refresh_step_runs — written at end of each job:refresh
 ```
 Manually-applied schemas (local AND VPS): `stellar_v1.sql`, `stellar_v1_metrics.sql`,
 `stellar_v1_bridge.sql` (Allbridge bridge flows — T2-D3), `stellar_v2_multiwallet.sql`,
 `stellar_v3_alerting.sql` (D2 alerting — must be applied AFTER v1 + v2),
-`stellar_v1_network_tvl.sql` (G0 network-TVL history — T3-D3).
+`stellar_v1_network_tvl.sql` (G0 network-TVL history — T3-D3),
+`stellar_v1_ops_metrics.sql` (E2 ops observability — T3-D3).
 Note: when a new table **or column** is added to one of these files (e.g. `network_stats_latest`
 in `stellar_v1_metrics.sql`, `bridge_flows` in `stellar_v1_bridge.sql`, or the T2-D1
 `is_active_signer` column + `user_wallets_one_signer_per_user` index, or the T2-D1 Gap B
@@ -177,6 +186,30 @@ psql "postgresql://dig:dig@localhost:5432/dig_stellar" \
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -c "select * from user_wallets;"
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" \
   -c "select user_wallet_id, asset_symbol, balance_usd, snapshot_at from wallet_balance_snapshots order by snapshot_at desc limit 20;"
+```
+
+---
+
+## Ops endpoints (Lot E — T3-D3)
+
+Public read-only observability — no auth, and they must never leak secrets, env values or
+internal URLs (targets/steps are fixed internal labels; `version` is the short GIT_SHA only).
+
+- `GET /health` — enriched liveness: `status` (`ok` | `degraded`), `version` (GIT_SHA),
+  `uptimeSeconds`, `db.ok`/`db.latencyMs`, per-venue `freshness` (same 45-min read-time rule as
+  the product reads), `lastRefreshAt` (max `as_of` in `network_tvl_snapshots`). Always HTTP 200
+  with a readable `status` — `degraded` when the DB errors or any venue is stale; HTTP 503 only
+  when the DB itself is unreachable.
+- `GET /v1/ops/metrics` — refresh-pipeline RPC latency + error rates over a 24h window, from
+  `rpc_metrics_runs` / `refresh_step_runs` (written by 71 at end of each `job:refresh`).
+  Error rate is aggregated (`sum(errors)/sum(calls)` — sound to aggregate); latency percentiles
+  are strictly per-run (never averaged). Known boundary: captures the INDEXER's outbound calls;
+  the API process's own Horizon calls (actions preflight) are not captured.
+
+```bash
+# Incident history — one query instead of grepping cron logs (E2):
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" \
+  -c "select run_at, step, status, duration_ms, left(message, 80) from refresh_step_runs where status = 'FAILED' order by run_at desc limit 20;"
 ```
 
 ---

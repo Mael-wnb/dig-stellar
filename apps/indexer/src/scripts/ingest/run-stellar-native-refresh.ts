@@ -1,3 +1,6 @@
+// E2 (Lot E): install RPC latency/error capture BEFORE any HTTP-touching import.
+import '../../lib/ops-capture';
+
 import "dotenv/config";
 
 import { createPgClient } from "../shared/db";

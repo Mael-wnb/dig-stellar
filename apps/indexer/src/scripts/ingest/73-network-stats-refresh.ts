@@ -10,6 +10,9 @@
 // never breaks the others. This whole script is also run NON-FATALLY by
 // 71-refresh-all-metrics.ts.
 
+// E2 (Lot E): install RPC latency/error capture BEFORE any HTTP-touching import.
+import '../../lib/ops-capture';
+
 import { nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
 

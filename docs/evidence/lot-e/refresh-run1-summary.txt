@@ -1,0 +1,17 @@
+=== Refresh step summary ===
+step 1 prices:reference: SUCCESS in 0.9s
+step 2 prices:soroswap-derived: SUCCESS in 1.0s
+step 3 blend: SUCCESS in 8.8s
+step 4 soroswap: SUCCESS in 5.0s
+step 5 aquarius: SUCCESS in 41.8s
+step 6 stellar-native: SUCCESS in 267.1s
+step 7 defindex: SUCCESS in 4.8s
+step 8 protocol-metrics: SUCCESS in 0.5s
+step 9 allbridge: SUCCESS in 1.1s
+step 10 network-stats: SUCCESS in 1.3s
+
+All steps succeeded (10 total)
+Total job duration: 332.2s
+
+=== Refresh completed successfully ===
+=== Global refresh job completed successfully ===

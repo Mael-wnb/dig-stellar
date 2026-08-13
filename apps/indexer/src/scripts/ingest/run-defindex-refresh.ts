@@ -4,6 +4,9 @@
 // env (ENTITY_SLUG + DEFINDEX_VAULT_ADDRESS), mirroring run-blend-pool-refresh /
 // run-aquarius-pool-refresh. Called once per active `defindex` entity by
 // 71-refresh-all-metrics.ts. NOT the legacy src/run-defindex.ts (Prisma).
+// E2 (Lot E): install RPC latency/error capture BEFORE any HTTP-touching import.
+import '../../lib/ops-capture';
+
 import 'dotenv/config';
 
 import { DefindexSDK } from '@defindex/sdk';

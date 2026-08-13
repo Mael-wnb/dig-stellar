@@ -1,0 +1,20 @@
+=== Refresh step summary ===
+step 1 prices:reference: SUCCESS in 0.8s
+step 2 prices:soroswap-derived: SUCCESS in 0.9s
+step 3 blend: FAILED (4/4 failed — blend-etherfuse-pool: Command failed (1): pnpm tsx src/scripts/ingest/run-blend-pool-refresh.ts; blend-fixed-pool: Command failed (1): pnpm tsx src/scripts/ingest/run-blend-pool-refresh.ts; blend-orbit-pool: Command failed (1): pnpm tsx src/scripts/ingest/run-blend-pool-refresh.ts; blend-yieldblox-pool: Command failed (1): pnpm tsx src/scripts/ingest/run-blend-pool-refresh.ts) in 119.5s
+step 4 soroswap: FAILED (2/2 failed — soroswap-native-eurc-pair: Command failed (1): pnpm tsx src/scripts/ingest/run-soroswap-pair-refresh.ts; soroswap-native-usdc-pair: Command failed (1): pnpm tsx src/scripts/ingest/run-soroswap-pair-refresh.ts) in 63.0s
+step 5 aquarius: FAILED (4/4 failed — aquarius-native-solvbtc-pool: Command failed (1): pnpm tsx src/scripts/ingest/run-aquarius-pool-refresh.ts; aquarius-native-usdc-pool: Command failed (1): pnpm tsx src/scripts/ingest/run-aquarius-pool-refresh.ts; aquarius-pyusd-usdc-pool: Command failed (1): pnpm tsx src/scripts/ingest/run-aquarius-pool-refresh.ts; aquarius-xsolvbtc-solvbtc-pool: Command failed (1): pnpm tsx src/scripts/ingest/run-aquarius-pool-refresh.ts) in 146.4s
+step 6 stellar-native: SUCCESS in 274.7s
+step 7 defindex: SUCCESS in 5.3s
+step 8 protocol-metrics: SUCCESS in 0.5s
+step 9 allbridge: FAILED (Command failed (1): pnpm tsx src/scripts/ingest/run-allbridge-bridge-refresh.ts) in 29.8s
+step 10 network-stats: SUCCESS in 1.1s
+
+4 step(s) FAILED (10 total)
+Total job duration: 642.2s
+
+=== Refresh completed WITH FAILURES ===
+Error: Command failed with exit code 1: pnpm tsx src/scripts/ingest/71-refresh-all-metrics.ts
+    at ChildProcess.<anonymous> (/Users/maelhenry/Documents/Eon/Dig/dig-stellar/apps/indexer/src/scripts/ingest/72-run-refresh-job.ts:29:9)
+    at ChildProcess.emit (node:events:524:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:293:12)

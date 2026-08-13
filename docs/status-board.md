@@ -92,7 +92,20 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   Post-deploy: one-time per-pool Aquarius event backfill (`LEDGER_LOOKBACK=115000
   MAX_EVENT_PAGES=200`) to capture the full ~7d RPC retention. Remaining T3-D3 unchanged: RPC
   latency/error metrics endpoints + CI/CD + final demo/reference packaging.
-- Last updated: 2026-08-12
+- T3-D3 note (2026-08-13): **Lot E E1+E2 landed (observability) — local-proven, VPS deploy pending.**
+  **E1** enriched `GET /health`: `status` ok|degraded, `version` (GIT_SHA env, runbook updated),
+  db latency, per-venue freshness (shared 45-min rule), `lastRefreshAt`; always HTTP 200 with a
+  readable status (503 only if DB unreachable); degraded state proven by aging a row. **E2** RPC
+  latency percentiles + error rates (the verbatim grant criterion): capture at the two real choke
+  points (global `fetch` + the shared axios copy used by stellar-sdk/blend-sdk/defindex-sdk),
+  per-run per-target rows in `rpc_metrics_runs` + queryable step outcomes in `refresh_step_runs`
+  (new `stellar_v1_ops_metrics.sql`, applied local; **apply on VPS at deploy**), served by
+  `GET /v1/ops/metrics` (24h window; error rate aggregated, percentiles strictly per-run). Proven
+  with 2 real refresh runs + 1 forced-failure run (bogus RPC: errors counted, FAILED steps queryable).
+  Known boundary: indexer calls only (API-side Horizon preflight not captured). Evidence:
+  `docs/evidence/lot-e/`. Remaining T3-D3: E3 adoption counters + E4 reference packaging (+ optional
+  CI bonus) + final demo.
+- Last updated: 2026-08-13
 
 ---
 

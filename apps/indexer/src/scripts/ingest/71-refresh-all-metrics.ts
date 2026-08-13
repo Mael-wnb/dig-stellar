@@ -1,7 +1,14 @@
 // apps/indexer/src/scripts/ingest/71-refresh-all-metrics.ts
 
+import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs';
+import path from 'node:path';
 import { createPgClient } from '../shared/db';
 import { runTsxWithRetry } from '../shared/retry';
+import {
+  parseSamplesFile,
+  summarizeOpsSamples,
+  type OpsSample,
+} from '../../lib/ops-metrics';
 
 type PgClient = ReturnType<typeof createPgClient>;
 
@@ -156,6 +163,57 @@ function printSummary(totalMs: number): boolean {
   return failed.length === 0;
 }
 
+// ── E2 (Lot E) — persist ops observability ───────────────────────────────────
+// The step scripts (spawned processes) each capture their external-call samples
+// via lib/ops-metrics and flush them as JSON lines to OPS_METRICS_FILE on exit.
+// At end of run we merge that file into per-target percentile rows
+// (rpc_metrics_runs) and persist the step summary we already print
+// (refresh_step_runs). Non-fatal: observability must never fail the refresh.
+async function persistOpsObservability(
+  client: PgClient,
+  runAt: Date,
+  opsFile: string
+): Promise<void> {
+  try {
+    let fileSamples: OpsSample[] = [];
+
+    if (existsSync(opsFile)) {
+      fileSamples = parseSamplesFile(readFileSync(opsFile, 'utf-8'));
+      unlinkSync(opsFile);
+    }
+
+    const summaries = summarizeOpsSamples(fileSamples);
+
+    for (const s of summaries) {
+      await client.query(
+        `
+        insert into rpc_metrics_runs (run_at, target, calls, errors, p50_ms, p95_ms, p99_ms)
+        values ($1, $2, $3, $4, $5, $6, $7)
+        on conflict (run_at, target) do nothing
+        `,
+        [runAt, s.target, s.calls, s.errors, s.p50Ms, s.p95Ms, s.p99Ms]
+      );
+    }
+
+    for (const step of stepResults) {
+      await client.query(
+        `
+        insert into refresh_step_runs (run_at, step, status, duration_ms, message)
+        values ($1, $2, $3, $4, $5)
+        on conflict (run_at, step) do nothing
+        `,
+        [runAt, step.name, step.status, step.durationMs, step.message ?? null]
+      );
+    }
+
+    console.log(
+      `\n[ops] persisted ${summaries.length} rpc target summary(ies) + ${stepResults.length} step outcome(s) for run_at=${runAt.toISOString()}`
+    );
+  } catch (error) {
+    console.error(`[ops] persist failed (non-fatal): ${toMessage(error)}`);
+  }
+}
+
 async function getPoolsByVenue(
   client: PgClient,
   venueSlug: string,
@@ -202,7 +260,14 @@ async function getPoolsByVenue(
 
 async function main(): Promise<boolean> {
   const jobStart = Date.now();
+  const runAt = new Date(jobStart);
   const client = createPgClient();
+
+  // E2 (Lot E): every spawned step inherits OPS_METRICS_FILE (retry.ts merges
+  // process.env into the child env) and appends its call samples there on exit.
+  const opsFile = path.resolve(process.cwd(), 'tmp', `ops-metrics-${jobStart}.jsonl`);
+  mkdirSync(path.dirname(opsFile), { recursive: true });
+  process.env.OPS_METRICS_FILE = opsFile;
 
   await client.connect();
 
@@ -325,6 +390,10 @@ async function main(): Promise<boolean> {
     await track('network-stats', () =>
       runStep('network-stats', 'src/scripts/ingest/73-network-stats-refresh.ts')
     );
+
+    console.log('\n=== 10. Persist ops observability (E2) ===');
+
+    await persistOpsObservability(client, runAt, opsFile);
   } finally {
     await client.end();
   }
