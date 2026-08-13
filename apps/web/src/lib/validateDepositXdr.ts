@@ -1,6 +1,6 @@
 // apps/web/src/lib/validateDepositXdr.ts
 //
-// Strict client-side validation of the Blend deposit XDRs the API returns, checked
+// Strict client-side validation of the Blend deposit AND withdraw XDRs the API returns, checked
 // against an intent DERIVED FROM USER INPUT + client-side config (config/blendPools.ts),
 // never from the API response. This is the Soroban-path equivalent of validateSwapXdr:
 // the security gate that must pass BEFORE the wallet is asked to sign, so the tx we hand
@@ -37,16 +37,30 @@ const RECOGNIZED_NETWORKS: readonly string[] = [Networks.TESTNET, Networks.PUBLI
 /**
  * Blend `submit` RequestType for supplying collateral. Verified against the
  * @blend-capital/blend-sdk source (pool enum: Supply=0, Withdraw=1,
- * SupplyCollateral=2, …). A deposit is ALWAYS SupplyCollateral; any other request
- * type on a "deposit" is an injection.
+ * SupplyCollateral=2, WithdrawCollateral=3, Borrow=4, Repay=5, …). A deposit is
+ * ALWAYS SupplyCollateral; any other request type on a "deposit" is an injection.
  */
 export const SUPPLY_COLLATERAL = 2;
 
 /**
- * Fee ceiling for the Soroban deposit (in stroops) on the TOTAL fee. Soroban fees
- * include the resource fee (observed ≈0.06 XLM for this deposit), so the cap is a
- * generous 2 XLM (20,000,000 stroops) — ample headroom while still catching a
- * corrupted or malicious fee field before it can burn XLM at signing.
+ * Blend `submit` RequestType for withdrawing supplied collateral — read from the
+ * SAME @blend-capital/blend-sdk enum source, never from memory. A withdraw is
+ * ALWAYS WithdrawCollateral.
+ *
+ * The two constants are what make the two gates mutually exclusive: a
+ * SupplyCollateral envelope can never pass the withdraw gate, and a
+ * WithdrawCollateral envelope can never pass the deposit gate. Note in particular
+ * that WithdrawCollateral (3) is NOT Withdraw (1) — Withdraw unwinds a
+ * non-collateral supply, which this app never creates, so it is rejected too.
+ */
+export const WITHDRAW_COLLATERAL = 3;
+
+/**
+ * Fee ceiling for a Soroban Blend `submit` (in stroops) on the TOTAL fee. Soroban
+ * fees include the resource fee (observed ≈0.06 XLM for the deposit; the withdraw
+ * is the same order of magnitude), so the cap is a generous 2 XLM (20,000,000
+ * stroops) — ample headroom while still catching a corrupted or malicious fee field
+ * before it can burn XLM at signing.
  */
 const MAX_DEPOSIT_FEE_STROOPS = 20_000_000n;
 
@@ -60,21 +74,31 @@ export type ValidationResult =
   | { ok: true }
   | { ok: false; violations: string[] };
 
-/** The user's intent for a Blend deposit, from user input + client-side config. */
-export type DepositIntent = {
+/**
+ * The user's intent for a Blend `submit` action (deposit or withdraw), from user
+ * input + client-side config. The two actions differ ONLY in the request type they
+ * pin, which is why they share this shape and the validator below.
+ */
+export type BlendSubmitIntent = {
   /** The user's own public key. Source, `from`, `spender`, and `to` must all equal this. */
   sourceAccount: string;
   /** Expected Blend pool contract id (from config/blendPools.ts — never the API). */
   poolId: string;
   /** Expected reserve SAC (Soroban asset contract) for the chosen asset. */
   assetSac: string;
-  /** Exact amount deposited, as the user entered it (decimal string). */
+  /** Exact amount moved, as the user entered it (decimal string). */
   amount: string;
   /** Decimals of the chosen asset (7 on Stellar) — how `amount` scales to i128. */
   decimals: number;
   /** The network passphrase the user believes they are on (and will sign with). */
   networkPassphrase: string;
 };
+
+/** The user's intent for a Blend deposit (SupplyCollateral). */
+export type DepositIntent = BlendSubmitIntent;
+
+/** The user's intent for a Blend withdraw of supplied collateral (WithdrawCollateral). */
+export type WithdrawIntent = BlendSubmitIntent;
 
 /** The user's intent for the classic USDC trustline that precedes a first USDC deposit. */
 export type TrustlineIntent = {
@@ -160,12 +184,22 @@ function decodeAndPreflight(
 }
 
 /**
- * Validates that `xdr` is exactly the Blend deposit described by `intent`: a single
- * Soroban invokeHostFunction calling `submit` on the expected pool, supplying the
- * expected asset SAC as collateral, for the exact amount, entirely on the user's own
- * account. Collects ALL violations; only unrecoverable failures stop inspection.
+ * Validates that `xdr` is exactly the Blend `submit` described by `intent`: a single
+ * Soroban invokeHostFunction calling `submit` on the expected pool, carrying exactly
+ * ONE request of exactly `expectedRequestType` against the expected asset SAC for the
+ * exact amount, entirely on the user's own account. Collects ALL violations; only
+ * unrecoverable failures stop inspection.
+ *
+ * `expectedRequestType` is the ONLY difference between the deposit and withdraw gates
+ * — pinning it is what stops either from ever accepting the other's transaction (let
+ * alone a Borrow or a Repay smuggled in under the same function name).
  */
-export function validateDepositXdr(xdr: string, intent: DepositIntent): ValidationResult {
+function validateSubmitXdr(
+  xdr: string,
+  intent: BlendSubmitIntent,
+  expectedRequestType: number,
+  requestTypeLabel: string,
+): ValidationResult {
   const violations: string[] = [];
 
   const tx = decodeAndPreflight(
@@ -190,7 +224,7 @@ export function validateDepositXdr(xdr: string, intent: DepositIntent): Validati
     return { ok: false, violations };
   }
 
-  // The deposit must be the SOLE op — Soroban forbids mixing other ops with an
+  // The invocation must be the SOLE op — Soroban forbids mixing other ops with an
   // invokeHostFunction anyway, and a hidden extra op would be an injection.
   if (ops.length !== 1) {
     violations.push(`expected exactly 1 operation, found ${ops.length}`);
@@ -204,7 +238,7 @@ export function validateDepositXdr(xdr: string, intent: DepositIntent): Validati
   }
 
   // Decode the contract call. A non-invokeContract host function (upload/create) is
-  // never a deposit.
+  // never a pool action.
   let contractId: string;
   let fnName: string;
   let args: xdr.ScVal[];
@@ -263,8 +297,8 @@ export function validateDepositXdr(xdr: string, intent: DepositIntent): Validati
     }
   }
 
-  // Exactly one request, and it must be the expected SupplyCollateral of the expected
-  // SAC for the exact amount.
+  // Exactly one request, and it must be the expected request type against the
+  // expected SAC for the exact amount.
   if (!Array.isArray(requests)) {
     violations.push("submit requests is not a list");
     return { ok: false, violations };
@@ -281,9 +315,9 @@ export function validateDepositXdr(xdr: string, intent: DepositIntent): Validati
     return { ok: false, violations };
   }
 
-  if (Number(req.request_type) !== SUPPLY_COLLATERAL) {
+  if (Number(req.request_type) !== expectedRequestType) {
     violations.push(
-      `request_type mismatch: expected SupplyCollateral (${SUPPLY_COLLATERAL}), got ${String(req.request_type)}`,
+      `request_type mismatch: expected ${requestTypeLabel} (${expectedRequestType}), got ${String(req.request_type)}`,
     );
   }
 
@@ -311,6 +345,37 @@ export function validateDepositXdr(xdr: string, intent: DepositIntent): Validati
   }
 
   return violations.length === 0 ? { ok: true } : { ok: false, violations };
+}
+
+/**
+ * Validates that `xdr` is exactly the Blend DEPOSIT described by `intent` — a single
+ * `submit` supplying the expected asset SAC as collateral (SupplyCollateral) for the
+ * exact amount, entirely on the user's own account.
+ *
+ * A withdraw envelope FAILS this gate (request_type 3 ≠ 2).
+ */
+export function validateDepositXdr(xdr: string, intent: DepositIntent): ValidationResult {
+  return validateSubmitXdr(xdr, intent, SUPPLY_COLLATERAL, "SupplyCollateral");
+}
+
+/**
+ * Validates that `xdr` is exactly the Blend WITHDRAW described by `intent` — a single
+ * `submit` withdrawing the expected asset SAC from collateral (WithdrawCollateral)
+ * for the exact amount, back to the user's own account.
+ *
+ * Identical invariants to the deposit gate, including `to` === the user: `to` is the
+ * account CREDITED with the withdrawn tokens, so a foreign `to` here would send the
+ * user's funds away. A deposit envelope FAILS this gate (request_type 2 ≠ 3).
+ *
+ * NOTE — no cap is applied here, matching the API: a withdraw returns the user's own
+ * funds to their own wallet, and capping it could strand a position larger than the
+ * cap. The amount is still pinned EXACTLY to what the user asked for.
+ */
+export function validateWithdrawXdr(
+  xdr: string,
+  intent: WithdrawIntent,
+): ValidationResult {
+  return validateSubmitXdr(xdr, intent, WITHDRAW_COLLATERAL, "WithdrawCollateral");
 }
 
 /**

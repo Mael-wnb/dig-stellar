@@ -34,6 +34,7 @@ export type ActionEventKind =
   | 'sdex-quote'
   | 'sdex-swap-build'
   | 'blend-deposit-build'
+  | 'blend-withdraw-build'
   | 'trustline-build';
 
 type WalletsRow = {

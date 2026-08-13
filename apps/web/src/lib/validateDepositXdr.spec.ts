@@ -12,9 +12,12 @@ import {
 } from "@stellar/stellar-sdk";
 import {
   validateDepositXdr,
+  validateWithdrawXdr,
   validateTrustlineXdr,
   SUPPLY_COLLATERAL,
+  WITHDRAW_COLLATERAL,
   type DepositIntent,
+  type WithdrawIntent,
   type TrustlineIntent,
 } from "./validateDepositXdr";
 
@@ -261,6 +264,201 @@ describe("validateDepositXdr — violations", () => {
       expect(result.violations.some((v) => v.includes("request amount mismatch"))).toBe(true);
       expect(result.violations.some((v) => v.includes("to mismatch"))).toBe(true);
     }
+  });
+});
+
+// --- Withdraw (Lot A3) ----------------------------------------------------
+//
+// Same envelope shape as the deposit; the ONLY difference is request_type
+// (WithdrawCollateral=3 vs SupplyCollateral=2). Every deposit invariant is
+// re-asserted here because the two gates are independent entry points, plus the
+// cross-type pair that proves neither gate accepts the other's transaction.
+
+/** Builds a real Soroban submit XDR whose single request is a WithdrawCollateral. */
+function buildWithdrawXdr(opts: DepositOpts = {}): string {
+  return buildDepositXdr({
+    ...opts,
+    requestType: opts.requestType ?? WITHDRAW_COLLATERAL,
+  });
+}
+
+const withdrawIntent: WithdrawIntent = { ...baseIntent };
+
+describe("validateWithdrawXdr — happy path", () => {
+  it("accepts a withdraw XDR that exactly matches the intent", () => {
+    expect(validateWithdrawXdr(buildWithdrawXdr(), withdrawIntent)).toEqual({ ok: true });
+  });
+
+  it("accepts an XLM withdraw (native SAC + XLM intent)", () => {
+    const xlmSac = "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA";
+    const xdrStr = buildWithdrawXdr({ sac: xlmSac });
+    expect(validateWithdrawXdr(xdrStr, { ...withdrawIntent, assetSac: xlmSac })).toEqual({
+      ok: true,
+    });
+  });
+
+  it("normalizes decimal formatting (12.345 == 12.3450000)", () => {
+    expect(
+      validateWithdrawXdr(buildWithdrawXdr(), { ...withdrawIntent, amount: "12.3450000" }),
+    ).toEqual({ ok: true });
+  });
+});
+
+const withdrawFailCases: FailCase[] = [
+  { name: "unparseable XDR", xdr: () => "not-a-real-xdr", expect: "unparseable XDR" },
+  {
+    name: "unrecognized network passphrase",
+    xdr: () => buildWithdrawXdr(),
+    intent: { networkPassphrase: "Bogus Network ; January 2099" },
+    expect: "unrecognized network passphrase",
+  },
+  {
+    name: "wrong tx source account",
+    xdr: () => buildWithdrawXdr({ source: OTHER }),
+    expect: "source account mismatch",
+  },
+  {
+    name: "wrong pool contract id (injection)",
+    xdr: () => buildWithdrawXdr({ pool: EVIL_POOL }),
+    expect: "pool contract mismatch",
+  },
+  {
+    name: "wrong contract function name",
+    xdr: () => buildWithdrawXdr({ fnName: "borrow" }),
+    expect: 'expected "submit"',
+  },
+  {
+    name: "wrong asset SAC (withdraws a different reserve)",
+    xdr: () => buildWithdrawXdr({ sac: EVIL_SAC }),
+    expect: "request asset mismatch",
+  },
+  {
+    name: "wrong request amount (withdraws more than the user asked for)",
+    xdr: () => buildWithdrawXdr({ amount: 999_999_999_999n }),
+    expect: "request amount mismatch",
+  },
+  {
+    name: "request_type Withdraw (1) — unwinds a NON-collateral supply, not our position",
+    xdr: () => buildWithdrawXdr({ requestType: 1 }),
+    expect: "request_type mismatch",
+  },
+  {
+    name: "request_type Borrow (4) smuggled under the withdraw",
+    xdr: () => buildWithdrawXdr({ requestType: 4 }),
+    expect: "request_type mismatch",
+  },
+  {
+    name: "foreign `from` (withdraws from another account's position)",
+    xdr: () => buildWithdrawXdr({ from: OTHER }),
+    expect: "from mismatch",
+  },
+  {
+    name: "foreign `spender`",
+    xdr: () => buildWithdrawXdr({ spender: OTHER }),
+    expect: "spender mismatch",
+  },
+  {
+    name: "foreign `to` (sends the withdrawn funds to an attacker)",
+    xdr: () => buildWithdrawXdr({ to: OTHER }),
+    expect: "to mismatch",
+  },
+  {
+    name: "extra operation smuggled alongside the withdraw",
+    xdr: () => buildWithdrawXdr({ extraOp: true }),
+    expect: "expected exactly 1 operation, found 2",
+  },
+  {
+    name: "inflated fee (corrupted fee field)",
+    xdr: () => buildWithdrawXdr({ fee: "30000000" }),
+    expect: "fee exceeds cap",
+  },
+  {
+    name: "zero requests",
+    xdr: () => buildWithdrawXdr({ requests: [] }),
+    expect: "expected exactly 1 request, found 0",
+  },
+  {
+    name: "two requests (withdraw + a hidden borrow)",
+    xdr: () =>
+      buildWithdrawXdr({
+        requests: [
+          requestScVal(USDC_SAC, AMOUNT_SCALED, WITHDRAW_COLLATERAL),
+          requestScVal(USDC_SAC, AMOUNT_SCALED, 4 /* Borrow */),
+        ],
+      }),
+    expect: "expected exactly 1 request, found 2",
+  },
+];
+
+describe("validateWithdrawXdr — violations", () => {
+  for (const c of withdrawFailCases) {
+    it(c.name, () => {
+      const intent = { ...withdrawIntent, ...c.intent };
+      const result = validateWithdrawXdr(c.xdr(), intent);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.violations.some((v) => v.includes(c.expect))).toBe(true);
+      }
+    });
+  }
+
+  it("collects MULTIPLE violations at once (does not short-circuit)", () => {
+    const xdrStr = buildWithdrawXdr({
+      pool: EVIL_POOL,
+      sac: EVIL_SAC,
+      amount: 1n,
+      to: OTHER,
+    });
+    const result = validateWithdrawXdr(xdrStr, withdrawIntent);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.violations.length).toBeGreaterThanOrEqual(4);
+      expect(result.violations.some((v) => v.includes("pool contract mismatch"))).toBe(true);
+      expect(result.violations.some((v) => v.includes("request asset mismatch"))).toBe(true);
+      expect(result.violations.some((v) => v.includes("request amount mismatch"))).toBe(true);
+      expect(result.violations.some((v) => v.includes("to mismatch"))).toBe(true);
+    }
+  });
+});
+
+// --- Cross-type: the two gates must NEVER accept each other's transaction ---
+//
+// The critical pair. Everything else about these envelopes is identical and valid
+// (same pool, same SAC, same amount, same account) — only request_type differs, so
+// nothing but the pinned request type can be rejecting them.
+
+describe("deposit ↔ withdraw cross-type rejection", () => {
+  it("a SupplyCollateral (deposit) XDR FAILS the withdraw gate", () => {
+    const result = validateWithdrawXdr(buildDepositXdr(), withdrawIntent);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(
+        result.violations.some((v) =>
+          v.includes(`request_type mismatch: expected WithdrawCollateral (${WITHDRAW_COLLATERAL}), got ${SUPPLY_COLLATERAL}`),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it("a WithdrawCollateral (withdraw) XDR FAILS the deposit gate", () => {
+    const result = validateDepositXdr(buildWithdrawXdr(), baseIntent);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(
+        result.violations.some((v) =>
+          v.includes(`request_type mismatch: expected SupplyCollateral (${SUPPLY_COLLATERAL}), got ${WITHDRAW_COLLATERAL}`),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it("the pinned request types are the SDK's values and are distinct", () => {
+    // Canary: @blend-capital/blend-sdk pool enum — Supply=0, Withdraw=1,
+    // SupplyCollateral=2, WithdrawCollateral=3. If either constant drifts, the
+    // cross-type property above silently collapses.
+    expect(SUPPLY_COLLATERAL).toBe(2);
+    expect(WITHDRAW_COLLATERAL).toBe(3);
+    expect(SUPPLY_COLLATERAL).not.toBe(WITHDRAW_COLLATERAL);
   });
 });
 

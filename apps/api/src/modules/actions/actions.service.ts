@@ -14,12 +14,14 @@ import {
   BASE_FEE,
   xdr,
   Operation,
+  SorobanDataBuilder,
 } from '@stellar/stellar-sdk';
-import { PoolContractV2, RequestType } from '@blend-capital/blend-sdk';
+import { PoolContractV2, PoolV2, RequestType } from '@blend-capital/blend-sdk';
 import type { SubmitArgs, Request as BlendRequest } from '@blend-capital/blend-sdk';
 import { ASSET_DECIMALS } from './testnet-registry';
 import {
   type ActionNetwork,
+  type BlendNetworkConfig,
   getNetworkConfig,
   getBlendConfig,
   vettedUsdcSdex,
@@ -58,6 +60,59 @@ export interface BlendDepositResult {
     resource: number;
     total: number;
   };
+}
+
+export interface BlendWithdrawParams {
+  address: string;
+  asset: 'USDC' | 'XLM';
+  amount: string;
+  network: ActionNetwork;
+}
+
+/**
+ * A withdraw is a single Soroban InvokeHostFunction — no trustline step (the asset
+ * was supplied FROM this account, so its trustline already exists) and no
+ * ChangeTrust variant, hence a narrower result than the deposit's.
+ */
+export interface BlendWithdrawResult {
+  /** The Soroban withdraw XDR. EMPTY when simulation failed (see `simulation`). */
+  xdr: string;
+  operations: string[];
+  simulation: {
+    success: boolean;
+    resourceFee: string;
+    error?: string;
+  };
+  fee: {
+    inclusion: number;
+    resource: number;
+    total: number;
+  };
+}
+
+export interface BlendPositionParams {
+  address: string;
+  network: ActionNetwork;
+}
+
+/** One asset's supplied position in the pool, in human units (decimal strings). */
+export interface BlendAssetPosition {
+  /** Reserve SAC id — the same value the withdraw request pins as `address`. */
+  sac: string;
+  /** Collateralized supply — what SupplyCollateral created and WithdrawCollateral burns. */
+  collateral: string;
+  /** Non-collateral supply (Blend `Supply`). The app never creates this; shown for honesty. */
+  supply: string;
+  /** Borrowed amount. Non-zero means withdrawing may be limited by the health factor. */
+  liabilities: string;
+  decimals: number;
+}
+
+export interface BlendPositionResult {
+  poolId: string;
+  network: ActionNetwork;
+  /** Keyed by the assets this app can supply/withdraw. Absent reserve → all zeros. */
+  positions: Record<'USDC' | 'XLM', BlendAssetPosition>;
 }
 
 /**
@@ -113,6 +168,60 @@ function toI128(amount: string, decimals: number): bigint {
   const [intStr, fracStr = ''] = amount.split('.');
   const frac = fracStr.padEnd(decimals, '0').slice(0, decimals);
   return BigInt(intStr) * BigInt(10 ** decimals) + BigInt(frac);
+}
+
+/** Converts an i128 integer amount back to a human decimal string at `decimals` precision. */
+function fromI128(value: bigint, decimals: number): string {
+  const negative = value < 0n;
+  const abs = negative ? -value : value;
+  const base = BigInt(10) ** BigInt(decimals);
+  const frac = (abs % base).toString().padStart(decimals, '0');
+  return `${negative ? '-' : ''}${abs / base}.${frac}`;
+}
+
+// --- Soroban resource headroom ---------------------------------------------
+//
+// A simulation measures the resources an invocation needs against the ledger AS IT
+// IS AT THAT MOMENT. The declared limits it produces are then enforced EXACTLY at
+// apply time, several seconds later — so any state drift in between fails the whole
+// transaction with `scecExceededLimit`, after the user has already signed.
+//
+// This is not hypothetical: it is how the first Lot A3 testnet withdraw failed
+// (tx 267bb75b…, "operation byte-write resources exceeds amount specified", needed
+// 1024 bytes, declared 996). A Max withdraw is the sharpest case of it — the
+// collateral accrues interest between simulation and apply, so a simulation that
+// zeroed the position (small write) can apply against a position with a dust
+// remainder (one extra i128 map entry, ~28 bytes more written).
+//
+// So we widen the declared LIMITS, not just the fee. The cost is small and mostly
+// non-refundable-fee-neutral at these magnitudes (observed ≈ +0.0006 XLM), and the
+// client-side gate still refuses to sign anything above its 2 XLM total-fee cap.
+
+/** Multiplier applied to every simulated resource limit (instructions / bytes). */
+const RESOURCE_PAD = 1.25;
+/** Flat byte headroom added on top of the multiplier, for small-entry drift. */
+const RESOURCE_PAD_BYTES = 128;
+/** Multiplier applied to the simulated minimum resource fee. */
+const RESOURCE_FEE_PAD = 1.5;
+
+/**
+ * Returns the simulation's Soroban data with widened resource limits and resource
+ * fee. The footprint (which entries are touched) is untouched — only how much room
+ * the invocation is allowed inside it.
+ */
+function padResources(
+  data: xdr.SorobanTransactionData,
+  resourceFee: number,
+): xdr.SorobanTransactionData {
+  const res = data.resources();
+  return new SorobanDataBuilder(data)
+    .setResources(
+      Math.ceil(res.instructions() * RESOURCE_PAD),
+      Math.ceil(res.diskReadBytes() * RESOURCE_PAD) + RESOURCE_PAD_BYTES,
+      Math.ceil(res.writeBytes() * RESOURCE_PAD) + RESOURCE_PAD_BYTES,
+    )
+    .setResourceFee(resourceFee)
+    .build();
 }
 
 /** True for the native-asset ref ('XLM' or 'native'). */
@@ -382,7 +491,190 @@ export class ActionsService {
       'base64',
     );
 
-    // Simulate using a tx at sequence S+1 (using the original account, which gets
+    // Simulate + assemble. For USDC the trustline is guaranteed to exist by the gate
+    // above, so this is a single InvokeHostFunction tx — no bundled ChangeTrust
+    // (Soroban forbids mixing classic ops with it anyway).
+    const built = await this.simulateAndAssembleSubmit({
+      address,
+      account,
+      seqBeforeBuild,
+      blendOp,
+      cfg,
+      rpcServer,
+    });
+
+    if (!built.xdr) {
+      return {
+        xdr: '',
+        operations: [],
+        simulation: built.simulation,
+        fee: built.fee,
+      };
+    }
+
+    return {
+      xdr: built.xdr,
+      trustlineRequired: false,
+      operations: [`blend_supply_collateral:${asset}`],
+      simulation: built.simulation,
+      fee: built.fee,
+    };
+  }
+
+  /**
+   * Builds the Blend WITHDRAW of supplied collateral (Lot A3) — the mirror of
+   * buildBlendDeposit, and the other half of the supply↔withdraw loop.
+   *
+   * Deliberate differences from the deposit, each of them safe:
+   *   - NO amount cap (enforced nowhere, by design — see the controller). A cap
+   *     protects a user from over-committing funds INTO a protocol; a withdraw
+   *     returns the user's OWN funds to their OWN wallet, and a cap could strand a
+   *     position larger than it.
+   *   - NO trustline step. The asset being withdrawn was supplied FROM this account,
+   *     so its classic trustline necessarily existed at supply time. If it were
+   *     somehow removed since, the SAC transfer back traps with Contract #13 and the
+   *     transaction fails ATOMICALLY on-chain — no partial state, only the fee burnt.
+   *   - NO spendable preflight. A withdraw does not send the asset; it receives it.
+   *     The only balance it needs is XLM for the fee, which the simulation covers.
+   *
+   * Amount semantics: the exact user amount is passed through to `submit`, in the
+   * reserve's own decimals. The builder relies on SIMULATION, not on any contract-side
+   * clamping: an amount the position cannot cover either simulates successfully
+   * (Blend clamps a WithdrawCollateral above the position down to the full position,
+   * so the user can never receive more than they hold) or fails simulation, in which
+   * case NO xdr is returned and nothing can be signed.
+   */
+  async buildBlendWithdraw(params: BlendWithdrawParams): Promise<BlendWithdrawResult> {
+    const { address, asset, amount, network } = params;
+    const cfg = getBlendConfig(network);
+    const rpcServer = this.rpcFor(network);
+    const poolContract = this.poolContractFor(network);
+    const decimals = ASSET_DECIMALS[asset];
+    const assetSac = cfg.sac[asset];
+    const scaledAmount = toI128(amount, decimals);
+
+    // Load account for sequence number. The private key never reaches this layer.
+    let account: Account;
+    try {
+      account = await rpcServer.getAccount(address);
+    } catch {
+      throw new InternalServerErrorException(
+        `Account ${address.slice(0, 8)}... not found on ${network}`,
+      );
+    }
+
+    // Save sequence before any TransactionBuilder.build() call increments it.
+    const seqBeforeBuild = account.sequenceNumber();
+
+    // RequestType.WithdrawCollateral === 3, read from the @blend-capital/blend-sdk
+    // enum source (Supply=0, Withdraw=1, SupplyCollateral=2, WithdrawCollateral=3,
+    // Borrow=4, Repay=5, …) — never from memory. The web gate pins the SAME value.
+    const request: BlendRequest = {
+      request_type: RequestType.WithdrawCollateral,
+      address: assetSac,
+      amount: scaledAmount,
+    };
+    const submitArgs: SubmitArgs = {
+      from: address,
+      spender: address,
+      to: address,
+      requests: [request],
+    };
+    const blendOp = xdr.Operation.fromXDR(
+      poolContract.submit(submitArgs),
+      'base64',
+    );
+
+    const built = await this.simulateAndAssembleSubmit({
+      address,
+      account,
+      seqBeforeBuild,
+      blendOp,
+      cfg,
+      rpcServer,
+    });
+
+    return {
+      xdr: built.xdr,
+      operations: built.xdr ? [`blend_withdraw_collateral:${asset}`] : [],
+      simulation: built.simulation,
+      fee: built.fee,
+    };
+  }
+
+  /**
+   * The user's CURRENT position in the network's Blend pool, read live from chain via
+   * the SDK (PoolV2.load → pool.loadUser), the same read path the indexer uses for
+   * wallet positions.
+   *
+   * Why live and not the stored wallet positions: `wallet_protocol_positions` is a
+   * MAINNET-only periodic snapshot (the indexer discovers pools from `entities`), so
+   * it is empty on testnet and can be minutes stale on mainnet. A withdraw's "Max"
+   * must equal what the pool holds RIGHT NOW, on the network the user is acting on.
+   *
+   * Amounts are returned as exact decimal strings derived from the SDK's integer
+   * (bToken → underlying) conversion, which rounds DOWN — so "Max" can never exceed
+   * the real position. Purely informational for the UI: the security gate compares
+   * the signed XDR against the amount the USER submits, never against this response.
+   */
+  async getBlendPosition(params: BlendPositionParams): Promise<BlendPositionResult> {
+    const { address, network } = params;
+    const cfg = getBlendConfig(network);
+
+    let pool: PoolV2;
+    let user: Awaited<ReturnType<PoolV2['loadUser']>>;
+    try {
+      pool = await PoolV2.load(
+        { passphrase: cfg.networkPassphrase, rpc: cfg.rpcUrl },
+        cfg.poolId,
+      );
+      user = await pool.loadUser(address);
+    } catch {
+      throw new InternalServerErrorException(
+        `Could not read the Blend position for ${address.slice(0, 8)}... on ${network}`,
+      );
+    }
+
+    const positions = {} as Record<'USDC' | 'XLM', BlendAssetPosition>;
+    for (const code of ['XLM', 'USDC'] as const) {
+      const sac = cfg.sac[code];
+      const reserve = pool.reserves.get(sac);
+      const decimals = reserve?.config.decimals ?? ASSET_DECIMALS[code];
+      positions[code] = {
+        sac,
+        decimals,
+        collateral: reserve ? fromI128(user.getCollateral(reserve), decimals) : '0',
+        supply: reserve ? fromI128(user.getSupply(reserve), decimals) : '0',
+        liabilities: reserve ? fromI128(user.getLiabilities(reserve), decimals) : '0',
+      };
+    }
+
+    return { poolId: cfg.poolId, network, positions };
+  }
+
+  /**
+   * Shared tail of both Blend builders: simulate the `submit` invocation, pad the
+   * resource fee by 20%, and rebuild at the ORIGINAL sequence with the simulation's
+   * auth + soroban data applied. Returns an empty `xdr` (and a populated
+   * `simulation.error`) when the invocation cannot be simulated — the caller must
+   * treat that as "nothing signable was produced".
+   */
+  private async simulateAndAssembleSubmit(params: {
+    address: string;
+    /** The account loaded from RPC — build() increments it, hence seqBeforeBuild. */
+    account: Account;
+    seqBeforeBuild: string;
+    blendOp: xdr.Operation;
+    cfg: BlendNetworkConfig;
+    rpcServer: rpc.Server;
+  }): Promise<{
+    xdr: string;
+    simulation: { success: boolean; resourceFee: string; error?: string };
+    fee: { inclusion: number; resource: number; total: number };
+  }> {
+    const { address, account, seqBeforeBuild, blendOp, cfg, rpcServer } = params;
+
+    // Simulate using a tx at sequence S+1 (the original account object, which gets
     // incremented by build()). Simulation results are independent of tx sequence.
     const txForSim = new TransactionBuilder(account, {
       fee: BASE_FEE,
@@ -400,7 +692,6 @@ export class ActionsService {
         : 'contract entry requires footprint restore';
       return {
         xdr: '',
-        operations: [],
         simulation: { success: false, resourceFee: '0', error },
         fee: { inclusion: 0, resource: 0, total: 0 },
       };
@@ -408,15 +699,11 @@ export class ActionsService {
 
     const inclusionFee = parseInt(BASE_FEE, 10);
     const minResourceFee = parseInt(simResult.minResourceFee, 10);
-    const paddedResourceFee = Math.ceil(minResourceFee * 1.2);
+    const paddedResourceFee = Math.ceil(minResourceFee * RESOURCE_FEE_PAD);
     const totalFee = inclusionFee + paddedResourceFee;
 
-    // Rebuild the deposit tx with the padded fee and apply the simulation
-    // (auth + soroban data). The trustline (for USDC) is guaranteed to exist by the
-    // gate above, so this is a single InvokeHostFunction tx at sequence S — no
-    // bundled ChangeTrust (Soroban forbids mixing classic ops with it anyway).
-    const accountForDeposit = new Account(address, seqBeforeBuild);
-    const txForDeposit = new TransactionBuilder(accountForDeposit, {
+    const accountForTx = new Account(address, seqBeforeBuild);
+    const txForSubmit = new TransactionBuilder(accountForTx, {
       fee: totalFee.toString(),
       networkPassphrase: cfg.networkPassphrase,
     })
@@ -424,17 +711,22 @@ export class ActionsService {
       .setTimeout(300)
       .build();
 
-    const finalTx = rpc.assembleTransaction(txForDeposit, simResult).build();
-    const depositXdr = finalTx.toEnvelope().toXDR('base64');
+    // assembleTransaction applies the simulation's auth entries + soroban data. Its
+    // resource LIMITS are the simulation's exact measurements, which is what we then
+    // widen below (see padResources) — the auth entries and footprint are kept as-is.
+    const assembled = rpc.assembleTransaction(txForSubmit, simResult).build();
+
+    // The builder's `fee` is the INCLUSION bid; build() adds sorobanData.resourceFee
+    // on top. Passing the inclusion fee alone makes the envelope's fee exactly the
+    // `total` we report (and the client gate then caps that same number).
+    const finalTx = TransactionBuilder.cloneFrom(assembled, {
+      fee: inclusionFee.toString(),
+      sorobanData: padResources(simResult.transactionData.build(), paddedResourceFee),
+    }).build();
 
     return {
-      xdr: depositXdr,
-      trustlineRequired: false,
-      operations: [`blend_supply_collateral:${asset}`],
-      simulation: {
-        success: true,
-        resourceFee: simResult.minResourceFee,
-      },
+      xdr: finalTx.toEnvelope().toXDR('base64'),
+      simulation: { success: true, resourceFee: simResult.minResourceFee },
       fee: {
         inclusion: inclusionFee,
         resource: paddedResourceFee,

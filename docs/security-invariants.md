@@ -11,7 +11,7 @@ This document is the security contract for **every non-custodial action executed
    `apps/web` swap/deposit widgets, signing flow) is reviewed against this list before merge, and
    again before any Mainnet ungating.
 
-Scope: SDEX swap and Blend deposit at launch; any future action inherits these invariants by
+Scope: SDEX swap, Blend deposit and Blend withdraw; any future action inherits these invariants by
 default. Testnet is the rehearsal environment — the invariants apply there too, but enforcement
 becomes non-negotiable the moment `PUBLIC` network execution is possible.
 
@@ -108,10 +108,43 @@ Review check: pure module, unit-tested per invariant with red tests (wrong contr
 request amount, foreign `to`/`from`/`spender`, extra op, wrong asset SAC, wrong request_type,
 inflated fee, wrong trustline issuer/code). Suite: `apps/web/src/lib/validateDepositXdr.spec.ts`.
 
+### 2c. Client-side XDR validation for the Blend withdraw — Lot A3
+
+The withdraw is the same Soroban `submit` envelope as the deposit, so it reuses the same module
+and the same decoder (`validateSubmitXdr`), parameterized by the expected request type. Wired in
+`BlendDepositCard.onWithdraw` before the signing prompt, intent from user input + client config —
+never the API response. INV-2.8 → INV-2.12 apply to `validateWithdrawXdr` unchanged, with:
+
+- **INV-2.13** ✅ **Request-type pinning is per action, and the two are mutually exclusive.** The
+  deposit gate pins `SupplyCollateral` (`2`); the withdraw gate pins `WithdrawCollateral` (**`3`**),
+  both read from the `@blend-capital/blend-sdk` enum source (`Supply=0, Withdraw=1,
+  SupplyCollateral=2, WithdrawCollateral=3, Borrow=4, Repay=5, …`), never from memory. A
+  SupplyCollateral envelope can therefore never pass the withdraw gate and vice versa — red-tested
+  both directions, on hand-built fixtures AND on real API-built envelopes in the testnet E2E. Note
+  `WithdrawCollateral` (3) ≠ `Withdraw` (1): the latter unwinds a non-collateral supply this app
+  never creates, and is rejected.
+- **INV-2.14** ✅ **`to` = the user, on the withdraw too.** On a withdraw `to` is the account
+  CREDITED with the returned tokens, so a foreign `to` is a direct fund-diversion vector. Same
+  assertion as the deposit, red-tested.
+- **INV-2.15** ✅ **No cap on the withdraw — deliberate, at every layer.** A cap protects a user
+  from over-committing funds INTO a protocol; a withdraw returns the user's own funds to their own
+  wallet, and a cap could strand a position larger than it. The exact-amount invariant (INV-2.11)
+  is unchanged, so the user still signs precisely what they asked for.
+
+Suite: same file, 72 tests. Evidence + testnet tx pair: `docs/evidence/lot-a3-blend-withdraw.md`.
+
 ## 3. Simulation before signature (Soroban path)
 
-- **INV-3.1** ✅ The Blend deposit is **simulated** and must succeed before any signing prompt; a
-  simulation failure is surfaced and nothing is signed.
+- **INV-3.1** ✅ The Blend deposit **and withdraw** are **simulated** and must succeed before any
+  signing prompt; a simulation failure is surfaced, the response carries an empty `xdr`, and
+  nothing is signed. (Proven for the withdraw: a withdraw against an empty position returns
+  Contract #1217 and no signable XDR — see `docs/evidence/lot-a3-blend-withdraw.md`.)
+- **INV-3.1b** ✅ **Declared Soroban resources carry headroom** (`padResources`, Lot A3). A
+  simulation measures resources against the ledger at that instant and those limits are enforced
+  exactly at apply time, so state drift in between fails a transaction the user already signed
+  (observed once: `scecExceededLimit`, needed 1024 write-bytes, declared 996). Both Blend builders
+  widen the declared limits ×1.25 (+128 bytes) and the resource fee ×1.5. The declared fee is a
+  ceiling, not a charge, and the client fee cap (INV-2.12) still applies.
 - **INV-3.2** ✅ **Trustline gate (2-step, honest)**: when the classic USDC trustline is missing,
   the API returns ONLY the ChangeTrust step (`trustlineRequired: true`, empty deposit XDR) — the
   deposit is never built, signed, or submitted while the trustline is missing (the SAC transfer
@@ -156,6 +189,11 @@ regime (see `docs/tasks/lot-a1-mainnet-swap.md` for the implementation brief):
   amount, and its asset set is XLM | USDC only (any other → 400). Enforced in `actions.controller.ts`
   (`resolveBlendNetwork`); pool + reserve SACs read per-network from `network-registry.ts`
   (`getBlendConfig`). Flags unset = testnet deposit byte-for-byte today's.
+- **INV-4.7** ✅ **The Blend withdraw rides the SAME kill-switch (Lot A3)** — no new flag.
+  `blend/withdraw` and `blend/position` both go through `resolveBlendNetwork`, so with the flags
+  unset a mainnet withdraw is a **403** exactly like a mainnet deposit and no mainnet endpoint is
+  contacted (verified in the testnet E2E). Same asset set (XLM | USDC, anything else 400).
+  **The per-transaction cap deliberately does NOT apply** — see INV-2.15 for why.
 
 ## 5. Known defects — status
 

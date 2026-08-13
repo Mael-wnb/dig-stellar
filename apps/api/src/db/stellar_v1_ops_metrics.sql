@@ -48,7 +48,7 @@ create index if not exists idx_refresh_step_runs_step_run_at
 -- never fail the action itself. No backfill: counters start at deploy.
 create table if not exists action_events (
   id bigint generated always as identity primary key,
-  kind text not null,            -- 'sdex-quote' | 'sdex-swap-build' | 'blend-deposit-build' | 'trustline-build'
+  kind text not null,            -- 'sdex-quote' | 'sdex-swap-build' | 'blend-deposit-build' | 'blend-withdraw-build' | 'trustline-build'
   network text not null,         -- 'testnet' | 'mainnet'
   address text,                  -- acting Stellar address; null for quotes
   created_at timestamptz not null default now()

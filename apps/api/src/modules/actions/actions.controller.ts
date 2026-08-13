@@ -31,6 +31,14 @@ interface BlendDepositBody {
   network?: string;
 }
 
+/** Same shape as the deposit body — the withdraw is its mirror (Lot A3). */
+type BlendWithdrawBody = BlendDepositBody;
+
+interface BlendPositionBody {
+  address: string;
+  network?: string;
+}
+
 /**
  * An SDEX asset as the client sends it. Two accepted shapes:
  *   - legacy string: 'XLM' | 'USDC' (USDC resolves to the vetted Circle testnet issuer)
@@ -204,6 +212,85 @@ export class ActionsController {
     }
 
     return result;
+  }
+
+  /**
+   * Blend WITHDRAW of supplied collateral (Lot A3) — the mirror of blend/deposit.
+   *
+   * Rides the SAME kill-switch as the deposit (`ACTIONS_MAINNET_BLEND_ENABLED` via
+   * resolveBlendNetwork): no new flag, and with the flags unset a mainnet withdraw
+   * is a 403 exactly like a mainnet deposit.
+   *
+   * NO amount cap — deliberate, and the one place this endpoint differs from the
+   * deposit. The mainnet cap exists to limit how much a user can commit INTO a
+   * protocol during the launch period; a withdraw moves the user's own funds back
+   * OUT to their own wallet, so capping it could strand a position larger than the
+   * cap and would push the user off-app to unwind it. The amount is still bounded by
+   * reality: Blend can only return what the position holds, and simulation failure
+   * means no XDR is produced at all.
+   */
+  @Post('blend/withdraw')
+  @HttpCode(HttpStatus.OK)
+  async blendWithdraw(@Body() body: BlendWithdrawBody) {
+    const { address, asset, amount, network } = body;
+
+    const resolvedNetwork = resolveBlendNetwork(network);
+    if (!address || typeof address !== 'string') {
+      throw new BadRequestException('address is required');
+    }
+    // Same asset whitelist as the deposit: you can only withdraw what this app can
+    // supply. EURC and anything else is a 400 on both networks.
+    if (!asset || !['USDC', 'XLM'].includes(asset)) {
+      throw new BadRequestException('asset must be USDC or XLM');
+    }
+    const parsedAmount = parseFloat(amount);
+    if (!amount || isNaN(parsedAmount) || parsedAmount <= 0) {
+      throw new BadRequestException('amount must be a positive numeric string');
+    }
+
+    const result = await this.actionsService.buildBlendWithdraw({
+      address,
+      asset,
+      amount,
+      network: resolvedNetwork,
+    });
+
+    // E3 adoption counter — only when a signable XDR was actually produced
+    // (a failed simulation returns an empty xdr and records nothing).
+    if (result.xdr) {
+      void this.opsService.recordActionEvent(
+        'blend-withdraw-build',
+        resolvedNetwork,
+        address,
+      );
+    }
+
+    return result;
+  }
+
+  /**
+   * The acting wallet's CURRENT Blend position, read live from chain. Feeds the
+   * withdraw pane's "you have X supplied" + Max. Same kill-switch as the deposit /
+   * withdraw, so it contacts no mainnet endpoint while the flag is off.
+   *
+   * Read-only and non-authoritative: the signing gate compares the returned XDR
+   * against the amount the USER typed and the client-side pool registry — never
+   * against this response.
+   */
+  @Post('blend/position')
+  @HttpCode(HttpStatus.OK)
+  async blendPosition(@Body() body: BlendPositionBody) {
+    const { address, network } = body;
+
+    const resolvedNetwork = resolveBlendNetwork(network);
+    if (!address || typeof address !== 'string') {
+      throw new BadRequestException('address is required');
+    }
+
+    return this.actionsService.getBlendPosition({
+      address,
+      network: resolvedNetwork,
+    });
   }
 
   @Post('sdex/quote')

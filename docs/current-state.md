@@ -493,6 +493,18 @@ First real mainnet swaps executed in both directions (1 XLM→USDC; USDC→XLM `
 `docs/security-invariants.md`; evidence: `docs/evidence/mainnet-ungating-2026-08-02.md` +
 `pair-vetting-2026-08-01.md`. The Blend deposit remains testnet-only until Lot A2.
 
+**Blend supply ↔ withdraw is complete in-app since Aug 13 (Lot A3).** The action modal's Blend card
+has Supply | Withdraw tabs: the withdraw pane reads the acting wallet's position live from chain
+(`POST /v1/actions/blend/position` → `PoolV2.loadUser`, network-aware — the stored wallet positions
+are a mainnet-only periodic snapshot and would be empty on testnet), offers Max, and refuses to
+build a withdraw with no position behind it. `POST /v1/actions/blend/withdraw` mirrors the deposit
+and rides the SAME kill-switch (`ACTIONS_MAINNET_BLEND_ENABLED` — no new flag), with **no amount
+cap** by design (INV-2.15: it returns the user's own funds). The client gate
+(`validateWithdrawXdr`) pins Blend `WithdrawCollateral` (3) where the deposit gate pins
+`SupplyCollateral` (2), so neither can accept the other's transaction — red-tested both ways.
+Proven E2E on testnet: supply `b199a1d7…` + withdraw `322d760e…`, both confirmed on-chain
+(`docs/evidence/lot-a3-blend-withdraw.md`). The mainnet pair is pending review.
+
 ---
 
 ## 9. Deployment / operations

@@ -319,11 +319,11 @@ briefs `docs/lot-a1-mainnet-swap.md` (swap) + `docs/lot-a2-blend-mainnet.md` (Bl
 | Var | App | Default | Effect |
 |-----|-----|---------|--------|
 | `ACTIONS_MAINNET_ENABLED` | api | unset → OFF | Swap kill-switch (INV-4.1). `"true"` lets `sdex/*` `network:"mainnet"` through; otherwise → **403**. |
-| `ACTIONS_MAINNET_BLEND_ENABLED` | api | unset → OFF | Blend-deposit kill-switch (Lot A2), independent of the swap. `"true"` lets `blend/deposit` `network:"mainnet"` through; otherwise → **403**. |
-| `ACTIONS_MAINNET_MAX_SEND_XLM` | api | `100` | Per-transaction cap (INV-4.2). Over-cap `sdex/swap` **and** `blend/deposit` → **400**. |
-| `ACTIONS_MAINNET_RPC_URL` | api | `https://mainnet.sorobanrpc.com` | Soroban RPC override for the mainnet swap **and** Blend deposit paths. |
+| `ACTIONS_MAINNET_BLEND_ENABLED` | api | unset → OFF | Blend kill-switch (Lot A2), independent of the swap. `"true"` lets `blend/deposit`, `blend/withdraw` **and** `blend/position` `network:"mainnet"` through; otherwise → **403**. The withdraw (Lot A3) rides this same switch — there is no separate withdraw flag. |
+| `ACTIONS_MAINNET_MAX_SEND_XLM` | api | `100` | Per-transaction cap (INV-4.2). Over-cap `sdex/swap` **and** `blend/deposit` → **400**. Deliberately **not** applied to `blend/withdraw` (INV-2.15). |
+| `ACTIONS_MAINNET_RPC_URL` | api | `https://mainnet.sorobanrpc.com` | Soroban RPC override for the mainnet swap **and** Blend paths. |
 | `VITE_ACTIONS_MAINNET_ENABLED` | web | unset → OFF | UX only — reveals the mainnet swap surface. NOT enforcement. |
-| `VITE_ACTIONS_MAINNET_BLEND_ENABLED` | web | unset → OFF | UX only — reveals the mainnet Blend deposit card. NOT enforcement. |
+| `VITE_ACTIONS_MAINNET_BLEND_ENABLED` | web | unset → OFF | UX only — reveals the mainnet Blend card (supply AND withdraw tabs). NOT enforcement. |
 
 Mainnet enforcement lives in `apps/api` (`actions.controller.ts` + `network-registry.ts`): the two
 kill-switches, the shared per-transaction cap, the swap asset whitelist (native XLM + Circle USDC
@@ -390,8 +390,42 @@ Its 2-step trustline-gated path is already proven E2E on testnet; this is the ma
    resolver picks up the Blend position + health factor) AND on blend.capital. Record the tx hash
    in `docs/evidence/` — it is the "vault/lending" evidence for T3-D2 criterion 1.
 
-**Rollback**: unset `ACTIONS_MAINNET_BLEND_ENABLED` on the VPS and restart PM2 — `blend/deposit`
-returns to 403 on mainnet immediately, independent of the swap flag and the web deploy.
+**Rollback**: unset `ACTIONS_MAINNET_BLEND_ENABLED` on the VPS and restart PM2 — `blend/deposit`,
+`blend/withdraw` and `blend/position` all return to 403 on mainnet immediately, independent of the
+swap flag and the web deploy.
+
+### Blend withdraw ungating (Lot A3)
+
+The withdraw ships behind the **same** switch as the deposit — flipping
+`ACTIONS_MAINNET_BLEND_ENABLED` ungates both, so there is nothing extra to enable. Its testnet
+money path is proven E2E (supply `b199a1d7…` + withdraw `322d760e…`, both confirmed on-chain —
+`docs/evidence/lot-a3-blend-withdraw.md`).
+
+Deliberate difference from the deposit: **there is no amount cap on a withdraw** (INV-2.15) — it
+returns the user's own funds to their own wallet, and a cap could strand a position larger than it.
+Do not "fix" this by adding one.
+
+`curl` validation (mainnet), after the deposit ungating above:
+```bash
+# flag OFF → 403 (withdraw AND the position read ride the same switch)
+curl -s -X POST $API/v1/actions/blend/withdraw -H "Content-Type: application/json" \
+  -d '{"address":"G...","asset":"XLM","amount":"5","network":"mainnet"}' | jq
+curl -s -X POST $API/v1/actions/blend/position -H "Content-Type: application/json" \
+  -d '{"address":"G...","network":"mainnet"}' | jq
+# flag ON, position read → collateral / supply / liabilities per asset, live from chain
+# flag ON, withdraw within the position → xdr + simulation.success:true
+# withdraw with NO position → simulation.success:false, xdr:"" (nothing signable)
+# EURC (or any non XLM/USDC asset) → 400
+```
+
+Then do ONE small real pair from the dashboard — supply a few XLM, then Withdraw → Max. The client
+gate (`validateWithdrawXdr`) validates the XDR against `config/blendPools.ts` before the signing
+prompt, pinning `WithdrawCollateral`. Verify the position drops in the portfolio and on
+blend.capital, and record BOTH hashes in `docs/evidence/lot-a3-blend-withdraw.md` — they are the
+T3-D2 bonus evidence pair.
+
+Expect a **dust remainder** after a Max withdraw (a few stroops): collateral accrues interest
+between the position read and apply. That is correct behavior, not a bug.
 
 ---
 

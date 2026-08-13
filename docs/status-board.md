@@ -52,6 +52,14 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
 - Biggest current risk: **the T3-D2 KPIs** — they cannot be built, only accumulated; every day of
   the open window counts.
 - Main execution goal: KPI push + A2 + T3-D3, converging on the Aug 15 internal target.
+- Lot A3 note (2026-08-13): **in-app Blend WITHDRAW is built and testnet-proven E2E** — the
+  supply↔withdraw loop is now complete in the action modal (supply tx `b199a1d7…` + withdraw tx
+  `322d760e…`, both confirmed on-chain; `docs/evidence/lot-a3-blend-withdraw.md`). Not required by
+  any SCF criterion (T3-D2's "vault/lending interactions" is satisfied by the deposit) — product
+  completeness before the advisor re-review. It rides the SAME kill-switch as the deposit (no new
+  flag), so it is testnet-only until `ACTIONS_MAINNET_BLEND_ENABLED` is set. **Awaiting: review,
+  then the mainnet supply+withdraw pair via Maël's wallet** (T3-D2 bonus evidence). Carried a
+  Soroban resource-headroom fix that also hardens the deposit path (INV-3.1b).
 - T3-D3 note (2026-08-05): the full UI port to the co-founder's Claude Design handoff landed green
   (web build + 49 tests + api build; captures in `docs/evidence/lot-c/`). Remaining T3-D3: RPC
   latency/error metrics endpoints + CI/CD, and the final demo/reference packaging. Liquidity actions

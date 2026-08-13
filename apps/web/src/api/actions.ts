@@ -108,3 +108,66 @@ export async function buildBlendDeposit(
     body: JSON.stringify(payload),
   });
 }
+
+// --- Blend withdraw (Lot A3) ----------------------------------------------
+
+/** Same shape as the deposit request — the withdraw is its mirror. */
+export type BlendWithdrawRequest = BlendDepositRequest;
+
+export type BlendWithdrawResponse = {
+  /** The Soroban withdraw (InvokeHostFunction) XDR to sign. Empty when simulation failed. */
+  xdr: string;
+  operations: string[];
+  simulation: {
+    success: boolean;
+    resourceFee: string;
+    error?: string;
+  };
+  fee: {
+    inclusion: number;
+    resource: number;
+    total: number;
+  };
+};
+
+export async function buildBlendWithdraw(
+  payload: BlendWithdrawRequest
+): Promise<BlendWithdrawResponse> {
+  return apiFetch<BlendWithdrawResponse>("/actions/blend/withdraw", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** One asset's supplied position, in human units (exact decimal strings). */
+export type BlendAssetPosition = {
+  sac: string;
+  /** Collateralized supply — what the in-app deposit creates and the withdraw burns. */
+  collateral: string;
+  /** Non-collateral supply. The app never creates this; surfaced for honesty. */
+  supply: string;
+  /** Borrowed amount — non-zero means the health factor may limit a withdraw. */
+  liabilities: string;
+  decimals: number;
+};
+
+export type BlendPositionResponse = {
+  poolId: string;
+  network: "testnet" | "mainnet";
+  positions: Record<"XLM" | "USDC", BlendAssetPosition>;
+};
+
+/**
+ * The acting wallet's CURRENT Blend position, read live from chain by the API.
+ * Informational only — it feeds the withdraw pane's "supplied" figure and Max; the
+ * signing gate never validates against it.
+ */
+export async function fetchBlendPosition(payload: {
+  address: string;
+  network?: "testnet" | "mainnet";
+}): Promise<BlendPositionResponse> {
+  return apiFetch<BlendPositionResponse>("/actions/blend/position", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
