@@ -10,6 +10,7 @@ import { fetchSoroswapPairState } from '../../lib/protocols/soroswap/fetch-pair-
 import { fetchSoroswapPairEvents } from '../../lib/protocols/soroswap/fetch-pair-events';
 import { normalizeSoroswapPairEvents } from '../../lib/protocols/soroswap/normalize-pair-events';
 import { persistSoroswapPairEvents } from '../../lib/protocols/soroswap/persist-pair-events';
+import { persistSoroswapPairReserves } from '../../lib/protocols/soroswap/persist-pair-reserves';
 import { persistSoroswapPairMetrics } from '../../lib/protocols/soroswap/persist-pair-metrics';
 
 async function main() {
@@ -60,6 +61,13 @@ async function main() {
       rows: normalized.rows,
     });
 
+    // Persist live reserves BEFORE metrics so this cycle's TVL is computed
+    // from today's reserves, not the last (possibly stale) snapshot.
+    const persistedReserves = await persistSoroswapPairReserves({
+      client,
+      pairState,
+    });
+
     const persistedMetrics = await persistSoroswapPairMetrics({
       client,
       entitySlug,
@@ -67,6 +75,7 @@ async function main() {
     });
 
     console.log(persistedEvents);
+    console.log(persistedReserves);
     console.log(persistedMetrics);
   } finally {
     await client.end();

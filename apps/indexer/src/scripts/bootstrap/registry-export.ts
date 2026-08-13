@@ -83,35 +83,12 @@ async function main() {
       `)
     ).rows;
 
-    // Soroswap + Aquarius: their metrics steps READ reserves from
-    // reserve_snapshots but nothing on the live refresh path writes them (they
-    // were inserted once by the legacy *-insert-snapshots.ts scripts, whose
-    // tmp/discovery inputs are gone). Export them so a fresh clone reproduces
-    // production behavior. Known issue, flagged in docs/evidence/lot-e/: these
-    // reserves are frozen at their March-2026 values in production too — a live
-    // writer is a follow-up fix. (Blend/stellar-native/defindex snapshots are
-    // written by the live refresh and are NOT exported.)
-    const reserveSnapshots = (
-      await client.query(`
-        select
-          e.slug as entity_slug,
-          a.contract_address as asset_contract_address,
-          rs.snapshot_at,
-          rs.symbol,
-          rs.name,
-          rs.decimals,
-          rs.enabled,
-          rs.d_supply_raw,
-          rs.d_supply_scaled,
-          rs.metadata
-        from reserve_snapshots rs
-        join entities e on e.id = rs.entity_id
-        join assets a on a.id = rs.asset_id
-        join venues v on v.id = e.venue_id
-        where v.slug in ('soroswap', 'aquarius')
-        order by e.slug asc, a.contract_address asc
-      `)
-    ).rows;
+    // reserve_snapshots are deliberately NOT exported: every venue that needs
+    // them now writes them on the live refresh path (Blend, stellar-native,
+    // defindex always did; Soroswap + Aquarius since the frozen-TVL hotfix —
+    // see docs/hotfix-frozen-amm-reserves.md), so a fresh clone's first
+    // `job:refresh` produces current rows by itself. Seed only what the first
+    // refresh cannot produce.
 
     const registry = {
       generatedAt: nowIso(),
@@ -120,7 +97,6 @@ async function main() {
       entities,
       assets,
       entityAssets,
-      reserveSnapshots,
     };
 
     await mkdir(path.dirname(OUT_FILE), { recursive: true });
@@ -133,7 +109,6 @@ async function main() {
       entities: entities.length,
       assets: assets.length,
       entityAssets: entityAssets.length,
-      reserveSnapshots: reserveSnapshots.length,
     });
   } finally {
     await client.end();

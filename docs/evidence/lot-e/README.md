@@ -118,6 +118,10 @@ prices) ever since. The seed reproduces this behavior on a fresh clone; a live
 reserve-snapshot writer for these two venues is the actual fix and is deliberately NOT
 part of Lot E (refresh-path surgery deserves its own reviewed change).
 
+> **CLOSED 2026-08-13** — live writers landed on the refresh path for both venues and
+> the reserve seed was retired; see `hotfix-frozen-amm-reserves.md` in this folder for
+> the before/after TVL per pool and the venue-UI cross-check.
+
 First-run expectations (documented in reference-deployment.md): only `defindex` fails
 without `DEFINDEX_API_KEY` (non-fatal, recorded); everything else green from run 1 once
 `bootstrap:core` has run.

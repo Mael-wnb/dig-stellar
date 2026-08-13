@@ -10,6 +10,7 @@ import { fetchAquariusPoolState } from '../../lib/protocols/aquarius/fetch-pool-
 import { fetchAquariusPoolEvents } from '../../lib/protocols/aquarius/fetch-pool-events';
 import { normalizeAquariusPoolEvents } from '../../lib/protocols/aquarius/normalize-pool-events';
 import { persistAquariusPoolEvents } from '../../lib/protocols/aquarius/persist-pool-events';
+import { persistAquariusPoolReserves } from '../../lib/protocols/aquarius/persist-pool-reserves';
 import { persistAquariusPoolMetrics } from '../../lib/protocols/aquarius/persist-pool-metrics';
 
 async function main() {
@@ -66,6 +67,15 @@ async function main() {
       expectedPoolId: poolId,
       rows: normalized.rows,
     });
+
+    // Persist live reserves BEFORE metrics so this cycle's TVL is computed
+    // from today's reserves, not the last (possibly stale) snapshot.
+    const persistedReserves = await persistAquariusPoolReserves({
+      client,
+      poolState,
+    });
+
+    console.log(persistedReserves);
 
     const persistedMetrics = await persistAquariusPoolMetrics({
       client,

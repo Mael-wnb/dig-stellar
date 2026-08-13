@@ -57,18 +57,6 @@ type Registry = {
     role: string;
     metadata: unknown;
   }>;
-  reserveSnapshots?: Array<{
-    entity_slug: string;
-    asset_contract_address: string;
-    snapshot_at: string;
-    symbol: string | null;
-    name: string | null;
-    decimals: number | null;
-    enabled: boolean | null;
-    d_supply_raw: string | null;
-    d_supply_scaled: string | null;
-    metadata: unknown;
-  }>;
 };
 
 async function main() {
@@ -176,49 +164,9 @@ async function main() {
       linkCount += 1;
     }
 
-    // Soroswap pair reserves (see registry-export.ts for why these are seeded):
-    // the pair-metrics refresh READS these rows; nothing on the live path writes
-    // them. Guarded per (entity, asset, snapshot_at) so re-runs don't duplicate.
-    let snapshotCount = 0;
-    for (const rs of registry.reserveSnapshots ?? []) {
-      const entityId = entityIds.get(rs.entity_slug);
-      const assetId = assetIds.get(rs.asset_contract_address);
-      if (!entityId || !assetId) {
-        throw new Error(
-          `reserve_snapshots seed ${rs.entity_slug} -> ${rs.asset_contract_address}: unresolved reference`
-        );
-      }
-      const venueRow = await client.query(
-        `select venue_id from entities where id = $1`,
-        [entityId]
-      );
-      await client.query(
-        `
-        insert into reserve_snapshots
-          (venue_id, entity_id, asset_id, snapshot_at, symbol, name, decimals, enabled,
-           d_supply_raw, d_supply_scaled, metadata)
-        select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb
-        where not exists (
-          select 1 from reserve_snapshots
-          where entity_id = $2 and asset_id = $3 and snapshot_at = $4
-        )
-        `,
-        [
-          venueRow.rows[0].venue_id,
-          entityId,
-          assetId,
-          rs.snapshot_at,
-          rs.symbol,
-          rs.name,
-          rs.decimals,
-          rs.enabled,
-          rs.d_supply_raw,
-          rs.d_supply_scaled,
-          JSON.stringify(rs.metadata ?? {}),
-        ]
-      );
-      snapshotCount += 1;
-    }
+    // reserve_snapshots are no longer seeded: since the frozen-TVL hotfix
+    // (docs/hotfix-frozen-amm-reserves.md) every venue writes them on the live
+    // refresh path, so the first `job:refresh` produces current rows itself.
 
     await client.query('commit');
 
@@ -229,7 +177,6 @@ async function main() {
       entities: entityIds.size,
       assets: assetIds.size,
       entityAssets: linkCount,
-      reserveSnapshots: snapshotCount,
     });
   } catch (err) {
     await client.query('rollback');
