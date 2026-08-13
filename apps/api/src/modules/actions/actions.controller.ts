@@ -8,6 +8,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ActionsService, type AssetRef } from './actions.service';
+import { OpsService } from '../ops/ops.service';
 import {
   type ActionNetwork,
   isMainnetEnabled,
@@ -150,7 +151,10 @@ function assertMainnetAsset(
 
 @Controller('v1/actions')
 export class ActionsController {
-  constructor(private readonly actionsService: ActionsService) {}
+  constructor(
+    private readonly actionsService: ActionsService,
+    private readonly opsService: OpsService,
+  ) {}
 
   @Post('blend/deposit')
   @HttpCode(HttpStatus.OK)
@@ -183,12 +187,23 @@ export class ActionsController {
       }
     }
 
-    return this.actionsService.buildBlendDeposit({
+    const result = await this.actionsService.buildBlendDeposit({
       address,
       asset,
       amount,
       network: resolvedNetwork,
     });
+
+    // E3 adoption counter — fire-and-forget (recordActionEvent never throws).
+    // Three outcomes: trustline-only build (2-step gate), successful deposit
+    // build, or failed simulation (empty xdr — nothing was built, no event).
+    if (result.trustlineRequired) {
+      void this.opsService.recordActionEvent('trustline-build', resolvedNetwork, address);
+    } else if (result.xdr) {
+      void this.opsService.recordActionEvent('blend-deposit-build', resolvedNetwork, address);
+    }
+
+    return result;
   }
 
   @Post('sdex/quote')
@@ -209,12 +224,17 @@ export class ActionsController {
       throw new BadRequestException('amount must be a positive numeric string');
     }
 
-    return this.actionsService.quoteSdexSwap({
+    const result = await this.actionsService.quoteSdexSwap({
       fromAsset: from,
       toAsset: to,
       amount,
       network: resolvedNetwork,
     });
+
+    // E3 adoption counter — quotes carry no acting address (null by design).
+    void this.opsService.recordActionEvent('sdex-quote', resolvedNetwork, null);
+
+    return result;
   }
 
   @Post('sdex/swap')
@@ -251,7 +271,7 @@ export class ActionsController {
       throw new BadRequestException('minReceive must be a positive numeric string');
     }
 
-    return this.actionsService.buildSdexSwap({
+    const result = await this.actionsService.buildSdexSwap({
       address,
       fromAsset: from,
       toAsset: to,
@@ -259,5 +279,11 @@ export class ActionsController {
       minReceive,
       network: resolvedNetwork,
     });
+
+    // E3 adoption counter — buildSdexSwap throws on failure, so reaching here
+    // means a signable XDR was produced.
+    void this.opsService.recordActionEvent('sdex-swap-build', resolvedNetwork, address);
+
+    return result;
   }
 }

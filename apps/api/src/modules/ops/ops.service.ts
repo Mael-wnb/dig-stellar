@@ -29,6 +29,33 @@ type RpcRunRow = {
   p99_ms: number;
 };
 
+// E3: the closed set of recorded build kinds (one row per successful build).
+export type ActionEventKind =
+  | 'sdex-quote'
+  | 'sdex-swap-build'
+  | 'blend-deposit-build'
+  | 'trustline-build';
+
+type WalletsRow = {
+  total: unknown;
+  signers: unknown;
+  distinct_users: unknown;
+};
+
+type ActionKindRow = {
+  kind: string;
+  network: string;
+  count_24h: unknown;
+  count_7d: unknown;
+  total: unknown;
+};
+
+type DistinctAddressesRow = {
+  d24h: unknown;
+  d7d: unknown;
+  total: unknown;
+};
+
 type StepSummaryRow = {
   step: string;
   last_run_at: unknown;
@@ -130,6 +157,91 @@ export class OpsService {
       scope: 'indexer refresh pipeline',
       rpc,
       steps,
+    };
+  }
+
+  // E3: fire-and-forget adoption event. A logging failure must NEVER fail the
+  // action build itself — swallow and warn. Callers do not await this.
+  async recordActionEvent(
+    kind: ActionEventKind,
+    network: string,
+    address: string | null,
+  ): Promise<void> {
+    try {
+      await this.prisma.$executeRawUnsafe(
+        `insert into action_events (kind, network, address) values ($1, $2, $3)`,
+        kind,
+        network,
+        address,
+      );
+    } catch (err) {
+      console.warn(
+        `[ops] action_events insert failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  // E3: adoption counters for the final tranche report / T3-D2 KPIs.
+  async getAdoption() {
+    const walletRows = (await this.prisma.$queryRawUnsafe(`
+      select
+        count(*)::int as total,
+        count(*) filter (where is_active_signer)::int as signers,
+        count(distinct user_id)::int as distinct_users
+      from user_wallets
+    `)) as WalletsRow[];
+    const wallets = walletRows[0];
+
+    const kindRows = (await this.prisma.$queryRawUnsafe(`
+      select
+        kind,
+        network,
+        count(*) filter (where created_at > now() - interval '24 hours')::int as count_24h,
+        count(*) filter (where created_at > now() - interval '7 days')::int as count_7d,
+        count(*)::int as total
+      from action_events
+      group by kind, network
+      order by kind asc, network asc
+    `)) as ActionKindRow[];
+
+    const addrRows = (await this.prisma.$queryRawUnsafe(`
+      select
+        count(distinct address) filter (where created_at > now() - interval '24 hours')::int as d24h,
+        count(distinct address) filter (where created_at > now() - interval '7 days')::int as d7d,
+        count(distinct address)::int as total
+      from action_events
+      where address is not null
+    `)) as DistinctAddressesRow[];
+    const addrs = addrRows[0];
+
+    return {
+      // Stated honest boundary (Lot E brief): builds, not executions.
+      boundary:
+        'Counts successful server-side BUILDS (quotes + signable XDRs). ' +
+        'On-chain submission happens client-side (non-custodial); executed-tx ' +
+        'evidence remains the manually kept transaction-hash list. Counters ' +
+        'start at deploy — no historical backfill exists.',
+      wallets: {
+        total: toInt(wallets?.total),
+        signers: toInt(wallets?.signers),
+        watchOnly: toInt(wallets?.total) - toInt(wallets?.signers),
+        distinctUsers: toInt(wallets?.distinct_users),
+      },
+      actions: {
+        total: kindRows.reduce((sum, r) => sum + toInt(r.total), 0),
+        byKind: kindRows.map((r) => ({
+          kind: r.kind,
+          network: r.network,
+          count24h: toInt(r.count_24h),
+          count7d: toInt(r.count_7d),
+          total: toInt(r.total),
+        })),
+        distinctAddresses: {
+          count24h: toInt(addrs?.d24h),
+          count7d: toInt(addrs?.d7d),
+          total: toInt(addrs?.total),
+        },
+      },
     };
   }
 }

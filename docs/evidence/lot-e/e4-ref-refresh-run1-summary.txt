@@ -1,0 +1,14 @@
+=== Refresh step summary ===
+step 1 prices:reference: SUCCESS in 0.8s
+step 2 prices:soroswap-derived: FAILED (2/2 failed — soroswap-native-eurc-pair: Command failed (1): pnpm tsx src/scripts/ingest/63-price-soroswap-derived.ts; soroswap-native-usdc-pair: Command failed (1): pnpm tsx src/scripts/ingest/63-price-soroswap-derived.ts) in 58.5s
+step 3 blend: SUCCESS in 10.7s
+step 4 soroswap: SUCCESS in 24.9s
+step 5 aquarius: FAILED (4/4 failed — aquarius-native-solvbtc-pool: Command failed (1): pnpm tsx src/scripts/ingest/run-aquarius-pool-refresh.ts; aquarius-native-usdc-pool: Command failed (1): pnpm tsx src/scripts/ingest/run-aquarius-pool-refresh.ts; aquarius-pyusd-usdc-pool: Command failed (1): pnpm tsx src/scripts/ingest/run-aquarius-pool-refresh.ts; aquarius-xsolvbtc-solvbtc-pool: Command failed (1): pnpm tsx src/scripts/ingest/run-aquarius-pool-refresh.ts) in 136.9s
+step 6 stellar-native: SUCCESS in 44.7s
+step 7 defindex: FAILED (3/3 failed — defindex-beans-eurc: Command failed (1): pnpm tsx src/scripts/ingest/run-defindex-refresh.ts; defindex-beans-usdc: Command failed (1): pnpm tsx src/scripts/ingest/run-defindex-refresh.ts; defindex-meru-usdc: Command failed (1): pnpm tsx src/scripts/ingest/run-defindex-refresh.ts) in 87.8s
+step 8 protocol-metrics: SUCCESS in 0.5s
+step 9 allbridge: SUCCESS in 1.5s
+step 10 network-stats: SUCCESS in 1.2s
+
+3 step(s) FAILED (10 total)
+Total job duration: 367.6s

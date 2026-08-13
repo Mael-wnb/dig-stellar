@@ -1,0 +1,35 @@
+# Minimal CI (E4 bonus, Lot E — T3-D3): builds + tests on push/PR.
+# Deliberately small — CI/CD beyond this is out of scope for the beta
+# (manual VPS deploy, documented in docs/deployment.md + docs/runbooks.md).
+name: ci
+
+on:
+  push:
+    branches: [main, alpha]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # @prisma/client is imported by the API build (generate needs no DB).
+      - run: pnpm -C packages/db prisma:generate
+
+      - run: pnpm -C apps/api build
+      - run: pnpm -C apps/api test
+
+      # vue-tsc typecheck runs inside the web build.
+      - run: pnpm -C apps/web build

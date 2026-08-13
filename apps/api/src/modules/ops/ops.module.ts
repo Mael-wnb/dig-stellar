@@ -8,5 +8,7 @@ import { OpsService } from './ops.service';
   imports: [DbModule],
   controllers: [OpsController],
   providers: [OpsService],
+  // Exported so ActionsModule can record adoption events (E3) on successful builds.
+  exports: [OpsService],
 })
 export class OpsModule {}

@@ -1,0 +1,14 @@
+=== Refresh step summary ===
+step 1 prices:reference: SUCCESS in 0.8s
+step 2 prices:soroswap-derived: SUCCESS in 1.0s
+step 3 blend: SUCCESS in 10.7s
+step 4 soroswap: SUCCESS in 6.6s
+step 5 aquarius: SUCCESS in 44.2s
+step 6 stellar-native: SUCCESS in 45.6s
+step 7 defindex: FAILED (3/3 failed — defindex-beans-eurc: Command failed (1): pnpm tsx src/scripts/ingest/run-defindex-refresh.ts; defindex-beans-usdc: Command failed (1): pnpm tsx src/scripts/ingest/run-defindex-refresh.ts; defindex-meru-usdc: Command failed (1): pnpm tsx src/scripts/ingest/run-defindex-refresh.ts) in 87.8s
+step 8 protocol-metrics: SUCCESS in 0.5s
+step 9 allbridge: SUCCESS in 1.2s
+step 10 network-stats: SUCCESS in 1.0s
+
+1 step(s) FAILED (10 total)
+Total job duration: 199.5s

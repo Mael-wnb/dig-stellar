@@ -103,8 +103,23 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   `GET /v1/ops/metrics` (24h window; error rate aggregated, percentiles strictly per-run). Proven
   with 2 real refresh runs + 1 forced-failure run (bogus RPC: errors counted, FAILED steps queryable).
   Known boundary: indexer calls only (API-side Horizon preflight not captured). Evidence:
-  `docs/evidence/lot-e/`. Remaining T3-D3: E3 adoption counters + E4 reference packaging (+ optional
-  CI bonus) + final demo.
+  `docs/evidence/lot-e/`.
+- T3-D3 note (2026-08-13, later): **Lot E E3+E4 landed — Lot E build COMPLETE, VPS deploy pending.**
+  **E3** adoption counters: `action_events` (one row per successful server-side build; fire-and-forget
+  insert) + `GET /v1/ops/adoption` (wallets total/signers/watch-only/distinct users, builds by
+  kind/network 24h/7d/total, distinct acting addresses; builds-not-executions boundary stated in the
+  payload). Proven live on testnet: quote + swap-build + trustline-build each visibly incremented.
+  **E4** reference packaging: compose parameterized (ports/prefix/project-name), `.env.example` per
+  app (api new; indexer corrected — `STELLAR_SOURCE_ACCOUNT` is required by aquarius), NEW
+  `bootstrap:core`/`bootstrap:export` (committed `registries/core-registry.json` — the legacy
+  per-protocol bootstraps were un-runnable: their tmp/discovery registries no longer exist),
+  `docs/reference-deployment.md` quickstart **proven from a fresh copy, no secrets, side-by-side
+  stack**: 9/10 steps green (defindex needs its API key, documented), dashboard served with
+  production-matching TVLs. CI bonus: `.github/workflows/ci.yml` (build+test on push; runs on first
+  push). **Known issue flagged for follow-up:** Soroswap+Aquarius reserve TVL reads
+  `reserve_snapshots` that nothing on the live path writes — production values frozen at 2026-03-19
+  reserves (× live prices); live writer = its own change, deliberately not in Lot E. Evidence:
+  `docs/evidence/lot-e/`. Remaining T3-D3: evidence assembly + final demo (no build work left).
 - Last updated: 2026-08-13
 
 ---

@@ -1,23 +1,41 @@
+# Dig Stellar — reference infrastructure stack (E4, Lot E — T3-D3).
+#
+# Runs the two infrastructure services (Postgres 16 + Redis 7). The application
+# processes run as documented pnpm services on the host — the deliberate
+# simplest-that-works choice for the reference deployment:
+#   api   -> pnpm -C apps/api start:dev        (NestJS, :3000)
+#   web   -> pnpm -C apps/web dev              (Vite, :5173)
+#   indexer -> one-shot cron-style commands (pnpm -C apps/indexer job:refresh),
+#              NOT a daemon.
+# Full quickstart (clone -> rendering dashboard): docs/reference-deployment.md.
+#
+# Host ports and container-name prefix are overridable so a second stack (e.g. a
+# fresh-clone verification) can run next to this one. CRITICAL: also set a distinct
+# COMPOSE_PROJECT_NAME — compose identifies a stack by project name (default = the
+# directory name), and a second checkout with the same project name REPLACES your
+# running containers and mounts your existing data volumes:
+#   COMPOSE_PROJECT_NAME=dig_ref DIG_CONTAINER_PREFIX=dig_ref \
+#   POSTGRES_PORT=15432 REDIS_PORT=16379 docker compose up -d
 services:
   postgres:
     image: postgres:16
-    container_name: dig_stellar_postgres
+    container_name: ${DIG_CONTAINER_PREFIX:-dig_stellar}_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: dig
       POSTGRES_PASSWORD: dig
       POSTGRES_DB: dig_stellar
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - dig_stellar_pgdata:/var/lib/postgresql/data
 
   redis:
     image: redis:7
-    container_name: dig_stellar_redis
+    container_name: ${DIG_CONTAINER_PREFIX:-dig_stellar}_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - dig_stellar_redisdata:/data
 

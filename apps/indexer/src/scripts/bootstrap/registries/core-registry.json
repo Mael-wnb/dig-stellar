@@ -1,0 +1,986 @@
+{
+  "generatedAt": "2026-08-13T10:14:25.344Z",
+  "source": "registry-export.ts (live DB snapshot of the vetted perimeter)",
+  "venues": [
+    {
+      "slug": "allbridge",
+      "name": "Allbridge",
+      "chain": "stellar-mainnet",
+      "venue_type": "bridge",
+      "logo_url": null,
+      "metadata": {
+        "source": "allbridge-upsert-core",
+        "bridgeContract": "CBQ6GW7QCFFE252QEVENUNG45KYHHBRO4IZIWFJOXEFANHPQUXX5NFWV"
+      }
+    },
+    {
+      "slug": "aquarius",
+      "name": "Aquarius",
+      "chain": "stellar-mainnet",
+      "venue_type": "amm",
+      "logo_url": null,
+      "metadata": {
+        "source": "aquarius_final_registry",
+        "generatedAt": "2026-03-20T18:13:52.451Z"
+      }
+    },
+    {
+      "slug": "blend",
+      "name": "Blend",
+      "chain": "stellar-mainnet",
+      "venue_type": "lending",
+      "logo_url": null,
+      "metadata": {
+        "source": "blend_final_registry",
+        "generatedAt": "2026-03-19T15:40:59.067Z"
+      }
+    },
+    {
+      "slug": "defindex",
+      "name": "DeFindex",
+      "chain": "stellar-mainnet",
+      "venue_type": "vault",
+      "logo_url": null,
+      "metadata": {
+        "source": "defindex_bootstrap",
+        "category": "yield",
+        "enumeration": "GET /vault/discover?network=mainnet (2026-08-02)"
+      }
+    },
+    {
+      "slug": "soroswap",
+      "name": "Soroswap",
+      "chain": "stellar-mainnet",
+      "venue_type": "amm",
+      "logo_url": null,
+      "metadata": {
+        "source": "59-soroswap-final-registry",
+        "generatedAt": "2026-03-19T23:55:25.328Z"
+      }
+    },
+    {
+      "slug": "stellar-native",
+      "name": "Stellar Native DEX",
+      "chain": "stellar-mainnet",
+      "venue_type": "amm",
+      "logo_url": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/stellar/info/logo.png",
+      "metadata": {
+        "source": "horizon-liquidity-pools"
+      }
+    }
+  ],
+  "entities": [
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-native-solvbtc-pool",
+      "name": "native-SolvBTC Aquarius Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CD2O2B6PWKXDVFXMHXHQMF25C4TWOSQAENA7DNFR5G27F5CHJ7AJP5F6",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 10,
+          "pool_type": "constant_product"
+        },
+        "source": "aquarius_final_registry",
+        "token0": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+        "token1": "CBIJBDNZNF4X35BJ4FFZWCDBSCKOP5NB4PLG4SNENRMLAPYG4P5FM6VN",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-native-usdc-pool",
+      "name": "native-USDC Aquarius Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CA6PUJLBYKZKUEKLZJMKBZLEKP2OTHANDEOWSFF44FTSYLKQPIICCJBE",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 10,
+          "pool_type": "constant_product"
+        },
+        "source": "aquarius_final_registry",
+        "token0": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+        "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-pyusd-usdc-pool",
+      "name": "PYUSD-USDC Aquarius Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CDMH535JSD224YXPET3B4SJOLXTQQ24GRSCWACGYBKSH2DKFJYWI7SUW",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "a": "1500",
+          "fee": 10,
+          "n_tokens": 2,
+          "pool_type": "stable"
+        },
+        "source": "aquarius_final_registry",
+        "token0": "CCCRWH6Q3FNP3I2I57BDLM5AFAT7O6OF6GKQOC6SSJNDAVRZ57SPHGU2",
+        "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-xsolvbtc-solvbtc-pool",
+      "name": "xSolvBTC-SolvBTC Aquarius Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CCNXGPE4AQCSNEBZO3XJDKKDI3CRLYMVS6UWBBTVDLALLWMJEXBORQ2A",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "a": "1500",
+          "fee": 10,
+          "n_tokens": 2,
+          "pool_type": "stable"
+        },
+        "source": "aquarius_final_registry",
+        "token0": "CAUP7NFABXE5TJRL3FKTPMWRLC7IAXYDCTHQRFSCLR5TMGKHOOQO772J",
+        "token1": "CBIJBDNZNF4X35BJ4FFZWCDBSCKOP5NB4PLG4SNENRMLAPYG4P5FM6VN",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "blend",
+      "slug": "blend-etherfuse-pool",
+      "name": "Etherfuse",
+      "entity_type": "lending_pool",
+      "contract_address": "CDMAVJPFXPADND3YRL4BSM3AKZWCTFMX27GLLXCML3PD62HEQS5FPVAI",
+      "is_active": true,
+      "metadata": {
+        "admin": "GDH3FRHOOWXYXEASH43N2VOVFOPJSVJF3EQFSLBLJYFPHOUAF4N4AETH",
+        "oracle": "CAVRP26CWW6IUEXBRA3Q2T2SHBUVBC2DF43M4E23LEZGW5ZEIB62HALS",
+        "source": "lib/protocols/blend/persist-pool-state",
+        "status": 1,
+        "backstop": "CAQQR5SWBXKIGZKPBZDH3KM5GQ5GUTPKB7JAFCINLZBC5WXPJKRG3IM7",
+        "maxPositions": 6,
+        "reserveCount": 5,
+        "minCollateral": "500000000000000"
+      }
+    },
+    {
+      "venue_slug": "blend",
+      "slug": "blend-fixed-pool",
+      "name": "Fixed",
+      "entity_type": "lending_pool",
+      "contract_address": "CAJJZSGMMM3PD7N33TAPHGBUGTB43OC73HVIK2L2G6BNGGGYOSSYBXBD",
+      "is_active": true,
+      "metadata": {
+        "admin": "GAX2VVWVHU5YQY5J3NJBXKHI3FFKZN54BE6GRJCWSIKSBZTQWJJNJMPC",
+        "oracle": "CCVTVW2CVA7JLH4ROQGP3CU4T3EXVCK66AZGSM4MUQPXAI4QHCZPOATS",
+        "source": "lib/protocols/blend/persist-pool-state",
+        "status": 1,
+        "backstop": "CAQQR5SWBXKIGZKPBZDH3KM5GQ5GUTPKB7JAFCINLZBC5WXPJKRG3IM7",
+        "maxPositions": 6,
+        "reserveCount": 3,
+        "minCollateral": "50000000"
+      }
+    },
+    {
+      "venue_slug": "blend",
+      "slug": "blend-orbit-pool",
+      "name": "Orbit",
+      "entity_type": "lending_pool",
+      "contract_address": "CAE7QVOMBLZ53CDRGK3UNRRHG5EZ5NQA7HHTFASEMYBWHG6MDFZTYHXC",
+      "is_active": true,
+      "metadata": {
+        "admin": "GDILTRFIVX4CM2S74PHNAMCCLIARBPLVFRXBSV7G4QL6TM6W5LQ26A7C",
+        "oracle": "CAD2MCFUXSNE4NU3G3YQUIWRZYPAUIPN45NHQCEBGJXRGFXU62JQOTUU",
+        "source": "lib/protocols/blend/persist-pool-state",
+        "status": 4,
+        "backstop": "CAQQR5SWBXKIGZKPBZDH3KM5GQ5GUTPKB7JAFCINLZBC5WXPJKRG3IM7",
+        "maxPositions": 6,
+        "reserveCount": 4,
+        "minCollateral": "1000000000000000"
+      }
+    },
+    {
+      "venue_slug": "blend",
+      "slug": "blend-yieldblox-pool",
+      "name": "YieldBlox",
+      "entity_type": "lending_pool",
+      "contract_address": "CCCCIQSDILITHMM7PBSLVDT5MISSY7R26MNZXCX4H7J5JQ5FPIYOGYFS",
+      "is_active": true,
+      "metadata": {
+        "admin": "CANSYFVMIP7JVYEZQ463Y2I2VLEVNLDJJ4QNZTDBGLOOGKURPTW4A6FQ",
+        "oracle": "CD74A3C54EKUVEGUC6WNTUPOTHB624WFKXN3IYTFJGX3EHXDXHCYMXXR",
+        "source": "lib/protocols/blend/persist-pool-state",
+        "status": 0,
+        "backstop": "CAQQR5SWBXKIGZKPBZDH3KM5GQ5GUTPKB7JAFCINLZBC5WXPJKRG3IM7",
+        "maxPositions": 6,
+        "reserveCount": 8,
+        "minCollateral": "50000000"
+      }
+    },
+    {
+      "venue_slug": "defindex",
+      "slug": "defindex-beans-eurc",
+      "name": "DeFindex Beans (EURC)",
+      "entity_type": "yield_vault",
+      "contract_address": "CAIZ3NMNPEN5SQISJV7PD2YY6NI6DIPFA4PCRUBOGDE4I7A3DXDLK5OI",
+      "is_active": true,
+      "metadata": {
+        "source": "defindex_bootstrap",
+        "vaultSymbol": "BNSEURC",
+        "seedEvidence": {
+          "strategies": [
+            "eurc_blend_autocompound_fixed"
+          ],
+          "discoveredApyPct": 5.37,
+          "discoveredEurcAmount": 172800
+        },
+        "underlyingAsset": "CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV",
+        "underlyingSymbol": "EURC"
+      }
+    },
+    {
+      "venue_slug": "defindex",
+      "slug": "defindex-beans-usdc",
+      "name": "DeFindex Beans (USDC)",
+      "entity_type": "yield_vault",
+      "contract_address": "CBNKCU3HGFKHFOF7JTGXQCNKE3G3DXS5RDBQUKQMIIECYKXPIOUGB2S3",
+      "is_active": true,
+      "metadata": {
+        "source": "defindex_bootstrap",
+        "vaultSymbol": "BNSUSDC",
+        "seedEvidence": {
+          "strategies": [
+            "usdc_blend_autocompound_fixed"
+          ],
+          "discoveredApyPct": 6.99,
+          "discoveredTvlUsd": 506000
+        },
+        "underlyingAsset": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "underlyingSymbol": "USDC"
+      }
+    },
+    {
+      "venue_slug": "defindex",
+      "slug": "defindex-meru-usdc",
+      "name": "DeFindex Meru (USDC)",
+      "entity_type": "yield_vault",
+      "contract_address": "CCA2ZJP5BVRXYTQH4FAGHCAUMRYCXVC4CRYC2NXHWMR7TIVX36U7F5HR",
+      "is_active": true,
+      "metadata": {
+        "source": "defindex_bootstrap",
+        "vaultSymbol": "MERU",
+        "seedEvidence": {
+          "strategies": [
+            "USDC Autocompound Blend Fixed",
+            "USDC Autocompound Blend YieldBlox"
+          ],
+          "discoveredApyPct": 7.87,
+          "discoveredTvlUsd": 17900000
+        },
+        "underlyingAsset": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "underlyingSymbol": "USDC"
+      }
+    },
+    {
+      "venue_slug": "soroswap",
+      "slug": "soroswap-native-eurc-pair",
+      "name": "native-EURC Soroswap LP Token",
+      "entity_type": "amm_pool",
+      "contract_address": "CATUJXDUO7SSSTAKSUV5YU6RSTB4B5AVIHQDV26QTCXOB46T6SLMWNMY",
+      "is_active": true,
+      "metadata": {
+        "source": "59-soroswap-final-registry",
+        "token0": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+        "token1": "CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "soroswap",
+      "slug": "soroswap-native-usdc-pair",
+      "name": "native-USDC Soroswap LP Token",
+      "entity_type": "amm_pool",
+      "contract_address": "CAM7DY53G63XA4AJRS24Z6VFYAFSSF76C3RZ45BE5YU3FQS5255OOABP",
+      "is_active": true,
+      "metadata": {
+        "source": "59-soroswap-final-registry",
+        "token0": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+        "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "reserveCount": 2
+      }
+    }
+  ],
+  "assets": [
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK",
+      "asset_type": "soroban_token",
+      "symbol": "AQUA",
+      "name": "AQUA:GBNZILSTVQZ4R7IKQDGHYGY2QXL5QOFJYQMXPKWRRM5PAV7Y4M67AQUA",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CAL6ER2TI6CTRAY6BFXWNWA7WTYXUXTQCHUBCIBU5O6KM3HJFG6Z6VXV",
+      "asset_type": "soroban_token",
+      "symbol": "CETES",
+      "name": "CETES:GCRYUGD5NVARGXT56XEZI5CIFCQETYHAPQQTHO2O3IQZTHDH4LATMYWC",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV",
+      "asset_type": "soroban_token",
+      "symbol": "EURC",
+      "name": "EURC:GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2",
+      "decimals": 7,
+      "logo_url": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c/logo.png",
+      "metadata": {
+        "source": "59-soroswap-final-registry",
+        "generatedAt": "2026-03-19T23:55:25.328Z"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "asset_type": "soroban_token",
+      "symbol": "native",
+      "name": "native",
+      "decimals": 7,
+      "logo_url": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/stellar/info/logo.png",
+      "metadata": {
+        "source": "aquarius_active_pool_assets",
+        "generatedAt": "2026-03-20T18:12:53.225Z"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CBZPEXQLJCGUYTAQRQ4FGCXUV5O4TZER5WSOMCGNDNIIO4EJ4FU5GQNZ",
+      "asset_type": "soroban_token",
+      "symbol": "oUSD",
+      "name": "oUSD:GBIWJGAOSFC4KUPHXM573TKTWHMI7VW7D4GCHYZYH243Q6HVBV7ORBIT",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CCCRWH6Q3FNP3I2I57BDLM5AFAT7O6OF6GKQOC6SSJNDAVRZ57SPHGU2",
+      "asset_type": "soroban_token",
+      "symbol": "PYUSD",
+      "name": "PYUSD:GDQE7IXJ4HUHV6RQHIUPRJSEZE4DRS5WY577O2FY6YQ5LVWZ7JZTU2V5",
+      "decimals": 7,
+      "logo_url": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6c3ea9036406852006290770BEdFcAbA0e23A0e8/logo.png",
+      "metadata": {
+        "source": "aquarius_active_pool_assets",
+        "generatedAt": "2026-03-20T18:09:04.003Z"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CBIJBDNZNF4X35BJ4FFZWCDBSCKOP5NB4PLG4SNENRMLAPYG4P5FM6VN",
+      "asset_type": "soroban_token",
+      "symbol": "SolvBTC",
+      "name": "Solv BTC",
+      "decimals": 8,
+      "logo_url": null,
+      "metadata": {
+        "source": "aquarius_active_pool_assets",
+        "generatedAt": "2026-03-20T18:13:52.451Z"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CD6M4R2322BYCY2LNWM74PEBQAQ63SA3DUJLI3L4225U4ZVCLMSCBCIS",
+      "asset_type": "soroban_token",
+      "symbol": "TESOURO",
+      "name": "TESOURO:GCRYUGD5NVARGXT56XEZI5CIFCQETYHAPQQTHO2O3IQZTHDH4LATMYWC",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "asset_type": "soroban_token",
+      "symbol": "USDC",
+      "name": "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+      "decimals": 7,
+      "logo_url": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
+      "metadata": {
+        "source": "aquarius_active_pool_assets",
+        "generatedAt": "2026-03-20T18:09:04.003Z"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CB226ZOEYXTBPD3QEGABTJYSKZVBP2PASEISLG3SBMTN5CE4QZUVZ3CE",
+      "asset_type": "soroban_token",
+      "symbol": "USDGLO",
+      "name": "USDGLO:GBBS25EGYQPGEZCGCFBKG4OAGFXU6DSOQBGTHELLJT3HZXZJ34HWS6XV",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CBLV4ATSIWU67CFSQU2NVRKINQIKUZ2ODSZBUJTJ43VJVRSBTZYOPNUR",
+      "asset_type": "soroban_token",
+      "symbol": "USTRY",
+      "name": "USTRY:GCRYUGD5NVARGXT56XEZI5CIFCQETYHAPQQTHO2O3IQZTHDH4LATMYWC",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CAUP7NFABXE5TJRL3FKTPMWRLC7IAXYDCTHQRFSCLR5TMGKHOOQO772J",
+      "asset_type": "soroban_token",
+      "symbol": "xSolvBTC",
+      "name": "xSolvBTC",
+      "decimals": 8,
+      "logo_url": null,
+      "metadata": {
+        "source": "aquarius_active_pool_assets",
+        "generatedAt": "2026-03-20T18:13:52.451Z"
+      }
+    }
+  ],
+  "entityAssets": [
+    {
+      "entity_slug": "aquarius-native-solvbtc-pool",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "role": "token0",
+      "metadata": {
+        "source": "aquarius_final_registry"
+      }
+    },
+    {
+      "entity_slug": "aquarius-native-solvbtc-pool",
+      "asset_contract_address": "CBIJBDNZNF4X35BJ4FFZWCDBSCKOP5NB4PLG4SNENRMLAPYG4P5FM6VN",
+      "role": "token1",
+      "metadata": {
+        "source": "aquarius_final_registry"
+      }
+    },
+    {
+      "entity_slug": "aquarius-native-usdc-pool",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "role": "token0",
+      "metadata": {
+        "source": "aquarius_final_registry"
+      }
+    },
+    {
+      "entity_slug": "aquarius-native-usdc-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token1",
+      "metadata": {
+        "source": "aquarius_final_registry"
+      }
+    },
+    {
+      "entity_slug": "aquarius-pyusd-usdc-pool",
+      "asset_contract_address": "CCCRWH6Q3FNP3I2I57BDLM5AFAT7O6OF6GKQOC6SSJNDAVRZ57SPHGU2",
+      "role": "token0",
+      "metadata": {
+        "source": "aquarius_final_registry"
+      }
+    },
+    {
+      "entity_slug": "aquarius-pyusd-usdc-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token1",
+      "metadata": {
+        "source": "aquarius_final_registry"
+      }
+    },
+    {
+      "entity_slug": "aquarius-xsolvbtc-solvbtc-pool",
+      "asset_contract_address": "CAUP7NFABXE5TJRL3FKTPMWRLC7IAXYDCTHQRFSCLR5TMGKHOOQO772J",
+      "role": "token0",
+      "metadata": {
+        "source": "aquarius_final_registry"
+      }
+    },
+    {
+      "entity_slug": "aquarius-xsolvbtc-solvbtc-pool",
+      "asset_contract_address": "CBIJBDNZNF4X35BJ4FFZWCDBSCKOP5NB4PLG4SNENRMLAPYG4P5FM6VN",
+      "role": "token1",
+      "metadata": {
+        "source": "aquarius_final_registry"
+      }
+    },
+    {
+      "entity_slug": "blend-etherfuse-pool",
+      "asset_contract_address": "CAL6ER2TI6CTRAY6BFXWNWA7WTYXUXTQCHUBCIBU5O6KM3HJFG6Z6VXV",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-etherfuse-pool",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-etherfuse-pool",
+      "asset_contract_address": "CBLV4ATSIWU67CFSQU2NVRKINQIKUZ2ODSZBUJTJ43VJVRSBTZYOPNUR",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-etherfuse-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-etherfuse-pool",
+      "asset_contract_address": "CD6M4R2322BYCY2LNWM74PEBQAQ63SA3DUJLI3L4225U4ZVCLMSCBCIS",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-fixed-pool",
+      "asset_contract_address": "CAL6ER2TI6CTRAY6BFXWNWA7WTYXUXTQCHUBCIBU5O6KM3HJFG6Z6VXV",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-fixed-pool",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-fixed-pool",
+      "asset_contract_address": "CBLV4ATSIWU67CFSQU2NVRKINQIKUZ2ODSZBUJTJ43VJVRSBTZYOPNUR",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-fixed-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-fixed-pool",
+      "asset_contract_address": "CD6M4R2322BYCY2LNWM74PEBQAQ63SA3DUJLI3L4225U4ZVCLMSCBCIS",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-fixed-pool",
+      "asset_contract_address": "CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-orbit-pool",
+      "asset_contract_address": "CAL6ER2TI6CTRAY6BFXWNWA7WTYXUXTQCHUBCIBU5O6KM3HJFG6Z6VXV",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-orbit-pool",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-orbit-pool",
+      "asset_contract_address": "CBLV4ATSIWU67CFSQU2NVRKINQIKUZ2ODSZBUJTJ43VJVRSBTZYOPNUR",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-orbit-pool",
+      "asset_contract_address": "CBZPEXQLJCGUYTAQRQ4FGCXUV5O4TZER5WSOMCGNDNIIO4EJ4FU5GQNZ",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-orbit-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-orbit-pool",
+      "asset_contract_address": "CD6M4R2322BYCY2LNWM74PEBQAQ63SA3DUJLI3L4225U4ZVCLMSCBCIS",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-yieldblox-pool",
+      "asset_contract_address": "CAL6ER2TI6CTRAY6BFXWNWA7WTYXUXTQCHUBCIBU5O6KM3HJFG6Z6VXV",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-yieldblox-pool",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-yieldblox-pool",
+      "asset_contract_address": "CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-yieldblox-pool",
+      "asset_contract_address": "CB226ZOEYXTBPD3QEGABTJYSKZVBP2PASEISLG3SBMTN5CE4QZUVZ3CE",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-yieldblox-pool",
+      "asset_contract_address": "CBLV4ATSIWU67CFSQU2NVRKINQIKUZ2ODSZBUJTJ43VJVRSBTZYOPNUR",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-yieldblox-pool",
+      "asset_contract_address": "CCCRWH6Q3FNP3I2I57BDLM5AFAT7O6OF6GKQOC6SSJNDAVRZ57SPHGU2",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-yieldblox-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "blend-yieldblox-pool",
+      "asset_contract_address": "CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV",
+      "role": "reserve",
+      "metadata": {
+        "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "entity_slug": "defindex-beans-eurc",
+      "asset_contract_address": "CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV",
+      "role": "underlying",
+      "metadata": {
+        "source": "defindex_bootstrap"
+      }
+    },
+    {
+      "entity_slug": "defindex-beans-usdc",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "underlying",
+      "metadata": {
+        "source": "defindex_bootstrap"
+      }
+    },
+    {
+      "entity_slug": "defindex-meru-usdc",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "underlying",
+      "metadata": {
+        "source": "defindex_bootstrap"
+      }
+    },
+    {
+      "entity_slug": "soroswap-native-eurc-pair",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "role": "token0",
+      "metadata": {
+        "source": "59-soroswap-final-registry"
+      }
+    },
+    {
+      "entity_slug": "soroswap-native-eurc-pair",
+      "asset_contract_address": "CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV",
+      "role": "token1",
+      "metadata": {
+        "source": "59-soroswap-final-registry"
+      }
+    },
+    {
+      "entity_slug": "soroswap-native-usdc-pair",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "role": "token0",
+      "metadata": {
+        "source": "59-soroswap-final-registry"
+      }
+    },
+    {
+      "entity_slug": "soroswap-native-usdc-pair",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token1",
+      "metadata": {
+        "source": "59-soroswap-final-registry"
+      }
+    }
+  ],
+  "reserveSnapshots": [
+    {
+      "entity_slug": "aquarius-native-solvbtc-pool",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "snapshot_at": "2026-03-20T18:12:54.032Z",
+      "symbol": "native",
+      "name": "native",
+      "decimals": 7,
+      "enabled": true,
+      "d_supply_raw": "174154004091879",
+      "d_supply_scaled": "17415400.4091879",
+      "metadata": {
+        "source": "61-aquarius-reserve-snapshots-db-ready"
+      }
+    },
+    {
+      "entity_slug": "aquarius-native-solvbtc-pool",
+      "asset_contract_address": "CBIJBDNZNF4X35BJ4FFZWCDBSCKOP5NB4PLG4SNENRMLAPYG4P5FM6VN",
+      "snapshot_at": "2026-03-20T18:12:54.032Z",
+      "symbol": "SolvBTC",
+      "name": "Solv BTC",
+      "decimals": 8,
+      "enabled": true,
+      "d_supply_raw": "4132315200",
+      "d_supply_scaled": "41.323152",
+      "metadata": {
+        "source": "61-aquarius-reserve-snapshots-db-ready"
+      }
+    },
+    {
+      "entity_slug": "aquarius-native-usdc-pool",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "snapshot_at": "2026-03-20T18:07:00.441Z",
+      "symbol": "native",
+      "name": "native",
+      "decimals": 7,
+      "enabled": true,
+      "d_supply_raw": "135025854044974",
+      "d_supply_scaled": "13502585.4044974",
+      "metadata": {
+        "source": "61-aquarius-reserve-snapshots-db-ready"
+      }
+    },
+    {
+      "entity_slug": "aquarius-native-usdc-pool",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "snapshot_at": "2026-03-20T17:48:36.832Z",
+      "symbol": "native",
+      "name": "native",
+      "decimals": 7,
+      "enabled": true,
+      "d_supply_raw": "135025854044974",
+      "d_supply_scaled": "13502585.4044974",
+      "metadata": {
+        "source": "61-aquarius-reserve-snapshots-db-ready"
+      }
+    },
+    {
+      "entity_slug": "aquarius-native-usdc-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "snapshot_at": "2026-03-20T18:07:00.441Z",
+      "symbol": "USDC",
+      "name": "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+      "decimals": 7,
+      "enabled": true,
+      "d_supply_raw": "22317028827053",
+      "d_supply_scaled": "2231702.8827053",
+      "metadata": {
+        "source": "61-aquarius-reserve-snapshots-db-ready"
+      }
+    },
+    {
+      "entity_slug": "aquarius-native-usdc-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "snapshot_at": "2026-03-20T17:48:36.832Z",
+      "symbol": "USDC",
+      "name": "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+      "decimals": 7,
+      "enabled": true,
+      "d_supply_raw": "22317028827053",
+      "d_supply_scaled": "2231702.8827053",
+      "metadata": {
+        "source": "61-aquarius-reserve-snapshots-db-ready"
+      }
+    },
+    {
+      "entity_slug": "aquarius-pyusd-usdc-pool",
+      "asset_contract_address": "CCCRWH6Q3FNP3I2I57BDLM5AFAT7O6OF6GKQOC6SSJNDAVRZ57SPHGU2",
+      "snapshot_at": "2026-03-20T18:09:04.790Z",
+      "symbol": "PYUSD",
+      "name": "PYUSD:GDQE7IXJ4HUHV6RQHIUPRJSEZE4DRS5WY577O2FY6YQ5LVWZ7JZTU2V5",
+      "decimals": 7,
+      "enabled": true,
+      "d_supply_raw": "41012361565041",
+      "d_supply_scaled": "4101236.1565041",
+      "metadata": {
+        "source": "61-aquarius-reserve-snapshots-db-ready"
+      }
+    },
+    {
+      "entity_slug": "aquarius-pyusd-usdc-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "snapshot_at": "2026-03-20T18:09:04.790Z",
+      "symbol": "USDC",
+      "name": "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+      "decimals": 7,
+      "enabled": true,
+      "d_supply_raw": "39269080564112",
+      "d_supply_scaled": "3926908.0564112",
+      "metadata": {
+        "source": "61-aquarius-reserve-snapshots-db-ready"
+      }
+    },
+    {
+      "entity_slug": "aquarius-xsolvbtc-solvbtc-pool",
+      "asset_contract_address": "CAUP7NFABXE5TJRL3FKTPMWRLC7IAXYDCTHQRFSCLR5TMGKHOOQO772J",
+      "snapshot_at": "2026-03-20T18:13:53.232Z",
+      "symbol": "xSolvBTC",
+      "name": "xSolvBTC",
+      "decimals": 8,
+      "enabled": true,
+      "d_supply_raw": "1569006763",
+      "d_supply_scaled": "15.69006763",
+      "metadata": {
+        "source": "61-aquarius-reserve-snapshots-db-ready"
+      }
+    },
+    {
+      "entity_slug": "aquarius-xsolvbtc-solvbtc-pool",
+      "asset_contract_address": "CBIJBDNZNF4X35BJ4FFZWCDBSCKOP5NB4PLG4SNENRMLAPYG4P5FM6VN",
+      "snapshot_at": "2026-03-20T18:13:53.232Z",
+      "symbol": "SolvBTC",
+      "name": "Solv BTC",
+      "decimals": 8,
+      "enabled": true,
+      "d_supply_raw": "1960411533",
+      "d_supply_scaled": "19.60411533",
+      "metadata": {
+        "source": "61-aquarius-reserve-snapshots-db-ready"
+      }
+    },
+    {
+      "entity_slug": "soroswap-native-eurc-pair",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "snapshot_at": "2026-03-19T23:55:26.071Z",
+      "symbol": "native",
+      "name": "native",
+      "decimals": 7,
+      "enabled": true,
+      "d_supply_raw": "12669573042347",
+      "d_supply_scaled": "1266957.3042347",
+      "metadata": {
+        "source": "61-soroswap-reserve-snapshots-db-ready"
+      }
+    },
+    {
+      "entity_slug": "soroswap-native-eurc-pair",
+      "asset_contract_address": "CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV",
+      "snapshot_at": "2026-03-19T23:55:26.071Z",
+      "symbol": "EURC",
+      "name": "EURC:GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2",
+      "decimals": 7,
+      "enabled": true,
+      "d_supply_raw": "1818871791024",
+      "d_supply_scaled": "181887.1791024",
+      "metadata": {
+        "source": "61-soroswap-reserve-snapshots-db-ready"
+      }
+    },
+    {
+      "entity_slug": "soroswap-native-usdc-pair",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "snapshot_at": "2026-03-19T23:52:53.756Z",
+      "symbol": "native",
+      "name": "native",
+      "decimals": 7,
+      "enabled": true,
+      "d_supply_raw": "3388879840437",
+      "d_supply_scaled": "338887.9840437",
+      "metadata": {
+        "source": "61-soroswap-reserve-snapshots-db-ready"
+      }
+    },
+    {
+      "entity_slug": "soroswap-native-usdc-pair",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "snapshot_at": "2026-03-19T23:52:53.756Z",
+      "symbol": "USDC",
+      "name": "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+      "decimals": 7,
+      "enabled": true,
+      "d_supply_raw": "560978875690",
+      "d_supply_scaled": "56097.887569",
+      "metadata": {
+        "source": "61-soroswap-reserve-snapshots-db-ready"
+      }
+    }
+  ]
+}

@@ -11,6 +11,8 @@
     "run:defindex": "tsx src/run-defindex.ts",
     "job:refresh": "tsx src/scripts/ingest/72-run-refresh-job.ts",
     "job:wallet-alert": "tsx src/scripts/82-run-wallet-alert-job.ts",
+    "bootstrap:core": "tsx src/scripts/bootstrap/seed-core.ts",
+    "bootstrap:export": "tsx src/scripts/bootstrap/registry-export.ts",
     "bootstrap:logos": "tsx src/scripts/bootstrap/seed-logos.ts"
   },
   "keywords": [],

@@ -2,6 +2,8 @@
 
 ## Purpose
 Describe the target deployment shape for Dig Stellar beta and how to operate it.
+For the fresh-machine quickstart (clone → rendering dashboard, proven end-to-end), see
+`docs/reference-deployment.md` (E4 — Lot E).
 
 ---
 

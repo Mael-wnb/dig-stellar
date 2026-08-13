@@ -39,3 +39,23 @@ create index if not exists idx_refresh_step_runs_run_at
 
 create index if not exists idx_refresh_step_runs_step_run_at
   on refresh_step_runs(step, run_at desc);
+
+-- E3 (Lot E — T3-D3): adoption counters. One row per successful server-side
+-- BUILD (quote / signable XDR) — on-chain submission happens client-side
+-- (non-custodial), so executed-tx evidence stays the manual hash list.
+-- Addresses are public on-chain data, stored to count distinct actors; quotes
+-- carry no address (null). Insert is fire-and-forget — a logging failure must
+-- never fail the action itself. No backfill: counters start at deploy.
+create table if not exists action_events (
+  id bigint generated always as identity primary key,
+  kind text not null,            -- 'sdex-quote' | 'sdex-swap-build' | 'blend-deposit-build' | 'trustline-build'
+  network text not null,         -- 'testnet' | 'mainnet'
+  address text,                  -- acting Stellar address; null for quotes
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_action_events_created_at
+  on action_events(created_at desc);
+
+create index if not exists idx_action_events_kind_created_at
+  on action_events(kind, created_at desc);

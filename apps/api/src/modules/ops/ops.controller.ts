@@ -12,4 +12,10 @@ export class OpsController {
   getMetrics() {
     return this.opsService.getMetrics();
   }
+
+  // E3: adoption counters — builds only (honest boundary stated in the payload).
+  @Get('adoption')
+  getAdoption() {
+    return this.opsService.getAdoption();
+  }
 }

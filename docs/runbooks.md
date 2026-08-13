@@ -59,11 +59,21 @@ pnpm -C apps/indexer job:refresh
 # A single ingest step directly (example: network stats)
 pnpm -C apps/indexer exec tsx src/scripts/ingest/73-network-stats-refresh.ts
 
-# Bootstrap (run once per protocol before first refresh)
-pnpm -C apps/indexer tsx src/scripts/bootstrap/blend-upsert-core.ts
-pnpm -C apps/indexer tsx src/scripts/bootstrap/soroswap-upsert-core.ts
-pnpm -C apps/indexer tsx src/scripts/bootstrap/aquarius-upsert-core.ts
+# Bootstrap on a fresh database (E4 — Lot E): seeds the WHOLE vetted perimeter
+# (6 venues, all non-stellar-native entities, assets, links) from the committed
+# registries/core-registry.json. Idempotent. Replaces the legacy per-protocol
+# upserts below for first-time setup.
+pnpm -C apps/indexer bootstrap:core
+pnpm -C apps/indexer bootstrap:logos
+
+# Regenerate the committed registry from a live DB (run on the source
+# deployment after onboarding a new pool/vault, commit the JSON):
+pnpm -C apps/indexer bootstrap:export
+
+# Legacy per-protocol upserts (kept for reference — their tmp/discovery registry
+# inputs are ephemeral and no longer exist, so prefer bootstrap:core):
 pnpm -C apps/indexer tsx src/scripts/bootstrap/defindex-upsert-core.ts   # T3-D1: venue 'defindex' + 3 mainnet vault entities
+pnpm -C apps/indexer tsx src/scripts/bootstrap/allbridge-upsert-core.ts  # T2-D3: venue 'allbridge' + USDC asset
 ```
 
 ### Onboarding DeFindex vaults (T3-D1)
@@ -205,6 +215,12 @@ internal URLs (targets/steps are fixed internal labels; `version` is the short G
   Error rate is aggregated (`sum(errors)/sum(calls)` — sound to aggregate); latency percentiles
   are strictly per-run (never averaged). Known boundary: captures the INDEXER's outbound calls;
   the API process's own Horizon calls (actions preflight) are not captured.
+- `GET /v1/ops/adoption` (E3) — adoption counters: wallets tracked (total / signers / watch-only,
+  distinct users, from `user_wallets`) + actions built by kind/network (24h/7d/total, from
+  `action_events`, one row per successful server-side build) + distinct acting addresses.
+  Honest boundary (stated in the payload): counts server-side BUILDS; on-chain submission is
+  client-side (non-custodial), so executed-tx evidence stays the manual hash list. No backfill —
+  counters start at deploy.
 
 ```bash
 # Incident history — one query instead of grepping cron logs (E2):

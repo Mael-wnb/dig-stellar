@@ -106,7 +106,12 @@ describe('ActionsController — swap spendable 400 path (F2)', () => {
           balances: view.balances,
         },
       );
-    return new ActionsController(service);
+    // E3: the controller records adoption events via OpsService — stubbed out
+    // here (fire-and-forget; irrelevant to the spendable 400 path under test).
+    const opsStub = {
+      recordActionEvent: jest.fn().mockResolvedValue(undefined),
+    } as unknown as ConstructorParameters<typeof ActionsController>[1];
+    return new ActionsController(service, opsStub);
   }
 
   it('rejects a swap sending more than spendable with a clean 400', async () => {
