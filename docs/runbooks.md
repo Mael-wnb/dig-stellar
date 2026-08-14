@@ -322,6 +322,7 @@ briefs `docs/lot-a1-mainnet-swap.md` (swap) + `docs/lot-a2-blend-mainnet.md` (Bl
 | `ACTIONS_MAINNET_BLEND_ENABLED` | api | unset → OFF | Blend kill-switch (Lot A2), independent of the swap. `"true"` lets `blend/deposit`, `blend/withdraw` **and** `blend/position` `network:"mainnet"` through; otherwise → **403**. The withdraw (Lot A3) rides this same switch — there is no separate withdraw flag. |
 | `ACTIONS_MAINNET_MAX_SEND_XLM` | api | `100` | Per-transaction cap (INV-4.2). Over-cap `sdex/swap` **and** `blend/deposit` → **400**. Deliberately **not** applied to `blend/withdraw` (INV-2.15). |
 | `ACTIONS_MAINNET_RPC_URL` | api | `https://mainnet.sorobanrpc.com` | Soroban RPC override for the mainnet swap **and** Blend paths. |
+| `ACTIONS_INCLUSION_FEE_STROOPS` | api | `10000` | Per-operation inclusion-fee **bid** on every built envelope (Blend deposit/withdraw, trustline, SDEX swap). A bid, not a price: the network charges the market-clearing rate (100 stroops off-surge), so a high bid costs nothing in practice. `BASE_FEE` (100) here caused a real mainnet `txInsufficientFee` rejection under surge pricing (2026-08-14). Keep ≤ 50,000: above that the client gates (swap ≤ 100,000 total over up to 2 ops) fail closed and refuse to sign. Values below 100 are ignored. |
 | `VITE_ACTIONS_MAINNET_ENABLED` | web | unset → OFF | UX only — reveals the mainnet swap surface. NOT enforcement. |
 | `VITE_ACTIONS_MAINNET_BLEND_ENABLED` | web | unset → OFF | UX only — reveals the mainnet Blend card (supply AND withdraw tabs). NOT enforcement. |
 

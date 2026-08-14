@@ -237,6 +237,44 @@ function padResources(
     .build();
 }
 
+// --- Inclusion-fee bid ------------------------------------------------------
+//
+// The inclusion fee is a BID (a maximum), not a price. Per the Stellar fee model
+// (developers.stellar.org, "Fees, resource limits, and metering"): under surge
+// pricing every included transaction pays the market-clearing minimum of the
+// included set, and off-surge everyone pays the network minimum (100 stroops)
+// regardless of bid. Bidding exactly BASE_FEE therefore buys ZERO headroom — the
+// first mainnet surge rejects the submission with txInsufficientFee before any
+// ledger is reached (observed on a real YieldBlox deposit: required total
+// 1,592,563 stroops vs our envelope bidding a 100-stroop inclusion; testnet never
+// surges, which is why A3's fee correction hid this). A 10,000-stroop bid costs
+// nothing extra in practice and clears all but extreme congestion.
+//
+// The client-side gates cap what a corrupted value could burn — keep the bid
+// within them or they fail closed and refuse to sign:
+//   swap gate      (validateSwapXdr)     ≤ 100,000 stroops TOTAL (up to 2 ops →
+//                                          keep the per-op bid ≤ 50,000)
+//   trustline gate (validateTrustlineXdr) ≤ 100,000 stroops (1 op)
+//   deposit gate   (validateDepositXdr)   ≤ 20,000,000 stroops total (incl + resource)
+
+/** Default per-operation inclusion-fee bid, in stroops (0.001 XLM). */
+const DEFAULT_INCLUSION_FEE_STROOPS = 10_000;
+
+/**
+ * Per-operation inclusion-fee bid: ACTIONS_INCLUSION_FEE_STROOPS when set to a
+ * sane integer (≥ BASE_FEE), else the 10,000-stroop default. Read per call so an
+ * operator can retune it without a rebuild.
+ */
+function inclusionFeeStroops(): number {
+  const raw = process.env.ACTIONS_INCLUSION_FEE_STROOPS;
+  if (raw !== undefined) {
+    const parsed = parseInt(raw, 10);
+    if (Number.isFinite(parsed) && parsed >= parseInt(BASE_FEE, 10))
+      return parsed;
+  }
+  return DEFAULT_INCLUSION_FEE_STROOPS;
+}
+
 /** True for the native-asset ref ('XLM' or 'native'). */
 function isNativeRef(ref: AssetRef): boolean {
   return ref.code === 'XLM' || ref.code === 'native';
@@ -460,14 +498,17 @@ export class ActionsService {
         ? this.hasTrustlineOnAccount(horizonAccount, cfg.usdcClassic)
         : false;
       if (!hasTrustline) {
+        const inclusionFee = inclusionFeeStroops();
         const ctTx = new TransactionBuilder(
           new Account(address, seqBeforeBuild),
-          { fee: BASE_FEE, networkPassphrase: cfg.networkPassphrase },
+          {
+            fee: inclusionFee.toString(),
+            networkPassphrase: cfg.networkPassphrase,
+          },
         )
           .addOperation(Operation.changeTrust({ asset: cfg.usdcClassic }))
           .setTimeout(300)
           .build();
-        const inclusionFee = parseInt(BASE_FEE, 10);
         return {
           xdr: '',
           changetrustXdr: ctTx.toEnvelope().toXDR('base64'),
@@ -725,7 +766,7 @@ export class ActionsService {
       };
     }
 
-    const inclusionFee = parseInt(BASE_FEE, 10);
+    const inclusionFee = inclusionFeeStroops();
     const minResourceFee = parseInt(simResult.minResourceFee, 10);
     const paddedResourceFee = Math.ceil(minResourceFee * RESOURCE_FEE_PAD);
     const totalFee = inclusionFee + paddedResourceFee;
@@ -900,8 +941,13 @@ export class ActionsService {
         : true;
     }
 
+    // The builder's `fee` is PER OPERATION (build() multiplies by op count), so the
+    // envelope's total is inclusionPerOp × ops — up to 2 ops here (ChangeTrust +
+    // path payment), which at the 10,000-stroop default stays well under the swap
+    // gate's 100,000-stroop total cap.
+    const inclusionPerOp = inclusionFeeStroops();
     const builder = new TransactionBuilder(account, {
-      fee: BASE_FEE,
+      fee: inclusionPerOp.toString(),
       networkPassphrase: config.networkPassphrase,
     });
 
@@ -927,7 +973,6 @@ export class ActionsService {
 
     const tx = builder.setTimeout(300).build();
 
-    const inclusionPerOp = parseInt(BASE_FEE, 10);
     const totalFee = inclusionPerOp * operations.length;
 
     return {

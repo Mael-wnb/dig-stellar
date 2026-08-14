@@ -187,15 +187,29 @@ const borrowed = computed(() => {
   );
 });
 
-type ActionStatus = "idle" | "building" | "step1" | "step2" | "success" | "error";
+// "pending" = confirmation polling TIMED OUT: the transaction was accepted by the
+// network and may still be included — it has NOT failed, so it must never render
+// failure copy. It gets its own block with the explorer link instead.
+type ActionStatus =
+  | "idle"
+  | "building"
+  | "step1"
+  | "step2"
+  | "success"
+  | "pending"
+  | "error";
 const status = ref<ActionStatus>("idle");
 const stepLabel = ref("");
 const txHash = ref("");
 const errorMessage = ref("");
-// True only when a SUBMITTED transaction failed on-chain (vs a pre-sign build /
-// validation / simulation error, which never reaches the network). Drives the
-// honest "failed atomically — no funds moved" copy (F4).
-const failedOnChain = ref(false);
+// How a network-facing failure happened — the two are financially different (F4):
+//   "onchain"  — INCLUDED in a ledger and failed atomically there: no funds moved,
+//                only the network fee was consumed.
+//   "rejected" — refused at SUBMISSION (sendTransaction ERROR, e.g. a fee bid under
+//                surge pricing): never reached a ledger, NOTHING was charged.
+// Null for pre-sign errors (build / validation / simulation), which never touch
+// the network at all.
+const failureKind = ref<"onchain" | "rejected" | null>(null);
 
 const isWithdraw = computed(() => mode.value === "withdraw");
 const isConnected = computed(() => !!connectedAddress.value);
@@ -349,12 +363,31 @@ async function rpcCall(method: string, params: unknown): Promise<any> {
   return json.result ?? {};
 }
 
+/**
+ * Confirmation polling ran out while the transaction was still pending. NOT a
+ * failure: the tx was accepted and may yet be included — the caller must render
+ * the "still pending" state (with the explorer link), never failure copy.
+ */
+class TxPendingTimeout extends Error {
+  readonly hash: string;
+  constructor(hash: string) {
+    super(`Timed out waiting for confirmation (${hash}).`);
+    this.hash = hash;
+  }
+}
+
 /** Sends a signed XDR and, if PENDING, polls getTransaction until it settles. */
 async function submitAndConfirm(signedXdr: string): Promise<string> {
   const sent = await rpcCall("sendTransaction", { transaction: signedXdr });
   if (sent.status === "ERROR") {
-    failedOnChain.value = true;
-    throw new Error(sent.errorResultXdr || "RPC rejected the transaction.");
+    // Rejected at SUBMISSION — never reached a ledger, nothing was charged.
+    // Distinct from an included-but-failed tx, which does consume its fee.
+    failureKind.value = "rejected";
+    throw new Error(
+      sent.errorResultXdr
+        ? `The network rejected the transaction (result XDR: ${sent.errorResultXdr}).`
+        : "The network rejected the transaction.",
+    );
   }
   const hash: string = sent.hash;
   if (sent.status === "SUCCESS") return hash;
@@ -365,11 +398,12 @@ async function submitAndConfirm(signedXdr: string): Promise<string> {
     const got = await rpcCall("getTransaction", { hash });
     if (got.status === "SUCCESS") return hash;
     if (got.status === "FAILED") {
-      failedOnChain.value = true;
+      failureKind.value = "onchain";
       throw new Error(`Transaction failed on-chain (${hash}).`);
     }
   }
-  throw new Error(`Timed out waiting for confirmation (${hash}). Check the explorer.`);
+  // Still pending after ~24s — not a failure (see TxPendingTimeout).
+  throw new TxPendingTimeout(hash);
 }
 
 /** Shared preflight for both actions: gating, signer check, state reset. */
@@ -386,7 +420,7 @@ function startAction(): { address: string; passphrase: string } | null {
   txHash.value = "";
   errorMessage.value = "";
   stepLabel.value = "";
-  failedOnChain.value = false;
+  failureKind.value = null;
 
   return {
     address: connectedAddress.value,
@@ -461,6 +495,12 @@ async function onDeposit() {
     loadBalances(); // reflect the new balances
     if (position.value) loadPosition(); // and the new supplied position
   } catch (err: unknown) {
+    if (err instanceof TxPendingTimeout) {
+      // Still pending ≠ failed: surface the hash + explorer link, claim nothing.
+      txHash.value = err.hash;
+      status.value = "pending";
+      return;
+    }
     errorMessage.value = readApiError(err, "Deposit failed.");
     status.value = "error";
   }
@@ -504,6 +544,11 @@ async function onWithdraw() {
     loadBalances(); // the withdrawn funds are back in the wallet
     loadPosition(); // and the supplied position has shrunk
   } catch (err: unknown) {
+    if (err instanceof TxPendingTimeout) {
+      txHash.value = err.hash;
+      status.value = "pending";
+      return;
+    }
     errorMessage.value = readApiError(err, "Withdraw failed.");
     status.value = "error";
   }
@@ -532,7 +577,7 @@ function reset() {
   txHash.value = "";
   errorMessage.value = "";
   stepLabel.value = "";
-  failedOnChain.value = false;
+  failureKind.value = null;
 }
 </script>
 
@@ -830,6 +875,33 @@ function reset() {
         </button>
       </div>
 
+      <!-- STILL PENDING — confirmation polling timed out. Not a failure: the tx was
+           accepted and may still be included, so no failure copy is allowed here. -->
+      <div
+        v-else-if="status === 'pending'"
+        class="bg-[#202020] border border-[rgba(255,184,107,0.4)] rounded-md p-3 text-[11px] flex flex-col gap-1"
+      >
+        <span class="text-[#ffb86b] font-semibold">
+          {{ isWithdraw ? "Withdraw still pending" : "Deposit still pending" }}
+        </span>
+        <span class="text-[#9a9b99]">
+          Confirmation is taking longer than usual. The transaction was accepted by the
+          network and has <span class="font-semibold">not</span> failed — check its
+          status on the explorer before retrying.
+        </span>
+        <a
+          :href="`https://stellar.expert/explorer/${explorerNetwork}/tx/${txHash}`"
+          target="_blank"
+          rel="noopener"
+          class="text-[#d5ff2f] hover:underline w-fit"
+        >
+          View on stellar.expert ↗
+        </a>
+        <button type="button" class="text-[#9a9b99] hover:text-[#d5ff2f] w-fit mt-1" @click="reset">
+          Done
+        </button>
+      </div>
+
       <!-- ERROR -->
       <div
         v-else-if="status === 'error'"
@@ -838,12 +910,21 @@ function reset() {
         <span class="text-[#ff7b7b] font-semibold">
           {{ isWithdraw ? "Withdraw failed" : "Deposit failed" }}
         </span>
+        <!-- Included in a ledger, failed there: atomic, only the fee was consumed. -->
         <span
-          v-if="failedOnChain"
+          v-if="failureKind === 'onchain'"
           class="text-[#9a9b99]"
         >
           The transaction failed atomically on-chain — no funds were moved. Only the
           network fee was consumed.
+        </span>
+        <!-- Rejected at submission: never reached a ledger, nothing was charged. -->
+        <span
+          v-else-if="failureKind === 'rejected'"
+          class="text-[#9a9b99]"
+        >
+          The transaction was rejected before inclusion — it never reached a ledger, so
+          nothing was charged and no funds moved.
         </span>
         <span class="text-[#9a9b99] break-all">{{ errorMessage }}</span>
         <button type="button" class="text-[#9a9b99] hover:text-[#d5ff2f] w-fit mt-1" @click="reset">

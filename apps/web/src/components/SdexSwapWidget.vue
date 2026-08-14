@@ -147,10 +147,12 @@ type SwapStatus = "idle" | "loading" | "success" | "error";
 const status = ref<SwapStatus>("idle");
 const txHash = ref("");
 const errorMessage = ref("");
-// True only when a SUBMITTED transaction failed on-chain (vs a pre-sign build /
-// validation / preflight error, which never reaches the network). Drives the
-// honest "failed atomically — no funds moved" copy (F4). Pairs with F2.
-const failedOnChain = ref(false);
+// True only when a SUBMITTED transaction was not accepted by the network
+// (sendTransaction did not return PENDING). This widget never polls getTransaction,
+// so the only network-facing failure it can observe is a SUBMISSION-time rejection —
+// the tx never reached a ledger and NOTHING was charged. Drives that honest copy
+// (F4); do not claim an on-chain failure or a consumed fee here. Pairs with F2.
+const rejectedBeforeInclusion = ref(false);
 
 const isConnected = computed(() => !!connectedAddress.value);
 const isMainnet = computed(() => network.value === "mainnet");
@@ -334,7 +336,7 @@ async function onSwap() {
   status.value = "loading";
   txHash.value = "";
   errorMessage.value = "";
-  failedOnChain.value = false;
+  rejectedBeforeInclusion.value = false;
 
   try {
     // 1. Build the unsigned XDR server-side (never exposes any key).
@@ -379,12 +381,12 @@ async function onSwap() {
       status.value = "success";
       loadBalances(); // reflect the new balances
     } else {
-      // Submitted, but the network rejected/failed it — an atomic on-chain
-      // failure, so no funds moved (at most the base fee was charged).
+      // The network did not accept the submission (e.g. a fee bid under surge
+      // pricing) — it never reached a ledger, so nothing was charged at all.
       errorMessage.value =
         result.errorResultXdr ||
-        `Transaction failed (status: ${result.status ?? "unknown"}).`;
-      failedOnChain.value = true;
+        `Transaction rejected (status: ${result.status ?? "unknown"}).`;
+      rejectedBeforeInclusion.value = true;
       status.value = "error";
     }
   } catch (err: unknown) {
@@ -397,7 +399,7 @@ function reset() {
   status.value = "idle";
   txHash.value = "";
   errorMessage.value = "";
-  failedOnChain.value = false;
+  rejectedBeforeInclusion.value = false;
 }
 </script>
 
@@ -580,11 +582,11 @@ function reset() {
       >
         <span class="font-semibold" style="color: var(--dig-red)">Swap failed</span>
         <span
-          v-if="failedOnChain"
+          v-if="rejectedBeforeInclusion"
           style="color: var(--dig-faint)"
         >
-          The transaction failed atomically on-chain — no funds were moved. At most
-          the base network fee (~0.00001 XLM) was charged.
+          The transaction was rejected before inclusion — it never reached a ledger,
+          so nothing was charged and no funds moved.
         </span>
         <span class="break-all" style="color: var(--dig-faint)">{{ errorMessage }}</span>
         <button type="button" class="w-fit mt-[2px] cursor-pointer hover:underline" style="color: var(--dig-faint)" @click="reset">
