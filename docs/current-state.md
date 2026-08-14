@@ -242,6 +242,16 @@ contracts whose on-chain reads 404) are soft-disabled (`is_active=false`) and sk
 instead of aborting the whole job. URL construction for Validation Cloud preserves the `/v1/<key>`
 base path (the `joinUrl` helper) — this fixed a cascading refresh failure earlier this session.
 
+**Dead-reserves defect fixed (Aug 14).** The Blend/Soroswap/Aquarius pool-metric writers read
+`reserve_snapshots` with `distinct on (asset_id)` — the latest row PER ASSET — so they kept counting
+reserves a pool no longer has (e.g. Orbit's removed USDC reserve, snapshotted 2026-04-01). Reserve
+snapshot writes are now **atomic per pool per refresh** (BEGIN/COMMIT/ROLLBACK — proven by an
+injected mid-batch crash) and the readers take the latest snapshot BATCH. Isolated effect: Blend
+−$270,174 (Orbit −33.3% — now matching Blend's own SDK read to $2 on $190k); Aquarius/Soroswap
+byte-identical. Known remaining discrepancy, flagged not fixed: YieldBlox +63.8% vs the Blend SDK
+(exotic-asset pricing in `asset_prices` — its own lot). Evidence:
+`docs/evidence/dead-reserves-2026-08-14.md`.
+
 Operational protocol coverage (verified in prod DB / API, Jun 18–19, 2026):
 - Soroban — Blend, Soroswap, Aquarius
 - Horizon — Stellar native DEX liquidity pools
@@ -397,8 +407,9 @@ captured in the ~5-min submission demo video — T2-D2 is complete.
 
 ## 8. On-chain actions / transaction builder
 
-**Fully proven on Testnet, narrow in scope by design.** The non-custodial path works end-to-end from
-the UI with a successful on-chain transaction.
+**Proven on Testnet AND on Mainnet (swaps + Blend supply/withdraw), narrow in scope by design.**
+The non-custodial path works end-to-end from the UI with successful on-chain transactions on both
+networks (mainnet evidence: `docs/evidence/t3-d2-mainnet-actions.md`).
 
 Working (verified Jun 19, 2026): the `actions/` module in `apps/api` exposes `POST /v1/actions/sdex/swap`,
 `POST /v1/actions/sdex/quote`, and `POST /v1/actions/blend/deposit`. The SDEX swap builds a
@@ -503,7 +514,43 @@ cap** by design (INV-2.15: it returns the user's own funds). The client gate
 (`validateWithdrawXdr`) pins Blend `WithdrawCollateral` (3) where the deposit gate pins
 `SupplyCollateral` (2), so neither can accept the other's transaction — red-tested both ways.
 Proven E2E on testnet: supply `b199a1d7…` + withdraw `322d760e…`, both confirmed on-chain
-(`docs/evidence/lot-a3-blend-withdraw.md`). The mainnet pair is pending review.
+(`docs/evidence/lot-a3-blend-withdraw.md`). **The mainnet pair executed 2026-08-14** — see the
+A5b paragraph below.
+
+**Multi-pool Blend actions since Aug 14 (Lot A5).** Supply + withdraw work on **every indexed
+Blend pool** (Fixed, YieldBlox, Orbit, Etherfuse), not just Fixed. All four pool ids were verified
+on-chain BEFORE any code (official V2 factory `is_pool()`, backstop reward zone, shared wasm hash,
+on-chain `metadata.name`); **Orbit is XLM-only** (its stale `reserve_snapshots` USDC row would have
+offered a deposit that fails at simulation — the registry is built from live SDK reads instead).
+Server: `resolveBlendPool` (unknown slug → 400, never a fallback) + `assertPoolSupportsAsset`;
+client: per-pool registry pinned by the signing gate, cross-pool red tests over every ordered pool
+pair (mutation-tested). Evidence: `docs/evidence/lot-a5-blend-multipool.md`.
+
+**Congestion-tolerant fee bid (fix `0c296ef`).** A YieldBlox submission was rejected under surge
+pricing with the old 100-stroop inclusion bid (`txInsufficientFee`). The builder now bids 10,000
+stroops per operation (`DEFAULT_INCLUSION_FEE_STROOPS`, env-overridable), still far under the
+client gates' fee caps, and the UI distinguishes the two financially different failure states
+(rejected-before-inclusion: nothing charged; failed-on-chain: only the fee consumed) plus an
+honest "still pending" state on confirmation timeout. Checked against reality on Aug 14: all four
+Soroban txs bid exactly 10,000 and were charged ~46–59% of the ceiling (unused resource fee
+refunded); the classic swaps paid the 100/op base under the same bid.
+
+**Mainnet execution evidence + pool-status awareness + friendly contract errors (Aug 14, Lot
+A5b).** Six successful Pubnet txs, Horizon-verified and XDR-decoded
+(`docs/evidence/t3-d2-mainnet-actions.md`): supplies 5 XLM → Fixed, 5 XLM + 5 USDC → YieldBlox
+(the multi-pool proof), swaps 50 XLM → 7.97 USDC and 10 XLM → 1.38 EURC, and the **withdraw
+closing the supply↔withdraw loop on mainnet** (`537a2303…` — the exact supplied Fixed position
+back, minus the SDK's 1-stroop round-down). Honest counter-example: a supply on the frozen Orbit
+pool dies at SIMULATION with `Error(Contract, #1206)` — nothing signed, no tx. Product follow-up:
+`POST /v1/actions/blend/position` now returns the pool's **live** `poolStatus`
+(`{code, label, supplyBlocked, withdrawBlocked}` from the same `PoolV2.load`, never the registry —
+status is governance-dynamic; semantics verified in the blend-contracts-v2 source: supply blocked
+at status > 3, withdraw NEVER status-blocked); the card disables Supply with honest copy + a
+status badge on non-Active pools and auto-selects Withdraw; known Blend error codes map
+client-side to one-line messages (`lib/blendContractErrors.ts`, #1206 → governance copy), unmapped
+codes render "code #NNNN" with the raw diagnostics behind a collapsible details (the API payload
+keeps the raw error verbatim). Local-proven (api build + 42 tests, web build); **VPS deploy of the
+A5/A5b code pending.**
 
 ---
 
@@ -526,7 +573,8 @@ Near-term: this shape is fine for the beta and the Tranche 2 claim. CI/CD and ob
 1. Horizon + Soroban indexing foundation (4 protocols, verified coverage + freshness, 15-min cron)
 2. Live beta on real Mainnet data
 3. Backend/API as the single product façade (`/v1` raw-SQL pipeline, DB-backed network stats)
-4. Non-custodial transaction builder: SDEX swap **fully successful** on Testnet, with live quote + auto-slippage
+4. Non-custodial transaction builder: SDEX swaps + multi-pool Blend supply/withdraw **executed and
+   Horizon-verified on Mainnet** (supply↔withdraw loop closed Aug 14), with live quote + auto-slippage
 5. Grouped multi-wallet portfolio foundation (raw SQL v2)
 6. Real wallet balance snapshot/refresh flows
 7. Architectural separation (web / api / indexer)
@@ -538,8 +586,9 @@ Near-term: this shape is fine for the beta and the Tranche 2 claim. CI/CD and ob
 2. Deployment maturity / CI-CD (T3) — *narrowed 2026-08-13 by Lot E E4: proven fresh-clone
    quickstart (`docs/reference-deployment.md`), `.env.example` per app, committed core-registry
    bootstrap, minimal CI workflow; VPS deploy discipline remains manual (documented)*
-3. Transaction builder breadth: SDEX swap + Blend testnet deposit both proven on-chain from the UI
-   (deposit tx `a842f370…`); mainnet execution remains T3-D2
+3. Transaction builder: mainnet execution is now evidenced end-to-end (swaps + Blend
+   supply/withdraw, `docs/evidence/t3-d2-mainnet-actions.md`) — remaining fragility is
+   deployment, not capability: the A5/A5b code is local-proven, VPS deploy pending
 
 ## 12. Closest tranche-relevant wins
 1. SCF Tranche 3 (30%) submission — the T2 group (portfolio/active-signer, live alerting, live bridge)
@@ -552,8 +601,9 @@ Near-term: this shape is fine for the beta and the Tranche 2 claim. CI/CD and ob
 ## 13. Current execution priorities (updated 2026-08-04 — internal T3 target: Aug 15)
 1. **T3-D2 KPI push** — mainnet swaps are live; 50+ wallets / 200+ txs accumulate only while the
    window is open. Distribution (Stellar/SCF channels, communities) is scheduled work.
-2. **Lot A2 — Blend deposit on Mainnet** (the "vault/lending" half of T3-D2; testnet-proven
-   `a842f370…`, mainnet extension under the same flag/cap regime)
+2. ~~Lot A2 — Blend deposit on Mainnet~~ **DONE and exceeded (Aug 14)**: multi-pool mainnet
+   supplies + the withdraw closing the loop, all Horizon-verified
+   (`docs/evidence/t3-d2-mainnet-actions.md`); VPS deploy of the A5/A5b code pending
 3. **T3-D3** — sidebar UX redesign, RPC latency/error metrics, SDF reference packaging
 4. **T3-D1 demo capture** (the only remaining T3-D1 item — everything else is live in prod)
 5. Keep `grant-roadmap.md` and `status-board.md` aligned with this reality

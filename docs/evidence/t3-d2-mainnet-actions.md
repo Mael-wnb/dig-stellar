@@ -21,9 +21,9 @@ testnet pair non-regression), `lot-a5-blend-multipool.md` (pool registry verific
 
 ---
 
-## 1. The five transactions of 2026-08-14 (all successful)
+## 1. The six transactions of 2026-08-14 (all successful)
 
-All five in ledgers 63950942–63950993, 2026-08-14 15:29–15:34 UTC, source account
+All six in ledgers 63950942–63951343, 2026-08-14 15:29–16:07 UTC, source account
 `GAIBRM…I7GP`. Fees in stroops (1 XLM = 10,000,000 stroops).
 
 | # | Hash (prefix) | Time (UTC) | Type | What it did | fee_charged | max_fee |
@@ -33,6 +33,7 @@ All five in ledgers 63950942–63950993, 2026-08-14 15:29–15:34 UTC, source ac
 | 3 | `7f5a2c41…` | 15:32:48 | Soroban `submit` | Supply 5.0 XLM as collateral → Blend **YieldBlox** pool | 946,470 | 1,647,738 |
 | 4 | `d22a0f93…` | 15:33:13 | Soroban `submit` | Supply 5.0 USDC as collateral → Blend **YieldBlox** pool | 544,813 | 954,807 |
 | 5 | `c4393fe1…` | 15:34:21 | classic, 2 ops | `change_trust` EURC + swap **10 XLM → 1.3778933 EURC** | 200 | 20,000 |
+| 6 | `537a2303…` | 16:07:12 | Soroban `submit` | **Withdraw 4.9999999 XLM collateral ← Blend Fixed pool** | 34,400 | 74,524 |
 
 Full hashes:
 
@@ -42,6 +43,7 @@ Full hashes:
 3  7f5a2c41332d2e1e2eb94e9694471c8642c2b5098e87974cc98ab434cfcac516
 4  d22a0f936b8d7f4c78491f4dbbe6413ae554592d55c0fd5e670f557fc67e1466
 5  c4393fe1eb7f0c0bf470a674f5f5efff30283eee8909f92329c4dc7bd33067b4
+6  537a230327ff071aec27bb4faecfd8a118e5b7f90b8213889ae000d310c10500
 ```
 
 ### Lending interactions (Blend `submit`, decoded from the envelope XDR)
@@ -63,6 +65,23 @@ The invoked pool ids equal the A5 registry entries verified in
 This is the **multi-pool** claim made real: the same supply flow, executed against two
 different vetted pools, in both a native and a credit asset.
 
+### The supply↔withdraw loop, closed on mainnet (#6)
+
+Tx #6 (`537a2303…`, 16:07:12 UTC, ledger 63951343) is `submit` on the **Fixed** pool
+with one request `{ request_type: 3 (WithdrawCollateral), amount: 49999999
+(= 4.9999999 XLM), address: <XLM SAC> }` — Horizon confirms the 4.9999999 XLM native
+transfer FROM the pool contract back TO the wallet. This is the exact position opened
+by tx #1 at 15:29: 5.0 XLM supplied, 4.9999999 withdrawn — the 1-stroop difference is
+the SDK's deliberate round-DOWN in the bToken → underlying conversion (the position
+endpoint's "Max" can never exceed the real position; see `getBlendPosition`). The
+withdraw XDR was pinned by the client gate to `WithdrawCollateral` (3), the mirror of
+the deposit gate's `SupplyCollateral` (2).
+
+**With #1 + #6 the full non-custodial lending loop — supply on mainnet, then withdraw
+the same position back to the wallet — is COMPLETE and publicly verifiable on Pubnet.**
+(The testnet loop was proven earlier in `lot-a3-blend-withdraw.md`; the YieldBlox
+supplies #3/#4 remain open positions.)
+
 ### Swaps (classic SDEX, `path_payment_strict_send`)
 
 - #2: op 1 `change_trust` for USDC (`GA5ZSE…KZVN`, Circle), op 2 strict-send
@@ -81,21 +100,22 @@ Both assets are entries of the server-enforced `MAINNET_ASSET_WHITELIST`
 Commit `0c296ef` raised the per-operation **inclusion-fee bid** to 10,000 stroops
 (`DEFAULT_INCLUSION_FEE_STROOPS`, `apps/api/src/modules/actions/actions.service.ts`)
 after a YieldBlox submission was rejected under surge pricing with a 100-stroop bid.
-All five transactions above were built post-fix. What the chain actually charged:
+All six transactions above were built post-fix. What the chain actually charged:
 
 **Soroban txs** — the envelope's `max_fee` decomposes as
-`sorobanData.resourceFee + inclusion bid`, and for all three:
+`sorobanData.resourceFee + inclusion bid`, and for all four:
 
 | Tx | resourceFee (declared) | max_fee | → inclusion bid | fee_charged |
 |----|----------------------:|--------:|----------------:|------------:|
 | #1 | 1,592,468 | 1,602,468 | **10,000** | 920,225 |
 | #3 | 1,637,738 | 1,647,738 | **10,000** | 946,470 |
 | #4 |   944,807 |   954,807 | **10,000** | 544,813 |
+| #6 |    64,524 |    74,524 | **10,000** | 34,400 |
 
-i.e. the bid is exactly the intended 10,000 stroops, and `fee_charged` came in at
-~57–59% of the ceiling: the network **refunded the unused resource fee** and charged the
-market inclusion fee, not the full bid. The bid is a ceiling that buys inclusion under
-congestion — not a cost.
+i.e. the bid is exactly the intended 10,000 stroops on every Soroban tx (supplies AND
+the withdraw), and `fee_charged` came in at ~46–59% of the ceiling: the network
+**refunded the unused resource fee** and charged the market inclusion fee, not the full
+bid. The bid is a ceiling that buys inclusion under congestion — not a cost.
 
 **Classic txs** — #2 and #5 bid 10,000/op (`max_fee` 20,000 for 2 ops) and were charged
 the 100-stroop/op base fee: **200 total** (≈ $0.000004). Same conclusion from the other
@@ -103,7 +123,7 @@ direction: with no surge in progress, the higher bid costs nothing extra.
 
 This closes the loop on the `0c296ef` failure mode with live data: the earlier
 100-stroop bid was rejected under surge (`txInsufficientFee`, required 1,592,563); the
-10,000-stroop bid included every transaction on the first attempt.
+10,000-stroop bid included all six transactions on the first attempt.
 
 ---
 
@@ -111,7 +131,7 @@ This closes the loop on the `0c296ef` failure mode with live data: the earlier
 
 The A5 registry also vets the Blend **Orbit** pool
 (`CAE7QVOMBLZ53CDRGK3UNRRHG5EZ5NQA7HHTFASEMYBWHG6MDFZTYHXC`). A supply attempted there
-**never produced a transaction** — there is deliberately no sixth hash:
+**never produced a transaction** — there is deliberately no Orbit hash in §1:
 
 1. The API builds the `submit` and **simulates before returning anything signable**.
 2. Simulation fails with `HostError: Error(Contract, #1206)` —
@@ -174,7 +194,8 @@ status-blocked** — a user can always exit. Statuses read live the same day: Fi
   verification** (`lot-a5-blend-multipool.md`).
 
 Together: mainnet **swaps** (XLM↔USDC, XLM→EURC), mainnet **lending interactions**
-(supply-as-collateral into two distinct Blend pools, two assets, plus the withdraw path
-of Lot A3), executed non-custodially from the product with server-side caps, client-side
-XDR validation before signing, and a demonstrated refusal path when the target pool's
-governance state forbids the action.
+(supply-as-collateral into two distinct Blend pools in two assets, AND the withdraw
+closing the Fixed-pool loop — the full non-custodial supply↔withdraw cycle is now
+evidenced on Pubnet, not just testnet), executed from the product with server-side
+caps, client-side XDR validation before signing, and a demonstrated refusal path when
+the target pool's governance state forbids the action.

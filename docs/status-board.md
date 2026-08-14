@@ -42,11 +42,12 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   our side).
 - T3 headline: **T3-D1 is DONE in prod** (Aug 4 — DeFindex live as the 5th protocol ≈$18.8M,
   first-class freshness + standardized backoff retries; demo capture remaining) and **T3-D2 mainnet
-  swaps are LIVE** (ungated Aug 2 behind kill-switch + 100 XLM cap + issuer-verified 5-pair
-  whitelist; first real swaps executed both directions). The KPI window (50+ wallets / 200+ txs)
-  is open.
-- Closest tranche-critical targets: T3-D2 KPIs (adoption — distribution push starts now), Lot A2
-  (Blend deposit mainnet; testnet-proven `a842f370…`), T3-D3 (**Lot C design-handoff port DONE** —
+  actions are LIVE and evidenced end-to-end** (swaps ungated Aug 2 behind kill-switch + 100 XLM cap
+  + issuer-verified 5-pair whitelist; Aug 14: multi-pool Blend supplies + the withdraw closing the
+  supply↔withdraw loop on Pubnet, all Horizon-verified — `docs/evidence/t3-d2-mainnet-actions.md`).
+  The KPI window (50+ wallets / 200+ txs) is open.
+- Closest tranche-critical targets: T3-D2 KPIs (adoption — distribution push starts now; the
+  execution evidence itself is now complete), T3-D3 (**Lot C design-handoff port DONE** —
   shell + 5 views + modals on real data, `/v1/pools/:slug/flows` + `/series` added; observability +
   reference packaging still open).
 - Biggest current risk: **the T3-D2 KPIs** — they cannot be built, only accumulated; every day of
@@ -57,8 +58,9 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   `322d760e…`, both confirmed on-chain; `docs/evidence/lot-a3-blend-withdraw.md`). Not required by
   any SCF criterion (T3-D2's "vault/lending interactions" is satisfied by the deposit) — product
   completeness before the advisor re-review. It rides the SAME kill-switch as the deposit (no new
-  flag), so it is testnet-only until `ACTIONS_MAINNET_BLEND_ENABLED` is set. **Awaiting: review,
-  then the mainnet supply+withdraw pair via Maël's wallet** (T3-D2 bonus evidence). Carried a
+  flag), so it is testnet-only until `ACTIONS_MAINNET_BLEND_ENABLED` is set. **The awaited mainnet
+  supply+withdraw pair EXECUTED 2026-08-14** (supply `38390736…` 15:29 + withdraw `537a2303…` 16:07,
+  same Fixed-pool position — `docs/evidence/t3-d2-mainnet-actions.md`). Carried a
   Soroban resource-headroom fix that also hardens the deposit path (INV-3.1b).
 - T3-D3 note (2026-08-05): the full UI port to the co-founder's Claude Design handoff landed green
   (web build + 49 tests + api build; captures in `docs/evidence/lot-c/`). Remaining T3-D3: RPC
@@ -175,16 +177,20 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   **mutation-tested** (pool-pinning removed → 28 fail; restored → 111/111). Curls: unknown slug 400,
   Orbit+USDC 400, position echoes the pool, no-pool = Fixed, flag off = 403 on all 4 pools × 3
   endpoints. Also fixed the `toLocaleString(undefined)` locale bug. Evidence:
-  `docs/evidence/lot-a5-blend-multipool.md`. **Pending Maël: one real supply+withdraw on a
-  non-Fixed pool (YieldBlox) + testnet re-verify.**
+  `docs/evidence/lot-a5-blend-multipool.md`. **The pending real-money item is RESOLVED (2026-08-14,
+  see A5b): supplies executed on YieldBlox (`7f5a2c41…` XLM + `d22a0f93…` USDC — still open
+  positions) and the supply↔withdraw loop closed on Fixed (`38390736…` + `537a2303…`). Testnet
+  re-verify still worth a pass at the next deploy.**
 - T3-D2 note (2026-08-14, Lot A5b): **Mainnet execution evidence LANDED + pool-status awareness +
   friendly contract errors. VPS deploy pending.** Five successful Pubnet txs (15:29–15:34 UTC,
   Horizon-verified + XDR-decoded, never from app logs): supplies of 5 XLM → Fixed, 5 XLM →
   YieldBlox, 5 USDC → YieldBlox (the real multi-pool proof — the A5 "supply on a non-Fixed pool"
-  pending item is DONE; a mainnet withdraw is still unevidenced, testnet A3 only), plus swaps
-  50 XLM → 7.97 USDC and 10 XLM → 1.38 EURC. Post-0c296ef fee check against reality: all Soroban
+  pending item is DONE), plus swaps 50 XLM → 7.97 USDC and 10 XLM → 1.38 EURC, **and (16:07 UTC)
+  the mainnet WITHDRAW closing the loop: `537a2303…` WithdrawCollateral 4.9999999 XLM from Fixed —
+  the exact 15:29 position minus the SDK's round-down. The supply↔withdraw cycle is COMPLETE and
+  publicly verifiable on Pubnet.** Post-0c296ef fee check against reality: all four Soroban
   txs bid exactly 10,000 stroops inclusion (max_fee = resourceFee + 10,000) and were charged
-  ~57–59% of the ceiling; classic swaps charged the 100/op base (200 total) under a 10,000/op bid.
+  ~46–59% of the ceiling; classic swaps charged the 100/op base (200 total) under a 10,000/op bid.
   Honest counter-example: Orbit supply fails at SIMULATION with `Error(Contract, #1206)`
   (`InvalidPoolStatus` — Orbit status=4, admin-frozen) → `xdr:""`, nothing signed, no sixth hash.
   Product follow-up shipped: position endpoint returns live `poolStatus` (from the same
@@ -248,7 +254,7 @@ T1-D3 criteria.
 | Deliverable | Status | Completion | Confidence | Current evidence | Main remaining gap | Next action |
 |---|---|---:|---|---|---|---|
 | D1 — Mainnet Deployment & Freshness Tracking | Done in prod | 95% | High | **Both criteria met, deployed to prod Aug 4 (Lot B).** (1) All 5 named protocols live on real Mainnet data — **DeFindex integrated into the v1 pipeline** (venue + 3 vaults enumerated from `GET /vault/discover`: Meru ≈$18.1M, Beans USDC ≈$507k, Beans EURC ≈$200k; ≈$18.8M aggregate, avg APY ≈7.1%; `protocolCount = 5`; yield-vault detail variant in the UI). (2) Freshness first-class: `isStale` + `staleAfterSeconds` on every `/v1/*` payload (read-time, threshold 45 min = 3× cron), FreshnessChip + stale badges in the UI, standardized exponential-backoff retries on every refresh step. Evidence in `docs/evidence/lot-b/`. Full prod `job:refresh` clean in ~3 min | **Demo capture** for the claim (only non-build item) | Capture the T3-D1 demo (5 protocols + stale drill) |
-| D2 — Non-Custodial Mainnet Actions | Substantially done — swaps live | 60% | Medium | **Mainnet swaps LIVE from the dashboard** (ungated Aug 2): first real executions in both directions (1 XLM→USDC; USDC→XLM `eeeae199…`). Security regime verified in prod: kill-switch (403 by default), server-enforced 100 XLM cap, issuer-verified 5-pair whitelist (XLM↔USDC/EURC/AQUA/yXLM/PYUSD — look-alike "XRP" rejected), client-side pre-sign XDR validation (fail closed), in-wallet signing only. Execution feedback UI with network-aware explorer links. Contract: `docs/security-invariants.md`; evidence: `docs/evidence/mainnet-ungating-2026-08-02.md` + `pair-vetting-2026-08-01.md`. Blend deposit already E2E-proven on **testnet** (`a842f370…`) | **KPIs** (50+ wallets / 200+ txs — window open, needs distribution) + **Lot A2** (Blend deposit mainnet) | KPI push now; A2 brief → implement |
+| D2 — Non-Custodial Mainnet Actions | Substantially done — swaps + lending evidenced on mainnet | 80% | Medium | **Both action families executed and Horizon-verified on Pubnet.** Swaps LIVE from the dashboard (ungated Aug 2; both directions incl. `eeeae199…`; Aug 14: 50 XLM→7.97 USDC + 10 XLM→1.38 EURC). **Blend lending: multi-pool supplies (5 XLM→Fixed, 5 XLM + 5 USDC→YieldBlox) AND the withdraw closing the supply↔withdraw loop (`537a2303…`, the exact supplied position back)** — six txs, all XDR-decoded, congestion-fee bid confirmed against reality (10,000-stroop inclusion bid, ~46–59% of ceiling charged). Honest refusal path proven: frozen Orbit supply dies at SIMULATION (#1206, nothing signed). Security regime verified in prod: kill-switch (403 default), 100 XLM cap, issuer-verified 5-pair whitelist, client-side pre-sign XDR validation (fail closed), in-wallet signing only. Evidence: `docs/evidence/t3-d2-mainnet-actions.md` + `mainnet-ungating-2026-08-02.md` + `pair-vetting-2026-08-01.md` + `lot-a5-blend-multipool.md` | **KPIs** (50+ wallets / 200+ txs — window open, needs distribution; the only open criterion) + VPS deploy of the A5/A5b code | KPI push now; deploy A5/A5b to the VPS |
 | D3 — Observability, UI/UX Polish & Reference Handoff | In progress | 45% | Medium | **UI/UX-polish component substantially landed** across Lots C/F/G/H (design-handoff port → shell + 5 views + modals; advisor-feedback F1–F5; founder-review G0–G4: TVL history + chain logos + clickable tx hashes + adaptive pools table + hero dedupe/compact actions + network-TVL hero chart; founder-review-2 H0–H4: modal teleport fix, dashboard "Your positions" panel, Uniswap-standard swap reskin, measurable flows coverage + Aquarius/Soroswap liquidity-amount extraction — **H deploy pending**) — all green (web build + 49 tests + api build), captures in `docs/evidence/lot-{c,f,g,h}/`. Plus `docker-compose.yml` local-dev stack, `/health` liveness, modular architecture, grown docs corpus | Real RPC latency/error metrics + CI/CD (still manual VPS deploy); packaged SDF reference implementation; final report w/ adoption metrics (depends on T3-D2 KPIs) | Deploy Lot H (build + PM2 restart + Aquarius event backfill), then observability (RPC latency/error metrics) + CI/CD, then reference packaging |
 
 ---
@@ -265,13 +271,13 @@ T1-D3 criteria.
 ## Weakest areas right now
 1. **T3-D2 KPIs** — adoption can't be built, only accumulated; distribution push not yet started
 2. Observability beyond freshness (RPC latency/error metrics) + CI/CD (still manual VPS deploy) — T3-D3
-3. Blend deposit mainnet (Lot A2) not yet extended from its proven testnet path
+3. A5/A5b (multi-pool actions + pool-status/friendly-errors) local-proven but not yet deployed to the VPS
 4. UI polish debt: sidebar redesign pending; responsive + loading/error consistency partial
 
 ## Best near-term tranche wins
 1. T3-D1 demo capture → claim-ready (everything else already live in prod)
-2. KPI distribution push — the swap is live; every announcement day counts toward 50/200
-3. Lot A2 (Blend deposit mainnet) → completes T3-D2 criterion 1
+2. KPI distribution push — swaps AND lending are live+evidenced; every announcement day counts toward 50/200
+3. Deploy A5/A5b to the VPS → the whole evidenced T3-D2 flow becomes the prod flow
 4. Sidebar redesign + metrics endpoints → T3-D3 momentum before the final report
 
 ---
