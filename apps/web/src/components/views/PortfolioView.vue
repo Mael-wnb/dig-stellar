@@ -14,12 +14,19 @@ import { useView } from '../../composables/useView'
 import { useAppUser } from '../../composables/useAppUser'
 import { useModals } from '../../composables/useModals'
 import { useConnectFlow } from '../../composables/useConnectFlow'
-import { formatUsd } from '../../utils/format'
+import {
+  displaySymbol,
+  formatTokenAmountCompact,
+  formatTokenAmountExact,
+  formatUsd,
+  shortAddress,
+} from '../../utils/format'
 import type { WalletItem, WalletPositionItem } from '../../types/wallet'
 import EmptyPortfolioState from '../common/EmptyPortfolioState.vue'
 import GetStartedCard from '../common/GetStartedCard.vue'
 import PositionAssetChips from '../common/PositionAssetChips.vue'
 import HealthFactorGauge from '../common/HealthFactorGauge.vue'
+import BrandLogo from '../common/BrandLogo.vue'
 
 const { userId } = useAppUser()
 const { openPool } = useView()
@@ -38,9 +45,16 @@ const {
   setSigner,
   setPrimary,
   toggleActive,
+  renameWallet,
   removeWallet,
   clearWallets,
 } = useSharedWallets()
+
+// W2 — the label fallback everywhere a label may be empty: the short address,
+// never the literal 'Wallet'.
+function walletLabel(w: WalletItem): string {
+  return w.label || shortAddress(w.address)
+}
 
 // Per-card management menu (⋯). Only one open at a time.
 const menuOpenId = ref<string | null>(null)
@@ -60,9 +74,28 @@ async function onToggleActive(w: WalletItem) {
   menuOpenId.value = null
   await toggleActive(w)
 }
+// W2 — inline rename from the card (opened from the ⋯ menu).
+const renamingId = ref<string | null>(null)
+const renameValue = ref('')
+function startRename(w: WalletItem) {
+  menuOpenId.value = null
+  renamingId.value = w.id
+  renameValue.value = w.label || ''
+}
+function cancelRename() {
+  renamingId.value = null
+}
+async function commitRename(w: WalletItem) {
+  if (renamingId.value !== w.id) return
+  renamingId.value = null
+  const next = renameValue.value.trim()
+  if (next === (w.label || '')) return
+  await renameWallet(w, next || null)
+}
+
 async function onDelete(w: WalletItem) {
   menuOpenId.value = null
-  if (!window.confirm(`Delete wallet ${w.label || w.address}?`)) return
+  if (!window.confirm(`Delete wallet ${walletLabel(w)}?`)) return
   await removeWallet(w)
   // Deleting the last wallet ends the session (mirrors the prior WalletSection).
   if (wallets.value.length === 0) {
@@ -76,9 +109,6 @@ const hasWallets = computed(() => wallets.value.length > 0)
 const WALLET_DOTS = ['#63A7FF', '#2E9E63', '#D86A3E', '#7B45D6', '#B98A00', '#159A8C', '#D0522E']
 function walletDot(w: WalletItem, i: number): string {
   return w.isActiveSigner ? '#D5FF2F' : WALLET_DOTS[i % WALLET_DOTS.length]
-}
-function shortAddr(a: string): string {
-  return a && a.length > 12 ? `${a.slice(0, 5)}…${a.slice(-5)}` : a
 }
 
 // Scope filter: 'all' or a wallet id.
@@ -111,7 +141,7 @@ const positions = computed<PositionRow[]>(() => {
       rows.push({
         key: `${w.id}-${p.poolSlug}`,
         walletId: w.id,
-        wallet: w.label || 'Wallet',
+        wallet: walletLabel(w),
         walletDot: walletDot(w, i),
         poolName: p.poolName || p.poolSlug || 'Pool',
         poolSlug: p.poolSlug,
@@ -161,7 +191,107 @@ const breakdown = computed(() => {
 const scopeTitle = computed(() => {
   if (scope.value === 'all') return 'Positions across all wallets'
   const w = wallets.value.find((x) => x.id === scope.value)
-  return w ? `Positions · ${w.label || 'Wallet'}` : 'Positions'
+  return w ? `Positions · ${walletLabel(w)}` : 'Positions'
+})
+
+// ── W3: Assets — what the wallets HOLD (liquid; kept DISTINCT from DeFi) ─────
+// Aggregated across wallets by asset from the per-wallet balance snapshots the
+// overview already loads (no new fetch). Honest USD: unpriced assets show "—",
+// never $0 — but their AMOUNTS still render and nothing is dropped.
+const ASSET_DUST_USD = 1 // visual-only grouping threshold ("Other"), never a filter
+
+interface AssetLeg {
+  walletId: string
+  wallet: string
+  dot: string
+  amount: number
+  usd: number | null
+}
+interface AssetRow {
+  key: string
+  symbol: string
+  amount: number
+  usd: number | null // null = unpriced
+  share: number // 0..1 of the priced total (share bar)
+  color: string
+  legs: AssetLeg[]
+}
+
+const expandedAssets = ref<Set<string>>(new Set())
+function toggleAsset(key: string) {
+  const next = new Set(expandedAssets.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  expandedAssets.value = next
+}
+
+const assetsView = computed(() => {
+  const map = new Map<
+    string,
+    { symbol: string; amount: number; usd: number; priced: boolean; legs: AssetLeg[] }
+  >()
+  wallets.value.forEach((w, i) => {
+    for (const b of w.balances ?? []) {
+      const key = b.assetContractId || b.symbol || b.id
+      const g =
+        map.get(key) ??
+        { symbol: displaySymbol(b.symbol), amount: 0, usd: 0, priced: false, legs: [] }
+      const amount = b.balance ?? 0
+      const usd = b.balanceUsd ?? null
+      g.amount += amount
+      if (usd !== null) {
+        g.usd += usd
+        g.priced = true
+      }
+      g.legs.push({
+        walletId: w.id,
+        wallet: walletLabel(w),
+        dot: walletDot(w, i),
+        amount,
+        usd,
+      })
+      map.set(key, g)
+    }
+  })
+
+  const all: AssetRow[] = [...map.entries()].map(([key, g], i) => ({
+    key,
+    symbol: g.symbol,
+    amount: g.amount,
+    usd: g.priced ? g.usd : null,
+    share: 0,
+    color: WALLET_DOTS[i % WALLET_DOTS.length],
+    legs: g.legs.sort((a, b) => (b.usd ?? 0) - (a.usd ?? 0) || b.amount - a.amount),
+  }))
+
+  const pricedSum = all.reduce((s, a) => s + (a.usd ?? 0), 0)
+  for (const a of all) a.share = pricedSum > 0 && a.usd !== null ? a.usd / pricedSum : 0
+
+  // The section total IS the hero liquid figure (same source — asserted, not
+  // recomputed): both are the sum of the same latest balance snapshots.
+  if (Math.abs(pricedSum - totalPortfolioUsd.value) > 0.01) {
+    console.warn('[portfolio-assets] asset sum drifted from the liquid hero figure', {
+      pricedSum,
+      heroLiquid: totalPortfolioUsd.value,
+    })
+  }
+
+  all.sort((a, b) => (b.usd ?? -1) - (a.usd ?? -1) || b.amount - a.amount)
+
+  // Dust: PRICED assets under the threshold group visually under "Other" —
+  // still counted in the total above. Unpriced assets stay as visible rows.
+  const main = all.filter((a) => a.usd === null || a.usd >= ASSET_DUST_USD)
+  const dust = all.filter((a) => a.usd !== null && a.usd < ASSET_DUST_USD)
+  const other =
+    dust.length > 0
+      ? {
+          usd: dust.reduce((s, a) => s + (a.usd ?? 0), 0),
+          share: dust.reduce((s, a) => s + a.share, 0),
+          rows: dust,
+        }
+      : null
+
+  return { rows: main, other, hasAny: all.length > 0 }
 })
 </script>
 
@@ -206,8 +336,21 @@ const scopeTitle = computed(() => {
         >
           <div class="flex items-center gap-[9px]">
             <span class="w-[9px] h-[9px] rounded-full" :style="{ background: walletDot(w, i) }"></span>
-            <span class="text-[13px] font-semibold truncate">{{ w.label || 'Wallet' }}</span>
-            <span class="ml-auto text-[11.5px] font-mono-geist" style="color: var(--dig-faint)">{{ shortAddr(w.address) }}</span>
+            <!-- W2: inline rename (from the ⋯ menu) -->
+            <input
+              v-if="renamingId === w.id"
+              v-model="renameValue"
+              autofocus
+              placeholder="Label"
+              class="flex-1 min-w-0 h-[26px] px-[8px] rounded-[8px] text-[13px] font-semibold outline-none"
+              style="border: 1px solid var(--dig-accent); background: var(--dig-surface-2); color: var(--dig-text)"
+              @click.stop
+              @keydown.enter.prevent="commitRename(w)"
+              @keydown.esc="cancelRename"
+              @blur="commitRename(w)"
+            />
+            <span v-else class="text-[13px] font-semibold truncate">{{ walletLabel(w) }}</span>
+            <span v-if="renamingId !== w.id" class="ml-auto text-[11.5px] font-mono-geist" style="color: var(--dig-faint)">{{ shortAddress(w.address) }}</span>
           </div>
           <div class="text-[26px] font-bold mt-[12px] tracking-[-0.02em] tabular-nums">{{ formatUsd(w.totalPortfolioUsd ?? 0) }}</div>
           <div class="flex items-center gap-[6px] mt-[6px] flex-wrap">
@@ -249,6 +392,7 @@ const scopeTitle = computed(() => {
             style="background: var(--dig-surface-2); border: 1px solid var(--dig-line); box-shadow: 0 12px 32px rgba(0,0,0,0.5)"
             @click.stop
           >
+            <button type="button" class="dig-row w-full text-left px-[13px] py-[9px] text-[12.5px] cursor-pointer" style="color: var(--dig-text)" :disabled="isBusy(w.id)" @click="startRename(w)">Rename</button>
             <button v-if="!w.isActiveSigner" type="button" class="dig-row w-full text-left px-[13px] py-[9px] text-[12.5px] cursor-pointer" style="color: var(--dig-text)" :disabled="isBusy(w.id)" @click="onSetSigner(w)">Set as active signer</button>
             <button v-if="!w.isPrimary" type="button" class="dig-row w-full text-left px-[13px] py-[9px] text-[12.5px] cursor-pointer" style="color: var(--dig-text)" :disabled="isBusy(w.id)" @click="onSetPrimary(w)">Set as primary</button>
             <button type="button" class="dig-row w-full text-left px-[13px] py-[9px] text-[12.5px] cursor-pointer" style="color: var(--dig-text)" :disabled="isBusy(w.id)" @click="onToggleActive(w)">{{ w.isActive ? 'Deactivate' : 'Activate' }}</button>
@@ -269,6 +413,83 @@ const scopeTitle = computed(() => {
       <!-- Get-started card: wallet connected, no positions yet. Disappears as
            soon as a position exists (positions.length > 0). -->
       <GetStartedCard v-if="!hasAnyPosition && !overviewLoading" />
+
+      <!-- W3: Assets — what the wallets hold (liquid; distinct from DeFi).
+           Total = the SAME hero liquid figure (asserted in assetsView). -->
+      <div v-if="assetsView.hasAny" class="rounded-[18px] p-[20px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
+        <div class="flex items-baseline justify-between mb-[14px]">
+          <div class="text-[14px] font-semibold">Assets</div>
+          <div class="text-[20px] font-bold tabular-nums">{{ formatUsd(totalPortfolioUsd) }}</div>
+        </div>
+
+        <!-- share bar (priced assets only; dust grouped as one segment) -->
+        <div class="flex h-[14px] rounded-[7px] overflow-hidden" style="background: var(--dig-line-soft)">
+          <div
+            v-for="a in assetsView.rows.filter((r) => r.share > 0)"
+            :key="a.key"
+            :style="{ width: `${a.share * 100}%`, background: a.color }"
+          ></div>
+          <div v-if="assetsView.other" :style="{ width: `${assetsView.other.share * 100}%`, background: 'var(--dig-faint)' }"></div>
+        </div>
+
+        <!-- one row per asset; click → per-wallet detail -->
+        <div class="mt-[12px]">
+          <div v-for="a in assetsView.rows" :key="a.key">
+            <div
+              class="dig-row flex items-center gap-[11px] py-[10px] cursor-pointer"
+              style="border-bottom: 1px solid var(--dig-line-soft)"
+              @click="toggleAsset(a.key)"
+            >
+              <BrandLogo :primary="null" :letter="(a.symbol || '•').charAt(0).toUpperCase()" tint="#242422" color="#B7B3AB" :size="26" :radius="8" :font-size="12" />
+              <span class="text-[13.5px] font-semibold">{{ a.symbol }}</span>
+              <span class="text-[13px] tabular-nums" style="color: var(--dig-faint)" :title="formatTokenAmountExact(a.amount)">{{ formatTokenAmountCompact(a.amount) }}</span>
+              <span class="ml-auto text-[13.5px] font-semibold tabular-nums">{{ a.usd === null ? '—' : formatUsd(a.usd) }}</span>
+              <span class="w-[44px] text-right text-[11.5px] tabular-nums" style="color: var(--dig-faint)">{{ a.share > 0 ? `${(a.share * 100).toFixed(1)}%` : '' }}</span>
+              <span class="text-[11px]" style="color: var(--dig-faint)">{{ expandedAssets.has(a.key) ? '▾' : '▸' }}</span>
+            </div>
+            <!-- per-wallet detail (which wallet holds how much) -->
+            <div v-if="expandedAssets.has(a.key)" style="border-bottom: 1px solid var(--dig-line-soft)">
+              <div
+                v-for="leg in a.legs"
+                :key="`${a.key}-${leg.walletId}`"
+                class="flex items-center gap-[9px] py-[7px] pl-[37px] pr-[2px]"
+              >
+                <span class="w-[7px] h-[7px] rounded-full flex-shrink-0" :style="{ background: leg.dot }"></span>
+                <span class="text-[12.5px] truncate" style="color: var(--dig-faint)">{{ leg.wallet }}</span>
+                <span class="ml-auto text-[12.5px] tabular-nums" :title="formatTokenAmountExact(leg.amount)">{{ formatTokenAmountCompact(leg.amount) }}</span>
+                <span class="w-[90px] text-right text-[12.5px] tabular-nums" style="color: var(--dig-faint)">{{ leg.usd === null ? '—' : formatUsd(leg.usd) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- dust, grouped visually — never dropped from the total above -->
+          <div v-if="assetsView.other">
+            <div
+              class="dig-row flex items-center gap-[11px] py-[10px] cursor-pointer"
+              style="border-bottom: 1px solid var(--dig-line-soft)"
+              @click="toggleAsset('__other__')"
+            >
+              <BrandLogo :primary="null" letter="·" tint="#242422" color="#B7B3AB" :size="26" :radius="8" :font-size="12" />
+              <span class="text-[13.5px] font-semibold" style="color: var(--dig-faint)">Other</span>
+              <span class="text-[12px]" style="color: var(--dig-faint)">{{ assetsView.other.rows.length }} small balances</span>
+              <span class="ml-auto text-[13.5px] font-semibold tabular-nums">{{ formatUsd(assetsView.other.usd) }}</span>
+              <span class="w-[44px] text-right text-[11.5px] tabular-nums" style="color: var(--dig-faint)">{{ assetsView.other.share > 0 ? `${(assetsView.other.share * 100).toFixed(1)}%` : '' }}</span>
+              <span class="text-[11px]" style="color: var(--dig-faint)">{{ expandedAssets.has('__other__') ? '▾' : '▸' }}</span>
+            </div>
+            <div v-if="expandedAssets.has('__other__')" style="border-bottom: 1px solid var(--dig-line-soft)">
+              <div
+                v-for="a in assetsView.other.rows"
+                :key="a.key"
+                class="flex items-center gap-[9px] py-[7px] pl-[37px] pr-[2px]"
+              >
+                <span class="text-[12.5px]" style="color: var(--dig-faint)">{{ a.symbol }}</span>
+                <span class="ml-auto text-[12.5px] tabular-nums" :title="formatTokenAmountExact(a.amount)">{{ formatTokenAmountCompact(a.amount) }}</span>
+                <span class="w-[90px] text-right text-[12.5px] tabular-nums" style="color: var(--dig-faint)">{{ a.usd === null ? '—' : formatUsd(a.usd) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Breakdown (by-position value share) -->
       <div v-if="breakdown.segs.length" class="rounded-[18px] p-[20px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">

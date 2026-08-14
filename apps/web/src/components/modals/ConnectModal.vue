@@ -19,11 +19,13 @@ const { addWallet } = useSharedWallets()
 
 const watchInput = ref('')
 const label = ref('')
+// W2 — optional label for the SIGNER path (watch-only has its own field).
+const signerLabel = ref('')
 const adding = ref(false)
 const error = ref<string | null>(null)
 
 async function onConnect() {
-  await connect()
+  await connect({ label: signerLabel.value })
   emit('close')
 }
 
@@ -68,6 +70,12 @@ async function onTrack() {
         <div class="text-[13px] mb-[20px]" style="color: var(--dig-faint)">Sign in with any Stellar wallet, or track a public address read-only.</div>
 
         <!-- Signer connect (Kit owns provider selection) -->
+        <input
+          v-model="signerLabel"
+          placeholder="Label (optional, e.g. Main)"
+          class="w-full h-[40px] px-[14px] mb-[9px] rounded-[12px] text-[13px] outline-none"
+          style="border: 1px solid var(--dig-line); background: var(--dig-surface-2); color: var(--dig-text)"
+        />
         <button
           type="button"
           class="dig-btn w-full h-[48px] rounded-[13px] text-[14px] font-bold cursor-pointer flex items-center justify-center gap-[8px]"

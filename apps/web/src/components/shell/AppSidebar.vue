@@ -58,7 +58,8 @@ const WALLET_DOTS = ['#63A7FF', '#2E9E63', '#D86A3E', '#7B45D6', '#B98A00', '#15
 const walletsNav = computed(() =>
   wallets.value.map((w, i) => ({
     id: w.id,
-    label: w.label || 'Wallet',
+    // W2: short-address fallback, never the literal 'Wallet'.
+    label: w.label || shortAddr(w.address),
     short: shortAddr(w.address),
     // Active signer → lime dot; watch-only → its palette colour, dimmed intent.
     dot: w.isActiveSigner ? '#D5FF2F' : WALLET_DOTS[i % WALLET_DOTS.length],

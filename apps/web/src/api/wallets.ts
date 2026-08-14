@@ -87,6 +87,22 @@ export async function setActiveSigner(
   );
 }
 
+// W2 — label-only rename. `null` clears the label (short-address fallback).
+export async function updateWalletLabel(
+  walletId: string,
+  userId: string,
+  label: string | null
+): Promise<{ updated: boolean; wallet: WalletItem }> {
+  const query = new URLSearchParams({ userId }).toString();
+  return apiFetch<{ updated: boolean; wallet: WalletItem }>(
+    `/wallets/${walletId}?${query}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ label }),
+    }
+  );
+}
+
 export async function setWalletActive(
   walletId: string,
   userId: string,

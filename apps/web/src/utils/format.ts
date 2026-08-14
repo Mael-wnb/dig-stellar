@@ -107,6 +107,13 @@ export function displaySymbol(s: string | null | undefined): string {
   return s === 'native' ? 'XLM' : (s ?? DASH)
 }
 
+// Short Stellar address for display (W2 — the wallet-label fallback everywhere
+// a label may be empty; replaces the literal 'Wallet' at all render sites).
+export function shortAddress(a: string | null | undefined): string {
+  if (!a) return DASH
+  return a.length > 12 ? `${a.slice(0, 5)}…${a.slice(-5)}` : a
+}
+
 // Relative "time ago" label for feeds (e.g. "3h ago"). Single source of truth —
 // mirrors the original inline helper in BridgeFlows.vue.
 export function relativeTime(iso: string | null | undefined): string {

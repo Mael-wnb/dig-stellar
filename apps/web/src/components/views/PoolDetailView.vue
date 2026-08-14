@@ -18,11 +18,13 @@ import { useModals } from '../../composables/useModals'
 import { venueTheme } from '../../data/venueTheme'
 import BrandLogo from '../common/BrandLogo.vue'
 import PairLogo from '../common/PairLogo.vue'
+import HealthFactorGauge from '../common/HealthFactorGauge.vue'
 import {
   displayPoolName,
   displaySymbol,
   formatCount,
   formatUsd,
+  shortAddress,
 } from '../../utils/format'
 import type { PoolDetailData } from '../../types/protocol'
 
@@ -33,7 +35,9 @@ const { pool, flows, series, flowWindow, loading, flowsLoading, error, setFlowWi
 
 // Shared wallets instance — the "Your position" card (Blend-only) reads the
 // user's positions without re-fetching (loaded once by useSharedWallets).
-const { wallets } = useSharedWallets()
+// W4 also reads defi.poolHealth (keyed by wallet × pool) for the per-wallet
+// breakdown when several tracked wallets hold a position here.
+const { wallets, defi } = useSharedWallets()
 
 const theme = computed(() => venueTheme(pool.value?.protocol?.id))
 
@@ -250,6 +254,34 @@ const myPosition = computed(() => {
     .filter((h): h is number => h !== null && Number.isFinite(h))
   const hf = hfs.length ? Math.min(...hfs) : null
   return { supplied, borrowed, hf }
+})
+
+// W4 — per-wallet breakdown of the aggregate above, from the overview's
+// defi.poolHealth (already keyed by wallet × pool; no new endpoint). Only
+// rendered when MORE THAN ONE tracked wallet holds a position in this pool —
+// the single-wallet card stays exactly as before.
+const WALLET_DOTS = ['#63A7FF', '#2E9E63', '#D86A3E', '#7B45D6', '#B98A00', '#159A8C', '#D0522E']
+
+const myPositionRows = computed(() => {
+  const p = pool.value
+  if (!p || !isLending.value) return []
+  return defi.value.poolHealth
+    .filter((ph) => ph.poolSlug && ph.poolSlug === p.id)
+    .map((ph) => {
+      const idx = wallets.value.findIndex((w) => w.id === ph.walletId)
+      const wallet = idx >= 0 ? wallets.value[idx] : null
+      return {
+        walletId: ph.walletId,
+        label: wallet?.label || ph.label || shortAddress(ph.address),
+        dot: wallet?.isActiveSigner
+          ? '#D5FF2F'
+          : WALLET_DOTS[(idx >= 0 ? idx : 0) % WALLET_DOTS.length],
+        supplied: ph.totalCollateralUsd ?? 0,
+        borrowed: ph.totalDebtUsd ?? 0,
+        hf: ph.healthFactor,
+      }
+    })
+    .sort((a, b) => b.supplied - a.supplied)
 })
 
 function hfColor(hf: number | null): string {
@@ -670,6 +702,25 @@ function openAction() {
               <span class="text-[13px] font-bold tabular-nums" :style="{ color: hfColor(myPosition.hf) }">
                 {{ myPosition.hf === null ? 'No borrow' : `HF ${myPosition.hf.toFixed(2)}` }}
               </span>
+            </div>
+
+            <!-- W4: per-wallet breakdown — only when several tracked wallets
+                 hold a position here (single-wallet card unchanged) -->
+            <div v-if="myPositionRows.length > 1" class="mt-[12px] pt-[4px]" style="border-top: 1px solid var(--dig-line-soft)">
+              <div
+                v-for="r in myPositionRows"
+                :key="r.walletId"
+                class="flex items-center gap-[8px] py-[8px]"
+                style="border-bottom: 1px solid var(--dig-line-soft)"
+              >
+                <span class="w-[7px] h-[7px] rounded-full flex-shrink-0" :style="{ background: r.dot }"></span>
+                <span class="text-[12.5px] font-semibold truncate">{{ r.label }}</span>
+                <div class="ml-auto text-right flex-shrink-0">
+                  <span class="text-[12.5px] font-semibold tabular-nums">{{ formatUsd(r.supplied) }}</span>
+                  <span v-if="r.borrowed > 0" class="text-[12px] tabular-nums ml-[7px]" style="color: var(--dig-amber)">−{{ formatUsd(r.borrowed) }}</span>
+                </div>
+                <HealthFactorGauge :health-factor="r.hf" dense />
+              </div>
             </div>
             <div class="flex gap-[9px] mt-[16px]">
               <button type="button" class="dig-btn flex-1 h-[40px] rounded-[11px] text-[13px] font-bold cursor-pointer" style="background: var(--dig-accent); color: #252525; border: none" @click="openAction">Supply</button>

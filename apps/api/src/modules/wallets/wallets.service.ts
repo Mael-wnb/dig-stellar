@@ -197,6 +197,11 @@ const POSITION_ASSET_JOIN = `
 export class WalletsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // STANDING DEBT (flagged in W1, fix out of scope): an ABSENT userId silently
+  // falls back to the shared demo account below instead of being rejected —
+  // several read routes depend on that default today. Do NOT use this helper on
+  // any path where "no userId" must mean something else (connectWallet uses
+  // normalizeOptionalUserId instead).
   private normalizeUserId(userId?: string): string {
     const value = (userId ?? '00000000-0000-0000-0000-000000000001').trim();
 
@@ -208,6 +213,19 @@ export class WalletsService {
       throw new BadRequestException(
         'userId must be a valid UUID, for example 00000000-0000-0000-0000-000000000001'
       );
+    }
+
+    return value;
+  }
+
+  // Strict optional variant for connect: absent/empty → null (recovery path),
+  // present → must be a valid UUID. Never defaults to the demo account.
+  private normalizeOptionalUserId(userId?: string | null): string | null {
+    const value = (userId ?? '').trim();
+    if (!value) return null;
+
+    if (!isUuid(value)) {
+      throw new BadRequestException('userId must be a valid UUID');
     }
 
     return value;
@@ -307,7 +325,48 @@ export class WalletsService {
     return wallet;
   }
 
-  private async getWalletByAddress(params: {
+  // W1: connect lookups are either session-scoped (attach) or signer-preferring
+  // (recovery). The old global "any account that has this address, limit 1"
+  // lookup is gone — it switched sessions to arbitrary accounts.
+
+  private async getWalletByAddressForUser(params: {
+    userId: string;
+    chain: string;
+    address: string;
+  }): Promise<WalletRow | null> {
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `
+      select
+        id,
+        user_id,
+        chain,
+        address,
+        label,
+        is_primary,
+        is_active,
+        is_active_signer,
+        metadata,
+        created_at,
+        updated_at
+      from user_wallets
+      where user_id = $1::uuid
+        and lower(chain) = lower($2)
+        and lower(address) = lower($3)
+      limit 1
+      `,
+      params.userId,
+      params.chain,
+      params.address
+    )) as WalletRow[];
+
+    return rows[0] ?? null;
+  }
+
+  // Recovery (no session): only an account where this address is the SIGNER may
+  // be recovered — an account that merely WATCHES the address must never be
+  // handed to whoever controls it. Deterministic: most recently touched signer
+  // row wins, id as the total-order tie-break.
+  private async findSignerWalletByAddress(params: {
     chain: string;
     address: string;
   }): Promise<WalletRow | null> {
@@ -328,6 +387,8 @@ export class WalletsService {
       from user_wallets
       where lower(chain) = lower($1)
         and lower(address) = lower($2)
+        and is_active_signer = true
+      order by updated_at desc, id asc
       limit 1
       `,
       params.chain,
@@ -481,28 +542,82 @@ export class WalletsService {
     );
   }
 
+  // W1 rule set (docs/lot-w-wallet-management.md):
+  //   session userId PRESENT → attach/promote inside THAT account only; the
+  //     session never switches accounts, whatever other accounts hold the
+  //     address (watch-only-anyone legitimately allows duplicates).
+  //   session userId ABSENT → recovery: a deterministic signer-preferring
+  //     lookup may recover the address's own account; a watch-only match
+  //     elsewhere never does. No match → fork a fresh account (old behavior).
   async connectWallet(params: {
+    userId?: string;
     chain?: string;
     address?: string;
     label?: string | null;
   }) {
+    const sessionUserId = this.normalizeOptionalUserId(params.userId);
     const chain = this.normalizeChain(params.chain);
     const address = this.normalizeAddress(params.address);
     const label = this.normalizeLabel(params.label);
 
-    const existingWallet = await this.getWalletByAddress({
-      chain,
-      address,
-    });
+    if (sessionUserId) {
+      const existingWallet = await this.getWalletByAddressForUser({
+        userId: sessionUserId,
+        chain,
+        address,
+      });
 
-    if (existingWallet) {
-      // Connecting via the Kit proves control of this address → it becomes the
-      // user's active signer (singleton; demotes any previous signer).
+      if (existingWallet) {
+        // Watch-only in this account → promote in place (same row, no
+        // duplicate). Already the signer → idempotent re-select. Both are
+        // promoteToActiveSigner (singleton; demotes any previous signer).
+        const promoted = await this.promoteToActiveSigner(
+          sessionUserId,
+          existingWallet.id
+        );
+        const overview = await this.getWalletsOverview(sessionUserId);
+
+        return {
+          connected: true,
+          createdUser: false,
+          createdWallet: false,
+          wallet: this.mapWallet(promoted),
+          ...overview,
+        };
+      }
+
+      const createdWallet = await this.createWalletForUser({
+        userId: sessionUserId,
+        chain,
+        address,
+        label,
+      });
+
       const promoted = await this.promoteToActiveSigner(
-        existingWallet.user_id,
-        existingWallet.id
+        sessionUserId,
+        createdWallet.id
       );
-      const overview = await this.getWalletsOverview(existingWallet.user_id);
+      const overview = await this.getWalletsOverview(sessionUserId);
+
+      return {
+        connected: true,
+        createdUser: false,
+        createdWallet: true,
+        wallet: this.mapWallet(promoted),
+        ...overview,
+      };
+    }
+
+    // No session → returning-user recovery (e.g. cleared localStorage): only a
+    // signer-owning account qualifies, chosen deterministically.
+    const signerWallet = await this.findSignerWalletByAddress({ chain, address });
+
+    if (signerWallet) {
+      const promoted = await this.promoteToActiveSigner(
+        signerWallet.user_id,
+        signerWallet.id
+      );
+      const overview = await this.getWalletsOverview(signerWallet.user_id);
 
       return {
         connected: true,
@@ -1239,6 +1354,51 @@ export class WalletsService {
     return {
       updated: true,
       wallet: this.mapWallet(updated),
+    };
+  }
+
+  // W2 — label-only rename. Empty/blank label clears back to the short-address
+  // fallback (label = null); everything else about the row is untouched.
+  async updateWalletLabel(params: {
+    userId?: string;
+    walletId?: string;
+    label?: string | null;
+  }) {
+    const userId = this.normalizeUserId(params.userId);
+    const walletId = this.normalizeWalletId(params.walletId);
+    const label = this.normalizeLabel(params.label);
+
+    await this.getWalletOrThrow(walletId, userId);
+
+    const updated = (await this.prisma.$queryRawUnsafe(
+      `
+      update user_wallets
+      set
+        label = $3,
+        updated_at = now()
+      where id = $1::uuid
+        and user_id = $2::uuid
+      returning
+        id,
+        user_id,
+        chain,
+        address,
+        label,
+        is_primary,
+        is_active,
+        is_active_signer,
+        metadata,
+        created_at,
+        updated_at
+      `,
+      walletId,
+      userId,
+      label
+    )) as WalletRow[];
+
+    return {
+      updated: true,
+      wallet: this.mapWallet(updated[0]),
     };
   }
 

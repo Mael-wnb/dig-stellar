@@ -63,7 +63,8 @@ const walletList = computed(() => (props.wallets.length ? props.wallets : SAMPLE
 function targetsFor(scope: AlertScope): Array<{ id: string; label: string; sub: string; tint: string; color: string }> {
   if (scope === 'wallet') {
     const w = walletList.value.map(x => ({
-      id: x.address, label: x.label,
+      // W2: short-address fallback when the wallet has no label.
+      id: x.address, label: x.label || `${x.address.slice(0, 3)}…${x.address.slice(-3)}`,
       sub: `${x.address.slice(0, 3)}…${x.address.slice(-3)}`, tint: '#171E30', color: '#63A7FF',
     }))
     return [...w, { id: 'all', label: 'All wallets', sub: 'Consolidated', tint: '#2E3A14', color: '#D5FF2F' }]

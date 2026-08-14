@@ -14,7 +14,7 @@ import { useSharedWallets } from '../../composables/useSharedWallets'
 import { useAppUser } from '../../composables/useAppUser'
 import { useModals } from '../../composables/useModals'
 import { useView } from '../../composables/useView'
-import { formatUsd } from '../../utils/format'
+import { formatUsd, shortAddress } from '../../utils/format'
 import type { WalletPositionItem } from '../../types/wallet'
 import EmptyPortfolioState from './EmptyPortfolioState.vue'
 import GetStartedCard from './GetStartedCard.vue'
@@ -53,7 +53,7 @@ const topPositions = computed(() => {
     for (const p of w.pools ?? []) {
       rows.push({
         key: `${w.id}-${p.poolSlug}`,
-        wallet: w.label || 'Wallet',
+        wallet: w.label || shortAddress(w.address),
         poolName: p.poolName || p.poolSlug || 'Pool',
         suppliedUsd: p.totalCollateralUsd ?? 0,
         borrowedUsd: p.totalDebtUsd ?? 0,

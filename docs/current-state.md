@@ -302,6 +302,24 @@ Blend SDK's `PositionsEstimate` (USD via the pool's Reflector oracle), internall
 (collateral/debt); the final visual cross-check against the mainnet.blend.capital UI has been
 performed and **matched**.
 
+**Lot W (Aug 14) — wallet-management & portfolio-assets UX repair.** (W1) Connect-signer now
+**attaches to the session account**: `POST /v1/wallets/connect` carries the session `userId`;
+present → user-scoped lookup, watch-only promotes in place, unknown address is added to THAT
+account (`createdUser:false` on every session branch) — the old global address lookup that forked
+a new user (or silently switched accounts) is gone. No session → deterministic **signer-preferring
+recovery** (`is_active_signer = true` + explicit ORDER BY; a watch-only match elsewhere never
+recovers), else fork as before. Covered by red tests (`wallets.connect.spec.ts`). (W2) Labels:
+optional label at connect on both flows, `PATCH /v1/wallets/:id { label }` (ownership-scoped,
+`wallets.label.spec.ts`), inline rename in the portfolio card ⋯ menu, and the short-address
+fallback (`shortAddress`) replacing the literal 'Wallet' at every render site. (W3) Portfolio
+**Assets card**: per-asset aggregation of the existing balance snapshots (amount + honest USD —
+"—" when unpriced, never $0; dust grouped visually under "Other", never dropped), expandable
+per-wallet detail; section total = the hero liquid figure (same source, asserted). (W4) Pool
+detail's "Your position" shows a **per-wallet breakdown** (dot + label + supplied/borrowed + HF
+gauge) whenever >1 tracked wallet holds a position in the pool, from the overview's
+`defi.poolHealth` — no new endpoint. Standing debt (flagged, out of scope): `normalizeUserId`'s
+absent-userId fallback to the shared demo UUID.
+
 Weak / not final: auth/session is not a final cryptographic production model; strong
 proof-of-ownership is **deliberately deferred** — connecting a wallet via the Kit is the beta
 "proof" you control a signer (no cryptographic challenge yet). Position aggregation is **Blend-only**

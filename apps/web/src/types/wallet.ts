@@ -128,6 +128,9 @@ export interface ConnectWalletRequest {
   chain: string;
   address: string;
   label?: string;
+  // Session account id when one exists (W1): the backend attaches/promotes the
+  // connected wallet inside THAT account instead of forking a new user.
+  userId?: string;
 }
 
 export interface ConnectWalletResponse {

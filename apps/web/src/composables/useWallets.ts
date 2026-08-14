@@ -10,6 +10,7 @@ import {
   setActiveSigner,
   setPrimaryWallet,
   setWalletActive,
+  updateWalletLabel,
 } from "../api/wallets";
 import type { WalletDefiSummary, WalletItem } from "../types/wallet";
 import { useActiveSigner } from "./useActiveSigner";
@@ -279,6 +280,39 @@ export function useWallets(userIdRef: { value: string | null }) {
     }
   }
 
+  // W2 — label-only rename. Patches the row server-side, then updates the one
+  // wallet in place (labels feed render sites only — no need for a full
+  // overview reload).
+  async function renameWallet(
+    wallet: WalletItem,
+    label: string | null
+  ): Promise<void> {
+    const userId = requireUserId();
+    error.value = "";
+    actionLoadingWalletId.value = wallet.id;
+
+    try {
+      const response = await updateWalletLabel(
+        wallet.id,
+        userId,
+        label?.trim() || null
+      );
+
+      const target = wallets.value.find((item) => item.id === wallet.id);
+      if (target) target.label = response.wallet.label ?? "";
+
+      if (selectedWallet.value?.id === wallet.id) {
+        selectedWallet.value =
+          wallets.value.find((item) => item.id === wallet.id) ?? null;
+      }
+    } catch (err) {
+      error.value =
+        err instanceof Error ? err.message : "Failed to rename wallet.";
+    } finally {
+      actionLoadingWalletId.value = null;
+    }
+  }
+
   async function removeWallet(wallet: WalletItem): Promise<void> {
     const userId = requireUserId();
     error.value = "";
@@ -353,6 +387,7 @@ export function useWallets(userIdRef: { value: string | null }) {
     setPrimary,
     setSigner,
     toggleActive,
+    renameWallet,
     removeWallet,
     hydrateFromConnect,
     clearWallets,

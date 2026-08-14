@@ -9,6 +9,10 @@ type CreateWalletBody = {
 };
 
 type ConnectWalletBody = {
+  // Session account id, sent by the client when one exists (W1). Present →
+  // attach/promote inside THAT account only. Absent → signer-preferring
+  // account recovery, else a fresh account.
+  userId?: string;
   chain?: string;
   address?: string;
   label?: string | null;
@@ -31,6 +35,11 @@ type RefreshWalletBody = {
   userId?: string;
 };
 
+type UpdateWalletBody = {
+  userId?: string;
+  label?: string | null;
+};
+
 @Controller('v1/wallets')
 export class WalletsController {
   constructor(private readonly walletsService: WalletsService) {}
@@ -38,6 +47,7 @@ export class WalletsController {
   @Post('connect')
   connectWallet(@Body() body?: ConnectWalletBody) {
     return this.walletsService.connectWallet({
+      userId: body?.userId,
       chain: body?.chain,
       address: body?.address,
       label: body?.label ?? null,
@@ -135,6 +145,21 @@ export class WalletsController {
       walletId,
       userId: queryUserId ?? body?.userId,
       isActive: body?.isActive,
+    });
+  }
+
+  // W2 — label-only update (rename). Same auth pattern as the other wallet
+  // ops: userId scoping, ownership enforced in the service WHERE clause.
+  @Patch(':walletId')
+  updateWallet(
+    @Param('walletId') walletId: string,
+    @Query('userId') queryUserId?: string,
+    @Body() body?: UpdateWalletBody
+  ) {
+    return this.walletsService.updateWalletLabel({
+      walletId,
+      userId: queryUserId ?? body?.userId,
+      label: body?.label ?? null,
     });
   }
 
