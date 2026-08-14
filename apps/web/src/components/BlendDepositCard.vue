@@ -19,6 +19,7 @@ import {
   type WithdrawIntent,
   type TrustlineIntent,
 } from "../lib/validateDepositXdr";
+import { friendlyContractError } from "../lib/blendContractErrors";
 
 // UX-only mainnet gate (Lot A2): the Blend card has its OWN kill-switch, independent
 // of the swap, and the withdraw (Lot A3) rides the SAME one — no new flag. The API
@@ -122,18 +123,25 @@ async function loadPosition() {
   }
 }
 
-onMounted(loadBalances);
+// A5b: the position read is now loaded EAGERLY (not just on the withdraw pane) —
+// it also carries the pool's live status, which gates the supply tab. It still
+// needs a connected address; disconnected users can't submit anyway, and a frozen
+// pool's supply attempt is additionally caught at simulation (#1206 → friendly copy).
+onMounted(() => {
+  loadBalances();
+  loadPosition();
+});
 watch(connectedAddress, () => {
   loadBalances();
-  if (mode.value === "withdraw") loadPosition();
+  loadPosition();
 });
 // On a network switch the endpoints + issuer + pool change — reset transient state,
-// reload balances and (if shown) the position from that network.
+// reload balances and the position/status from that network.
 watch(network, () => {
   reset();
   amount.value = "";
   loadBalances();
-  if (mode.value === "withdraw") loadPosition();
+  loadPosition();
 });
 
 // A5: keep the selected asset inside THIS pool's reserve set. Orbit has no USDC
@@ -187,6 +195,37 @@ const borrowed = computed(() => {
   );
 });
 
+// --- Live pool status (A5b) ------------------------------------------------
+//
+// Read from the SAME position response (the API derives it from PoolV2.load, never
+// a registry — status is governance-dynamic). Per the deployed pool contract,
+// supply is blocked at status > 3 (Frozen/Setup) while withdrawals are NEVER
+// status-blocked — so a frozen pool disables the supply tab but keeps withdraw.
+const poolStatus = computed(() => position.value?.poolStatus ?? null);
+const supplyBlocked = computed(() => poolStatus.value?.supplyBlocked === true);
+/** Badge on the card for any non-Active pool (On-Ice shows too — borrow is blocked there). */
+const statusBadge = computed(() => {
+  const s = poolStatus.value;
+  return s && s.label !== "Active" ? s.label : "";
+});
+const supplyBlockedCopy = computed(() => {
+  const s = poolStatus.value;
+  if (!s?.supplyBlocked) return "";
+  const why =
+    s.label === "Frozen"
+      ? "is frozen by Blend governance"
+      : s.label === "Setup"
+        ? "is still in setup"
+        : `reports pool status ${s.code}`;
+  return `${poolLabel.value} ${why} — deposits are disabled. Withdrawals remain available.`;
+});
+
+// A frozen pool can't take a deposit: if the status arrives while the supply pane
+// is open, move to withdraw (the only action the pool still allows this app).
+watch(supplyBlocked, (blocked) => {
+  if (blocked && mode.value === "supply") setMode("withdraw");
+});
+
 // "pending" = confirmation polling TIMED OUT: the transaction was accepted by the
 // network and may still be included — it has NOT failed, so it must never render
 // failure copy. It gets its own block with the explorer link instead.
@@ -202,6 +241,10 @@ const status = ref<ActionStatus>("idle");
 const stepLabel = ref("");
 const txHash = ref("");
 const errorMessage = ref("");
+// A5b: when errorMessage is a mapped one-liner for a contract error, the raw
+// HostError text goes here — rendered behind a collapsible "details", never as
+// the primary message.
+const errorDetails = ref("");
 // How a network-facing failure happened — the two are financially different (F4):
 //   "onchain"  — INCLUDED in a ledger and failed atomically there: no funds moved,
 //                only the network fee was consumed.
@@ -277,6 +320,8 @@ const canSubmit = computed(
     isActiveSignerConnected.value &&
     !isBusy.value &&
     !usdcUnavailable.value &&
+    // A5b: never build a supply the pool's live status would reject (#1206).
+    (isWithdraw.value || !supplyBlocked.value) &&
     parsedAmount.value > 0 &&
     (!isWithdraw.value || (!positionLoading.value && !hasNoPosition.value && !exceedsPosition.value)),
 );
@@ -419,6 +464,7 @@ function startAction(): { address: string; passphrase: string } | null {
   status.value = "building";
   txHash.value = "";
   errorMessage.value = "";
+  errorDetails.value = "";
   stepLabel.value = "";
   failureKind.value = null;
 
@@ -476,10 +522,10 @@ async function onDeposit() {
     }
 
     if (!built.simulation.success || !built.xdr) {
-      errorMessage.value =
-        built.simulation.error ||
-        "Deposit simulation failed. Ensure the account holds this asset.";
-      status.value = "error";
+      showSimulationError(
+        built.simulation.error,
+        "Deposit simulation failed. Ensure the account holds this asset.",
+      );
       return;
     }
 
@@ -526,10 +572,10 @@ async function onWithdraw() {
     });
 
     if (!built.simulation.success || !built.xdr) {
-      errorMessage.value =
-        built.simulation.error ||
-        "Withdraw simulation failed. Your position may not cover this amount.";
-      status.value = "error";
+      showSimulationError(
+        built.simulation.error,
+        "Withdraw simulation failed. Your position may not cover this amount.",
+      );
       return;
     }
 
@@ -576,15 +622,46 @@ function reset() {
   status.value = "idle";
   txHash.value = "";
   errorMessage.value = "";
+  errorDetails.value = "";
   stepLabel.value = "";
   failureKind.value = null;
+}
+
+/**
+ * Simulation failed — nothing signable was produced. Map a known contract error
+ * (e.g. #1206 pool status) to its one-liner and park the raw HostError behind
+ * "details"; a non-contract error keeps the raw text as before (it is usually a
+ * short, already-readable message like the trustline short-circuit).
+ */
+function showSimulationError(rawError: string | undefined, fallback: string) {
+  const friendly = friendlyContractError(rawError);
+  if (friendly) {
+    errorMessage.value = friendly.message;
+    errorDetails.value = friendly.raw;
+  } else {
+    errorMessage.value = rawError || fallback;
+  }
+  status.value = "error";
 }
 </script>
 
 <template>
   <div class="bg-[#2A2A2A] border border-[#383838] rounded-lg p-4 flex flex-col gap-3">
     <div class="flex items-center justify-between">
-      <span class="text-xs font-semibold text-[#e2e6e1]">Blend</span>
+      <span class="text-xs font-semibold text-[#e2e6e1] flex items-center gap-2">
+        Blend
+        <!-- A5b: live pool status badge — shown for any non-Active pool. -->
+        <span
+          v-if="statusBadge"
+          class="text-[9px] font-bold uppercase tracking-wider px-[5px] py-[1px] rounded-[6px]"
+          :class="
+            supplyBlocked
+              ? 'text-[#ff7b7b] bg-[rgba(255,123,123,0.12)]'
+              : 'text-[#ffb86b] bg-[rgba(255,184,107,0.12)]'
+          "
+          :title="`Live on-chain pool status: ${poolStatus?.code}`"
+        >{{ statusBadge }}</span>
+      </span>
       <span class="text-[10px] text-[#9a9b99] uppercase tracking-widest">{{ network }}</span>
     </div>
 
@@ -618,22 +695,35 @@ function reset() {
     </div>
 
     <template v-else>
-      <!-- MODE — supply ↔ withdraw, the two halves of the same position -->
+      <!-- MODE — supply ↔ withdraw, the two halves of the same position.
+           A5b: the supply tab is DISABLED when the pool's live status blocks
+           deposits (contract would reject with #1206); withdraw stays available —
+           the contract never status-blocks an exit. -->
       <div class="flex gap-2">
         <button
           v-for="m in (['supply', 'withdraw'] as const)"
           :key="m"
           type="button"
-          class="flex-1 px-3 py-2 rounded-md border text-xs font-semibold capitalize transition"
+          class="flex-1 px-3 py-2 rounded-md border text-xs font-semibold capitalize transition disabled:opacity-40 disabled:cursor-not-allowed"
           :class="
             mode === m
               ? 'border-[#d5ff2f] text-[#d5ff2f] bg-[rgba(213,255,47,0.08)]'
               : 'border-[#383838] text-[#9a9b99] hover:border-[#555]'
           "
+          :disabled="m === 'supply' && supplyBlocked"
+          :title="m === 'supply' && supplyBlocked ? supplyBlockedCopy : undefined"
           @click="setMode(m)"
         >
           {{ m }}
         </button>
+      </div>
+
+      <!-- A5b: honest copy for a status-blocked supply (e.g. Orbit, frozen). -->
+      <div
+        v-if="supplyBlocked"
+        class="bg-[#202020] border border-[rgba(255,123,123,0.3)] rounded-md p-3 text-[11px] text-[#9a9b99]"
+      >
+        {{ supplyBlockedCopy }}
       </div>
 
       <!-- MAINNET WARNING (live: real funds) -->
@@ -837,6 +927,7 @@ function reset() {
         <template v-else-if="isWithdraw && positionLoading">Reading position…</template>
         <template v-else-if="isWithdraw && hasNoPosition">Nothing to withdraw</template>
         <template v-else-if="isWithdraw">Withdraw {{ asset }} from Blend</template>
+        <template v-else-if="supplyBlocked">Deposits disabled — pool {{ statusBadge.toLowerCase() }}</template>
         <template v-else>Deposit {{ asset }} to Blend</template>
       </button>
 
@@ -927,6 +1018,14 @@ function reset() {
           nothing was charged and no funds moved.
         </span>
         <span class="text-[#9a9b99] break-all">{{ errorMessage }}</span>
+        <!-- A5b: the raw contract/host error stays available, but never as the
+             primary message — behind a disclosure, for support and power users. -->
+        <details v-if="errorDetails" class="text-[#9a9b99]">
+          <summary class="cursor-pointer hover:text-[#d5ff2f] w-fit">details</summary>
+          <pre
+            class="mt-1 p-2 bg-[#161616] rounded whitespace-pre-wrap break-all text-[10px] font-mono max-h-48 overflow-y-auto"
+          >{{ errorDetails }}</pre>
+        </details>
         <button type="button" class="text-[#9a9b99] hover:text-[#d5ff2f] w-fit mt-1" @click="reset">
           Try again
         </button>

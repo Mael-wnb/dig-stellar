@@ -115,6 +115,57 @@ export interface BlendAssetPosition {
   decimals: number;
 }
 
+/**
+ * The pool's LIVE on-chain status (A5b) — read from the same PoolV2 load as the
+ * position, NEVER from the registry: status is governance-dynamic (admin `set_status`
+ * or the permissionless backstop-driven `update_status`), so a pinned value would
+ * go stale the moment governance moves.
+ *
+ * Semantics verified against the deployed contract source
+ * (blend-contracts-v2 pool/src/pool/pool.rs, require_action_allowed):
+ *
+ *     if (status > 1 && (action == Borrow || action == DeleteLiquidationAuction))
+ *         || (status > 3 && (action == Supply || action == SupplyCollateral))
+ *     { panic InvalidPoolStatus }   // contract error #1206
+ *
+ * i.e. 0–1 Active (everything allowed), 2–3 On-Ice (borrowing blocked, supply and
+ * withdraw allowed), 4–5 Frozen and 6 Setup (supply blocked). Withdraw / Repay are
+ * NEVER status-blocked — a user can always exit. Even codes are admin-set, odd are
+ * backstop-driven (blend-sdk pool_contract.d.ts: setStatus takes 0/2/4).
+ */
+export interface BlendPoolStatus {
+  /** Raw on-chain `metadata.status` value. */
+  code: number;
+  label: 'Active' | 'On-Ice' | 'Frozen' | 'Setup' | 'Unknown';
+  /** True iff the contract would reject Supply/SupplyCollateral (status > 3). */
+  supplyBlocked: boolean;
+  /** Always false today — the contract never status-blocks withdrawals. Kept
+   * explicit so the UI states it from data, not from an assumption. */
+  withdrawBlocked: boolean;
+}
+
+/** Numeric rule mirrors the contract exactly; the label is cosmetic on top. */
+export function derivePoolStatus(code: number): BlendPoolStatus {
+  const label: BlendPoolStatus['label'] =
+    !Number.isInteger(code) || code < 0
+      ? 'Unknown'
+      : code <= 1
+        ? 'Active'
+        : code <= 3
+          ? 'On-Ice'
+          : code <= 5
+            ? 'Frozen'
+            : code === 6
+              ? 'Setup'
+              : 'Unknown';
+  return {
+    code,
+    label,
+    supplyBlocked: code > 3,
+    withdrawBlocked: false,
+  };
+}
+
 export interface BlendPositionResult {
   poolId: string;
   /** Registry slug of the pool actually read (A5) — lets the UI assert it got what it asked for. */
@@ -124,6 +175,8 @@ export interface BlendPositionResult {
   /** The assets THIS pool has reserves for (Orbit is XLM-only). */
   assets: Array<'USDC' | 'XLM'>;
   network: ActionNetwork;
+  /** Live pool status (A5b) — what the UI's supply/withdraw gating keys off. */
+  poolStatus: BlendPoolStatus;
   /** Keyed by the assets this app can supply/withdraw. Absent reserve → all zeros. */
   positions: Record<'USDC' | 'XLM', BlendAssetPosition>;
 }
@@ -717,6 +770,9 @@ export class ActionsService {
       poolLabel: cfg.poolLabel,
       assets: [...cfg.assets],
       network,
+      // Live from the SAME PoolV2 load as the position — no extra RPC round-trip,
+      // and never from the registry (status is governance-dynamic).
+      poolStatus: derivePoolStatus(pool.metadata.status),
       positions,
     };
   }

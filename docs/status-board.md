@@ -177,6 +177,23 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   endpoints. Also fixed the `toLocaleString(undefined)` locale bug. Evidence:
   `docs/evidence/lot-a5-blend-multipool.md`. **Pending Maël: one real supply+withdraw on a
   non-Fixed pool (YieldBlox) + testnet re-verify.**
+- T3-D2 note (2026-08-14, Lot A5b): **Mainnet execution evidence LANDED + pool-status awareness +
+  friendly contract errors. VPS deploy pending.** Five successful Pubnet txs (15:29–15:34 UTC,
+  Horizon-verified + XDR-decoded, never from app logs): supplies of 5 XLM → Fixed, 5 XLM →
+  YieldBlox, 5 USDC → YieldBlox (the real multi-pool proof — the A5 "supply on a non-Fixed pool"
+  pending item is DONE; a mainnet withdraw is still unevidenced, testnet A3 only), plus swaps
+  50 XLM → 7.97 USDC and 10 XLM → 1.38 EURC. Post-0c296ef fee check against reality: all Soroban
+  txs bid exactly 10,000 stroops inclusion (max_fee = resourceFee + 10,000) and were charged
+  ~57–59% of the ceiling; classic swaps charged the 100/op base (200 total) under a 10,000/op bid.
+  Honest counter-example: Orbit supply fails at SIMULATION with `Error(Contract, #1206)`
+  (`InvalidPoolStatus` — Orbit status=4, admin-frozen) → `xdr:""`, nothing signed, no sixth hash.
+  Product follow-up shipped: position endpoint returns live `poolStatus` (from the same
+  `PoolV2.load`, never the registry — status is governance-dynamic; semantics verified in
+  blend-contracts-v2 source: supply blocked at status>3, withdraw NEVER status-blocked); UI
+  disables Supply with honest copy + status badge + auto-switch to Withdraw on frozen pools;
+  known Blend error codes map to one-liners (#1206 → governance copy), unmapped → "code #NNNN"
+  with raw diagnostics behind a collapsible details (raw stays verbatim in the API payload).
+  All green (api build + 42 tests, web build). Evidence: `docs/evidence/t3-d2-mainnet-actions.md`.
 - T3-D3 note (2026-08-14): **Dead-reserves defect FIXED** (found during A5; own small lot, same
   discipline as the frozen-reserves hotfix). The Blend/Soroswap/Aquarius pool-metric writers read
   `reserve_snapshots` with `distinct on (asset_id)` — the latest row PER ASSET — so they kept

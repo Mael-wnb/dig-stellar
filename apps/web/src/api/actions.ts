@@ -158,6 +158,20 @@ export type BlendAssetPosition = {
   decimals: number;
 };
 
+/**
+ * The pool's LIVE on-chain status (A5b), derived server-side from the same PoolV2
+ * load as the position — never from a registry (status is governance-dynamic).
+ * Per the deployed contract: supply is blocked at status > 3 (Frozen/Setup);
+ * withdrawals are NEVER status-blocked, so a user can always exit.
+ */
+export type BlendPoolStatus = {
+  /** Raw on-chain status value (0–1 Active, 2–3 On-Ice, 4–5 Frozen, 6 Setup). */
+  code: number;
+  label: "Active" | "On-Ice" | "Frozen" | "Setup" | "Unknown";
+  supplyBlocked: boolean;
+  withdrawBlocked: boolean;
+};
+
 export type BlendPositionResponse = {
   poolId: string;
   /** Registry slug of the pool actually read (A5) — assert it matches what was asked. */
@@ -166,6 +180,8 @@ export type BlendPositionResponse = {
   /** The assets that pool has reserves for. */
   assets: Array<"XLM" | "USDC">;
   network: "testnet" | "mainnet";
+  /** Live pool status (A5b) — what the supply gating + status badge key off. */
+  poolStatus: BlendPoolStatus;
   positions: Record<"XLM" | "USDC", BlendAssetPosition>;
 };
 
