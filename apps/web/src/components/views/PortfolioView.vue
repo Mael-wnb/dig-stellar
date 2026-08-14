@@ -226,11 +226,15 @@ function toggleAsset(key: string) {
 }
 
 const assetsView = computed(() => {
+  // Respects the wallet scope filter like the positions do: scoped → ONLY that
+  // wallet's balances, and the total/assert target is THAT wallet's figure.
+  const scoped = scope.value !== 'all'
   const map = new Map<
     string,
     { symbol: string; amount: number; usd: number; priced: boolean; legs: AssetLeg[] }
   >()
   wallets.value.forEach((w, i) => {
+    if (scoped && w.id !== scope.value) return
     for (const b of w.balances ?? []) {
       const key = b.assetContractId || b.symbol || b.id
       const g =
@@ -267,12 +271,20 @@ const assetsView = computed(() => {
   const pricedSum = all.reduce((s, a) => s + (a.usd ?? 0), 0)
   for (const a of all) a.share = pricedSum > 0 && a.usd !== null ? a.usd / pricedSum : 0
 
-  // The section total IS the hero liquid figure (same source — asserted, not
-  // recomputed): both are the sum of the same latest balance snapshots.
-  if (Math.abs(pricedSum - totalPortfolioUsd.value) > 0.01) {
-    console.warn('[portfolio-assets] asset sum drifted from the liquid hero figure', {
+  // The section total IS the liquid figure for the current scope (same source —
+  // asserted, not recomputed): global hero figure on 'all', the scoped wallet's
+  // own totalPortfolioUsd otherwise. Both sum the same latest balance snapshots.
+  const scopeWallet = scoped
+    ? wallets.value.find((w) => w.id === scope.value) ?? null
+    : null
+  const totalUsd = scoped
+    ? scopeWallet?.totalPortfolioUsd ?? 0
+    : totalPortfolioUsd.value
+  if (Math.abs(pricedSum - totalUsd) > 0.01) {
+    console.warn('[portfolio-assets] asset sum drifted from the scope liquid figure', {
       pricedSum,
-      heroLiquid: totalPortfolioUsd.value,
+      scopeLiquid: totalUsd,
+      scope: scope.value,
     })
   }
 
@@ -291,7 +303,14 @@ const assetsView = computed(() => {
         }
       : null
 
-  return { rows: main, other, hasAny: all.length > 0 }
+  return {
+    rows: main,
+    other,
+    hasAny: all.length > 0,
+    scoped,
+    totalUsd,
+    title: scopeWallet ? `Assets · ${walletLabel(scopeWallet)}` : 'Assets',
+  }
 })
 </script>
 
@@ -418,8 +437,8 @@ const assetsView = computed(() => {
            Total = the SAME hero liquid figure (asserted in assetsView). -->
       <div v-if="assetsView.hasAny" class="rounded-[18px] p-[20px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
         <div class="flex items-baseline justify-between mb-[14px]">
-          <div class="text-[14px] font-semibold">Assets</div>
-          <div class="text-[20px] font-bold tabular-nums">{{ formatUsd(totalPortfolioUsd) }}</div>
+          <div class="text-[14px] font-semibold">{{ assetsView.title }}</div>
+          <div class="text-[20px] font-bold tabular-nums">{{ formatUsd(assetsView.totalUsd) }}</div>
         </div>
 
         <!-- share bar (priced assets only; dust grouped as one segment) -->
@@ -436,19 +455,21 @@ const assetsView = computed(() => {
         <div class="mt-[12px]">
           <div v-for="a in assetsView.rows" :key="a.key">
             <div
-              class="dig-row flex items-center gap-[11px] py-[10px] cursor-pointer"
+              class="dig-row flex items-center gap-[11px] py-[10px]"
+              :class="{ 'cursor-pointer': !assetsView.scoped }"
               style="border-bottom: 1px solid var(--dig-line-soft)"
-              @click="toggleAsset(a.key)"
+              @click="!assetsView.scoped && toggleAsset(a.key)"
             >
               <BrandLogo :primary="null" :letter="(a.symbol || '•').charAt(0).toUpperCase()" tint="#242422" color="#B7B3AB" :size="26" :radius="8" :font-size="12" />
               <span class="text-[13.5px] font-semibold">{{ a.symbol }}</span>
               <span class="text-[13px] tabular-nums" style="color: var(--dig-faint)" :title="formatTokenAmountExact(a.amount)">{{ formatTokenAmountCompact(a.amount) }}</span>
               <span class="ml-auto text-[13.5px] font-semibold tabular-nums">{{ a.usd === null ? '—' : formatUsd(a.usd) }}</span>
               <span class="w-[44px] text-right text-[11.5px] tabular-nums" style="color: var(--dig-faint)">{{ a.share > 0 ? `${(a.share * 100).toFixed(1)}%` : '' }}</span>
-              <span class="text-[11px]" style="color: var(--dig-faint)">{{ expandedAssets.has(a.key) ? '▾' : '▸' }}</span>
+              <!-- scoped to one wallet → per-wallet expansion is redundant -->
+              <span v-if="!assetsView.scoped" class="text-[11px]" style="color: var(--dig-faint)">{{ expandedAssets.has(a.key) ? '▾' : '▸' }}</span>
             </div>
             <!-- per-wallet detail (which wallet holds how much) -->
-            <div v-if="expandedAssets.has(a.key)" style="border-bottom: 1px solid var(--dig-line-soft)">
+            <div v-if="!assetsView.scoped && expandedAssets.has(a.key)" style="border-bottom: 1px solid var(--dig-line-soft)">
               <div
                 v-for="leg in a.legs"
                 :key="`${a.key}-${leg.walletId}`"

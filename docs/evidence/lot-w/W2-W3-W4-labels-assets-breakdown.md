@@ -42,9 +42,16 @@ commits manually). Follows the approved W1 (see `W1-identity-attach.md`).
   wallet label + amount + USD).
 - Dust: priced assets < $1 grouped visually under "Other" (expandable), still
   counted in the total — never dropped.
-- **Total = the hero liquid figure** (`totalPortfolioUsd` — same source,
-  displayed as-is, not recomputed); a runtime assert (`console.warn`) fires if
-  the per-asset sum ever drifts from it by > $0.01.
+- **Scope-aware** (founder follow-up, same day): the card respects the wallet
+  scope filter like the positions do. Scope = a wallet id → only that wallet's
+  balances aggregate, the title echoes the scope ("Assets · <wallet label>"),
+  the per-wallet expansion (chevron + detail) is hidden as redundant, and the
+  total + drift assert compare against THAT wallet's `totalPortfolioUsd`.
+  Scope = 'all' → exactly the original behavior.
+- **Total = the liquid figure for the current scope** (same source, displayed
+  as-is, not recomputed — global hero figure on 'all', the wallet's own total
+  when scoped); a runtime assert (`console.warn`) fires if the per-asset sum
+  ever drifts from it by > $0.01.
 - Placement: between the summary/wallet-cards block and the Position breakdown,
   liquid kept DISTINCT from DeFi supplied/borrowed (standing rule).
 
