@@ -73,6 +73,8 @@ function depositBlend() {
     name: p?.name ?? 'Blend pool',
     venue: p?.protocol.name ?? 'Blend',
     kind: 'lending',
+    // A5: act on the pool this card advertised (undefined → network default).
+    poolSlug: p?.id,
   })
 }
 </script>

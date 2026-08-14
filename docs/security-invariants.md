@@ -90,9 +90,17 @@ For the **deposit XDR**, the validator asserts (`validateDepositXdr`):
   INV-2.1, signed with the same passphrase validated with.
 - **INV-2.9** ✅ **Source + single op**: tx source (and op source, if set) equals the connected
   active-signer address, and the deposit is the **sole** operation, of type `invokeHostFunction`.
-- **INV-2.10** ✅ **Pool pinning**: the invoked contract id equals the expected pool from the CLIENT
-  registry (`config/blendPools.ts`), and the called function is `submit`. A swapped pool/contract is
-  rejected regardless of what the API returned.
+- **INV-2.10** ✅ **Pool pinning** (generalized to N pools in Lot A5): the invoked contract id equals
+  the expected pool from the CLIENT registry (`config/blendPools.ts`), and the called function is
+  `submit`. A swapped pool/contract is rejected regardless of what the API returned.
+  Since A5 the registry holds **several vetted pools per network**, and the gate pins the
+  **REQUESTED** one — the pool the card resolved from its own registry for the slug the modal was
+  opened with, never a default and never the pool named in the API response. Generalizing the pool
+  from a constant into a parameter is exactly the kind of change that can quietly weaken a gate, so
+  it is held by cross-pool red tests over every ORDERED PAIR of real registry pools
+  (`validateDepositXdr.spec.ts`, Lot A5 blocks): an XDR built for pool A must fail an intent that
+  pins pool B, for deposit and withdraw alike. A slug absent from the client registry resolves to
+  `null` and the card renders **no form at all** — an unvetted pool id must never reach the gate.
 - **INV-2.11** ✅ **Submit args**: `from` / `spender` / `to` all equal the user; exactly ONE request;
   `request_type` = `SupplyCollateral` (enum value `2`, verified against `@blend-capital/blend-sdk`
   source); request `address` = the expected reserve SAC for the chosen asset; request `amount` =
@@ -188,12 +196,22 @@ regime (see `docs/tasks/lot-a1-mainnet-swap.md` for the implementation brief):
   deposit reuses the shared per-transaction cap (`ACTIONS_MAINNET_MAX_SEND_XLM`) on the deposit
   amount, and its asset set is XLM | USDC only (any other → 400). Enforced in `actions.controller.ts`
   (`resolveBlendNetwork`); pool + reserve SACs read per-network from `network-registry.ts`
-  (`getBlendConfig`). Flags unset = testnet deposit byte-for-byte today's.
+  (`resolveBlendPool`). Flags unset = testnet deposit byte-for-byte today's.
 - **INV-4.7** ✅ **The Blend withdraw rides the SAME kill-switch (Lot A3)** — no new flag.
   `blend/withdraw` and `blend/position` both go through `resolveBlendNetwork`, so with the flags
   unset a mainnet withdraw is a **403** exactly like a mainnet deposit and no mainnet endpoint is
   contacted (verified in the testnet E2E). Same asset set (XLM | USDC, anything else 400).
   **The per-transaction cap deliberately does NOT apply** — see INV-2.15 for why.
+- **INV-4.8** ✅ **Multi-pool resolution never falls back (Lot A5).** `blend/deposit`,
+  `blend/withdraw` and `blend/position` accept an optional `pool` slug. Absent = the network's
+  default pool (pre-A5 behavior, so older clients are unaffected); **unknown = 400**, never a
+  silent substitution — acting on a pool the caller did not name is the defect A5 fixes, and on a
+  money path it would mean supplying funds somewhere the user never chose. An asset the resolved
+  pool has no reserve for is also a **400** naming the pool (`assertPoolSupportsAsset`); the Orbit
+  pool is XLM-only, verified on-chain. The kill-switch is checked BEFORE pool resolution, so with
+  the flags unset every pool returns 403 (verified for all 4 pools × 3 endpoints). Each pool's
+  asset list comes from a **live SDK read**, never from `reserve_snapshots`, which retains rows for
+  reserves a pool no longer has — see `docs/evidence/lot-a5-blend-multipool.md`.
 
 ## 5. Known defects — status
 

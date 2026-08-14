@@ -429,6 +429,55 @@ between the position read and apply. That is correct behavior, not a bug.
 
 ---
 
+### Blend multi-pool: adding or ungating a pool (Lot A5)
+
+Since A5, supply + withdraw work on **every pool in the registry**, not just Fixed. Both registries
+must agree, entry for entry:
+
+- API: `apps/api/src/modules/actions/network-registry.ts` → `MAINNET_BLEND_POOLS`
+- Web: `apps/web/src/config/blendPools.ts` → `MAINNET_BLEND_POOLS`
+
+The client one is what the signing gate pins — a divergence between them is a **security bug**, not
+config drift.
+
+**Before adding a pool** (never from memory; the A2 rule — an id that cannot be verified is
+EXCLUDED, not guessed):
+
+1. Confirm it is in the indexed perimeter (`entities` × `venues.slug='blend'`,
+   `entity_type='lending_pool'`, `is_active`). A pool the product does not list is out of scope.
+2. Verify the contract id against Blend itself. `mainnet.blend.capital` is a client-rendered SPA
+   (a fetch returns an empty shell), so verify on-chain instead — stronger, and reproducible:
+   - the official **V2 pool factory** (`CDSYOAVXFY7SM5S64IZPPPYB4GVGGLMQVFREPSQQEZVIWXX5R23G4QSU`,
+     from docs.blend.capital) must answer `is_pool(<id>) = true`;
+   - the pool should appear in the **backstop reward zone**
+     (`CAQQR5SWBXKIGZKPBZDH3KM5GQ5GUTPKB7JAFCINLZBC5WXPJKRG3IM7`) — Blend governance recognition;
+   - stellar.expert should report the **same wasm hash** as the vetted Fixed pool;
+   - `PoolV2.load` must succeed (this IS the V2 confirmation — the builder uses `PoolContractV2`),
+     and its `metadata.name` is the label to use.
+3. Read the pool's reserves **live via the SDK** to decide its asset list. Do **NOT** read
+   `reserve_snapshots`: it retains rows for reserves a pool no longer has (Orbit still has a
+   2026-04-01 USDC row but no USDC reserve on-chain), so a DB-derived list would offer a deposit
+   that fails at simulation.
+4. Add the entry to BOTH registries, then run `pnpm -C apps/web test` — the cross-pool red tests
+   iterate the real registry, so a new pool is automatically covered by the pairwise pinning tests.
+
+`curl` validation per pool (mainnet):
+```bash
+# unknown slug → 400 (never a silent fallback to another pool)
+curl -s -X POST $API/v1/actions/blend/deposit -H "Content-Type: application/json" \
+  -d '{"address":"G...","asset":"XLM","amount":"1","network":"mainnet","pool":"blend-nope"}' | jq
+# asset the pool has no reserve for → 400 naming the pool (e.g. Orbit + USDC)
+curl -s -X POST $API/v1/actions/blend/deposit -H "Content-Type: application/json" \
+  -d '{"address":"G...","asset":"USDC","amount":"1","network":"mainnet","pool":"blend-orbit-pool"}' | jq
+# position read echoes the pool it actually read + that pool's assets
+curl -s -X POST $API/v1/actions/blend/position -H "Content-Type: application/json" \
+  -d '{"address":"G...","network":"mainnet","pool":"blend-yieldblox-pool"}' | jq '.poolSlug, .assets'
+# no "pool" key at all → the default (Fixed), i.e. pre-A5 behavior
+# flag OFF → 403 for EVERY pool (the kill-switch is checked before pool resolution)
+```
+
+---
+
 ## Wallet troubleshooting
 - Test wallet connect: connect via the header button (Stellar Wallets Kit); pick Freighter.
 - After a page reload, the kit re-selects the connected provider (`restoreWalletSession` +

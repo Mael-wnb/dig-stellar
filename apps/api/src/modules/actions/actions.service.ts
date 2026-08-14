@@ -23,7 +23,8 @@ import {
   type ActionNetwork,
   type BlendNetworkConfig,
   getNetworkConfig,
-  getBlendConfig,
+  resolveBlendPool,
+  assertPoolSupportsAsset,
   vettedUsdcSdex,
 } from './network-registry';
 
@@ -32,6 +33,8 @@ export interface BlendDepositParams {
   asset: 'USDC' | 'XLM';
   amount: string;
   network: ActionNetwork;
+  /** Registry slug of the pool to act on (A5). Absent = the network default. */
+  poolSlug?: string;
 }
 
 export interface BlendDepositResult {
@@ -67,6 +70,8 @@ export interface BlendWithdrawParams {
   asset: 'USDC' | 'XLM';
   amount: string;
   network: ActionNetwork;
+  /** Registry slug of the pool to act on (A5). Absent = the network default. */
+  poolSlug?: string;
 }
 
 /**
@@ -93,6 +98,8 @@ export interface BlendWithdrawResult {
 export interface BlendPositionParams {
   address: string;
   network: ActionNetwork;
+  /** Registry slug of the pool to act on (A5). Absent = the network default. */
+  poolSlug?: string;
 }
 
 /** One asset's supplied position in the pool, in human units (decimal strings). */
@@ -110,6 +117,12 @@ export interface BlendAssetPosition {
 
 export interface BlendPositionResult {
   poolId: string;
+  /** Registry slug of the pool actually read (A5) — lets the UI assert it got what it asked for. */
+  poolSlug: string;
+  /** Human label of that pool. */
+  poolLabel: string;
+  /** The assets THIS pool has reserves for (Orbit is XLM-only). */
+  assets: Array<'USDC' | 'XLM'>;
   network: ActionNetwork;
   /** Keyed by the assets this app can supply/withdraw. Absent reserve → all zeros. */
   positions: Record<'USDC' | 'XLM', BlendAssetPosition>;
@@ -318,14 +331,16 @@ export class ActionsService {
   // the Blend deposit paths.
   private readonly rpcServers = new Map<ActionNetwork, rpc.Server>();
   private readonly horizonServers = new Map<ActionNetwork, Horizon.Server>();
-  private readonly poolContracts = new Map<ActionNetwork, PoolContractV2>();
+  // Keyed by POOL ID (A5), not by network: one network now has several pools, and
+  // a network-keyed cache would hand pool A's contract to a pool B request.
+  private readonly poolContracts = new Map<string, PoolContractV2>();
 
-  /** Lazily-built Blend pool contract (V2) for the given network. */
-  private poolContractFor(network: ActionNetwork): PoolContractV2 {
-    let pool = this.poolContracts.get(network);
+  /** Lazily-built Blend pool contract (V2) for a resolved pool. */
+  private poolContractFor(cfg: BlendNetworkConfig): PoolContractV2 {
+    let pool = this.poolContracts.get(cfg.poolId);
     if (!pool) {
-      pool = new PoolContractV2(getBlendConfig(network).poolId);
-      this.poolContracts.set(network, pool);
+      pool = new PoolContractV2(cfg.poolId);
+      this.poolContracts.set(cfg.poolId, pool);
     }
     return pool;
   }
@@ -398,10 +413,13 @@ export class ActionsService {
   }
 
   async buildBlendDeposit(params: BlendDepositParams): Promise<BlendDepositResult> {
-    const { address, asset, amount, network } = params;
-    const cfg = getBlendConfig(network);
+    const { address, asset, amount, network, poolSlug } = params;
+    // A5: resolve the REQUESTED pool (unknown slug → 400, never a fallback) and
+    // refuse an asset that pool has no reserve for, before anything is built.
+    const cfg = resolveBlendPool(network, poolSlug);
+    assertPoolSupportsAsset(cfg, asset);
     const rpcServer = this.rpcFor(network);
-    const poolContract = this.poolContractFor(network);
+    const poolContract = this.poolContractFor(cfg);
     const decimals = ASSET_DECIMALS[asset];
     const assetSac = cfg.sac[asset];
     const scaledAmount = toI128(amount, decimals);
@@ -545,10 +563,12 @@ export class ActionsService {
    * case NO xdr is returned and nothing can be signed.
    */
   async buildBlendWithdraw(params: BlendWithdrawParams): Promise<BlendWithdrawResult> {
-    const { address, asset, amount, network } = params;
-    const cfg = getBlendConfig(network);
+    const { address, asset, amount, network, poolSlug } = params;
+    // A5: same pool resolution + asset guard as the deposit.
+    const cfg = resolveBlendPool(network, poolSlug);
+    assertPoolSupportsAsset(cfg, asset);
     const rpcServer = this.rpcFor(network);
-    const poolContract = this.poolContractFor(network);
+    const poolContract = this.poolContractFor(cfg);
     const decimals = ASSET_DECIMALS[asset];
     const assetSac = cfg.sac[asset];
     const scaledAmount = toI128(amount, decimals);
@@ -618,8 +638,8 @@ export class ActionsService {
    * the signed XDR against the amount the USER submits, never against this response.
    */
   async getBlendPosition(params: BlendPositionParams): Promise<BlendPositionResult> {
-    const { address, network } = params;
-    const cfg = getBlendConfig(network);
+    const { address, network, poolSlug } = params;
+    const cfg = resolveBlendPool(network, poolSlug);
 
     let pool: PoolV2;
     let user: Awaited<ReturnType<PoolV2['loadUser']>>;
@@ -649,7 +669,15 @@ export class ActionsService {
       };
     }
 
-    return { poolId: cfg.poolId, network, positions };
+    // Echo the resolved pool so the UI can assert it got the pool it asked for.
+    return {
+      poolId: cfg.poolId,
+      poolSlug: cfg.poolSlug,
+      poolLabel: cfg.poolLabel,
+      assets: [...cfg.assets],
+      network,
+      positions,
+    };
   }
 
   /**

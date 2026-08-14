@@ -71,6 +71,13 @@ export type BlendDepositRequest = {
   asset: "XLM" | "USDC";
   amount: string;
   network?: "testnet" | "mainnet";
+  /**
+   * Registry slug of the Blend pool to act on (Lot A5). The card always sends the
+   * slug it resolved from its OWN registry, so the API acts on the same pool the
+   * signing gate validates against. Absent = the network's default pool; an unknown
+   * slug is a 400 (never a silent fallback).
+   */
+  pool?: string;
 };
 
 export type BlendDepositResponse = {
@@ -153,6 +160,11 @@ export type BlendAssetPosition = {
 
 export type BlendPositionResponse = {
   poolId: string;
+  /** Registry slug of the pool actually read (A5) — assert it matches what was asked. */
+  poolSlug: string;
+  poolLabel: string;
+  /** The assets that pool has reserves for. */
+  assets: Array<"XLM" | "USDC">;
   network: "testnet" | "mainnet";
   positions: Record<"XLM" | "USDC", BlendAssetPosition>;
 };
@@ -165,6 +177,8 @@ export type BlendPositionResponse = {
 export async function fetchBlendPosition(payload: {
   address: string;
   network?: "testnet" | "mainnet";
+  /** Registry slug of the pool to read (A5). Absent = the network default. */
+  pool?: string;
 }): Promise<BlendPositionResponse> {
   return apiFetch<BlendPositionResponse>("/actions/blend/position", {
     method: "POST",

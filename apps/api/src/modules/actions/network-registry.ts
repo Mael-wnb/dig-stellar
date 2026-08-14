@@ -7,6 +7,7 @@
 // default — this module resolves ONLY testnet, and the testnet config is re-exported
 // unchanged from testnet-registry.ts. Mainnet stays fully behind the kill-switch.
 
+import { BadRequestException } from '@nestjs/common';
 import { Asset, Networks } from '@stellar/stellar-sdk';
 import {
   TESTNET_RPC_URL,
@@ -64,7 +65,7 @@ export const MAINNET_USDC_SDEX = new Asset('USDC', MAINNET_USDC_ISSUER);
 // Re-verify all three against the DB + blend.capital before any Mainnet ungating
 // (see docs/runbooks.md).
 
-/** Blend "Fixed" pool (V2) on Pubnet — the single mainnet deposit target at launch. */
+/** Blend "Fixed" pool (V2) on Pubnet — the DEFAULT mainnet target (Lot A2). */
 export const MAINNET_BLEND_POOL =
   'CAJJZSGMMM3PD7N33TAPHGBUGTB43OC73HVIK2L2G6BNGGGYOSSYBXBD';
 
@@ -84,14 +85,104 @@ export const MAINNET_XLM_SAC =
  */
 export const MAINNET_USDC_CLASSIC = new Asset('USDC', MAINNET_USDC_ISSUER);
 
+/** The assets this app can supply/withdraw. Unchanged by A5 (scope stays XLM|USDC). */
+export type BlendAssetCode = 'USDC' | 'XLM';
+
+/**
+ * One vetted Blend pool (Lot A5). SACs are deliberately NOT here: they are
+ * per-ASSET network constants (MAINNET_USDC_SAC / MAINNET_XLM_SAC) shared by every
+ * pool, so a pool entry is only "which pool, called what, holding which of our
+ * assets".
+ *
+ * `assets` is the pool's REAL reserve set, read live from chain via PoolV2.load —
+ * NOT from `reserve_snapshots`, which retains rows for reserves a pool no longer
+ * has (verified 2026-08-14: Orbit's USDC reserve_snapshots row is from 2026-04-01
+ * while the pool has no USDC reserve on-chain). Building this list from the DB
+ * would have offered an Orbit USDC deposit that fails at simulation.
+ */
+export interface BlendPoolEntry {
+  /** entities.slug — the id the product already uses for this pool everywhere. */
+  slug: string;
+  poolId: string;
+  label: string;
+  assets: readonly BlendAssetCode[];
+}
+
+/**
+ * Mainnet Blend pools — the full indexed perimeter (entities where venue=blend,
+ * entity_type=lending_pool, is_active). Every id verified 2026-08-14 (evidence:
+ * docs/evidence/lot-a5-blend-multipool.md):
+ *   - Blend's OFFICIAL V2 pool factory (CDSYOAVX…, from docs.blend.capital)
+ *     answers is_pool(<id>) = true for all four;
+ *   - all four are in the backstop reward zone (Blend-governance recognised);
+ *   - all four report the SAME wasm hash a41fc53d… as the A2-vetted Fixed pool,
+ *     i.e. byte-identical pool code;
+ *   - PoolV2.load succeeds for each (this IS the V2 confirmation — the builder
+ *     uses PoolContractV2);
+ *   - the label below equals the pool's own on-chain metadata.name.
+ * Re-verify before adding a pool. An id that cannot be verified is EXCLUDED, never
+ * guessed (the A2 rule).
+ *
+ * MUST stay in sync with apps/web/src/config/blendPools.ts — the client registry is
+ * what the signing gate pins, so a divergence between the two is a security bug.
+ */
+export const MAINNET_BLEND_POOLS: readonly BlendPoolEntry[] = [
+  {
+    slug: 'blend-fixed-pool',
+    poolId: MAINNET_BLEND_POOL,
+    label: 'Fixed',
+    assets: ['XLM', 'USDC'],
+  },
+  {
+    slug: 'blend-yieldblox-pool',
+    poolId: 'CCCCIQSDILITHMM7PBSLVDT5MISSY7R26MNZXCX4H7J5JQ5FPIYOGYFS',
+    label: 'YieldBlox',
+    assets: ['XLM', 'USDC'],
+  },
+  {
+    // XLM ONLY — verified on-chain 2026-08-14: this pool has no USDC reserve.
+    slug: 'blend-orbit-pool',
+    poolId: 'CAE7QVOMBLZ53CDRGK3UNRRHG5EZ5NQA7HHTFASEMYBWHG6MDFZTYHXC',
+    label: 'Orbit',
+    assets: ['XLM'],
+  },
+  {
+    slug: 'blend-etherfuse-pool',
+    poolId: 'CDMAVJPFXPADND3YRL4BSM3AKZWCTFMX27GLLXCML3PD62HEQS5FPVAI',
+    label: 'Etherfuse',
+    assets: ['XLM', 'USDC'],
+  },
+];
+
+/** Default mainnet pool when a request names none — preserves pre-A5 behavior. */
+export const MAINNET_DEFAULT_BLEND_POOL_SLUG = 'blend-fixed-pool';
+
+/** Testnet keeps its single pool; the slug is internal (no indexed testnet entity). */
+export const TESTNET_DEFAULT_BLEND_POOL_SLUG = 'blend-testnet-pool';
+
+export const TESTNET_BLEND_POOLS: readonly BlendPoolEntry[] = [
+  {
+    slug: TESTNET_DEFAULT_BLEND_POOL_SLUG,
+    poolId: TESTNET_BLEND_POOL,
+    label: 'Blend Testnet Pool (V2)',
+    assets: ['XLM', 'USDC'],
+  },
+];
+
 /** Per-network Blend deposit config (pool + reserve SACs + classic USDC trustline). */
 export interface BlendNetworkConfig {
   poolId: string;
+  /** Registry slug of the RESOLVED pool — echoed so a caller can assert it. */
+  poolSlug: string;
+  /** Human label of the resolved pool (its on-chain metadata.name). */
+  poolLabel: string;
+  /** The assets THIS pool actually has reserves for. */
+  assets: readonly BlendAssetCode[];
   networkPassphrase: string;
   rpcUrl: string;
   horizonUrl: string;
-  /** SAC contract id per depositable asset. */
-  sac: Record<'USDC' | 'XLM', string>;
+  /** SAC contract id per depositable asset (per-ASSET network constants). */
+  sac: Record<BlendAssetCode, string>;
   /** The classic USDC asset whose trustline the SAC deposit needs. */
   usdcClassic: Asset;
 }
@@ -153,15 +244,51 @@ export function vettedUsdcSdex(network: ActionNetwork): Asset {
   return network === 'testnet' ? TESTNET_USDC_SDEX : MAINNET_USDC_SDEX;
 }
 
+/** The pool registry for a network. */
+export function blendPoolsFor(network: ActionNetwork): readonly BlendPoolEntry[] {
+  return network === 'testnet' ? TESTNET_BLEND_POOLS : MAINNET_BLEND_POOLS;
+}
+
 /**
- * Full per-network Blend deposit config. Testnet re-exports the testnet-registry
- * constants verbatim (so the testnet deposit stays byte-for-byte identical);
- * mainnet uses the Fixed-pool registry above.
+ * Full per-network Blend config for the REQUESTED pool (Lot A5).
+ *
+ * - `poolSlug` absent → the network's default pool. That keeps every pre-A5 client
+ *   (which sends no pool) on the exact same pool it used before.
+ * - `poolSlug` present but unknown → **400**. Never fall back to another pool:
+ *   silently acting on a pool the caller did not name is precisely the bug A5
+ *   exists to fix, and on a money path it would mean supplying funds somewhere the
+ *   user never chose.
+ *
+ * Testnet re-exports the testnet-registry constants verbatim, so the testnet
+ * deposit stays byte-for-byte identical. SACs are per-ASSET network constants and
+ * are therefore the same for every pool on a network.
  */
-export function getBlendConfig(network: ActionNetwork): BlendNetworkConfig {
+export function resolveBlendPool(
+  network: ActionNetwork,
+  poolSlug?: string,
+): BlendNetworkConfig {
+  const pools = blendPoolsFor(network);
+  const defaultSlug =
+    network === 'testnet'
+      ? TESTNET_DEFAULT_BLEND_POOL_SLUG
+      : MAINNET_DEFAULT_BLEND_POOL_SLUG;
+
+  const wanted = poolSlug?.trim() || defaultSlug;
+  const entry = pools.find((p) => p.slug === wanted);
+  if (!entry) {
+    throw new BadRequestException(
+      `unknown Blend pool "${String(poolSlug)}" on ${network} (known: ${pools
+        .map((p) => p.slug)
+        .join(', ')})`,
+    );
+  }
+
   if (network === 'testnet') {
     return {
-      poolId: TESTNET_BLEND_POOL,
+      poolId: entry.poolId,
+      poolSlug: entry.slug,
+      poolLabel: entry.label,
+      assets: entry.assets,
       networkPassphrase: TESTNET_NETWORK_PASSPHRASE,
       rpcUrl: TESTNET_RPC_URL,
       horizonUrl: TESTNET_HORIZON_URL,
@@ -170,13 +297,32 @@ export function getBlendConfig(network: ActionNetwork): BlendNetworkConfig {
     };
   }
   return {
-    poolId: MAINNET_BLEND_POOL,
+    poolId: entry.poolId,
+    poolSlug: entry.slug,
+    poolLabel: entry.label,
+    assets: entry.assets,
     networkPassphrase: Networks.PUBLIC,
     rpcUrl: mainnetRpcUrl(),
     horizonUrl: MAINNET_HORIZON_URL,
     sac: { USDC: MAINNET_USDC_SAC, XLM: MAINNET_XLM_SAC },
     usdcClassic: MAINNET_USDC_CLASSIC,
   };
+}
+
+/**
+ * Asserts the resolved pool actually has a reserve for `asset` — **400** naming the
+ * pool otherwise. Without this, an Orbit USDC deposit would build a request against
+ * a reserve the pool does not have and fail at simulation with an opaque error.
+ */
+export function assertPoolSupportsAsset(
+  cfg: BlendNetworkConfig,
+  asset: BlendAssetCode,
+): void {
+  if (!cfg.assets.includes(asset)) {
+    throw new BadRequestException(
+      `${cfg.poolLabel} does not have a ${asset} reserve (supported: ${cfg.assets.join(', ')})`,
+    );
+  }
 }
 
 /**

@@ -95,7 +95,9 @@ const activeTab = ref('primary')
                — does not change the Mainnet portfolio/data plane. -->
           <NetworkToggle />
         </div>
-        <BlendDepositCard v-if="ctx.kind === 'lending'" />
+        <!-- A5: the card acts on the pool the modal titles. Passing the clicked
+             pool's slug is what makes the header and the action agree. -->
+        <BlendDepositCard v-if="ctx.kind === 'lending'" :pool-slug="ctx.poolSlug" />
         <SdexSwapWidget v-else />
       </div>
     </div>

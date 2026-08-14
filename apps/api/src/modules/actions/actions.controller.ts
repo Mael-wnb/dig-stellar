@@ -29,6 +29,12 @@ interface BlendDepositBody {
   asset: 'USDC' | 'XLM';
   amount: string;
   network?: string;
+  /**
+   * Registry slug of the Blend pool to act on (Lot A5). ABSENT = the network's
+   * default pool, so every pre-A5 client keeps working unchanged. An unknown slug
+   * is a 400 from resolveBlendPool — never a silent fallback to another pool.
+   */
+  pool?: string;
 }
 
 /** Same shape as the deposit body — the withdraw is its mirror (Lot A3). */
@@ -37,6 +43,8 @@ type BlendWithdrawBody = BlendDepositBody;
 interface BlendPositionBody {
   address: string;
   network?: string;
+  /** Registry slug of the pool to read (A5). Absent = the network default. */
+  pool?: string;
 }
 
 /**
@@ -167,7 +175,7 @@ export class ActionsController {
   @Post('blend/deposit')
   @HttpCode(HttpStatus.OK)
   async blendDeposit(@Body() body: BlendDepositBody) {
-    const { address, asset, amount, network } = body;
+    const { address, asset, amount, network, pool } = body;
 
     // Lot A2 gating regime: mainnet requires the deposit's own kill-switch (403
     // otherwise); absent/'testnet' keeps today's behavior byte-for-byte.
@@ -200,6 +208,7 @@ export class ActionsController {
       asset,
       amount,
       network: resolvedNetwork,
+      poolSlug: pool,
     });
 
     // E3 adoption counter — fire-and-forget (recordActionEvent never throws).
@@ -232,7 +241,7 @@ export class ActionsController {
   @Post('blend/withdraw')
   @HttpCode(HttpStatus.OK)
   async blendWithdraw(@Body() body: BlendWithdrawBody) {
-    const { address, asset, amount, network } = body;
+    const { address, asset, amount, network, pool } = body;
 
     const resolvedNetwork = resolveBlendNetwork(network);
     if (!address || typeof address !== 'string') {
@@ -253,6 +262,7 @@ export class ActionsController {
       asset,
       amount,
       network: resolvedNetwork,
+      poolSlug: pool,
     });
 
     // E3 adoption counter — only when a signable XDR was actually produced
@@ -280,7 +290,7 @@ export class ActionsController {
   @Post('blend/position')
   @HttpCode(HttpStatus.OK)
   async blendPosition(@Body() body: BlendPositionBody) {
-    const { address, network } = body;
+    const { address, network, pool } = body;
 
     const resolvedNetwork = resolveBlendNetwork(network);
     if (!address || typeof address !== 'string') {
@@ -290,6 +300,7 @@ export class ActionsController {
     return this.actionsService.getBlendPosition({
       address,
       network: resolvedNetwork,
+      poolSlug: pool,
     });
   }
 

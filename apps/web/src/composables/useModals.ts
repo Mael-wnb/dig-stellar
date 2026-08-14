@@ -10,6 +10,14 @@ export interface ActionContext {
   venue: string
   // 'lending' → Blend deposit widget · 'amm' → SDEX swap widget.
   kind: 'lending' | 'amm'
+  /**
+   * A5: the Blend pool the action must act on (entities.slug). Set ONLY by call
+   * sites that know a real pool — a generic "Deposit" CTA leaves it undefined and
+   * the card falls back to the network default, exactly as before A5. Kept separate
+   * from `slug` because `slug` is also used for non-pool CTA ids ('blend',
+   * 'sdex-swap') that must not be looked up in the pool registry.
+   */
+  poolSlug?: string
 }
 
 type ModalKind = 'connect' | 'action' | null

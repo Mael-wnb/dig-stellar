@@ -158,6 +158,34 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   `No borrow` renders NO gauge (text as before) — a full green bar there would invent a safety
   margin. All green (web build + api build + 42 tests). Before/after (H7 before == H6 after,
   md5-verified) in `docs/evidence/lot-h/h7-chips-hf-gauge-2026-08-14.md`.
+- T3-D2 note (2026-08-14): **Lot A5 landed (multi-pool Blend actions) — local-proven, VPS deploy
+  pending. MONEY PATH.** Supply + withdraw now work on **every indexed Blend pool**, not just Fixed
+  (the modal titled the clicked pool while the card was hardcoded to Fixed). §1 inventory verified
+  all 4 pools BEFORE any code: Blend's official V2 pool factory answers `is_pool()=true`, all are in
+  the backstop reward zone, all share the A2-vetted Fixed pool's wasm hash, `PoolV2.load` succeeds
+  (V2), and each label is the pool's own on-chain `metadata.name`. blend.capital is a SPA (empty
+  shell to a fetch), so that on-chain verification stands in for the page check — stronger and
+  reproducible. **Orbit is XLM-only** (no USDC reserve on-chain); the registry is built from live
+  SDK reads because `reserve_snapshots` still holds a stale 2026-04-01 Orbit USDC row that would
+  have offered a deposit failing at simulation. API: `resolveBlendPool` (unknown slug → 400, never
+  a fallback) + `assertPoolSupportsAsset` (→ 400 naming the pool); pool-contract cache re-keyed from
+  network to pool id. Web: per-pool client registry (the gate's anchor), `poolSlug` prop threaded
+  from the modal, unknown slug → no form + blend.capital link. Acceptance gate: cross-pool red tests
+  over every ORDERED PAIR of real pools, deposit + withdraw, plus cross-TYPE per pool —
+  **mutation-tested** (pool-pinning removed → 28 fail; restored → 111/111). Curls: unknown slug 400,
+  Orbit+USDC 400, position echoes the pool, no-pool = Fixed, flag off = 403 on all 4 pools × 3
+  endpoints. Also fixed the `toLocaleString(undefined)` locale bug. Evidence:
+  `docs/evidence/lot-a5-blend-multipool.md`. **Pending Maël: one real supply+withdraw on a
+  non-Fixed pool (YieldBlox) + testnet re-verify.**
+- T3-D3 note (2026-08-14): **Defect found, NOT fixed (needs its own lot).** The Blend/Soroswap/
+  Aquarius pool-metric writers read `reserve_snapshots` with `distinct on (asset_id)` — the latest
+  row PER ASSET — so they keep counting reserves a pool no longer has. Measured: Blend TVL is
+  **+$270k too high** (Fixed +$174,966 from dead CETES/TESOURO/USTRY; **Orbit +$95,207, i.e. +50%**
+  from dead TESOURO/USDC). The API READ path is correct (pool-detail reserves and TVL history both
+  filter to the latest snapshot BATCH), so the pool page currently shows 3 live reserves for Fixed
+  next to a TVL computed over 6. Deliberately not fixed in A5: it spans 3 writers, moves headline
+  TVL numbers (needs before/after validation vs venue UIs, cf. the Lot E frozen-reserves hotfix),
+  and a batch filter assumes refreshes write all reserves atomically — which needs checking first.
 - Last updated: 2026-08-14
 
 ---

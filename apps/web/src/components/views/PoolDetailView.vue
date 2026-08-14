@@ -385,6 +385,8 @@ function openAction() {
     name: pairName.value,
     venue: p.protocol?.name ?? '',
     kind: actionKind.value,
+    // A5: act on THIS pool, not the registry default.
+    poolSlug: actionKind.value === 'lending' ? p.id : undefined,
   })
 }
 </script>

@@ -10,6 +10,7 @@ import { useWalletSession } from "../composables/useWalletSession";
 import { useActiveSigner } from "../composables/useActiveSigner";
 import { useNetwork, toWalletNetwork } from "../composables/useNetwork";
 import { blendPoolFor } from "../config/blendPools";
+import { formatTokenAmountCompact, formatTokenAmountExact } from "../utils/format";
 import {
   validateDepositXdr,
   validateWithdrawXdr,
@@ -27,13 +28,29 @@ import {
 const MAINNET_BLEND_ENABLED =
   import.meta.env.VITE_ACTIONS_MAINNET_BLEND_ENABLED === "true";
 
+// Lot A5: the pool this card acts on. ABSENT = the network's default pool, which
+// keeps every pre-A5 entry point (the dashboard's generic "Deposit" CTA) working
+// exactly as before.
+const props = defineProps<{ poolSlug?: string }>();
+
 const { connectedAddress, signTransaction } = useWalletSession();
 const { activeSignerAddress } = useActiveSigner();
 const { network } = useNetwork();
 
-// Per-network Blend config (pool id, reserve SACs, classic USDC issuer, endpoints).
-// This is the CLIENT-SIDE intent source for the validation gates — never the API.
-const config = computed(() => blendPoolFor(network.value));
+// Per-pool, per-network Blend config (pool id, reserve SACs, classic USDC issuer,
+// endpoints). This is the CLIENT-SIDE intent source for the validation gates — never
+// the API. NULL when the requested slug is not in the vetted registry, in which case
+// the form is not rendered at all (see `isVettedPool`): the alternative — falling back
+// to some other pool — is the exact bug Lot A5 exists to fix, on a money path.
+const config = computed(() => blendPoolFor(network.value, props.poolSlug));
+const isVettedPool = computed(() => config.value !== null);
+
+/** The pool config, or throw — used only on paths that must never run unvetted. */
+function requirePool() {
+  const cfg = config.value;
+  if (!cfg) throw new Error("Refused: this pool is not in the vetted registry.");
+  return cfg;
+}
 
 /** Supply (deposit) and withdraw are the two halves of the same position loop. */
 type Mode = "supply" | "withdraw";
@@ -45,7 +62,7 @@ const asset = ref<"XLM" | "USDC">("XLM");
 const amount = ref("");
 
 const selectedAsset = computed(
-  () => config.value.assets.find((a) => a.code === asset.value),
+  () => config.value?.assets.find((a) => a.code === asset.value),
 );
 const selectedAssetNote = computed(() => selectedAsset.value?.note ?? "");
 
@@ -55,9 +72,9 @@ const balances = ref<Record<string, string>>({});
 async function loadBalances() {
   balances.value = {};
   const addr = connectedAddress.value;
-  if (!addr || mainnetBlendBlocked.value) return;
+  if (!addr || mainnetBlendBlocked.value || !config.value) return;
   try {
-    const res = await fetch(`${config.value.horizonUrl}/accounts/${addr}`);
+    const res = await fetch(`${config.value!.horizonUrl}/accounts/${addr}`);
     if (!res.ok) return;
     const data = await res.json();
     const map: Record<string, string> = {};
@@ -88,12 +105,15 @@ async function loadPosition() {
   position.value = null;
   positionError.value = "";
   const addr = connectedAddress.value;
-  if (!addr || mainnetBlendBlocked.value) return;
+  if (!addr || mainnetBlendBlocked.value || !config.value) return;
   positionLoading.value = true;
   try {
     position.value = await fetchBlendPosition({
       address: addr,
       network: network.value,
+      // Name the pool explicitly (from the CLIENT registry) — never let the API
+      // pick, so the position shown is the one this card will act on.
+      pool: config.value.slug,
     });
   } catch (err) {
     positionError.value = readApiError(err, "Could not read your Blend position.");
@@ -116,10 +136,34 @@ watch(network, () => {
   if (mode.value === "withdraw") loadPosition();
 });
 
+// A5: keep the selected asset inside THIS pool's reserve set. Orbit has no USDC
+// reserve, so arriving there with USDC selected must fall back to an asset the pool
+// really has — never leave a selection the pool cannot serve.
+watch(
+  config,
+  (cfg) => {
+    if (!cfg) return;
+    if (!cfg.assets.some((a) => a.code === asset.value)) {
+      asset.value = cfg.assets[0]?.code ?? "XLM";
+    }
+  },
+  { immediate: true },
+);
+
+// Display-only projections of the resolved pool (null-safe for the unvetted case).
+const poolLabel = computed(() => config.value?.label ?? "");
+const poolContractId = computed(() => config.value?.poolId ?? "");
+const poolContractShort = computed(() =>
+  poolContractId.value
+    ? `${poolContractId.value.slice(0, 6)}…${poolContractId.value.slice(-4)}`
+    : "",
+);
+const poolAssets = computed(() => config.value?.assets ?? []);
+
 const xlmBalance = computed(() => parseFloat(balances.value["XLM"] ?? "0") || 0);
 const usdcBalance = computed(
   () =>
-    parseFloat(balances.value[`USDC:${config.value.usdcClassic.issuer}`] ?? "0") || 0,
+    parseFloat(balances.value[`USDC:${config.value?.usdcClassic.issuer}`] ?? "0") || 0,
 );
 const selectedBalance = computed(() =>
   asset.value === "XLM" ? xlmBalance.value : usdcBalance.value,
@@ -160,7 +204,7 @@ const isMainnet = computed(() => network.value === "mainnet");
 // raw isMainnet — gates the card, so flipping the flag reveals the (still API-gated)
 // mainnet supply AND withdraw paths in one place.
 const mainnetBlendBlocked = computed(() => isMainnet.value && !MAINNET_BLEND_ENABLED);
-const explorerNetwork = computed(() => config.value.explorer);
+const explorerNetwork = computed(() => config.value?.explorer ?? "public");
 
 /**
  * The testnet SAC-backed USDC (issuer GATALTGT…) cannot be acquired in-app (no
@@ -172,7 +216,7 @@ const explorerNetwork = computed(() => config.value.explorer);
 const usdcUnavailable = computed(
   () =>
     !isWithdraw.value &&
-    !config.value.realFunds &&
+    !config.value?.realFunds &&
     asset.value === "USDC" &&
     usdcBalance.value <= 0,
 );
@@ -243,6 +287,7 @@ function readApiError(err: unknown, fallback: string): string {
  * neither can ever accept the other's transaction.
  */
 function blendIntent(passphrase: string): DepositIntent & WithdrawIntent {
+  const cfg = requirePool();
   const sac = selectedAsset.value?.sac;
   const decimals = selectedAsset.value?.decimals;
   if (!sac || decimals === undefined || !connectedAddress.value) {
@@ -250,7 +295,7 @@ function blendIntent(passphrase: string): DepositIntent & WithdrawIntent {
   }
   return {
     sourceAccount: connectedAddress.value,
-    poolId: config.value.poolId,
+    poolId: cfg.poolId,
     assetSac: sac,
     amount: amount.value,
     decimals,
@@ -282,7 +327,7 @@ function assertTrustlineXdr(xdr: string, passphrase: string): void {
   }
   const intent: TrustlineIntent = {
     sourceAccount: connectedAddress.value,
-    asset: config.value.usdcClassic,
+    asset: requirePool().usdcClassic,
     networkPassphrase: passphrase,
   };
   const check = validateTrustlineXdr(xdr, intent);
@@ -294,7 +339,7 @@ function assertTrustlineXdr(xdr: string, passphrase: string): void {
 }
 
 async function rpcCall(method: string, params: unknown): Promise<any> {
-  const res = await fetch(config.value.rpcUrl, {
+  const res = await fetch(requirePool().rpcUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
@@ -360,6 +405,7 @@ async function onDeposit() {
       asset: asset.value,
       amount: amount.value,
       network: network.value,
+      pool: requirePool().slug,
     });
 
     // Step 1/2 — the deposit CANNOT be simulated until the classic USDC trustline
@@ -386,6 +432,7 @@ async function onDeposit() {
         asset: asset.value,
         amount: amount.value,
         network: network.value,
+        pool: requirePool().slug,
       });
       if (built.trustlineRequired) {
         throw new Error(
@@ -435,6 +482,7 @@ async function onWithdraw() {
       asset: asset.value,
       amount: amount.value,
       network: network.value,
+      pool: requirePool().slug,
     });
 
     if (!built.simulation.success || !built.xdr) {
@@ -502,6 +550,28 @@ function reset() {
       Blend supply &amp; withdraw are <span class="text-[#d5ff2f] font-semibold">Testnet-only</span> in this beta.
     </div>
 
+    <!-- A5: the requested pool is not in the vetted client registry (e.g. the
+         indexer lists a pool the registry has not vetted yet). Refuse to render any
+         form — an unvetted pool id must never reach the signing gate — and point at
+         the protocol's own UI, which can always manage the position. -->
+    <div
+      v-else-if="!isVettedPool"
+      class="bg-[#202020] border border-[rgba(213,255,47,0.3)] rounded-md p-3 text-[11px] text-[#9a9b99] flex flex-col gap-1"
+    >
+      <span>
+        In-app supply &amp; withdraw are not available for this pool yet.
+      </span>
+      <span>
+        Your funds are unaffected — manage this pool directly on
+        <a
+          href="https://mainnet.blend.capital"
+          target="_blank"
+          class="text-[#d5ff2f] hover:underline"
+        >blend.capital</a>
+        with this same wallet.
+      </span>
+    </div>
+
     <template v-else>
       <!-- MODE — supply ↔ withdraw, the two halves of the same position -->
       <div class="flex gap-2">
@@ -549,18 +619,19 @@ function reset() {
       </div>
 
       <div class="text-[11px] text-[#9a9b99] flex items-center justify-between">
-        <span>{{ config.label }}</span>
+        <!-- Names the pool this card WILL ACT ON — always the modal's pool (A5). -->
+        <span>{{ poolLabel }}</span>
         <a
-          :href="`https://stellar.expert/explorer/${explorerNetwork}/contract/${config.poolId}`"
+          :href="`https://stellar.expert/explorer/${explorerNetwork}/contract/${poolContractId}`"
           target="_blank"
           class="font-mono hover:text-[#d5ff2f]"
-        >{{ config.poolId.slice(0, 6) }}…{{ config.poolId.slice(-4) }}</a>
+        >{{ poolContractShort }}</a>
       </div>
 
       <!-- ASSET (XLM is the recommended, zero-prerequisite path) -->
       <div class="flex gap-2">
         <button
-          v-for="a in config.assets"
+          v-for="a in poolAssets"
           :key="a.code"
           type="button"
           class="flex-1 px-3 py-2 rounded-md border text-xs font-semibold transition flex items-center justify-center gap-1"
@@ -587,7 +658,9 @@ function reset() {
         class="text-[11px] text-[#9a9b99] flex items-center justify-between -mt-1"
       >
         <span>{{ selectedAssetNote }}</span>
-        <span>Balance: {{ selectedBalance.toLocaleString(undefined, { maximumFractionDigits: 4 }) }} {{ asset }}</span>
+        <span :title="`${formatTokenAmountExact(selectedBalance)} ${asset}`"
+          >Balance: {{ formatTokenAmountCompact(selectedBalance) }} {{ asset }}</span
+        >
       </div>
 
       <!-- WITHDRAW: the live supplied position (what Max draws on) -->
@@ -595,8 +668,8 @@ function reset() {
         <span>Supplied to this pool</span>
         <span v-if="positionLoading">reading position…</span>
         <span v-else-if="positionError" class="text-[#ffb86b]">unavailable</span>
-        <span v-else class="text-[#e2e6e1]">
-          {{ supplied.toLocaleString(undefined, { maximumFractionDigits: 7 }) }} {{ asset }}
+        <span v-else class="text-[#e2e6e1]" :title="`${formatTokenAmountExact(supplied)} ${asset}`">
+          {{ formatTokenAmountCompact(supplied) }} {{ asset }}
         </span>
       </div>
 
@@ -700,7 +773,7 @@ function reset() {
       </label>
 
       <p v-if="exceedsPosition" class="text-[10px] text-[#ffb86b] -mt-1">
-        You have {{ supplied.toLocaleString(undefined, { maximumFractionDigits: 7 }) }}
+        You have {{ formatTokenAmountCompact(supplied) }}
         {{ asset }} supplied — use Max to withdraw all of it.
       </p>
 

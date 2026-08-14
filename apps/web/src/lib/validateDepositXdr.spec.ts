@@ -20,6 +20,9 @@ import {
   type WithdrawIntent,
   type TrustlineIntent,
 } from "./validateDepositXdr";
+// Lot A5: the REAL client registry — these tests must bind to production values, not
+// to fixtures, so a bad edit to the registry fails the suite.
+import { MAINNET_BLEND_POOLS, blendPoolFor } from "../config/blendPools";
 
 // --- Fixtures -------------------------------------------------------------
 
@@ -556,5 +559,159 @@ describe("validateTrustlineXdr", () => {
     if (!result.ok) {
       expect(result.violations.some((v) => v.includes("unrecognized network passphrase"))).toBe(true);
     }
+  });
+});
+
+// --- Lot A5: CROSS-POOL red tests -----------------------------------------
+//
+// The critical tests for the multi-pool generalization. When there was one pool, a
+// hardcoded constant made pool-pinning true by construction; now that the pool is a
+// parameter, these prove the gate pins the REQUESTED pool as strictly as before.
+// Every id below comes from the REAL registry (config/blendPools.ts), not a fixture:
+// a test that passed against invented ids would prove nothing about production.
+//
+// The threat: the modal titles pool B while the API builds against pool A. That is
+// the exact bug Lot A5 fixes, and the gate is the last line of defence — it must
+// refuse to sign, not merely display the right name.
+
+describe("Lot A5 — cross-pool pinning (deposit)", () => {
+  const registry = MAINNET_BLEND_POOLS;
+
+  it("has at least two vetted mainnet pools to cross-check", () => {
+    expect(registry.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // Every ORDERED pair of real pools: an XDR built for A must fail an intent for B.
+  for (const a of MAINNET_BLEND_POOLS) {
+    for (const b of MAINNET_BLEND_POOLS) {
+      if (a.slug === b.slug) continue;
+      it(`rejects a deposit built for ${a.label} when the intent pins ${b.label}`, () => {
+        const xdrStr = buildDepositXdr({ pool: a.poolId });
+        const result = validateDepositXdr(xdrStr, { ...baseIntent, poolId: b.poolId });
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(
+            result.violations.some((v) =>
+              v.includes(`pool contract mismatch: expected ${b.poolId}, got ${a.poolId}`),
+            ),
+          ).toBe(true);
+        }
+      });
+    }
+  }
+
+  it("accepts a deposit for each vetted pool when the intent pins that same pool", () => {
+    for (const p of MAINNET_BLEND_POOLS) {
+      const xdrStr = buildDepositXdr({ pool: p.poolId });
+      expect(validateDepositXdr(xdrStr, { ...baseIntent, poolId: p.poolId })).toEqual({
+        ok: true,
+      });
+    }
+  });
+});
+
+describe("Lot A5 — cross-pool pinning (withdraw)", () => {
+  for (const a of MAINNET_BLEND_POOLS) {
+    for (const b of MAINNET_BLEND_POOLS) {
+      if (a.slug === b.slug) continue;
+      it(`rejects a withdraw built for ${a.label} when the intent pins ${b.label}`, () => {
+        const xdrStr = buildDepositXdr({
+          pool: a.poolId,
+          requestType: WITHDRAW_COLLATERAL,
+        });
+        const result = validateWithdrawXdr(xdrStr, { ...baseIntent, poolId: b.poolId });
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(
+            result.violations.some((v) =>
+              v.includes(`pool contract mismatch: expected ${b.poolId}, got ${a.poolId}`),
+            ),
+          ).toBe(true);
+        }
+      });
+    }
+  }
+});
+
+describe("Lot A5 — cross-TYPE still holds per pool", () => {
+  // A3's guarantee, re-proven for EVERY pool: generalizing the pool must not have
+  // weakened the request-type pinning that keeps deposit and withdraw disjoint.
+  for (const p of MAINNET_BLEND_POOLS) {
+    it(`rejects a withdraw XDR against a deposit intent for ${p.label} (same pool)`, () => {
+      const xdrStr = buildDepositXdr({
+        pool: p.poolId,
+        requestType: WITHDRAW_COLLATERAL,
+      });
+      const result = validateDepositXdr(xdrStr, { ...baseIntent, poolId: p.poolId });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.violations.some((v) =>
+            v.includes(`request_type mismatch: expected SupplyCollateral (${SUPPLY_COLLATERAL}), got ${WITHDRAW_COLLATERAL}`),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it(`rejects a deposit XDR against a withdraw intent for ${p.label} (same pool)`, () => {
+      const xdrStr = buildDepositXdr({ pool: p.poolId });
+      const result = validateWithdrawXdr(xdrStr, { ...baseIntent, poolId: p.poolId });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.violations.some((v) =>
+            v.includes(`request_type mismatch: expected WithdrawCollateral (${WITHDRAW_COLLATERAL}), got ${SUPPLY_COLLATERAL}`),
+          ),
+        ).toBe(true);
+      }
+    });
+  }
+});
+
+describe("Lot A5 — the registry itself", () => {
+  it("resolves a known slug to that pool, and an UNKNOWN slug to null (never a fallback)", () => {
+    for (const p of MAINNET_BLEND_POOLS) {
+      expect(blendPoolFor("mainnet", p.slug)?.poolId).toBe(p.poolId);
+    }
+    // The whole point: an unknown pool must NOT silently resolve to the default.
+    expect(blendPoolFor("mainnet", "blend-does-not-exist-pool")).toBeNull();
+    expect(blendPoolFor("mainnet", "blend-forex-pool")).toBeNull();
+  });
+
+  it("defaults to the Fixed pool when no slug is given (pre-A5 behavior)", () => {
+    expect(blendPoolFor("mainnet")?.slug).toBe("blend-fixed-pool");
+    expect(blendPoolFor("mainnet", undefined)?.poolId).toBe(
+      "CAJJZSGMMM3PD7N33TAPHGBUGTB43OC73HVIK2L2G6BNGGGYOSSYBXBD",
+    );
+  });
+
+  it("has unique slugs and unique pool ids (a duplicate would make routing ambiguous)", () => {
+    const slugs = MAINNET_BLEND_POOLS.map((p) => p.slug);
+    const ids = MAINNET_BLEND_POOLS.map((p) => p.poolId);
+    expect(new Set(slugs).size).toBe(slugs.length);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("offers ONLY the assets each pool really has — Orbit is XLM-only (verified on-chain)", () => {
+    const orbit = blendPoolFor("mainnet", "blend-orbit-pool");
+    expect(orbit).not.toBeNull();
+    expect(orbit!.assets.map((a) => a.code)).toEqual(["XLM"]);
+    // The client-side asset guard: a USDC intent is impossible for Orbit because the
+    // card can only select from this list. Asserting it here keeps a future edit that
+    // "adds USDC everywhere" from silently reintroducing an unsupported reserve.
+    expect(orbit!.assets.some((a) => a.code === "USDC")).toBe(false);
+  });
+
+  it("uses the SAME per-asset SAC across every pool on a network (SACs are per-asset)", () => {
+    const sacFor = (slug: string, code: string) =>
+      blendPoolFor("mainnet", slug)!.assets.find((a) => a.code === code)?.sac;
+    const xlmSacs = new Set(MAINNET_BLEND_POOLS.map((p) => sacFor(p.slug, "XLM")));
+    expect(xlmSacs.size).toBe(1);
+    const usdcSacs = new Set(
+      MAINNET_BLEND_POOLS.filter((p) => p.assets.some((a) => a.code === "USDC")).map(
+        (p) => sacFor(p.slug, "USDC"),
+      ),
+    );
+    expect(usdcSacs.size).toBe(1);
   });
 });
