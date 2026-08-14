@@ -102,14 +102,26 @@ async function main() {
 
     const reserveRes = await client.query<ReserveSnapshotRow>(
       `
-      select distinct on (rs.asset_id)
+      -- Dead-reserves fix (2026-08-14): take the LATEST SNAPSHOT BATCH for this
+      -- entity, not the latest row per asset. Reserve rows are written one batch
+      -- per refresh under a single snapshot_at, atomically (see the persist
+      -- functions), so the newest snapshot_at IS this pool's current reserve set.
+      -- The old "distinct on (asset_id)" kept resurrecting reserves the pool no
+      -- longer has: it counted 3 removed reserves in Blend's Fixed pool and 2 in
+      -- Orbit, inflating Blend TVL by ~$270k (Orbit alone by ~50%).
+      select
         rs.asset_id,
         rs.d_supply_scaled,
         rs.snapshot_at
       from reserve_snapshots rs
       join entities e on e.id = rs.entity_id
       where e.slug = $1
-      order by rs.asset_id, rs.snapshot_at desc
+        and rs.snapshot_at = (
+          select max(rs2.snapshot_at)
+          from reserve_snapshots rs2
+          where rs2.entity_id = rs.entity_id
+        )
+      order by rs.asset_id
       `,
       [entitySlug]
     );

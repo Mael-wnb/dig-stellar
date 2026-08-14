@@ -53,7 +53,13 @@ export async function computeBlendPoolMetrics(params: {
 
   const reserveRes = await client.query(
     `
-    select distinct on (rs.asset_id)
+    -- Dead-reserves fix (2026-08-14): the LATEST SNAPSHOT BATCH for this entity,
+    -- not the latest row per asset. Reserve rows are written one batch per refresh
+    -- under a single snapshot_at, atomically (persist-pool-state.ts), so the newest
+    -- snapshot_at IS this pool's current reserve set. The old
+    -- "distinct on (asset_id)" kept resurrecting removed reserves: 3 of them in the
+    -- Fixed pool and 2 in Orbit, inflating Blend TVL by ~$270k (Orbit by ~50%).
+    select
       rs.asset_id,
       rs.symbol,
       rs.name,
@@ -66,7 +72,10 @@ export async function computeBlendPoolMetrics(params: {
       rs.est_borrow_apy
     from reserve_snapshots rs
     where rs.entity_id = $1
-    order by rs.asset_id, rs.snapshot_at desc, rs.created_at desc
+      and rs.snapshot_at = (
+        select max(rs2.snapshot_at) from reserve_snapshots rs2 where rs2.entity_id = $1
+      )
+    order by rs.asset_id
     `,
     [entity.id]
   );

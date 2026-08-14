@@ -177,15 +177,25 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   endpoints. Also fixed the `toLocaleString(undefined)` locale bug. Evidence:
   `docs/evidence/lot-a5-blend-multipool.md`. **Pending Maël: one real supply+withdraw on a
   non-Fixed pool (YieldBlox) + testnet re-verify.**
-- T3-D3 note (2026-08-14): **Defect found, NOT fixed (needs its own lot).** The Blend/Soroswap/
-  Aquarius pool-metric writers read `reserve_snapshots` with `distinct on (asset_id)` — the latest
-  row PER ASSET — so they keep counting reserves a pool no longer has. Measured: Blend TVL is
-  **+$270k too high** (Fixed +$174,966 from dead CETES/TESOURO/USTRY; **Orbit +$95,207, i.e. +50%**
-  from dead TESOURO/USDC). The API READ path is correct (pool-detail reserves and TVL history both
-  filter to the latest snapshot BATCH), so the pool page currently shows 3 live reserves for Fixed
-  next to a TVL computed over 6. Deliberately not fixed in A5: it spans 3 writers, moves headline
-  TVL numbers (needs before/after validation vs venue UIs, cf. the Lot E frozen-reserves hotfix),
-  and a batch filter assumes refreshes write all reserves atomically — which needs checking first.
+- T3-D3 note (2026-08-14): **Dead-reserves defect FIXED** (found during A5; own small lot, same
+  discipline as the frozen-reserves hotfix). The Blend/Soroswap/Aquarius pool-metric writers read
+  `reserve_snapshots` with `distinct on (asset_id)` — the latest row PER ASSET — so they kept
+  counting reserves a pool no longer has. **Atomicity checked first** (it decides the filter): all
+  three already wrote one `snapshot_at` per pool per refresh, but with NO transaction anywhere in
+  the indexer, so batch completeness was observed and not guaranteed. Rather than fall back to a
+  fuzzy recency window — unusable here, since Blend's refresh gap is 26.7 min median but 7.7 days
+  p90 — the writes were **made atomic** (BEGIN/COMMIT/ROLLBACK) and the three readers switched to
+  the latest snapshot BATCH. Atomicity is proven by an injected mid-batch crash (rolled back, no
+  partial batch) and mutation-tested (without the transaction a 1-row partial batch becomes the
+  latest). **Isolated fix effect, same-data: Blend −$270,174** (Fixed −$174,967, Orbit −$95,207 =
+  −33.3% of the old number, i.e. the +49.9% overcount removed); Aquarius/Soroswap byte-identical
+  (no dead reserves — fixed anyway so the venues stay in sync). Cross-checked against the venues
+  themselves: **Orbit now matches Blend's own SDK read to $2 on $190k**; Aquarius within ±1.8% of
+  amm-api.aqua.network. Pool page self-contradiction gone (Fixed: 3 reserves, Σ = TVL, +0.00%).
+  **The −$270k step on 2026-08-14 is the number becoming true**, like the +$8.57M step on
+  2026-08-13. Separate PRE-EXISTING discrepancy flagged, not fixed: YieldBlox is +63.8% vs the
+  Blend SDK (exotic-asset pricing in `asset_prices`, not dead reserves) — its own lot. Evidence:
+  `docs/evidence/dead-reserves-2026-08-14.md`.
 - Last updated: 2026-08-14
 
 ---
