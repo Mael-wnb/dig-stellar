@@ -52,6 +52,24 @@ export function formatCount(n: number | null | undefined): string {
   return `${Math.round(n)}`
 }
 
+// H6 — token amounts for position chips. Deliberately NOT formatCount: that one
+// rounds to whole units (k/M/B), which would turn a real 0.42 XLM position into
+// "0". Here the stored amount is shown as-is, only trimmed: grouped thousands,
+// up to 4 decimals at/above 1 unit and up to 8 below, trailing zeros removed. A
+// non-zero amount too small for that precision renders as "<0.00000001" rather
+// than a misleading "0".
+export function formatTokenAmount(n: number | null | undefined): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return DASH
+  if (n === 0) return '0'
+
+  const abs = Math.abs(n)
+  const decimals = abs >= 1 ? 4 : 8
+  const rounded = Number(n.toFixed(decimals))
+  if (rounded === 0) return `${n < 0 ? '>-' : '<'}0.${'0'.repeat(decimals - 1)}1`
+
+  return rounded.toLocaleString('en-US', { maximumFractionDigits: decimals })
+}
+
 // Display-only asset symbol. The native Stellar token is technically "native"
 // (Horizon/SDK term) but users know it as "XLM". This maps the display label
 // ONLY — technical identifiers (DB, data keys, price lookups) stay "native".

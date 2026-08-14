@@ -16,9 +16,10 @@ import { useModals } from '../../composables/useModals'
 import { useConnectFlow } from '../../composables/useConnectFlow'
 import { formatUsd } from '../../utils/format'
 import { hfDisplay as hf } from '../../utils/health'
-import type { WalletItem } from '../../types/wallet'
+import type { WalletItem, WalletPositionItem } from '../../types/wallet'
 import EmptyPortfolioState from '../common/EmptyPortfolioState.vue'
 import GetStartedCard from '../common/GetStartedCard.vue'
+import PositionAssetChips from '../common/PositionAssetChips.vue'
 
 const { userId } = useAppUser()
 const { openPool } = useView()
@@ -99,6 +100,7 @@ interface PositionRow {
   suppliedUsd: number
   borrowedUsd: number
   healthFactor: number | null
+  legs: WalletPositionItem[] // H6 — per-asset composition, shown as chips
 }
 
 const positions = computed<PositionRow[]>(() => {
@@ -116,6 +118,7 @@ const positions = computed<PositionRow[]>(() => {
         suppliedUsd: p.totalCollateralUsd ?? 0,
         borrowedUsd: p.totalDebtUsd ?? 0,
         healthFactor: p.healthFactor,
+        legs: p.positions ?? [],
       })
     }
   })
@@ -314,12 +317,16 @@ const scopeTitle = computed(() => {
           <div class="grid px-[20px] py-[11px] text-[11px] font-semibold uppercase tracking-[0.04em]" style="grid-template-columns: 2fr 1.3fr 1fr 1fr 90px; color: var(--dig-faint); border-bottom: 1px solid var(--dig-line-soft)">
             <div>Position</div><div>Wallet</div><div class="text-right">Supplied</div><div class="text-right">Health</div><div></div>
           </div>
-          <div v-for="p in positions" :key="p.key" class="dig-row grid items-center px-[20px] py-[13px]" style="grid-template-columns: 2fr 1.3fr 1fr 1fr 90px; border-bottom: 1px solid var(--dig-line-soft)">
-            <div class="text-[14px] font-semibold truncate">{{ p.poolName }}</div>
-            <div class="flex items-center gap-[7px] text-[13px]" style="color: var(--dig-faint)"><span class="w-[7px] h-[7px] rounded-full" :style="{ background: p.walletDot }"></span>{{ p.wallet }}</div>
-            <div class="text-right text-[14px] font-semibold tabular-nums">{{ formatUsd(p.suppliedUsd) }}</div>
-            <div class="text-right text-[13px] font-bold tabular-nums" :style="{ color: hf(p.healthFactor).color }">{{ hf(p.healthFactor).label }}</div>
-            <div class="text-right"><button type="button" class="dig-chip text-[12px] font-semibold cursor-pointer px-[10px] py-[5px] rounded-[8px]" style="color: var(--dig-text)" :disabled="!p.poolSlug" @click="p.poolSlug && openPool(p.poolSlug)">Manage</button></div>
+          <div v-for="p in positions" :key="p.key" class="dig-row px-[20px] py-[13px]" style="border-bottom: 1px solid var(--dig-line-soft)">
+            <div class="grid items-center" style="grid-template-columns: 2fr 1.3fr 1fr 1fr 90px">
+              <div class="text-[14px] font-semibold truncate">{{ p.poolName }}</div>
+              <div class="flex items-center gap-[7px] text-[13px]" style="color: var(--dig-faint)"><span class="w-[7px] h-[7px] rounded-full" :style="{ background: p.walletDot }"></span>{{ p.wallet }}</div>
+              <div class="text-right text-[14px] font-semibold tabular-nums">{{ formatUsd(p.suppliedUsd) }}</div>
+              <div class="text-right text-[13px] font-bold tabular-nums" :style="{ color: hf(p.healthFactor).color }">{{ hf(p.healthFactor).label }}</div>
+              <div class="text-right"><button type="button" class="dig-chip text-[12px] font-semibold cursor-pointer px-[10px] py-[5px] rounded-[8px]" style="color: var(--dig-text)" :disabled="!p.poolSlug" @click="p.poolSlug && openPool(p.poolSlug)">Manage</button></div>
+            </div>
+            <!-- H6: what the USD figures are actually made of -->
+            <PositionAssetChips :positions="p.legs" class="mt-[9px]" />
           </div>
         </template>
 
@@ -329,11 +336,15 @@ const scopeTitle = computed(() => {
             <div class="flex items-center gap-[8px] px-[20px] py-[10px] text-[12px] font-semibold" style="background: var(--dig-surface-2)">
               <span class="w-[8px] h-[8px] rounded-full" :style="{ background: g.dot }"></span>{{ g.wallet }}
             </div>
-            <div v-for="p in g.rows" :key="p.key" class="dig-row grid items-center px-[20px] py-[13px]" style="grid-template-columns: 2fr 1fr 1fr 90px; border-bottom: 1px solid var(--dig-line-soft)">
-              <div class="text-[14px] font-semibold truncate">{{ p.poolName }}</div>
-              <div class="text-right text-[14px] font-semibold tabular-nums">{{ formatUsd(p.suppliedUsd) }}</div>
-              <div class="text-right text-[13px] font-bold tabular-nums" :style="{ color: hf(p.healthFactor).color }">{{ hf(p.healthFactor).label }}</div>
-              <div class="text-right"><button type="button" class="dig-chip text-[12px] font-semibold cursor-pointer px-[10px] py-[5px] rounded-[8px]" style="color: var(--dig-text)" :disabled="!p.poolSlug" @click="p.poolSlug && openPool(p.poolSlug)">Manage</button></div>
+            <div v-for="p in g.rows" :key="p.key" class="dig-row px-[20px] py-[13px]" style="border-bottom: 1px solid var(--dig-line-soft)">
+              <div class="grid items-center" style="grid-template-columns: 2fr 1fr 1fr 90px">
+                <div class="text-[14px] font-semibold truncate">{{ p.poolName }}</div>
+                <div class="text-right text-[14px] font-semibold tabular-nums">{{ formatUsd(p.suppliedUsd) }}</div>
+                <div class="text-right text-[13px] font-bold tabular-nums" :style="{ color: hf(p.healthFactor).color }">{{ hf(p.healthFactor).label }}</div>
+                <div class="text-right"><button type="button" class="dig-chip text-[12px] font-semibold cursor-pointer px-[10px] py-[5px] rounded-[8px]" style="color: var(--dig-text)" :disabled="!p.poolSlug" @click="p.poolSlug && openPool(p.poolSlug)">Manage</button></div>
+              </div>
+              <!-- H6: what the USD figures are actually made of -->
+              <PositionAssetChips :positions="p.legs" class="mt-[9px]" />
             </div>
           </div>
         </template>

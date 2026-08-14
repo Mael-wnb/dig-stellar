@@ -93,16 +93,26 @@ type ProtocolPositionRow = {
   venue_id: string | null;
   position_type: string;
   asset_symbol: string | null;
+  asset_contract_id: string | null;
+  logo_url: string | null;
   amount_scaled: unknown;
   amount_usd: unknown;
   metadata: unknown;
   snapshot_at: unknown;
 };
 
+// H6: per-asset legs of a position, carried alongside the USD rollup on the
+// consolidated overview. Same row shape as the per-wallet positions endpoint,
+// plus the owning wallet so legs can be bucketed per (wallet, pool).
+type DefiPositionLegRow = ProtocolPositionRow & {
+  user_wallet_id: string;
+};
+
 type DefiHealthRow = {
   user_wallet_id: string;
   address: string;
   label: string | null;
+  entity_id: string | null;
   pool_slug: string | null;
   pool_name: string | null;
   health_factor: unknown;
@@ -120,6 +130,68 @@ function compareHealthFactorAscNullsLast(
   if (b === null) return -1;
   return a - b;
 }
+
+// H6 (display honesty): one stored supply/borrow row, exposed verbatim. Amounts
+// are the indexer's scaled values — never re-derived, never synthesized. `side`
+// is a UI-facing rename of position_type; the raw type is kept so a future
+// position family (not supply/borrow) still surfaces.
+type PositionLeg = {
+  positionType: string;
+  side: 'supplied' | 'borrowed' | 'other';
+  assetSymbol: string | null;
+  assetContractId: string | null;
+  logoUrl: string | null;
+  amountScaled: number;
+  amountUsd: number | null;
+  collateralEnabled?: boolean;
+};
+
+function sideOf(positionType: string): PositionLeg['side'] {
+  if (positionType === 'supply') return 'supplied';
+  if (positionType === 'borrow') return 'borrowed';
+  return 'other';
+}
+
+function toPositionLeg(row: ProtocolPositionRow): PositionLeg {
+  const meta = (row.metadata ?? {}) as Record<string, unknown>;
+  const leg: PositionLeg = {
+    positionType: row.position_type,
+    side: sideOf(row.position_type),
+    assetSymbol: row.asset_symbol,
+    assetContractId: row.asset_contract_id,
+    logoUrl: row.logo_url,
+    amountScaled: toNumber(row.amount_scaled) ?? 0,
+    amountUsd: toNumber(row.amount_usd),
+  };
+  if (typeof meta.collateralEnabled === 'boolean') {
+    leg.collateralEnabled = meta.collateralEnabled;
+  }
+  return leg;
+}
+
+// Deterministic leg order: supplied before borrowed, then by USD weight, then
+// symbol. Purely presentational — no value is altered.
+const SIDE_RANK: Record<PositionLeg['side'], number> = {
+  supplied: 0,
+  borrowed: 1,
+  other: 2,
+};
+
+function comparePositionLegs(a: PositionLeg, b: PositionLeg): number {
+  if (SIDE_RANK[a.side] !== SIDE_RANK[b.side]) {
+    return SIDE_RANK[a.side] - SIDE_RANK[b.side];
+  }
+  const usdDelta = (b.amountUsd ?? 0) - (a.amountUsd ?? 0);
+  if (usdDelta !== 0) return usdDelta;
+  return (a.assetSymbol ?? '').localeCompare(b.assetSymbol ?? '');
+}
+
+// Shared join: the position's asset row, by id when the indexer resolved one,
+// otherwise by contract address (unique). Supplies the logo the UI chips use.
+const POSITION_ASSET_JOIN = `
+      left join assets a
+        on a.id = p.asset_id
+        or (p.asset_id is null and a.contract_address = p.asset_contract_id)`;
 
 @Injectable()
 export class WalletsService {
@@ -702,6 +774,7 @@ export class WalletsService {
         h.user_wallet_id,
         uw.address,
         uw.label,
+        h.entity_id,
         e.slug as pool_slug,
         e.name as pool_name,
         h.health_factor,
@@ -718,6 +791,53 @@ export class WalletsService {
       normalizedUserId
     )) as DefiHealthRow[];
 
+    // H6: the per-asset supply/borrow legs behind each pool's USD rollup. Same
+    // latest-snapshot-per-wallet rule as the health rows above, so a leg can
+    // never outlive the snapshot its total came from.
+    const defiLegRows = (await this.prisma.$queryRawUnsafe(
+      `
+      with latest as (
+        select p.user_wallet_id, max(p.snapshot_at) as snap
+        from wallet_protocol_positions p
+        join user_wallets uw on uw.id = p.user_wallet_id
+        where uw.user_id = $1::uuid
+        group by p.user_wallet_id
+      )
+      select
+        p.user_wallet_id,
+        p.entity_id,
+        p.venue_id,
+        p.position_type,
+        p.asset_symbol,
+        p.asset_contract_id,
+        a.logo_url,
+        p.amount_scaled,
+        p.amount_usd,
+        p.metadata,
+        p.snapshot_at
+      from wallet_protocol_positions p
+      join latest l
+        on l.user_wallet_id = p.user_wallet_id
+       and l.snap = p.snapshot_at
+      join user_wallets uw on uw.id = p.user_wallet_id${POSITION_ASSET_JOIN}
+      where uw.user_id = $1::uuid
+      `,
+      normalizedUserId
+    )) as DefiPositionLegRow[];
+
+    // Bucket legs per (wallet, pool) — the same key the health rows carry.
+    const legsByWalletPool = new Map<string, PositionLeg[]>();
+    const legKeyOf = (walletId: string, entityId: string | null): string =>
+      `${walletId}::${entityId ?? 'unknown'}`;
+
+    for (const row of defiLegRows) {
+      const key = legKeyOf(row.user_wallet_id, row.entity_id);
+      const bucket = legsByWalletPool.get(key);
+      if (bucket) bucket.push(toPositionLeg(row));
+      else legsByWalletPool.set(key, [toPositionLeg(row)]);
+    }
+    for (const legs of legsByWalletPool.values()) legs.sort(comparePositionLegs);
+
     let totalSuppliedUsd = 0;
     let totalBorrowedUsd = 0;
     const poolHealth = defiRows.map((row) => {
@@ -729,11 +849,13 @@ export class WalletsService {
         walletId: row.user_wallet_id,
         address: row.address,
         label: row.label,
+        entityId: row.entity_id,
         poolSlug: row.pool_slug,
         poolName: row.pool_name,
         healthFactor: toNumber(row.health_factor),
         totalCollateralUsd: collateralUsd,
         totalDebtUsd: debtUsd,
+        positions: legsByWalletPool.get(legKeyOf(row.user_wallet_id, row.entity_id)) ?? [],
       };
     });
 
@@ -875,24 +997,20 @@ export class WalletsService {
         p.venue_id,
         p.position_type,
         p.asset_symbol,
+        p.asset_contract_id,
+        a.logo_url,
         p.amount_scaled,
         p.amount_usd,
         p.metadata,
         p.snapshot_at
       from wallet_protocol_positions p
-      join latest l on p.snapshot_at = l.snap
+      join latest l on p.snapshot_at = l.snap${POSITION_ASSET_JOIN}
       where p.user_wallet_id = $1::uuid
       `,
       walletId
     )) as ProtocolPositionRow[];
 
-    type PoolPosition = {
-      positionType: string;
-      assetSymbol: string | null;
-      amountScaled: number;
-      amountUsd: number | null;
-      collateralEnabled?: boolean;
-    };
+    type PoolPosition = PositionLeg;
     type Pool = {
       venueSlug: string | null;
       entityId: string | null; // pool entity id (nullable in wallet_pool_health)
@@ -952,18 +1070,10 @@ export class WalletsService {
         poolMap.set(key, pool);
       }
 
-      const meta = (p.metadata ?? {}) as Record<string, unknown>;
-      const position: PoolPosition = {
-        positionType: p.position_type,
-        assetSymbol: p.asset_symbol,
-        amountScaled: toNumber(p.amount_scaled) ?? 0,
-        amountUsd: toNumber(p.amount_usd),
-      };
-      if (typeof meta.collateralEnabled === 'boolean') {
-        position.collateralEnabled = meta.collateralEnabled;
-      }
-      pool.positions.push(position);
+      pool.positions.push(toPositionLeg(p));
     }
+
+    for (const pool of poolMap.values()) pool.positions.sort(comparePositionLegs);
 
     const pools = Array.from(poolMap.values()).sort((a, b) =>
       compareHealthFactorAscNullsLast(a.healthFactor, b.healthFactor)

@@ -33,11 +33,13 @@ export interface WalletPoolHealthSummary {
   walletId: string;
   address: string;
   label: string | null;
+  entityId: string | null; // pool entity id
   poolSlug: string | null;
   poolName: string | null;
   healthFactor: number | null; // null = no debt (not at risk)
   totalCollateralUsd: number;
   totalDebtUsd: number;
+  positions?: WalletPositionItem[]; // H6 — per-asset legs behind the USD rollup
 }
 
 export interface WalletDefiSummary {
@@ -49,7 +51,10 @@ export interface WalletDefiSummary {
 
 export interface WalletPositionItem {
   positionType: "supply" | "borrow" | string;
+  side: "supplied" | "borrowed" | "other";
   assetSymbol: string | null;
+  assetContractId: string | null;
+  logoUrl: string | null; // backend asset logo; null → BrandLogo monogram
   amountScaled: number;
   amountUsd: number | null;
   collateralEnabled?: boolean;

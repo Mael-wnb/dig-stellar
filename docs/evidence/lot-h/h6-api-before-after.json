@@ -1,0 +1,111 @@
+{
+  "note": "Real local API against the live dev DB (Blend, wallet 'test blend'). Trimmed to one pool per endpoint; USD totals are byte-identical before/after.",
+  "overview_defi_poolHealth_0": {
+    "before": {
+      "walletId": "d5e7ee36-92ca-49bd-82f1-8420f063ce9f",
+      "address": "GAZXV3PHJ342NLK2UJYAK2VU6DYZGMN5TF2JEEQXEW4MOB6DYDCZLAPL",
+      "label": "test blend",
+      "poolSlug": "blend-yieldblox-pool",
+      "poolName": "YieldBlox",
+      "healthFactor": 1.2744005687272069,
+      "totalCollateralUsd": 20168.239662105352,
+      "totalDebtUsd": 15825.6674997
+    },
+    "after": {
+      "walletId": "d5e7ee36-92ca-49bd-82f1-8420f063ce9f",
+      "address": "GAZXV3PHJ342NLK2UJYAK2VU6DYZGMN5TF2JEEQXEW4MOB6DYDCZLAPL",
+      "label": "test blend",
+      "entityId": "6422e97e-e2bc-4719-a22c-53fe8d4eb863",
+      "poolSlug": "blend-yieldblox-pool",
+      "poolName": "YieldBlox",
+      "healthFactor": 1.2744005687272069,
+      "totalCollateralUsd": 20168.239662105352,
+      "totalDebtUsd": 15825.6674997,
+      "positions": [
+        {
+          "positionType": "supply",
+          "side": "supplied",
+          "assetSymbol": "native",
+          "assetContractId": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+          "logoUrl": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/stellar/info/logo.png",
+          "amountScaled": 150007.9838593,
+          "amountUsd": 26890.9862161584,
+          "collateralEnabled": true
+        },
+        {
+          "positionType": "borrow",
+          "side": "borrowed",
+          "assetSymbol": "USDC",
+          "assetContractId": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+          "logoUrl": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
+          "amountScaled": 15034.3841247,
+          "amountUsd": 15034.3841247
+        }
+      ]
+    }
+  },
+  "positions_pools_0": {
+    "before": {
+      "venueSlug": "blend",
+      "entityId": "6422e97e-e2bc-4719-a22c-53fe8d4eb863",
+      "poolSlug": "blend-yieldblox-pool",
+      "poolName": "YieldBlox",
+      "healthFactor": 1.2744005687272069,
+      "totalCollateralUsd": 20168.239662105352,
+      "totalDebtUsd": 15825.6674997,
+      "borrowLimitUsd": 4342.572162405353,
+      "netApy": -0.02581741499001241,
+      "positionsCount": 2,
+      "snapshotAt": "2026-06-26T17:22:56.893Z",
+      "positions": [
+        {
+          "positionType": "supply",
+          "assetSymbol": "native",
+          "amountScaled": 150007.9838593,
+          "amountUsd": 26890.9862161584,
+          "collateralEnabled": true
+        },
+        {
+          "positionType": "borrow",
+          "assetSymbol": "USDC",
+          "amountScaled": 15034.3841247,
+          "amountUsd": 15034.3841247
+        }
+      ]
+    },
+    "after": {
+      "venueSlug": "blend",
+      "entityId": "6422e97e-e2bc-4719-a22c-53fe8d4eb863",
+      "poolSlug": "blend-yieldblox-pool",
+      "poolName": "YieldBlox",
+      "healthFactor": 1.2744005687272069,
+      "totalCollateralUsd": 20168.239662105352,
+      "totalDebtUsd": 15825.6674997,
+      "borrowLimitUsd": 4342.572162405353,
+      "netApy": -0.02581741499001241,
+      "positionsCount": 2,
+      "snapshotAt": "2026-06-26T17:22:56.893Z",
+      "positions": [
+        {
+          "positionType": "supply",
+          "side": "supplied",
+          "assetSymbol": "native",
+          "assetContractId": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+          "logoUrl": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/stellar/info/logo.png",
+          "amountScaled": 150007.9838593,
+          "amountUsd": 26890.9862161584,
+          "collateralEnabled": true
+        },
+        {
+          "positionType": "borrow",
+          "side": "borrowed",
+          "assetSymbol": "USDC",
+          "assetContractId": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+          "logoUrl": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
+          "amountScaled": 15034.3841247,
+          "amountUsd": 15034.3841247
+        }
+      ]
+    }
+  }
+}

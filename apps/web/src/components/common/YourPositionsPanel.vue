@@ -16,8 +16,10 @@ import { useModals } from '../../composables/useModals'
 import { useView } from '../../composables/useView'
 import { formatUsd } from '../../utils/format'
 import { hfDisplay } from '../../utils/health'
+import type { WalletPositionItem } from '../../types/wallet'
 import EmptyPortfolioState from './EmptyPortfolioState.vue'
 import GetStartedCard from './GetStartedCard.vue'
+import PositionAssetChips from './PositionAssetChips.vue'
 
 const { userId } = useAppUser()
 const { openConnect } = useModals()
@@ -45,6 +47,7 @@ const topPositions = computed(() => {
     suppliedUsd: number
     borrowedUsd: number
     healthFactor: number | null
+    legs: WalletPositionItem[]
   }> = []
   for (const w of wallets.value) {
     for (const p of w.pools ?? []) {
@@ -55,6 +58,7 @@ const topPositions = computed(() => {
         suppliedUsd: p.totalCollateralUsd ?? 0,
         borrowedUsd: p.totalDebtUsd ?? 0,
         healthFactor: p.healthFactor,
+        legs: p.positions ?? [],
       })
     }
   }
@@ -111,17 +115,21 @@ const positionCount = computed(() =>
         <div
           v-for="p in topPositions"
           :key="p.key"
-          class="flex items-center gap-[10px] py-[10px]"
+          class="py-[10px]"
           style="border-bottom: 1px solid var(--dig-line-soft)"
         >
-          <div class="min-w-0">
-            <div class="text-[13px] font-semibold truncate">{{ p.poolName }}</div>
-            <div class="text-[11.5px] truncate" style="color: var(--dig-faint)">Blend · {{ p.wallet }}</div>
+          <div class="flex items-center gap-[10px]">
+            <div class="min-w-0">
+              <div class="text-[13px] font-semibold truncate">{{ p.poolName }}</div>
+              <div class="text-[11.5px] truncate" style="color: var(--dig-faint)">Blend · {{ p.wallet }}</div>
+            </div>
+            <div class="ml-auto text-right flex-shrink-0">
+              <div class="text-[13px] font-semibold tabular-nums">{{ formatUsd(p.suppliedUsd) }}</div>
+              <div class="text-[11.5px] font-bold tabular-nums" :style="{ color: hfDisplay(p.healthFactor).color }">{{ hfDisplay(p.healthFactor).label }}</div>
+            </div>
           </div>
-          <div class="ml-auto text-right flex-shrink-0">
-            <div class="text-[13px] font-semibold tabular-nums">{{ formatUsd(p.suppliedUsd) }}</div>
-            <div class="text-[11.5px] font-bold tabular-nums" :style="{ color: hfDisplay(p.healthFactor).color }">{{ hfDisplay(p.healthFactor).label }}</div>
-          </div>
+          <!-- H6: what the USD figures are actually made of -->
+          <PositionAssetChips :positions="p.legs" :size="14" dense class="mt-[7px]" />
         </div>
       </div>
       <div v-if="positionCount > topPositions.length" class="text-[11.5px] mt-[8px]" style="color: var(--dig-faint)">

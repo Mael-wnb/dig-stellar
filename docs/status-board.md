@@ -128,6 +128,22 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   `reserve_snapshots` that nothing on the live path writes — production values frozen at 2026-03-19
   reserves (× live prices); live writer = its own change, deliberately not in Lot E. Evidence:
   `docs/evidence/lot-e/`. Remaining T3-D3: evidence assembly + final demo (no build work left).
+- T3-D3 note (2026-08-13, later): **Lot H — H6 landed (display honesty: per-asset position
+  breakdown) — local-proven, VPS deploy pending.** Display-only; the data already existed.
+  `wallet_protocol_positions` has stored per-asset supply/borrow legs since T2-D1, but the product
+  collapsed them into one USD figure per (wallet, pool). **API** (`wallets.service.ts`, additive):
+  `/v1/wallets/:id/positions` legs gain `side`/`assetContractId`/`logoUrl` (joined from `assets`),
+  and `/v1/wallets/overview` `defi.poolHealth[]` gains `entityId` + a `positions[]` leg array —
+  both under the SAME latest-snapshot-per-wallet rule as the USD rollups, so a leg cannot outlive
+  its snapshot. **Web**: new shared `PositionAssetChips.vue` (BrandLogo + exact amount + symbol,
+  grouped supplied/borrowed) under each position row in `PortfolioView` (both by-position and
+  by-wallet modes) and the dashboard `YourPositionsPanel`; new `formatTokenAmount` (deliberately
+  NOT `formatCount`, which rounds to whole units and would render 0.42 XLM as "0"). Honest rules
+  held: exact stored amounts, nothing synthesized, EVERY leg listed (no top-asset truncation —
+  the Fixed pool shows 2 supplied assets + 1 borrowed), absent legs render as absence. USD totals
+  unchanged (`defi` totals + `summary` byte-identical before/after). No action path touched.
+  All green (api build + 42 tests + web build). Before/after captured headless against the real
+  local API: `docs/evidence/lot-h/h6-position-breakdown-2026-08-13.md`.
 - Last updated: 2026-08-13
 
 ---
