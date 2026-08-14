@@ -15,11 +15,11 @@ import { useAppUser } from '../../composables/useAppUser'
 import { useModals } from '../../composables/useModals'
 import { useView } from '../../composables/useView'
 import { formatUsd } from '../../utils/format'
-import { hfDisplay } from '../../utils/health'
 import type { WalletPositionItem } from '../../types/wallet'
 import EmptyPortfolioState from './EmptyPortfolioState.vue'
 import GetStartedCard from './GetStartedCard.vue'
 import PositionAssetChips from './PositionAssetChips.vue'
+import HealthFactorGauge from './HealthFactorGauge.vue'
 
 const { userId } = useAppUser()
 const { openConnect } = useModals()
@@ -125,7 +125,7 @@ const positionCount = computed(() =>
             </div>
             <div class="ml-auto text-right flex-shrink-0">
               <div class="text-[13px] font-semibold tabular-nums">{{ formatUsd(p.suppliedUsd) }}</div>
-              <div class="text-[11.5px] font-bold tabular-nums" :style="{ color: hfDisplay(p.healthFactor).color }">{{ hfDisplay(p.healthFactor).label }}</div>
+              <div class="flex justify-end mt-[1px]"><HealthFactorGauge :health-factor="p.healthFactor" dense /></div>
             </div>
           </div>
           <!-- H6: what the USD figures are actually made of -->

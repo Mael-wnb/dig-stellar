@@ -52,22 +52,52 @@ export function formatCount(n: number | null | undefined): string {
   return `${Math.round(n)}`
 }
 
-// H6 — token amounts for position chips. Deliberately NOT formatCount: that one
-// rounds to whole units (k/M/B), which would turn a real 0.42 XLM position into
-// "0". Here the stored amount is shown as-is, only trimmed: grouped thousands,
-// up to 4 decimals at/above 1 unit and up to 8 below, trailing zeros removed. A
-// non-zero amount too small for that precision renders as "<0.00000001" rather
-// than a misleading "0".
-export function formatTokenAmount(n: number | null | undefined): string {
+// H7 — compact token amount for position chips. Deliberately NOT formatCount:
+// that one rounds every sub-1000 value to a whole unit, turning a real 0.42 XLM
+// position into "0". Scale:
+//   >= 1e9 -> "1.2B"      >= 1e6 -> "15.2M"     >= 1e5 -> "240k"
+//   >= 1e3 -> "10,187"    (grouped, still exact to the unit)
+//   >= 1   -> "69.05"     (<=2 decimals, trailing zeros trimmed)
+//   > 0    -> "0.4231"    (<=4 decimals; "<0.0001" rather than a lying "0")
+// Precision is NOT dropped here — it moves to the hover title, which carries the
+// exact stored amount (formatTokenAmountExact). Chips read; hover verifies.
+export function formatTokenAmountCompact(n: number | null | undefined): string {
   if (n === null || n === undefined || !Number.isFinite(n)) return DASH
   if (n === 0) return '0'
 
-  const abs = Math.abs(n)
-  const decimals = abs >= 1 ? 4 : 8
-  const rounded = Number(n.toFixed(decimals))
-  if (rounded === 0) return `${n < 0 ? '>-' : '<'}0.${'0'.repeat(decimals - 1)}1`
+  const sign = n < 0 ? '-' : ''
+  const v = Math.abs(n)
+  // Trim trailing zeros at a given precision ("1.0M" -> "1M").
+  const trim = (x: number, d: number): string =>
+    Number(x.toFixed(d)).toLocaleString('en-US', { maximumFractionDigits: d })
 
-  return rounded.toLocaleString('en-US', { maximumFractionDigits: decimals })
+  // Boundaries are the half-up rounding points, so a value never renders as
+  // "1,000k" or "100,000" when the next unit up is what it rounds to.
+  if (v >= 999_500_000) return `${sign}${trim(v / 1e9, 1)}B`
+  if (v >= 999_500) return `${sign}${trim(v / 1e6, 1)}M`
+  if (v >= 99_999.5) return `${sign}${Math.round(v / 1e3).toLocaleString('en-US')}k`
+  if (v >= 1_000) return `${sign}${Math.round(v).toLocaleString('en-US')}`
+  if (v >= 1) return `${sign}${trim(v, 2)}`
+
+  if (Number(v.toFixed(4)) === 0) return `${sign}<0.0001`
+  return `${sign}${trim(v, 4)}`
+}
+
+// H7 — the exact stored amount, for hover titles. No rounding at all: the
+// number's own decimal representation, with thousands grouping added. This is
+// what makes the compact chip honest rather than lossy.
+export function formatTokenAmountExact(n: number | null | undefined): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return DASH
+
+  const sign = n < 0 ? '-' : ''
+  const raw = String(Math.abs(n))
+  // Exponential notation (extreme magnitudes) is left verbatim — grouping it
+  // would misrepresent the value.
+  if (raw.includes('e') || raw.includes('E')) return `${sign}${raw}`
+
+  const [int, frac] = raw.split('.')
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return `${sign}${frac ? `${grouped}.${frac}` : grouped}`
 }
 
 // Display-only asset symbol. The native Stellar token is technically "native"

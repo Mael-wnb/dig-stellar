@@ -15,11 +15,11 @@ import { useAppUser } from '../../composables/useAppUser'
 import { useModals } from '../../composables/useModals'
 import { useConnectFlow } from '../../composables/useConnectFlow'
 import { formatUsd } from '../../utils/format'
-import { hfDisplay as hf } from '../../utils/health'
 import type { WalletItem, WalletPositionItem } from '../../types/wallet'
 import EmptyPortfolioState from '../common/EmptyPortfolioState.vue'
 import GetStartedCard from '../common/GetStartedCard.vue'
 import PositionAssetChips from '../common/PositionAssetChips.vue'
+import HealthFactorGauge from '../common/HealthFactorGauge.vue'
 
 const { userId } = useAppUser()
 const { openPool } = useView()
@@ -322,7 +322,7 @@ const scopeTitle = computed(() => {
               <div class="text-[14px] font-semibold truncate">{{ p.poolName }}</div>
               <div class="flex items-center gap-[7px] text-[13px]" style="color: var(--dig-faint)"><span class="w-[7px] h-[7px] rounded-full" :style="{ background: p.walletDot }"></span>{{ p.wallet }}</div>
               <div class="text-right text-[14px] font-semibold tabular-nums">{{ formatUsd(p.suppliedUsd) }}</div>
-              <div class="text-right text-[13px] font-bold tabular-nums" :style="{ color: hf(p.healthFactor).color }">{{ hf(p.healthFactor).label }}</div>
+              <div class="flex justify-end"><HealthFactorGauge :health-factor="p.healthFactor" /></div>
               <div class="text-right"><button type="button" class="dig-chip text-[12px] font-semibold cursor-pointer px-[10px] py-[5px] rounded-[8px]" style="color: var(--dig-text)" :disabled="!p.poolSlug" @click="p.poolSlug && openPool(p.poolSlug)">Manage</button></div>
             </div>
             <!-- H6: what the USD figures are actually made of -->
@@ -340,7 +340,7 @@ const scopeTitle = computed(() => {
               <div class="grid items-center" style="grid-template-columns: 2fr 1fr 1fr 90px">
                 <div class="text-[14px] font-semibold truncate">{{ p.poolName }}</div>
                 <div class="text-right text-[14px] font-semibold tabular-nums">{{ formatUsd(p.suppliedUsd) }}</div>
-                <div class="text-right text-[13px] font-bold tabular-nums" :style="{ color: hf(p.healthFactor).color }">{{ hf(p.healthFactor).label }}</div>
+                <div class="flex justify-end"><HealthFactorGauge :health-factor="p.healthFactor" /></div>
                 <div class="text-right"><button type="button" class="dig-chip text-[12px] font-semibold cursor-pointer px-[10px] py-[5px] rounded-[8px]" style="color: var(--dig-text)" :disabled="!p.poolSlug" @click="p.poolSlug && openPool(p.poolSlug)">Manage</button></div>
               </div>
               <!-- H6: what the USD figures are actually made of -->

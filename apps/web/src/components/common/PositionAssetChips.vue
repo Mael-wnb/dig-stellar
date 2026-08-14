@@ -1,11 +1,14 @@
 <script setup lang="ts">
-// PositionAssetChips — H6 (Lot H, T3-D3). The composition behind a position's
-// USD rollup: one chip per stored supply/borrow leg (logo + symbol + exact
-// amount), e.g. "Supplied: 5 XLM · Borrowed: 3 USDC".
+// PositionAssetChips — H6, compacted in H7 (Lot H, T3-D3). The composition
+// behind a position's USD rollup: one chip per stored supply/borrow leg
+// (logo + symbol + amount), e.g. "240k XLM · 10,187 USDC".
 //
 // Display honesty rules this component holds to:
-//  • amounts are the API's stored values, printed exactly — nothing rounded to
-//    a friendlier number, nothing derived, nothing invented,
+//  • amounts come only from the API's stored values — nothing derived, nothing
+//    invented,
+//  • the chip shows a COMPACT amount and the hover title shows the EXACT stored
+//    amount (H7). Precision is relocated, never discarded: the readable form is
+//    always one hover away from the real number,
 //  • EVERY leg is listed — a position with three supplied assets shows three
 //    chips; there is no "top asset" truncation that would hide the rest,
 //  • no legs (older snapshot, or an asset the indexer never resolved) renders
@@ -13,7 +16,11 @@
 // The USD totals stay where they are; these chips only add the *what*.
 import { computed } from 'vue'
 import type { WalletPositionItem } from '../../types/wallet'
-import { displaySymbol, formatTokenAmount } from '../../utils/format'
+import {
+  displaySymbol,
+  formatTokenAmountCompact,
+  formatTokenAmountExact,
+} from '../../utils/format'
 import BrandLogo from './BrandLogo.vue'
 
 const props = withDefaults(
@@ -39,6 +46,20 @@ const groups = computed(() =>
     legs: (props.positions ?? []).filter((p) => p.side === g.side),
   })).filter((g) => g.legs.length > 0),
 )
+
+// H7: the SUPPLIED/BORROWED labels earn their space only when there are two
+// sides to tell apart. A supply-only position drops the label — the chips are
+// unambiguous on their own. A position that is somehow NOT supply-only keeps
+// its label even when alone, because bare chips would read as "supplied" by
+// default, which is exactly the misreading the labels exist to prevent.
+const showLabels = computed(
+  () => groups.value.length > 1 || groups.value[0]?.side !== 'supplied',
+)
+
+// Hover carries what the chip compacts away: side, exact stored amount, symbol.
+function legTitle(leg: WalletPositionItem, sideLabel: string): string {
+  return `${sideLabel} ${formatTokenAmountExact(leg.amountScaled)} ${displaySymbol(leg.assetSymbol)}`
+}
 </script>
 
 <template>
@@ -57,6 +78,7 @@ const groups = computed(() =>
       <span v-if="gi > 0" :style="{ color: 'var(--dig-line)' }" class="select-none">·</span>
 
       <span
+        v-if="showLabels"
         class="font-semibold uppercase tracking-[0.04em]"
         :class="dense ? 'text-[10px]' : 'text-[10.5px]'"
         :style="{ color: g.color }"
@@ -68,7 +90,7 @@ const groups = computed(() =>
         class="flex items-center rounded-[7px]"
         :class="dense ? 'gap-[4px] px-[5px] py-[2px] text-[11px]' : 'gap-[5px] px-[6px] py-[3px] text-[12px]'"
         style="background: var(--dig-surface-2); border: 1px solid var(--dig-line-soft)"
-        :title="leg.amountUsd !== null ? `${formatTokenAmount(leg.amountScaled)} ${displaySymbol(leg.assetSymbol)}` : undefined"
+        :title="legTitle(leg, g.label)"
       >
         <BrandLogo
           :primary="leg.logoUrl"
@@ -80,7 +102,7 @@ const groups = computed(() =>
           :font-size="Math.round(size * 0.5)"
           :img-scale="0.72"
         />
-        <span class="tabular-nums font-semibold">{{ formatTokenAmount(leg.amountScaled) }}</span>
+        <span class="tabular-nums font-semibold">{{ formatTokenAmountCompact(leg.amountScaled) }}</span>
         <span style="color: var(--dig-faint)">{{ displaySymbol(leg.assetSymbol) }}</span>
       </span>
     </div>

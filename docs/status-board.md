@@ -144,7 +144,21 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   unchanged (`defi` totals + `summary` byte-identical before/after). No action path touched.
   All green (api build + 42 tests + web build). Before/after captured headless against the real
   local API: `docs/evidence/lot-h/h6-position-breakdown-2026-08-13.md`.
-- Last updated: 2026-08-13
+- T3-D3 note (2026-08-14): **Lot H — H7 landed (display polish on H6) — local-proven, VPS deploy
+  pending.** Web-only; no API/schema/indexer/action change. **Chips** now show a compact amount
+  (`200k XLM`, `15,041 USDC`) with the EXACT stored amount on the hover title
+  (`Supplied 150,007.9838593 XLM`) — precision relocated, not dropped; new
+  `formatTokenAmountCompact` + `formatTokenAmountExact` (still deliberately NOT `formatCount`,
+  which would render 0.42 XLM as "0"). SUPPLIED/BORROWED labels now render only when both sides
+  exist; a supply-only position shows chips alone (a borrow-only one keeps its label — bare chips
+  would read as "supplied"). **HF gauge**: new `HealthFactorGauge.vue` replaces the bare "HF 1.23"
+  text in PortfolioView (both modes) + the dashboard panel (dense) — continuous red→amber→green
+  gradient anchored to the UNCHANGED `utils/health.ts` thresholds (1.2 → 20%, 1.5 → 50% on a
+  1.0–2.0 scale, clamped, liquidation at 1.0 stated in the title), marker + numeric value.
+  `No borrow` renders NO gauge (text as before) — a full green bar there would invent a safety
+  margin. All green (web build + api build + 42 tests). Before/after (H7 before == H6 after,
+  md5-verified) in `docs/evidence/lot-h/h7-chips-hf-gauge-2026-08-14.md`.
+- Last updated: 2026-08-14
 
 ---
 
