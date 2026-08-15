@@ -185,6 +185,23 @@ const iconFor = (n: { metric?: any; category?: string }) => ICONS[metricIconKey(
           <span class="text-xs text-[#5E5F5D]">{{ activeCount }} active</span>
         </div>
 
+        <!-- System rule (N2): the automatic pool-status protection — visible so
+             its existence is honest, not toggleable (it is not a user rule). -->
+        <div class="py-3.5 border-b border-[#2C2C29]">
+          <div class="flex items-center gap-[9px]">
+            <span class="w-2 h-2 rounded-full" style="background:#63A7FF" />
+            <span class="text-[13.5px] font-semibold">Pool status</span>
+            <span
+              class="text-[9.5px] font-semibold uppercase tracking-[.06em] px-[7px] py-px rounded-full"
+              style="background:#17233A; color:#63A7FF;"
+            >Automatic</span>
+          </div>
+          <p class="text-xs text-[#5E5F5D] mt-[5px] ml-[17px] leading-[1.45]">
+            Notifies you when a Blend pool where you hold a position changes status
+            (Active / On-Ice / Frozen). Always on — checked every sweep.
+          </p>
+        </div>
+
         <div v-if="loading && !rules.length" class="space-y-3 py-2">
           <div v-for="i in 3" :key="i" class="h-4 rounded bg-[#242422] animate-pulse" />
         </div>

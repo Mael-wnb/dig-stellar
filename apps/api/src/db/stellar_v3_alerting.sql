@@ -123,3 +123,19 @@ create table if not exists alert_rule_subject_state (
   last_fired_at      timestamptz,
   primary key (rule_id, subject_key)
 );
+
+-- ---------------------------------------------------------
+-- 6. pool_status_state — last-seen Blend pool status (Lot N / N2)
+-- ---------------------------------------------------------
+-- The automatic pool-status protection has NO alert_rules row (it is not a user
+-- rule), so its last-seen state gets its own tiny table. One row per monitored
+-- pool entity; the first observation seeds silently (no retroactive firing).
+-- status is the derived A5b label at observation time; status_code the raw
+-- on-chain metadata.status it was derived from.
+create table if not exists pool_status_state (
+  entity_id    uuid primary key,      -- entities.id of the pool (plain uuid, see header note)
+  status_code  integer not null,
+  status       text not null,
+  changed_at   timestamptz not null,  -- when the label last changed (seed = first seen)
+  seen_at      timestamptz not null   -- last observation
+);

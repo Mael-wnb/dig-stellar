@@ -85,6 +85,63 @@ export function buildPriceCopy(input: PriceCopyInput): {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Pool-status family (N2) — automatic protection, no user rule. Pure edge logic
+// over the A5b-derived status label (derivePoolStatus in actions.service.ts is
+// the single source of the code→label mapping; this module only compares labels).
+// ---------------------------------------------------------------------------
+
+export type PoolStatusOutcome =
+  | 'seed' // first observation of this pool — record state, NEVER notify
+  | 'unchanged' // same label as last seen — silent
+  | 'changed' // real transition between two known labels — notify
+  | 'suppressed'; // transition involving 'Unknown' — record, never notify
+  // ('Unknown' is a data/RPC anomaly, not a pool event — notifying would be noise)
+
+export function diffPoolStatus(
+  prev: string | null,
+  current: string
+): PoolStatusOutcome {
+  if (prev === null) return 'seed';
+  if (prev === current) return 'unchanged';
+  if (prev === 'Unknown' || current === 'Unknown') return 'suppressed';
+  return 'changed';
+}
+
+// What each status means for the user's actions — mirrors derivePoolStatus /
+// the contract's require_action_allowed (withdraw is NEVER status-blocked).
+const POOL_STATUS_CONSEQUENCE: Record<string, string> = {
+  Active: 'All actions are available again.',
+  'On-Ice': 'Borrowing is disabled; supplies and withdrawals remain available.',
+  Frozen: 'Supplies and borrowing are disabled; withdrawals remain available.',
+  Setup: 'The pool is in setup; supplies and borrowing are disabled, withdrawals remain available.',
+};
+
+export type PoolStatusCopy = {
+  kind: 'alert_fired' | 'alert_resolved';
+  title: string;
+  body: string;
+};
+
+// "Blend YieldBlox pool status changed: Active → Frozen. Supplies and borrowing
+// are disabled; withdrawals remain available." Back to Active reads as a resolve.
+export function buildPoolStatusCopy(input: {
+  poolLabel: string;
+  from: string;
+  to: string;
+}): PoolStatusCopy {
+  const { poolLabel, from, to } = input;
+  const backToActive = to === 'Active';
+  const consequence = POOL_STATUS_CONSEQUENCE[to] ?? '';
+  return {
+    kind: backToActive ? 'alert_resolved' : 'alert_fired',
+    title: backToActive
+      ? `Pool status: ${poolLabel} is Active again`
+      : `Pool status: ${poolLabel} is now ${to}`,
+    body: `${poolLabel} pool status changed: ${from} → ${to}.${consequence ? ` ${consequence}` : ''}`,
+  };
+}
+
 // assets.symbol stores the Stellar-native lumen as 'native'; display it as XLM.
 export function displaySymbol(
   symbol: string | null,

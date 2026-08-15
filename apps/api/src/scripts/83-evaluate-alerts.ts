@@ -14,6 +14,7 @@
 // `now` is injected into every evaluate() call.
 
 import 'dotenv/config';
+import { PoolV2 } from '@blend-capital/blend-sdk';
 import { PrismaService } from '../db/prisma.service';
 import {
   AlertsRepository,
@@ -21,11 +22,18 @@ import {
 } from '../modules/alerts/alerts.repository';
 import { evaluate } from '../modules/alerts/evaluate';
 import {
+  buildPoolStatusCopy,
   buildPriceCopy,
+  diffPoolStatus,
   displaySymbol,
   formatAsOf,
   partitionRulesByFamily,
 } from '../modules/alerts/families';
+import { derivePoolStatus } from '../modules/actions/actions.service';
+import {
+  MAINNET_BLEND_POOLS,
+  getNetworkConfig,
+} from '../modules/actions/network-registry';
 
 const OPERATOR_SYMBOL: Record<string, string> = {
   lt: '<',
@@ -287,12 +295,110 @@ async function main() {
       }
     }
 
+    // ── System family: pool status (N2) — AUTOMATIC protection, no user rule.
+    // Load the mainnet Blend pools' live status (PoolV2.load × 4 — same read
+    // path as A5b; derivePoolStatus is the single code→label mapping), diff
+    // against pool_status_state, and on a real change notify every user with a
+    // current tracked-wallet position in that pool. First observation of a pool
+    // seeds silently. RPC failure for a pool = skip it this sweep, state kept.
+    let poolStatusChanges = 0;
+    let poolStatusNotified = 0;
+    try {
+      const cfg = getNetworkConfig('mainnet');
+      const slugToEntity = await repo.getEntityIdsBySlug(
+        MAINNET_BLEND_POOLS.map((p) => p.slug)
+      );
+      const prevStates = await repo.getPoolStatusStates();
+
+      for (const entry of MAINNET_BLEND_POOLS) {
+        const entityId = slugToEntity.get(entry.slug);
+        if (!entityId) {
+          console.warn(
+            `[evaluate-alerts] pool-status: no active entity for ${entry.slug} — skipped`
+          );
+          continue;
+        }
+
+        let statusCode: number;
+        try {
+          const pool = await PoolV2.load(
+            { passphrase: cfg.networkPassphrase, rpc: cfg.rpcUrl },
+            entry.poolId
+          );
+          statusCode = pool.metadata.status;
+        } catch (error) {
+          console.error(
+            `[evaluate-alerts] pool-status: PoolV2.load failed for ${entry.slug} — skipped`
+          );
+          console.error(error);
+          continue;
+        }
+
+        const status = derivePoolStatus(statusCode);
+        const prev = prevStates.get(entityId) ?? null;
+        const outcome = diffPoolStatus(prev?.status ?? null, status.label);
+
+        await repo.upsertPoolStatusState({
+          entityId,
+          statusCode: status.code,
+          status: status.label,
+          changedAt:
+            outcome === 'changed' || outcome === 'suppressed' || prev === null
+              ? now.toISOString()
+              : (toIso(prev.changedAt) ?? now.toISOString()),
+          seenAt: now.toISOString(),
+        });
+
+        if (outcome !== 'changed' || prev === null) continue;
+        poolStatusChanges += 1;
+
+        const poolLabel = `Blend ${entry.label}`;
+        const copy = buildPoolStatusCopy({
+          poolLabel,
+          from: prev.status,
+          to: status.label,
+        });
+        const affected = await repo.usersWithPositionsByPool([entityId]);
+        const userIds = affected.get(entityId) ?? [];
+
+        for (const userId of userIds) {
+          await repo.insertNotification({
+            userId,
+            ruleId: null, // automatic protection — not a user rule
+            kind: copy.kind,
+            title: copy.title,
+            body: copy.body,
+            payload: {
+              metric: 'pool_status',
+              poolEntityId: entityId,
+              poolLabel,
+              from: prev.status,
+              to: status.label,
+              statusCode: status.code,
+              supplyBlocked: status.supplyBlocked,
+              withdrawBlocked: status.withdrawBlocked,
+              asOf: now.toISOString(),
+              // The subject of a pool-status alert is the pool's page.
+              link: { view: 'pool', poolId: entry.slug },
+            },
+          });
+          poolStatusNotified += 1;
+        }
+      }
+    } catch (error) {
+      // The automatic family must never abort the user-rule families' summary.
+      console.error('[evaluate-alerts] pool-status stage failed');
+      console.error(error);
+    }
+
     console.log({
       completedAt: new Date().toISOString(),
       rulesEvaluated,
       rowsMatched,
       fired,
       resolved,
+      poolStatusChanges,
+      poolStatusNotified,
     });
   } finally {
     await prisma.$disconnect();

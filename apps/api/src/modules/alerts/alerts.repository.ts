@@ -235,6 +235,23 @@ type LatestAssetPriceRow = {
 // for new price rules (honesty rule: creatable IFF the evaluator has data).
 const PRICED_ASSET_MAX_AGE = '7 days';
 
+// Lot N (N2) — last-seen status of a monitored Blend pool (pool_status_state).
+export type PoolStatusState = {
+  entityId: string;
+  statusCode: number;
+  status: string;
+  changedAt: unknown;
+  seenAt: unknown;
+};
+
+type PoolStatusStateRow = {
+  entity_id: string;
+  status_code: number;
+  status: string;
+  changed_at: unknown;
+  seen_at: unknown;
+};
+
 @Injectable()
 export class AlertsRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -672,6 +689,113 @@ export class AlertsRepository {
       params.lastEvaluatedAt,
       params.lastFiredAt
     );
+  }
+
+  // -------------------------------------------------------------------------
+  // Lot N (N2) — pool-status protection reads/writes
+  // -------------------------------------------------------------------------
+
+  // Resolve pool registry slugs to entities.id (active entities only).
+  async getEntityIdsBySlug(slugs: string[]): Promise<Map<string, string>> {
+    const wanted = Array.from(new Set(slugs.filter(Boolean)));
+    if (wanted.length === 0) return new Map();
+
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `
+      select slug, id
+      from entities
+      where slug = any($1::text[])
+        and is_active = true
+      `,
+      wanted
+    )) as Array<{ slug: string; id: string }>;
+
+    const map = new Map<string, string>();
+    for (const row of rows) map.set(row.slug, row.id);
+    return map;
+  }
+
+  // Last-seen status per monitored pool. Empty map before the seed run.
+  async getPoolStatusStates(): Promise<Map<string, PoolStatusState>> {
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `
+      select entity_id, status_code, status, changed_at, seen_at
+      from pool_status_state
+      `
+    )) as PoolStatusStateRow[];
+
+    const map = new Map<string, PoolStatusState>();
+    for (const row of rows) {
+      map.set(row.entity_id, {
+        entityId: row.entity_id,
+        statusCode: row.status_code,
+        status: row.status,
+        changedAt: row.changed_at,
+        seenAt: row.seen_at,
+      });
+    }
+    return map;
+  }
+
+  async upsertPoolStatusState(params: {
+    entityId: string;
+    statusCode: number;
+    status: string;
+    changedAt: string; // ISO — when the label last changed (seed = first seen)
+    seenAt: string; // ISO — this observation
+  }): Promise<void> {
+    await this.prisma.$executeRawUnsafe(
+      `
+      insert into pool_status_state (entity_id, status_code, status, changed_at, seen_at)
+      values ($1::uuid, $2, $3, $4::timestamptz, $5::timestamptz)
+      on conflict (entity_id) do update set
+        status_code = excluded.status_code,
+        status      = excluded.status,
+        changed_at  = excluded.changed_at,
+        seen_at     = excluded.seen_at
+      `,
+      params.entityId,
+      params.statusCode,
+      params.status,
+      params.changedAt,
+      params.seenAt
+    );
+  }
+
+  // Users with a CURRENT position in each given pool: latest wallet_pool_health
+  // row per (wallet, pool) — script 81 only writes a row when the wallet HAS a
+  // position, so a wallet that exited stops producing rows; the freshness window
+  // keeps long-gone positions from notifying forever. No HF filter here: a
+  // supply-only position (health_factor NULL) is still affected by a status change.
+  async usersWithPositionsByPool(
+    entityIds: string[]
+  ): Promise<Map<string, string[]>> {
+    const ids = Array.from(new Set(entityIds.filter(Boolean)));
+    if (ids.length === 0) return new Map();
+
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `
+      select distinct latest.entity_id, uw.user_id
+      from (
+        select distinct on (wph.user_wallet_id, wph.entity_id)
+          wph.user_wallet_id, wph.entity_id, wph.snapshot_at
+        from wallet_pool_health wph
+        where wph.entity_id = any($1::uuid[])
+        order by wph.user_wallet_id, wph.entity_id, wph.snapshot_at desc
+      ) latest
+      join user_wallets uw on uw.id = latest.user_wallet_id
+      where latest.snapshot_at > now() - interval '24 hours'
+      `,
+      ids
+    )) as Array<{ entity_id: string; user_id: string }>;
+
+    const map = new Map<string, string[]>();
+    for (const row of rows) {
+      const list = map.get(row.entity_id) ?? [];
+      list.push(row.user_id);
+      map.set(row.entity_id, list);
+    }
+    return map;
   }
 
   private mapAssetPrice(row: LatestAssetPriceRow): LatestAssetPrice {

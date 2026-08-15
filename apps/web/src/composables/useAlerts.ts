@@ -280,17 +280,33 @@ export function useAlerts() {
   const feed = computed<AlertNotification[]>(() =>
     notifications.value.map((n: AppNotification): AlertNotification => {
       const fired = n.kind === 'alert_fired'
-      const isPrice = n.payload?.metric === 'price'
+      const payloadMetric = n.payload?.metric
+      // Severity/category derived from the payload: a health-factor fire is a
+      // risk event (critical); a pool-status degradation is a protection event
+      // (warning, surfaced under Critical); a price crossing is informational.
+      let severity: AlertSeverity = 'info'
+      let category: 'critical' | 'activity' = 'activity'
+      let metric: AlertMetric | undefined = 'health'
+      if (payloadMetric === 'price') {
+        metric = 'price'
+      } else if (payloadMetric === 'pool_status') {
+        metric = undefined // bell icon — pool status is not a rule metric
+        if (fired) {
+          severity = 'warning'
+          category = 'critical'
+        }
+      } else if (fired) {
+        severity = 'critical'
+        category = 'critical'
+      }
       return {
         id: n.id,
         title: n.title,
         body: n.body ?? '',
         scope_ref: n.payload?.poolLabel ?? n.payload?.symbol ?? undefined,
-        // Severity derived from the payload: a health-factor fire is a risk
-        // event (critical); a price crossing is informational.
-        severity: fired && !isPrice ? 'critical' : 'info',
-        category: fired && !isPrice ? 'critical' : 'activity',
-        metric: isPrice ? 'price' : 'health',
+        severity,
+        category,
+        metric,
         created_at: n.createdAt,
         acknowledged_at: n.readAt,
         link: n.payload?.link,

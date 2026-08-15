@@ -6,7 +6,9 @@
 // against health rows regardless of metric).
 
 import {
+  buildPoolStatusCopy,
   buildPriceCopy,
+  diffPoolStatus,
   displaySymbol,
   formatAsOf,
   formatUsdPrice,
@@ -186,6 +188,69 @@ describe('price copy (observed value + as_of, honesty rules)', () => {
     expect(displaySymbol('AQUA', null, 'abc')).toBe('AQUA');
     expect(displaySymbol(null, null, '12345678-dead-beef')).toBe(
       'asset 12345678',
+    );
+  });
+});
+
+describe('pool-status family (N2) — automatic protection edge logic', () => {
+  it('SEED RUN IS SILENT: the first observation records state and never notifies', () => {
+    expect(diffPoolStatus(null, 'Active')).toBe('seed');
+    expect(diffPoolStatus(null, 'Frozen')).toBe('seed');
+    // even a "bad" first status is a seed, not an event — no retroactive firing
+    expect(diffPoolStatus(null, 'Unknown')).toBe('seed');
+  });
+
+  it('an unchanged status stays silent sweep after sweep', () => {
+    expect(diffPoolStatus('Active', 'Active')).toBe('unchanged');
+    expect(diffPoolStatus('Frozen', 'Frozen')).toBe('unchanged');
+  });
+
+  it('a real transition between known labels notifies', () => {
+    expect(diffPoolStatus('Active', 'Frozen')).toBe('changed');
+    expect(diffPoolStatus('Active', 'On-Ice')).toBe('changed');
+    expect(diffPoolStatus('On-Ice', 'Active')).toBe('changed');
+  });
+
+  it('transitions involving Unknown are recorded but never notified (RPC noise)', () => {
+    expect(diffPoolStatus('Active', 'Unknown')).toBe('suppressed');
+    expect(diffPoolStatus('Unknown', 'Active')).toBe('suppressed');
+  });
+
+  it('degradation copy carries the transition and the A5b action consequences', () => {
+    const { kind, title, body } = buildPoolStatusCopy({
+      poolLabel: 'Blend YieldBlox',
+      from: 'Active',
+      to: 'Frozen',
+    });
+    expect(kind).toBe('alert_fired');
+    expect(title).toBe('Pool status: Blend YieldBlox is now Frozen');
+    expect(body).toBe(
+      'Blend YieldBlox pool status changed: Active → Frozen. Supplies and borrowing are disabled; withdrawals remain available.',
+    );
+  });
+
+  it('On-Ice copy states borrowing blocked but supplies still open', () => {
+    const { kind, body } = buildPoolStatusCopy({
+      poolLabel: 'Blend Orbit',
+      from: 'Active',
+      to: 'On-Ice',
+    });
+    expect(kind).toBe('alert_fired');
+    expect(body).toBe(
+      'Blend Orbit pool status changed: Active → On-Ice. Borrowing is disabled; supplies and withdrawals remain available.',
+    );
+  });
+
+  it('a return to Active reads as a resolve', () => {
+    const { kind, title, body } = buildPoolStatusCopy({
+      poolLabel: 'Blend Orbit',
+      from: 'Frozen',
+      to: 'Active',
+    });
+    expect(kind).toBe('alert_resolved');
+    expect(title).toBe('Pool status: Blend Orbit is Active again');
+    expect(body).toBe(
+      'Blend Orbit pool status changed: Frozen → Active. All actions are available again.',
     );
   });
 });
