@@ -6,6 +6,7 @@
 //
 //   POST   /v1/alert-rules?userId=...      create
 //   GET    /v1/alert-rules?userId=...      list the user's rules
+//   GET    /v1/alert-rules/priced-assets   vetted asset list for price rules
 //   GET    /v1/alert-rules/:id?userId=...  one rule (404 if not owned)
 //   PATCH  /v1/alert-rules/:id?userId=...  partial update (404 if not owned)
 //   DELETE /v1/alert-rules/:id?userId=...  delete (404 if not owned)
@@ -33,7 +34,7 @@ export class AlertsController {
   @Post()
   createRule(
     @Query('userId') queryUserId?: string,
-    @Body() body?: CreateAlertRuleBody
+    @Body() body?: CreateAlertRuleBody,
   ) {
     return this.alertsService.createRule(queryUserId, body ?? {});
   }
@@ -41,6 +42,13 @@ export class AlertsController {
   @Get()
   listRules(@Query('userId') userId?: string) {
     return this.alertsService.listRules(userId);
+  }
+
+  // Static path — declared BEFORE ':id' so it never matches as a rule id.
+  // The vetted asset list for price rules (market data, not user-scoped).
+  @Get('priced-assets')
+  listPricedAssets() {
+    return this.alertsService.listPricedAssets();
   }
 
   @Get(':id')
@@ -52,7 +60,7 @@ export class AlertsController {
   updateRule(
     @Param('id') id: string,
     @Query('userId') queryUserId?: string,
-    @Body() body?: UpdateAlertRuleBody
+    @Body() body?: UpdateAlertRuleBody,
   ) {
     return this.alertsService.updateRule(queryUserId, id, body ?? {});
   }

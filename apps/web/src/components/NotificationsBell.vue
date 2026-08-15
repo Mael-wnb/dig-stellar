@@ -11,7 +11,7 @@ import type { AppNotification } from '../api/notifications'
 
 const { notifications, unreadCount, loading, error, load, markAsRead, markAllAsRead } =
   useNotifications()
-const { setView } = useView()
+const { setView, openPool } = useView()
 
 const open = ref(false)
 const hasUnread = computed(() => unreadCount.value > 0)
@@ -31,8 +31,14 @@ function toggle() {
 function close() {
   open.value = false
 }
-function onRowClick(id: string) {
-  void markAsRead(id)
+function onRowClick(n: AppNotification) {
+  void markAsRead(n.id)
+  // Lot N deep-link: a route hint in the payload navigates to the subject.
+  const link = n.payload?.link
+  if (!link) return
+  open.value = false
+  if (link.view === 'pool' && link.poolId) openPool(link.poolId)
+  else setView(link.view)
 }
 function goAlerts() {
   open.value = false
@@ -101,7 +107,7 @@ function goAlerts() {
           borderLeft: `3px solid ${kindStyle(n).border}`,
           background: n.readAt ? 'transparent' : 'rgba(213,255,47,0.03)',
         }"
-        @click="onRowClick(n.id)"
+        @click="onRowClick(n)"
       >
         <span
           class="w-[30px] h-[30px] flex-shrink-0 rounded-[9px] flex items-center justify-center"

@@ -30,18 +30,20 @@ export type CreateAlertRuleBody = {
   rearmHysteresis?: number | null;
   userWalletId?: string | null;
   poolEntityId?: string | null;
+  assetId?: string | null;
   enabled?: boolean;
 };
 
 export type UpdateAlertRuleBody = Partial<CreateAlertRuleBody>;
 
-const SUPPORTED_METRICS = new Set(['health_factor']);
+// Lot N: creatable families = the ones the evaluator actually runs (honesty rule).
+const SUPPORTED_METRICS = new Set(['health_factor', 'price']);
 const OPERATORS = new Set(['lt', 'lte', 'gt', 'gte']);
 const DEFAULT_COOLDOWN_SECONDS = 3600;
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value
+    value,
   );
 }
 
@@ -60,7 +62,7 @@ export class AlertsService {
     }
     if (!isUuid(value)) {
       throw new BadRequestException(
-        'userId must be a valid UUID, for example 00000000-0000-0000-0000-000000000001'
+        'userId must be a valid UUID, for example 00000000-0000-0000-0000-000000000001',
       );
     }
     return value;
@@ -79,19 +81,19 @@ export class AlertsService {
 
   // --- field validators (shared by create + patch) -------------------------
 
-  private validateMetric(metric: unknown): 'health_factor' {
+  private validateMetric(metric: unknown): 'health_factor' | 'price' {
     if (typeof metric !== 'string' || !SUPPORTED_METRICS.has(metric)) {
       throw new BadRequestException(
-        `Unsupported metric. Only 'health_factor' is supported today.`
+        `Unsupported metric. Supported today: 'health_factor', 'price'.`,
       );
     }
-    return metric as 'health_factor';
+    return metric as 'health_factor' | 'price';
   }
 
   private validateOperator(operator: unknown): 'lt' | 'lte' | 'gt' | 'gte' {
     if (typeof operator !== 'string' || !OPERATORS.has(operator)) {
       throw new BadRequestException(
-        `operator must be one of: lt, lte, gt, gte.`
+        `operator must be one of: lt, lte, gt, gte.`,
       );
     }
     return operator as 'lt' | 'lte' | 'gt' | 'gte';
@@ -103,7 +105,7 @@ export class AlertsService {
   private validateThreshold(threshold: unknown): number {
     if (typeof threshold !== 'number' || !Number.isFinite(threshold)) {
       throw new BadRequestException(
-        'threshold is required and must be a finite number (recommended HF band ~1.1–1.5).'
+        'threshold is required and must be a finite number (recommended HF band ~1.1–1.5).',
       );
     }
     return threshold;
@@ -116,7 +118,7 @@ export class AlertsService {
       cooldownSeconds <= 0
     ) {
       throw new BadRequestException(
-        'cooldownSeconds must be a positive integer.'
+        'cooldownSeconds must be a positive integer.',
       );
     }
     return cooldownSeconds;
@@ -124,9 +126,13 @@ export class AlertsService {
 
   private validateHysteresis(rearmHysteresis: unknown): number | null {
     if (rearmHysteresis === null || rearmHysteresis === undefined) return null;
-    if (typeof rearmHysteresis !== 'number' || !Number.isFinite(rearmHysteresis) || rearmHysteresis < 0) {
+    if (
+      typeof rearmHysteresis !== 'number' ||
+      !Number.isFinite(rearmHysteresis) ||
+      rearmHysteresis < 0
+    ) {
       throw new BadRequestException(
-        'rearmHysteresis must be a non-negative number or null.'
+        'rearmHysteresis must be a non-negative number or null.',
       );
     }
     return rearmHysteresis;
@@ -151,17 +157,43 @@ export class AlertsService {
   // Reject a rule that scopes to a wallet the user does not own.
   private async assertWalletOwned(
     userId: string,
-    walletId: string
+    walletId: string,
   ): Promise<void> {
     const owned = await this.alerts.walletBelongsToUser(userId, walletId);
     if (!owned) {
       throw new BadRequestException(
-        'userWalletId does not belong to this user.'
+        'userWalletId does not belong to this user.',
       );
     }
   }
 
   // --- CRUD ----------------------------------------------------------------
+
+  // Family invariants (Lot N): a price rule's subject is an asset, never a
+  // wallet/pool; a health-factor rule's subjects are wallet/pool, never an asset.
+  private assertFamilyShape(input: {
+    metric: 'health_factor' | 'price';
+    userWalletId: string | null;
+    poolEntityId: string | null;
+    assetId: string | null;
+  }): void {
+    if (input.metric === 'price') {
+      if (input.assetId === null) {
+        throw new BadRequestException('a price rule requires assetId.');
+      }
+      if (input.userWalletId !== null || input.poolEntityId !== null) {
+        throw new BadRequestException(
+          'a price rule is asset-scoped: userWalletId and poolEntityId must be null.',
+        );
+      }
+      return;
+    }
+    if (input.assetId !== null) {
+      throw new BadRequestException(
+        'assetId only applies to price rules; must be null for health_factor.',
+      );
+    }
+  }
 
   async createRule(rawUserId: string | undefined, body: CreateAlertRuleBody) {
     const userId = this.normalizeUserId(rawUserId ?? body?.userId);
@@ -178,8 +210,11 @@ export class AlertsService {
       rearmHysteresis: this.validateHysteresis(b.rearmHysteresis),
       userWalletId: this.validateOptionalUuid(b.userWalletId, 'userWalletId'),
       poolEntityId: this.validateOptionalUuid(b.poolEntityId, 'poolEntityId'),
+      assetId: this.validateOptionalUuid(b.assetId, 'assetId'),
       enabled: b.enabled === undefined ? true : this.validateEnabled(b.enabled),
     };
+
+    this.assertFamilyShape(input);
 
     if (input.userWalletId !== null) {
       await this.assertWalletOwned(userId, input.userWalletId);
@@ -191,6 +226,14 @@ export class AlertsService {
   async listRules(rawUserId?: string) {
     const userId = this.normalizeUserId(rawUserId);
     return this.alerts.listRules(userId);
+  }
+
+  // Lot N — the vetted asset list for price rules: every asset the pipeline
+  // actually prices (recent asset_prices row), with its latest observation so
+  // the modal can show current price + freshness. Not user-scoped (market data).
+  async listPricedAssets() {
+    const assets = await this.alerts.listPricedAssets();
+    return { count: assets.length, assets };
   }
 
   async getRule(rawUserId: string | undefined, id: string): Promise<AlertRule> {
@@ -206,7 +249,7 @@ export class AlertsService {
   async updateRule(
     rawUserId: string | undefined,
     id: string,
-    body: UpdateAlertRuleBody
+    body: UpdateAlertRuleBody,
   ): Promise<AlertRule> {
     const userId = this.normalizeUserId(rawUserId ?? body?.userId);
     const ruleId = this.normalizeRuleId(id);
@@ -214,19 +257,59 @@ export class AlertsService {
 
     // Only validate + write the keys actually present (explicit null is honored
     // for the nullable columns, e.g. clearing user_wallet_id back to "all").
+    // Lot N: metric (the family) is immutable after creation — switching family
+    // would orphan the rule's edge state and invalidate its subject columns.
     const patch: UpdateRuleInput = {};
-    if (has(b, 'metric')) patch.metric = this.validateMetric(b.metric);
+    if (has(b, 'metric')) {
+      throw new BadRequestException(
+        'metric cannot be changed after creation; delete the rule and create a new one.',
+      );
+    }
     if (has(b, 'operator')) patch.operator = this.validateOperator(b.operator);
-    if (has(b, 'threshold')) patch.threshold = this.validateThreshold(b.threshold);
+    if (has(b, 'threshold'))
+      patch.threshold = this.validateThreshold(b.threshold);
     if (has(b, 'cooldownSeconds'))
       patch.cooldownSeconds = this.validateCooldown(b.cooldownSeconds);
     if (has(b, 'rearmHysteresis'))
       patch.rearmHysteresis = this.validateHysteresis(b.rearmHysteresis);
     if (has(b, 'userWalletId'))
-      patch.userWalletId = this.validateOptionalUuid(b.userWalletId, 'userWalletId');
+      patch.userWalletId = this.validateOptionalUuid(
+        b.userWalletId,
+        'userWalletId',
+      );
     if (has(b, 'poolEntityId'))
-      patch.poolEntityId = this.validateOptionalUuid(b.poolEntityId, 'poolEntityId');
+      patch.poolEntityId = this.validateOptionalUuid(
+        b.poolEntityId,
+        'poolEntityId',
+      );
+    if (has(b, 'assetId'))
+      patch.assetId = this.validateOptionalUuid(b.assetId, 'assetId');
     if (has(b, 'enabled')) patch.enabled = this.validateEnabled(b.enabled);
+
+    // A patched subject must keep the rule's family shape valid — merge with the
+    // current (ownership-scoped) row and re-check the invariants.
+    if (
+      patch.userWalletId !== undefined ||
+      patch.poolEntityId !== undefined ||
+      patch.assetId !== undefined
+    ) {
+      const current = await this.alerts.getRule(userId, ruleId);
+      if (!current) {
+        throw new NotFoundException('Alert rule not found.');
+      }
+      this.assertFamilyShape({
+        metric: current.metric,
+        userWalletId:
+          patch.userWalletId !== undefined
+            ? patch.userWalletId
+            : current.userWalletId,
+        poolEntityId:
+          patch.poolEntityId !== undefined
+            ? patch.poolEntityId
+            : current.poolEntityId,
+        assetId: patch.assetId !== undefined ? patch.assetId : current.assetId,
+      });
+    }
 
     if (patch.userWalletId !== undefined && patch.userWalletId !== null) {
       await this.assertWalletOwned(userId, patch.userWalletId);
@@ -273,7 +356,7 @@ export class AlertsService {
 
   async listNotifications(
     rawUserId: string | undefined,
-    query: { limit?: number; before?: string } = {}
+    query: { limit?: number; before?: string } = {},
   ) {
     const userId = this.normalizeUserId(rawUserId);
     const before = this.normalizeBefore(query.before);

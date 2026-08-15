@@ -88,3 +88,38 @@ create index if not exists notifications_user_created_idx
 -- Unread badge / "what's new" query → partial index on unread:
 create index if not exists notifications_user_unread_idx
   on notifications (user_id) where read_at is null;
+
+-- =========================================================
+-- Lot N (N1) — PRICE family: metric widening + asset subject + generic edge state
+-- =========================================================
+-- Additive + idempotent (drop-if-exists then recreate for the CHECK). Applied
+-- with `psql -f` on top of the tables above.
+
+-- 4a. Widen the metric family list. The inline CHECK on alert_rules.metric got
+-- the auto-generated name alert_rules_metric_check.
+alter table alert_rules drop constraint if exists alert_rules_metric_check;
+alter table alert_rules add constraint alert_rules_metric_check
+  check (metric in ('health_factor', 'price'));
+
+-- 4b. Price rules reference an asset (assets.id, stellar_v1.sql). Plain typed
+-- uuid, no FK — same convention as pool_entity_id (see header note). NULL for
+-- every non-price family.
+alter table alert_rules add column if not exists asset_id uuid;
+
+-- ---------------------------------------------------------
+-- 5. alert_rule_subject_state — edge state for wallet-less families
+-- ---------------------------------------------------------
+-- alert_rule_state's PK requires a NOT NULL user_wallet_id (with FK), which
+-- wallet-less families (price; later pool-TVL / APY) cannot key into. This is
+-- the generic sibling: one row per (rule, subject), where subject_key is the
+-- family's subject id as text (price → asset_id; pool families → entity_id).
+-- Same edge semantics as alert_rule_state (fire on crossing, resolve on return).
+create table if not exists alert_rule_subject_state (
+  rule_id            uuid not null references alert_rules(id) on delete cascade,
+  subject_key        text not null,
+  status             text not null check (status in ('ok', 'breached')),
+  last_value         numeric,
+  last_evaluated_at  timestamptz not null,
+  last_fired_at      timestamptz,
+  primary key (rule_id, subject_key)
+);

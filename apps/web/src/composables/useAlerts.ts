@@ -26,18 +26,21 @@ import { useAlertRules } from './useAlertRules'
 import { useNotifications } from './useNotifications'
 import { fetchWalletOverview } from '../api/wallets'
 import type { WalletItem } from '../types/wallet'
-import type {
-  AlertRule as BackendRule,
-  AlertOperator as BackendOperator,
-  CreateAlertRuleInput,
+import {
+  fetchPricedAssets,
+  type AlertRule as BackendRule,
+  type AlertOperator as BackendOperator,
+  type CreateAlertRuleInput,
+  type PricedAsset,
 } from '../api/alertRules'
-import type { AppNotification } from '../api/notifications'
+import type { AppNotification, NotificationLink } from '../api/notifications'
 
-export type AlertScope = 'venue' | 'wallet' | 'protocol'
+export type AlertScope = 'venue' | 'wallet' | 'protocol' | 'asset'
 export type AlertMetric =
-  | 'apy' | 'tvl' | 'util' | 'netflow' | 'price'          // venue
+  | 'apy' | 'tvl' | 'util' | 'netflow'                    // venue
   | 'balance' | 'exposure' | 'health' | 'posvalue'        // wallet
   | 'volume'                                              // protocol
+  | 'price'                                               // asset
 export type AlertOperator = 'lt' | 'gt' | 'pct'
 export type AlertSeverity = 'info' | 'warning' | 'critical'
 
@@ -64,6 +67,7 @@ export interface AlertNotification {
   metric?: AlertMetric
   created_at: string           // ISO
   acknowledged_at?: string | null
+  link?: NotificationLink      // deep-link to the notification's subject
 }
 
 export interface CreateRulePayload {
@@ -76,13 +80,14 @@ export interface CreateRulePayload {
   severity: AlertSeverity
 }
 
-// ── Scope discipline (T2-D2) ────────────────────────────────────────────────
-// The engine only evaluates the wallet health-factor family today. The builder
-// still shows the full vision (Paul's design), but non-supported combinations are
-// flagged "soon" and cannot be created, so the product never implies an alert
-// fires when the backend won't evaluate it. Expand this set as families ship.
+// ── Scope discipline (T2-D2, widened by Lot N) ──────────────────────────────
+// The engine evaluates two families today: wallet health-factor and asset
+// price (N1). The builder still shows the full vision (Paul's design), but
+// non-supported combinations are flagged "soon" and cannot be created, so the
+// product never implies an alert fires when the backend won't evaluate it.
 export const SUPPORTED_METRICS: Record<AlertScope, Set<AlertMetric>> = {
   wallet: new Set<AlertMetric>(['health']),
+  asset: new Set<AlertMetric>(['price']),
   venue: new Set<AlertMetric>([]),
   protocol: new Set<AlertMetric>([]),
 }
@@ -99,7 +104,7 @@ export const SEVERITY_STYLE: Record<AlertSeverity, { color: string; tint: string
 
 export function metricIconKey(n: { metric?: AlertMetric; category?: string }): string {
   if (n.category === 'critical' || n.metric === 'health') return 'heart'
-  if (n.metric === 'apy' || n.metric === 'volume' || n.metric === 'tvl') return 'trend'
+  if (n.metric === 'apy' || n.metric === 'volume' || n.metric === 'tvl' || n.metric === 'price') return 'trend'
   if (n.metric === 'netflow') return 'drop'
   if (n.metric === 'balance' || n.metric === 'exposure' || n.metric === 'posvalue') return 'wallet'
   return 'bell'
@@ -159,6 +164,20 @@ function severityForThreshold(threshold: number | null): AlertSeverity {
   return 'info'
 }
 
+// assets.symbol stores the Stellar-native lumen as 'native'; display it as XLM.
+export function assetDisplaySymbol(a: Pick<PricedAsset, 'symbol' | 'name' | 'assetId'>): string {
+  const s = (a.symbol ?? '').trim()
+  if (s === 'native') return 'XLM'
+  if (s) return s
+  return (a.name ?? '').trim() || `${a.assetId.slice(0, 8)}…`
+}
+
+// USD price display: >= $1 → 2 decimals, sub-dollar → 4 (matches the API copy).
+export function formatUsdPrice(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return '—'
+  return Math.abs(value) >= 1 ? `$${value.toFixed(2)}` : `$${value.toFixed(4)}`
+}
+
 /** Stateful composable used by AlertsView (+ shared with the header bell). */
 export function useAlerts() {
   const { userId } = useAppUser()
@@ -167,6 +186,7 @@ export function useAlerts() {
     load: loadRules,
     createRule: createBackendRule,
     toggleRule: toggleBackendRule,
+    deleteRule: deleteBackendRule,
   } = useAlertRules()
   const {
     notifications,
@@ -194,6 +214,22 @@ export function useAlerts() {
     return m
   })
 
+  // Priced-asset directory (Lot N): the vetted list for price rules, also used
+  // to label existing price rules by symbol.
+  const pricedAssets = ref<PricedAsset[]>([])
+  const assets = computed(() =>
+    pricedAssets.value.map((a) => ({
+      id: a.assetId,
+      label: assetDisplaySymbol(a),
+      sub: formatUsdPrice(a.priceUsd),
+    })),
+  )
+  const assetById = computed(() => {
+    const m = new Map<string, PricedAsset>()
+    for (const a of pricedAssets.value) m.set(a.assetId, a)
+    return m
+  })
+
   // scope_ref display for a rule: the wallet's label, or "All wallets" when the rule
   // spans every wallet (userWalletId === null).
   function scopeRefLabel(userWalletId: string | null): string {
@@ -203,9 +239,29 @@ export function useAlerts() {
 
   const rules = computed<AlertRule[]>(() =>
     backendRules.value.map((r: BackendRule): AlertRule => {
-      const label = scopeRefLabel(r.userWalletId)
       const threshold = r.threshold ?? 0
       const sym = BACKEND_OP_SYMBOL[r.operator]
+
+      if (r.metric === 'price') {
+        const asset = r.assetId ? assetById.value.get(r.assetId) : undefined
+        const label = asset
+          ? assetDisplaySymbol(asset)
+          : `${(r.assetId ?? '').slice(0, 8)}…`
+        return {
+          id: r.id,
+          name: `${label} · Price`,
+          scope: 'asset',
+          scope_ref: label,
+          metric: 'price',
+          operator: toViewOperator(r.operator),
+          threshold,
+          severity: 'info',
+          enabled: r.enabled,
+          condition: `price ${sym} ${formatUsdPrice(threshold)} · ${label}`,
+        }
+      }
+
+      const label = scopeRefLabel(r.userWalletId)
       return {
         id: r.id,
         name: `${label} · Health factor`,
@@ -224,16 +280,20 @@ export function useAlerts() {
   const feed = computed<AlertNotification[]>(() =>
     notifications.value.map((n: AppNotification): AlertNotification => {
       const fired = n.kind === 'alert_fired'
+      const isPrice = n.payload?.metric === 'price'
       return {
         id: n.id,
         title: n.title,
         body: n.body ?? '',
-        scope_ref: n.payload?.poolLabel ?? undefined,
-        severity: fired ? 'critical' : 'info',
-        category: fired ? 'critical' : 'activity',
-        metric: 'health',
+        scope_ref: n.payload?.poolLabel ?? n.payload?.symbol ?? undefined,
+        // Severity derived from the payload: a health-factor fire is a risk
+        // event (critical); a price crossing is informational.
+        severity: fired && !isPrice ? 'critical' : 'info',
+        category: fired && !isPrice ? 'critical' : 'activity',
+        metric: isPrice ? 'price' : 'health',
         created_at: n.createdAt,
         acknowledged_at: n.readAt,
+        link: n.payload?.link,
       }
     }),
   )
@@ -242,11 +302,22 @@ export function useAlerts() {
     loading.value = true
     error.value = null
     try {
-      await Promise.all([loadRules(), loadNotifications(), loadWallets()])
+      await Promise.all([loadRules(), loadNotifications(), loadWallets(), loadAssets()])
     } catch (e: any) {
       error.value = e?.message ?? 'Failed to load alerts'
     } finally {
       loading.value = false
+    }
+  }
+
+  async function loadAssets() {
+    try {
+      const data = await fetchPricedAssets()
+      pricedAssets.value = data.assets ?? []
+    } catch {
+      // non-fatal: price rules render with a short-id label, the modal shows
+      // an honest "no priced assets" state.
+      pricedAssets.value = []
     }
   }
 
@@ -266,11 +337,27 @@ export function useAlerts() {
   }
 
   async function createRule(payload: CreateRulePayload) {
-    // The modal only lets the supported family (wallet · health) through, but guard
-    // anyway so a future widening can't silently POST an unsupported metric.
+    // The modal only lets supported families through, but guard anyway so a
+    // future widening can't silently POST an unsupported metric.
     if (!isSupported(payload.scope, payload.metric)) {
       throw new Error('This alert type is not evaluated by the engine yet.')
     }
+
+    if (payload.scope === 'asset') {
+      // scope_ref is the asset id from the vetted priced-assets list.
+      const input: CreateAlertRuleInput = {
+        metric: 'price',
+        operator: toBackendOperator(payload.operator),
+        threshold: payload.threshold,
+        assetId: payload.scope_ref,
+        userWalletId: null,
+        poolEntityId: null,
+        enabled: true,
+      }
+      await createBackendRule(input)
+      return
+    }
+
     // scope_ref is a wallet address, or the sentinel 'all' (⇒ all wallets ⇒ null).
     const userWalletId =
       payload.scope_ref === 'all'
@@ -292,5 +379,12 @@ export function useAlerts() {
     await toggleBackendRule(rule.id, !rule.enabled)
   }
 
-  return { rules, feed, wallets, loading, error, load, createRule, toggleRule }
+  async function removeRule(rule: AlertRule) {
+    await deleteBackendRule(rule.id)
+  }
+
+  return {
+    rules, feed, wallets, assets, loading, error,
+    load, createRule, toggleRule, removeRule,
+  }
 }

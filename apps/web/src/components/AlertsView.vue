@@ -8,17 +8,35 @@ import { onMounted, onUnmounted, computed, ref, watch } from 'vue'
 import AlertRuleModal from './AlertRuleModal.vue'
 import {
   useAlerts, SEVERITY_STYLE, metricIconKey, conditionLabel, timeAgo,
-  type CreateRulePayload,
+  type AlertNotification, type AlertRule, type CreateRulePayload,
 } from '../composables/useAlerts'
 import { useNotifications } from '../composables/useNotifications'
 import { useModals } from '../composables/useModals'
+import { useView } from '../composables/useView'
 
-const { rules, feed, wallets, loading, error, load, createRule, toggleRule } = useAlerts()
+const { rules, feed, wallets, assets, loading, error, load, createRule, toggleRule, removeRule } = useAlerts()
 // Shared unread state (drives the bell + sidebar badge). "Mark all read" here
 // clears the same in-app notifications the bell surfaces.
-const { unreadCount, markAllAsRead } = useNotifications()
+const { unreadCount, markAllAsRead, markAsRead } = useNotifications()
 // Other surfaces (dashboard, pool detail) request the create-rule modal here.
 const { pendingAlert, consumeAlertRequest } = useModals()
+// Deep-links: a notification carrying a route hint navigates to its subject.
+const { setView, openPool } = useView()
+
+// Lot N: a notification with a route hint is clickable — go to its subject
+// (and mark it read on the way, same as the bell).
+function openNotification(a: AlertNotification) {
+  void markAsRead(a.id)
+  if (!a.link) return
+  if (a.link.view === 'pool' && a.link.poolId) openPool(a.link.poolId)
+  else setView(a.link.view)
+}
+
+// Delete is destructive — one native confirm is enough for the beta.
+async function onDelete(rule: AlertRule) {
+  if (!window.confirm(`Delete the rule "${rule.name}"? Its past notifications are kept.`)) return
+  await removeRule(rule)
+}
 
 const filter = ref<'all' | 'critical' | 'activity'>('all')
 const modalOpen = ref(false)
@@ -124,7 +142,10 @@ const iconFor = (n: { metric?: any; category?: string }) => ICONS[metricIconKey(
           v-for="a in filteredFeed"
           :key="a.id"
           class="flex gap-[13px] px-5 py-[15px] border-b border-[#2C2C29]"
+          :class="a.link ? 'cursor-pointer hover:bg-[#242422]' : ''"
           :style="{ background: !a.acknowledged_at ? '#242422' : '#1E1E1E' }"
+          :title="a.link ? 'Open the subject of this alert' : undefined"
+          @click="openNotification(a)"
         >
           <span
             class="w-9 h-9 flex-shrink-0 rounded-[10px] flex items-center justify-center"
@@ -192,6 +213,16 @@ const iconFor = (n: { metric?: any; category?: string }) => ICONS[metricIconKey(
                 :style="{ left: r.enabled ? '18px' : '2px' }"
               />
             </button>
+            <button
+              class="w-[26px] h-[26px] rounded-lg flex items-center justify-center cursor-pointer text-[#5E5F5D] hover:text-[#D0522E] hover:bg-[#2A2A27]"
+              aria-label="Delete rule"
+              title="Delete rule"
+              @click="onDelete(r)"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
           </div>
           <p class="text-xs text-[#5E5F5D] mt-[5px] ml-[17px]" style="font-family:'Geist Mono',monospace;">
             {{ conditionLabel(r) }}
@@ -208,6 +239,7 @@ const iconFor = (n: { metric?: any; category?: string }) => ICONS[metricIconKey(
       <AlertRuleModal
         v-if="modalOpen"
         :wallets="wallets"
+        :assets="assets"
         @close="modalOpen = false"
         @create="onCreate"
       />

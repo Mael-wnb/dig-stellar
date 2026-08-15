@@ -43,7 +43,7 @@ function toNumber(value: unknown): number | null {
 // Canonical alert_rules column list (select / RETURNING). One source of truth so
 // every read returns the same shape that mapRule() consumes.
 const RULE_COLUMNS = `
-  id, user_id, metric, user_wallet_id, pool_entity_id,
+  id, user_id, metric, user_wallet_id, pool_entity_id, asset_id,
   operator, threshold, cooldown_seconds, rearm_hysteresis,
   enabled, extra, created_at, updated_at
 `;
@@ -80,6 +80,7 @@ type AlertRuleRow = {
   metric: string;
   user_wallet_id: string | null;
   pool_entity_id: string | null;
+  asset_id: string | null;
   operator: string;
   threshold: unknown;
   cooldown_seconds: number;
@@ -127,9 +128,10 @@ export type LatestPoolHealth = {
 export type AlertRule = {
   id: string;
   userId: string;
-  metric: 'health_factor';
-  userWalletId: string | null; // null = all wallets
-  poolEntityId: string | null; // null = all pools
+  metric: 'health_factor' | 'price';
+  userWalletId: string | null; // null = all wallets (health_factor family)
+  poolEntityId: string | null; // null = all pools (health_factor family)
+  assetId: string | null; // price family subject; null for other families
   operator: 'lt' | 'lte' | 'gt' | 'gte';
   threshold: number | null;
   cooldownSeconds: number;
@@ -152,13 +154,14 @@ export type AlertRuleState = {
 
 // Fully-normalized create input (the service validates/defaults before calling).
 export type CreateRuleInput = {
-  metric: 'health_factor';
+  metric: 'health_factor' | 'price';
   operator: 'lt' | 'lte' | 'gt' | 'gte';
   threshold: number;
   cooldownSeconds: number;
   rearmHysteresis: number | null;
   userWalletId: string | null;
   poolEntityId: string | null;
+  assetId: string | null;
   enabled: boolean;
 };
 
@@ -189,6 +192,48 @@ export type PoolLabel = {
   name: string;
   venueLabel: string | null;
 };
+
+// Lot N — generic edge state for wallet-less families (price; later pool
+// families). subject_key is the family's subject id as text (price → asset_id).
+export type AlertSubjectState = {
+  ruleId: string;
+  subjectKey: string;
+  status: 'ok' | 'breached';
+  lastValue: number | null;
+  lastEvaluatedAt: unknown;
+  lastFiredAt: unknown;
+};
+
+type AlertSubjectStateRow = {
+  rule_id: string;
+  subject_key: string;
+  status: string;
+  last_value: unknown;
+  last_evaluated_at: unknown;
+  last_fired_at: unknown;
+};
+
+// Latest observed USD price for one asset (asset_prices ⋈ assets).
+export type LatestAssetPrice = {
+  assetId: string;
+  symbol: string | null;
+  name: string | null;
+  priceUsd: number | null;
+  observedAt: unknown;
+};
+
+type LatestAssetPriceRow = {
+  asset_id: string;
+  symbol: string | null;
+  name: string | null;
+  price_usd: unknown;
+  observed_at: unknown;
+};
+
+// Only assets priced recently count as "tracked" — an asset whose newest price
+// is older than this is no longer on the refresh path and must not be offered
+// for new price rules (honesty rule: creatable IFF the evaluator has data).
+const PRICED_ASSET_MAX_AGE = '7 days';
 
 @Injectable()
 export class AlertsRepository {
@@ -256,11 +301,11 @@ export class AlertsRepository {
     const rows = (await this.prisma.$queryRawUnsafe(
       `
       insert into alert_rules (
-        user_id, metric, user_wallet_id, pool_entity_id,
+        user_id, metric, user_wallet_id, pool_entity_id, asset_id,
         operator, threshold, cooldown_seconds, rearm_hysteresis, enabled
       ) values (
-        $1::uuid, $2, $3::uuid, $4::uuid,
-        $5, $6, $7, $8, $9
+        $1::uuid, $2, $3::uuid, $4::uuid, $5::uuid,
+        $6, $7, $8, $9, $10
       )
       returning ${RULE_COLUMNS}
       `,
@@ -268,6 +313,7 @@ export class AlertsRepository {
       input.metric,
       input.userWalletId,
       input.poolEntityId,
+      input.assetId,
       input.operator,
       input.threshold,
       input.cooldownSeconds,
@@ -338,6 +384,7 @@ export class AlertsRepository {
       add('user_wallet_id', patch.userWalletId, '::uuid');
     if (patch.poolEntityId !== undefined)
       add('pool_entity_id', patch.poolEntityId, '::uuid');
+    if (patch.assetId !== undefined) add('asset_id', patch.assetId, '::uuid');
     if (patch.enabled !== undefined) add('enabled', patch.enabled);
 
     // No-op patch → return the current (still ownership-scoped) row.
@@ -524,6 +571,120 @@ export class AlertsRepository {
   }
 
   // -------------------------------------------------------------------------
+  // Lot N — price family reads/writes
+  // -------------------------------------------------------------------------
+
+  // Latest price per asset for the evaluator (one query for the whole sweep).
+  // DISTINCT ON picks the newest observation across sources.
+  async latestPricesByAsset(
+    assetIds: string[]
+  ): Promise<Map<string, LatestAssetPrice>> {
+    const ids = Array.from(new Set(assetIds.filter(Boolean)));
+    if (ids.length === 0) return new Map();
+
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `
+      select distinct on (ap.asset_id)
+        ap.asset_id, a.symbol, a.name, ap.price_usd, ap.observed_at
+      from asset_prices ap
+      join assets a on a.id = ap.asset_id
+      where ap.asset_id = any($1::uuid[])
+      order by ap.asset_id, ap.observed_at desc
+      `,
+      ids
+    )) as LatestAssetPriceRow[];
+
+    const map = new Map<string, LatestAssetPrice>();
+    for (const row of rows) {
+      map.set(row.asset_id, this.mapAssetPrice(row));
+    }
+    return map;
+  }
+
+  // The vetted asset list for the rule modal: every asset with a recent price
+  // (see PRICED_ASSET_MAX_AGE), latest observation each, ordered by symbol.
+  async listPricedAssets(): Promise<LatestAssetPrice[]> {
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `
+      select * from (
+        select distinct on (ap.asset_id)
+          ap.asset_id, a.symbol, a.name, ap.price_usd, ap.observed_at
+        from asset_prices ap
+        join assets a on a.id = ap.asset_id
+        where ap.observed_at > now() - interval '${PRICED_ASSET_MAX_AGE}'
+        order by ap.asset_id, ap.observed_at desc
+      ) priced
+      order by lower(coalesce(priced.symbol, priced.name, ''))
+      `
+    )) as LatestAssetPriceRow[];
+
+    return rows.map((row) => this.mapAssetPrice(row));
+  }
+
+  // Current subject-state rows for one rule. Returns [] before first evaluation.
+  async getSubjectState(ruleId: string): Promise<AlertSubjectState[]> {
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `
+      select rule_id, subject_key, status, last_value, last_evaluated_at, last_fired_at
+      from alert_rule_subject_state
+      where rule_id = $1::uuid
+      `,
+      ruleId
+    )) as AlertSubjectStateRow[];
+
+    return rows.map((row) => ({
+      ruleId: row.rule_id,
+      subjectKey: row.subject_key,
+      status: row.status as AlertSubjectState['status'],
+      lastValue: toNumber(row.last_value),
+      lastEvaluatedAt: row.last_evaluated_at,
+      lastFiredAt: row.last_fired_at,
+    }));
+  }
+
+  // Upsert one (rule, subject) evaluation outcome — same last_fired_at coalesce
+  // semantics as upsertRuleState.
+  async upsertSubjectState(params: {
+    ruleId: string;
+    subjectKey: string;
+    status: 'ok' | 'breached';
+    lastValue: number | null;
+    lastEvaluatedAt: string; // ISO timestamp
+    lastFiredAt: string | null; // ISO timestamp, or null to keep prior
+  }): Promise<void> {
+    await this.prisma.$executeRawUnsafe(
+      `
+      insert into alert_rule_subject_state (
+        rule_id, subject_key, status, last_value, last_evaluated_at, last_fired_at
+      ) values (
+        $1::uuid, $2, $3, $4, $5::timestamptz, $6::timestamptz
+      )
+      on conflict (rule_id, subject_key) do update set
+        status            = excluded.status,
+        last_value        = excluded.last_value,
+        last_evaluated_at = excluded.last_evaluated_at,
+        last_fired_at     = coalesce(excluded.last_fired_at, alert_rule_subject_state.last_fired_at)
+      `,
+      params.ruleId,
+      params.subjectKey,
+      params.status,
+      params.lastValue,
+      params.lastEvaluatedAt,
+      params.lastFiredAt
+    );
+  }
+
+  private mapAssetPrice(row: LatestAssetPriceRow): LatestAssetPrice {
+    return {
+      assetId: row.asset_id,
+      symbol: row.symbol,
+      name: row.name,
+      priceUsd: toNumber(row.price_usd),
+      observedAt: row.observed_at,
+    };
+  }
+
+  // -------------------------------------------------------------------------
   // Notifications read API (lot 4). Same ownership invariant: every read and the
   // mark-read mutation filter on user_id.
   // -------------------------------------------------------------------------
@@ -650,6 +811,7 @@ export class AlertsRepository {
       metric: row.metric as AlertRule['metric'],
       userWalletId: row.user_wallet_id,
       poolEntityId: row.pool_entity_id,
+      assetId: row.asset_id,
       operator: row.operator as AlertRule['operator'],
       threshold: toNumber(row.threshold),
       cooldownSeconds: row.cooldown_seconds,

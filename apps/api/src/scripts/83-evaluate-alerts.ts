@@ -6,16 +6,26 @@
 // so a cross-package indexer script would have to duplicate the SQL. Invoked by
 // the indexer orchestrator (script 82) AFTER the wallet-health sweep (script 81).
 //
-// Flow: load enabled rules + the latest-per-(wallet,pool) health snapshots, match
-// each rule to its in-scope rows, run the pure state machine, persist next state,
-// and append a notification on every fire/resolve edge. Per-rule try/catch so one
-// bad rule can't abort the sweep. No clock magic — a single `now` is injected into
-// every evaluate() call.
+// Flow: load enabled rules, PARTITION THEM BY FAMILY (Lot N — a price rule must
+// never enter the health-factor evaluator and vice versa), then per family:
+// match each rule to its in-scope subjects, run the pure state machine, persist
+// next state, and append a notification on every fire/resolve edge. Per-rule
+// try/catch so one bad rule can't abort the sweep. No clock magic — a single
+// `now` is injected into every evaluate() call.
 
 import 'dotenv/config';
 import { PrismaService } from '../db/prisma.service';
-import { AlertsRepository, type AlertRuleState } from '../modules/alerts/alerts.repository';
+import {
+  AlertsRepository,
+  type AlertRuleState,
+} from '../modules/alerts/alerts.repository';
 import { evaluate } from '../modules/alerts/evaluate';
+import {
+  buildPriceCopy,
+  displaySymbol,
+  formatAsOf,
+  partitionRulesByFamily,
+} from '../modules/alerts/families';
 
 const OPERATOR_SYMBOL: Record<string, string> = {
   lt: '<',
@@ -58,16 +68,29 @@ async function main() {
     // Fixed" — the venue/protocol prefix is derived (not hard-coded), so it stays
     // correct for future non-Blend venues.
     const poolLabels = await repo.getPoolLabels(
-      latest.map((row) => row.poolEntityId)
+      latest.map((row) => row.poolEntityId),
     );
     const formatPoolLabel = (entityId: string): string => {
       const parts = poolLabels.get(entityId);
       // Degenerate case: no entity row at all -> short id, no prefix.
       if (!parts) return `pool ${entityId.slice(0, 8)}`;
-      return parts.venueLabel ? `${parts.venueLabel} ${parts.name}` : parts.name;
+      return parts.venueLabel
+        ? `${parts.venueLabel} ${parts.name}`
+        : parts.name;
     };
 
-    for (const rule of rules) {
+    // Family dispatch (Lot N). Unknown metrics (DB ahead of the code) are
+    // skipped loudly — never evaluated against the wrong family's data.
+    const families = partitionRulesByFamily(rules);
+    if (families.unknown.length > 0) {
+      console.warn(
+        `[evaluate-alerts] skipping ${families.unknown.length} rule(s) with no evaluator: ` +
+          families.unknown.map((r) => `${r.id} (${r.metric})`).join(', '),
+      );
+    }
+
+    // ── Family 1: health_factor — rules matched against wallet-pool health rows.
+    for (const rule of families.healthFactor) {
       rulesEvaluated += 1;
       try {
         // In-scope rows: same user, and wallet/pool either unconstrained (NULL =
@@ -78,12 +101,12 @@ async function main() {
             (rule.userWalletId === null ||
               row.userWalletId === rule.userWalletId) &&
             (rule.poolEntityId === null ||
-              row.poolEntityId === rule.poolEntityId)
+              row.poolEntityId === rule.poolEntityId),
         );
 
         const priorState = await repo.getRuleState(rule.id);
         const stateMap = new Map<string, AlertRuleState>(
-          priorState.map((s) => [stateKey(s.userWalletId, s.poolEntityId), s])
+          priorState.map((s) => [stateKey(s.userWalletId, s.poolEntityId), s]),
         );
 
         for (const row of matched) {
@@ -122,6 +145,11 @@ async function main() {
             const directionWord = lowIsBad ? 'dropped to' : 'rose to';
             const hf3 =
               row.healthFactor !== null ? row.healthFactor.toFixed(3) : 'n/a';
+            // Honesty rule (Lot N): copy carries the observation's as_of.
+            const asOfIso = toIso(row.snapshotAt);
+            const asOfSuffix = asOfIso
+              ? ` — as of ${formatAsOf(new Date(asOfIso), now)}`
+              : '';
 
             const payload = {
               walletId: row.userWalletId,
@@ -131,6 +159,10 @@ async function main() {
               value: row.healthFactor, // full precision (machine-grade)
               threshold: rule.threshold,
               operator: rule.operator,
+              asOf: asOfIso,
+              // Route hint for the web feed (new notifications only): the
+              // subject of a wallet-health alert lives on the portfolio view.
+              link: { view: 'portfolio' },
             };
 
             const title =
@@ -139,8 +171,8 @@ async function main() {
                 : `Health factor recovered: ${poolLabel}`;
             const body =
               out.emit === 'alert_fired'
-                ? `${poolLabel} health factor ${directionWord} ${hf3} (alert threshold ${opSym} ${rule.threshold}).`
-                : `${poolLabel} health factor back to ${hf3}.`;
+                ? `${poolLabel} health factor ${directionWord} ${hf3} (alert threshold ${opSym} ${rule.threshold})${asOfSuffix}.`
+                : `${poolLabel} health factor back to ${hf3}${asOfSuffix}.`;
 
             await repo.insertNotification({
               userId: rule.userId,
@@ -157,6 +189,99 @@ async function main() {
         }
       } catch (error) {
         // One bad rule must not abort the whole sweep.
+        console.error(`[evaluate-alerts] rule ${rule.id} failed`);
+        console.error(error);
+      }
+    }
+
+    // ── Family 2: price — one subject per rule (its asset), edge state in
+    // alert_rule_subject_state. Latest prices loaded once for the whole family.
+    const priceMap = await repo.latestPricesByAsset(
+      families.price
+        .map((r) => r.assetId)
+        .filter((id): id is string => id !== null),
+    );
+
+    for (const rule of families.price) {
+      rulesEvaluated += 1;
+      try {
+        // Shape is service-enforced; skip defensively rather than mis-evaluate.
+        if (rule.assetId === null || rule.threshold === null) continue;
+
+        const px = priceMap.get(rule.assetId);
+        if (!px || px.priceUsd === null) {
+          // No observed price → neither fire nor resolve; state untouched.
+          console.warn(
+            `[evaluate-alerts] price rule ${rule.id}: no recent price for asset ${rule.assetId} — skipped`,
+          );
+          continue;
+        }
+        rowsMatched += 1;
+
+        const subjectStates = await repo.getSubjectState(rule.id);
+        const prevSubject =
+          subjectStates.find((s) => s.subjectKey === rule.assetId) ?? null;
+        // Adapt to the evaluator's prev shape — identity fields are unused here
+        // (the subject key is authoritative at persist time, like wallet/pool
+        // for the health family).
+        const prev: AlertRuleState | null = prevSubject
+          ? {
+              ruleId: prevSubject.ruleId,
+              userWalletId: '',
+              poolEntityId: '',
+              status: prevSubject.status,
+              lastValue: prevSubject.lastValue,
+              lastEvaluatedAt: prevSubject.lastEvaluatedAt,
+              lastFiredAt: prevSubject.lastFiredAt,
+            }
+          : null;
+
+        const out = evaluate({ rule, current: px.priceUsd, prev, now });
+
+        await repo.upsertSubjectState({
+          ruleId: rule.id,
+          subjectKey: rule.assetId,
+          status: out.nextStatus,
+          lastValue: out.nextState.lastValue,
+          lastEvaluatedAt: now.toISOString(),
+          lastFiredAt: toIso(out.nextState.lastFiredAt),
+        });
+
+        if (out.emit !== null) {
+          const symbol = displaySymbol(px.symbol, px.name, px.assetId);
+          const asOfIso = toIso(px.observedAt);
+          const copy = buildPriceCopy({
+            emit: out.emit,
+            symbol,
+            operator: rule.operator,
+            threshold: rule.threshold,
+            value: px.priceUsd,
+            asOf: asOfIso ? new Date(asOfIso) : now,
+            now,
+          });
+
+          await repo.insertNotification({
+            userId: rule.userId,
+            ruleId: rule.id,
+            kind: out.emit,
+            title: copy.title,
+            body: copy.body,
+            payload: {
+              assetId: rule.assetId,
+              symbol,
+              metric: rule.metric,
+              value: px.priceUsd, // full precision (machine-grade)
+              threshold: rule.threshold,
+              operator: rule.operator,
+              asOf: asOfIso,
+              // No route hint: assets have no page of their own (honest).
+            },
+          });
+
+          if (out.emit === 'alert_fired') fired += 1;
+          else resolved += 1;
+        }
+      } catch (error) {
         console.error(`[evaluate-alerts] rule ${rule.id} failed`);
         console.error(error);
       }

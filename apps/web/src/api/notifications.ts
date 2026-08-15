@@ -13,15 +13,26 @@ import { apiFetch } from './client'
 export type NotificationKind = 'alert_fired' | 'alert_resolved'
 
 // Machine-grade payload baked at fire time (poolLabel is the human label, e.g.
-// "Blend Fixed"; value keeps full HF precision).
+// "Blend Fixed"; value keeps full precision). Lot N additions: price-family
+// fields (assetId/symbol), the observation's asOf, and an optional route hint
+// the feed uses to deep-link the notification to its subject.
+export interface NotificationLink {
+  view: 'dashboard' | 'protocols' | 'pool' | 'portfolio' | 'alerts'
+  poolId?: string
+}
+
 export interface NotificationPayload {
   walletId?: string
   poolEntityId?: string
   poolLabel?: string
+  assetId?: string
+  symbol?: string
   metric?: string
   value?: number | null
   threshold?: number | null
   operator?: string
+  asOf?: string | null
+  link?: NotificationLink
 }
 
 // Matches the back DTO (mapNotification): title/body are already human-readable.

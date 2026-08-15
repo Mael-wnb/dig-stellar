@@ -12,13 +12,17 @@ import { apiFetch } from './client'
 
 export type AlertOperator = 'lt' | 'lte' | 'gt' | 'gte'
 
+// Lot N: two evaluated families — wallet health-factor and asset price.
+export type AlertRuleMetric = 'health_factor' | 'price'
+
 // Matches the back DTO (mapRule).
 export interface AlertRule {
   id: string
   userId: string
-  metric: 'health_factor'
-  userWalletId: string | null // null = all wallets
-  poolEntityId: string | null // null = all pools
+  metric: AlertRuleMetric
+  userWalletId: string | null // null = all wallets (health_factor family)
+  poolEntityId: string | null // null = all pools (health_factor family)
+  assetId: string | null // price family subject
   operator: AlertOperator
   threshold: number | null
   cooldownSeconds: number
@@ -30,14 +34,34 @@ export interface AlertRule {
 }
 
 export interface CreateAlertRuleInput {
-  metric: 'health_factor'
+  metric: AlertRuleMetric
   operator: AlertOperator
   threshold: number
   userWalletId?: string | null
   poolEntityId?: string | null
+  assetId?: string | null
   cooldownSeconds?: number
   rearmHysteresis?: number | null
   enabled?: boolean
+}
+
+// GET /v1/alert-rules/priced-assets — the vetted list for price rules (assets
+// the pipeline actually prices, with the latest observation for freshness).
+export interface PricedAsset {
+  assetId: string
+  symbol: string | null
+  name: string | null
+  priceUsd: number | null
+  observedAt: string
+}
+
+export async function fetchPricedAssets(): Promise<{
+  count: number
+  assets: PricedAsset[]
+}> {
+  return apiFetch<{ count: number; assets: PricedAsset[] }>(
+    '/alert-rules/priced-assets'
+  )
 }
 
 export type UpdateAlertRuleInput = Partial<CreateAlertRuleInput>

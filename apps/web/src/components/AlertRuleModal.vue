@@ -17,25 +17,32 @@ import {
 
 const emit = defineEmits<{ (e: 'close'): void; (e: 'create', payload: CreateRulePayload): void }>()
 
-// Wallet targets normally come from the wallet store; fall back to a sample if not passed.
+// Wallet targets normally come from the wallet store; fall back to a sample if
+// not passed. Asset targets (Lot N, price rules) come from the vetted
+// priced-assets list — NO fallback sample: no priced assets ⇒ honest empty state.
 const props = withDefaults(defineProps<{
   wallets?: Array<{ address: string; label: string }>
-}>(), { wallets: () => [] })
+  assets?: Array<{ id: string; label: string; sub: string }>
+}>(), { wallets: () => [], assets: () => [] })
 
-// ── Definitions (faithful to Paul's builder) ────────────────────────────────
+// ── Definitions (faithful to Paul's builder; Lot N adds the Asset scope) ────
 const SCOPES: Array<{ key: AlertScope; label: string; sub: string; icon: string[] }> = [
   { key: 'venue', label: 'Pool / venue', sub: 'A specific market', icon: ['M12 2 2 7l10 5 10-5-10-5z', 'M2 17l10 5 10-5', 'M2 12l10 5 10-5'] },
   { key: 'wallet', label: 'Wallet', sub: 'Balance & exposure', icon: ['M3 7h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11', 'M16 13h.01'] },
+  { key: 'asset', label: 'Asset', sub: 'Market price', icon: ['M12 1v22', 'M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'] },
   { key: 'protocol', label: 'Protocol', sub: 'Whole venue', icon: ['M3 3h7v7H3z', 'M14 3h7v7h-7z', 'M14 14h7v7h-7z', 'M3 14h7v7H3z'] },
 ]
 
+// 'price' moved from the venue scope to the asset scope (Lot N): the evaluator
+// prices assets, not venues — a venue-price family will never exist.
 const METRICS_BY_SCOPE: Record<AlertScope, Array<[AlertMetric, string]>> = {
-  venue: [['apy', 'APY'], ['tvl', 'TVL delta'], ['util', 'Utilization'], ['netflow', 'Netflow'], ['price', 'Price']],
+  venue: [['apy', 'APY'], ['tvl', 'TVL delta'], ['util', 'Utilization'], ['netflow', 'Netflow']],
   wallet: [['balance', 'Balance change'], ['exposure', 'Net exposure'], ['health', 'Health factor'], ['posvalue', 'Position value']],
+  asset: [['price', 'Price']],
   protocol: [['tvl', 'TVL delta'], ['volume', 'Volume spike'], ['netflow', 'Netflow'], ['health', 'Protocol health']],
 }
 
-const SCOPE_NOUN: Record<AlertScope, string> = { venue: 'pool', wallet: 'wallet', protocol: 'protocol' }
+const SCOPE_NOUN: Record<AlertScope, string> = { venue: 'pool', wallet: 'wallet', asset: 'asset', protocol: 'protocol' }
 
 const METRIC_LABEL: Record<AlertMetric, string> = {
   apy: 'APY', health: 'Health factor', netflow: '1h netflow', tvl: 'TVL', util: 'Utilization',
@@ -69,6 +76,12 @@ function targetsFor(scope: AlertScope): Array<{ id: string; label: string; sub: 
     }))
     return [...w, { id: 'all', label: 'All wallets', sub: 'Consolidated', tint: '#2E3A14', color: '#D5FF2F' }]
   }
+  if (scope === 'asset') {
+    // Vetted list only — the assets the pricing pipeline actually tracks.
+    return props.assets.map(a => ({
+      id: a.id, label: a.label, sub: a.sub, tint: '#2E3A14', color: '#D5FF2F',
+    }))
+  }
   if (scope === 'protocol') {
     return [
       { id: 'blend', label: 'Blend', sub: 'Lending', tint: '#17233A', color: '#2E6FD6' },
@@ -84,7 +97,7 @@ function targetsFor(scope: AlertScope): Array<{ id: string; label: string; sub: 
   ]
 }
 
-// ── State (default to the one creatable family: wallet · health) ────────────
+// ── State (default to the wallet · health family) ───────────────────────────
 const scope = ref<AlertScope>('wallet')
 const targetId = ref<string>(targetsFor('wallet')[0].id)
 const metric = ref<AlertMetric>('health')
@@ -92,13 +105,20 @@ const operator = ref<AlertOperator>('lt')
 const threshold = ref<string>('1.25')
 const severity = ref<AlertSeverity>('warning')
 
+// Sensible starting threshold per family (the user always edits it).
+const DEFAULT_THRESHOLD: Partial<Record<AlertMetric, string>> = { health: '1.25' }
+
 function pickScope(s: AlertScope) {
   scope.value = s
-  targetId.value = targetsFor(s)[0].id
+  // A scope can have zero targets (e.g. no priced assets yet) — keep an empty
+  // selection; canCreate stays false and the template shows the honest note.
+  targetId.value = targetsFor(s)[0]?.id ?? ''
   // prefer a supported metric if one exists in this scope, else the first
   const metrics = METRICS_BY_SCOPE[s]
   const supported = metrics.find(([m]) => isSupported(s, m))
   metric.value = (supported ?? metrics[0])[0]
+  operator.value = 'lt'
+  threshold.value = DEFAULT_THRESHOLD[metric.value] ?? ''
 }
 
 const targets = computed(() => targetsFor(scope.value))
@@ -108,14 +128,24 @@ const selectedTarget = computed(() => targets.value.find(t => t.id === targetId.
 const selectedMetricLabel = computed(() => METRIC_LABEL[metric.value])
 const unit = computed(() => (operator.value === 'pct' ? '%' : UNIT[metric.value]))
 const supported = computed(() => isSupported(scope.value, metric.value))
-const canCreate = computed(() => supported.value && threshold.value.trim() !== '' && !Number.isNaN(Number(threshold.value)))
+// For a creatable family only the operators the backend evaluates are offered
+// ('pct' has no backend equivalent — showing it would silently create 'lt').
+const operators = computed<Array<[AlertOperator, string]>>(() =>
+  supported.value ? OPERATORS.filter(([op]) => op !== 'pct') : OPERATORS,
+)
+const canCreate = computed(() =>
+  supported.value &&
+  selectedTarget.value !== undefined &&
+  threshold.value.trim() !== '' &&
+  !Number.isNaN(Number(threshold.value)),
+)
 
 function submit() {
-  if (!canCreate.value) return
+  if (!canCreate.value || !selectedTarget.value) return
   emit('create', {
     name: `${selectedTarget.value.label} · ${selectedMetricLabel.value}`,
     scope: scope.value,
-    scope_ref: targetId.value,
+    scope_ref: selectedTarget.value.id,
     metric: metric.value,
     operator: operator.value,
     threshold: Number(threshold.value),
@@ -153,7 +183,7 @@ function submit() {
 
         <!-- 1 · What to watch -->
         <p class="text-xs font-semibold text-[#5E5F5D] mb-[9px]">1 · What to watch</p>
-        <div class="grid grid-cols-3 gap-[9px] mb-5">
+        <div class="grid grid-cols-4 gap-[9px] mb-5">
           <button
             v-for="sc in SCOPES"
             :key="sc.key"
@@ -174,7 +204,10 @@ function submit() {
 
         <!-- 2 · Which target -->
         <p class="text-xs font-semibold text-[#5E5F5D] mb-[9px] capitalize">2 · Which {{ scopeNoun }}</p>
-        <div class="grid grid-cols-2 gap-2 mb-5 max-h-[150px] overflow-y-auto">
+        <p v-if="!targets.length" class="text-[12px] text-[#C98A1E] mb-5">
+          No priced assets available right now — the tracked-asset list comes from the data pipeline.
+        </p>
+        <div v-else class="grid grid-cols-2 gap-2 mb-5 max-h-[150px] overflow-y-auto">
           <button
             v-for="t in targets"
             :key="t.id"
@@ -215,12 +248,12 @@ function submit() {
         <!-- "Notify me when …" builder bar -->
         <div class="flex items-center gap-2.5 flex-wrap px-[18px] py-4 bg-[#1C1C1A] border border-[#2C2C29] rounded-[13px] mb-2">
           <span class="text-[13.5px] text-[#5E5F5D]">Notify me when</span>
-          <span class="text-[13.5px] font-bold text-[#D5FF2F]">{{ selectedTarget.label }}</span>
+          <span class="text-[13.5px] font-bold text-[#D5FF2F]">{{ selectedTarget?.label ?? '—' }}</span>
           <span class="text-[13.5px] text-[#5E5F5D]">·</span>
           <span class="text-[13.5px] font-semibold text-[#E2E6E1]">{{ selectedMetricLabel }}</span>
           <span class="flex gap-1.5">
             <button
-              v-for="[op, label] in OPERATORS"
+              v-for="[op, label] in operators"
               :key="op"
               class="text-[12.5px] font-semibold px-[11px] py-1.5 rounded-lg cursor-pointer"
               :style="operator === op ? 'background:#D5FF2F; color:#141414;' : 'background:#37372F; color:#5E5F5D;'"
@@ -240,7 +273,10 @@ function submit() {
         <p v-if="!supported" class="text-[12px] text-[#C98A1E] mb-5">
           This alert type isn't evaluated by the engine yet — coming soon. Pick a supported metric to create a rule.
         </p>
-        <div v-else class="mb-5" />
+        <!-- honest cadence note: rules ride the periodic sweep, not a live stream -->
+        <p v-else class="text-[12px] text-[#5E5F5D] mb-5">
+          Rules are checked every ~15 minutes by the monitoring sweep — not in real time.
+        </p>
 
         <!-- 4 · Severity -->
         <p class="text-xs font-semibold text-[#5E5F5D] mb-[9px]">4 · Severity</p>
