@@ -338,19 +338,30 @@ cross-check vs mainnet.blend.capital is matched — **T2-D1 is complete** (v2 sc
 | Protocol | Source | Pools | TVL (verified) | State |
 |---|---|---:|---|---|
 | Blend | Soroban RPC | 4 | ≈ $166M | operational (fixed, orbit, etherfuse, yieldblox; Forex excluded — frozen oracle) |
-| Aquarius | Soroban RPC | 4 | ≈ $22.7M | operational |
+| Aquarius | Soroban RPC | 21 | ≈ $41M | operational — **perimeter widened Aug 16 (Lot P)**, incl. 6 concentrated pools |
 | Stellar native DEX | Horizon | 9 | ≈ $6.2M | operational (now aggregated at protocol level) |
-| Soroswap | Soroban RPC | 1 active | ≈ $130k | operational (dead native/EURC pair disabled) |
+| Soroswap | Soroban RPC | 4 active | ≈ $1.18M | operational — **+2 pairs Aug 16 (Lot P)**; native/EURC pair revived on-chain and re-enabled |
 | DeFindex | DeFindex API (SDK) | 3 vaults | ≈ $18.8M | operational — **live in prod since Aug 4** (T3-D1) |
 | Wallet balances | Horizon + Stellar RPC | — | — | operational |
+
+**AMM perimeter widened (Aug 16, 2026 — Lot P, local validation done; VPS seed pending).** 19 pools
+added top-TVL-first from the venues' own data under the honesty gate (TVL ≥ $50k, every asset priced,
+contract id venue-verified): 17 Aquarius (incl. 6 concentrated — same contract interface, adapter
+unchanged) + 2 Soroswap (USDC/EURC, USTRY/USDC). Five assets joined the pricing config (USDY, yXLM,
+yUSDC, BTC, ETH — proxies/pegs carry `confidence: medium`). The long-dead Soroswap native/EURC pair
+is live again on-chain ($415k) and was re-enabled as part of the same seed. TVL cross-check vs the
+venues: 24/25 pools within ±3.1%; the one outlier (CETES/USDC −25%) exposed a **pre-existing stale
+CoinGecko `cetes` feed** (~½ the on-chain market price — also understates CETES reserves in 3 Blend
+pools), flagged for a founder decision, not silently patched. Evidence: `docs/evidence/lot-p/`.
 
 All five protocols aggregate at the protocol level (`protocol_metrics_latest`), with a synchronous
 `as_of` within one `job:refresh` cycle, observed advancing across consecutive cycles.
 `protocolCount` = 5 (DeFindex added — T3-D1 Lot B; enumerated from `GET /vault/discover`, 3 mainnet
 vaults incl. an EURC one, TVL priced via the `asset_prices` pipeline, APY stored as a fraction; venue
-`defindex`, `entity_type='yield_vault'`). The Soroswap native/EURC pair was archived on-chain (all reads 404); it is
-soft-disabled and excluded from the API and from TVL aggregation, which corrected the inflated
-Soroswap TVL (was ≈$587k including the dead pair, now ≈$130k of live liquidity).
+`defindex`, `entity_type='yield_vault'`). The Soroswap native/EURC pair was archived on-chain (all
+reads 404) and soft-disabled at the time; the contract has since been restored with real liquidity
+(reads verified Aug 16, ≈$415k) and the pair was **re-enabled** by the Lot P seed — the historical
+soft-disable note above describes the June state, not the current one.
 
 **Blend pool coverage (updated June 26, 2026):** YieldBlox (`CCCCIQSD…`, ≈$2.9M, 8 reserves) added as
 a 4th active Blend entity so positions on it resolve (test wallet `GCSQXZ…` supplies on YieldBlox; the

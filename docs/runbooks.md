@@ -70,6 +70,12 @@ pnpm -C apps/indexer bootstrap:logos
 # deployment after onboarding a new pool/vault, commit the JSON):
 pnpm -C apps/indexer bootstrap:export
 
+# Widening the AMM pool perimeter (Lot P procedure, Aug 2026): after a git pull
+# that changes core-registry.json, ONE seed run picks up the new perimeter —
+# the cron's next job:refresh does the rest (first cycle: reserve snapshots +
+# metrics; derived soroswap prices follow on the SECOND cycle by design).
+pnpm -C apps/indexer bootstrap:core && pnpm -C apps/indexer bootstrap:logos
+
 # Legacy per-protocol upserts (kept for reference — their tmp/discovery registry
 # inputs are ephemeral and no longer exist, so prefer bootstrap:core):
 pnpm -C apps/indexer tsx src/scripts/bootstrap/defindex-upsert-core.ts   # T3-D1: venue 'defindex' + 3 mainnet vault entities

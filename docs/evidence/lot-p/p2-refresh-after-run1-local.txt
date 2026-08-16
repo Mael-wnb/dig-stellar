@@ -1,0 +1,17 @@
+=== Refresh step summary ===
+step 1 prices:reference: SUCCESS in 0.9s
+step 2 prices:soroswap-derived: FAILED (2/4 failed — soroswap-usdc-eurc-pair: Command failed (1): pnpm tsx src/scripts/ingest/63-price-soroswap-derived.ts; soroswap-ustry-usdc-pair: Command failed (1): pnpm tsx src/scripts/ingest/63-price-soroswap-derived.ts) in 59.4s
+step 3 blend: SUCCESS in 9.2s
+step 4 soroswap: SUCCESS in 9.1s
+step 5 aquarius: SUCCESS in 168.7s
+step 6 stellar-native: SUCCESS in 379.6s
+step 7 defindex: SUCCESS in 3.7s
+step 8 protocol-metrics: SUCCESS in 0.5s
+step 9 allbridge: SUCCESS in 1.0s
+step 10 network-stats: SUCCESS in 1.1s
+
+1 step(s) FAILED (10 total)
+Total job duration: 633.2s
+
+=== Refresh completed WITH FAILURES ===
+Error: Command failed with exit code 1: pnpm tsx src/scripts/ingest/71-refresh-all-metrics.ts

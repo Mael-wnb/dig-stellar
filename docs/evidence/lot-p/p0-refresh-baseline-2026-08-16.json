@@ -1,0 +1,82 @@
+[
+  {
+    "step": "allbridge",
+    "lastRunAt": "2026-08-16T09:15:06.369Z",
+    "lastStatus": "SUCCESS",
+    "lastDurationMs": 2674,
+    "lastMessage": null,
+    "failures24h": 0
+  },
+  {
+    "step": "aquarius",
+    "lastRunAt": "2026-08-16T09:15:06.369Z",
+    "lastStatus": "SUCCESS",
+    "lastDurationMs": 37260,
+    "lastMessage": null,
+    "failures24h": 0
+  },
+  {
+    "step": "blend",
+    "lastRunAt": "2026-08-16T09:15:06.369Z",
+    "lastStatus": "SUCCESS",
+    "lastDurationMs": 15584,
+    "lastMessage": null,
+    "failures24h": 0
+  },
+  {
+    "step": "defindex",
+    "lastRunAt": "2026-08-16T09:15:06.369Z",
+    "lastStatus": "SUCCESS",
+    "lastDurationMs": 9707,
+    "lastMessage": null,
+    "failures24h": 0
+  },
+  {
+    "step": "network-stats",
+    "lastRunAt": "2026-08-16T09:15:06.369Z",
+    "lastStatus": "SUCCESS",
+    "lastDurationMs": 2933,
+    "lastMessage": null,
+    "failures24h": 0
+  },
+  {
+    "step": "prices:reference",
+    "lastRunAt": "2026-08-16T09:15:06.369Z",
+    "lastStatus": "SUCCESS",
+    "lastDurationMs": 3872,
+    "lastMessage": null,
+    "failures24h": 0
+  },
+  {
+    "step": "prices:soroswap-derived",
+    "lastRunAt": "2026-08-16T09:15:06.369Z",
+    "lastStatus": "SUCCESS",
+    "lastDurationMs": 3293,
+    "lastMessage": null,
+    "failures24h": 0
+  },
+  {
+    "step": "protocol-metrics",
+    "lastRunAt": "2026-08-16T09:15:06.369Z",
+    "lastStatus": "SUCCESS",
+    "lastDurationMs": 1914,
+    "lastMessage": null,
+    "failures24h": 0
+  },
+  {
+    "step": "soroswap",
+    "lastRunAt": "2026-08-16T09:15:06.369Z",
+    "lastStatus": "SUCCESS",
+    "lastDurationMs": 3695,
+    "lastMessage": null,
+    "failures24h": 0
+  },
+  {
+    "step": "stellar-native",
+    "lastRunAt": "2026-08-16T09:15:06.369Z",
+    "lastStatus": "SUCCESS",
+    "lastDurationMs": 187156,
+    "lastMessage": null,
+    "failures24h": 0
+  }
+]
