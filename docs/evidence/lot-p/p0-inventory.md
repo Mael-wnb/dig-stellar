@@ -233,3 +233,8 @@ Awaiting founder decisions:
 1. **Go/no-go on the 12 zero-pricing-work additions** (§5).
 2. **Which shortlist assets to approve for P0b** (§6) — each adds its unlocked pools to P1.
 3. **SSH host-key confirmation** (ops note above) — required before the P1 VPS seed.
+
+> **Resolution (same day):** the documented IP was stale — DigitalOcean had recycled it;
+> the real VPS is `stellar-api.getdig.ai` (209.38.195.61) and its host key never changed.
+> Nothing was compromised — the mismatch was a stranger's droplet answering on the old IP.
+> SSH restored via the founder's key; docs reference the hostname from now on.

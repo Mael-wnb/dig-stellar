@@ -36,7 +36,32 @@ history lost — this lot is genuinely deadline-sensitive, unlike most.
 One table of candidates: venue · pool · assets · TVL (venue figure) · contract id
 + how it was verified · include/exclude + reason. Plus the current refresh
 baseline duration (the step-summary numbers) for the before/after compare.
-STOP-and-report — quick founder skim, continue on his go.
+
+**P0 must also answer the price-coverage question with data** (founder concern,
+2026-08-16 — the priced-asset filter may be the binding constraint):
+
+- the CURRENT priced-asset list (symbol + last `observed_at` + price source);
+- for every candidate excluded by rule 2: WHICH asset blocks it, and whether a
+  robust price source exists for that asset — in order of preference: (a) a
+  mid-price derivable from one of our own indexed pools with real liquidity
+  (e.g. AQUA via an AQUA/USDC pool), (b) the venue's own API price, (c) nothing
+  robust → stays excluded;
+- a shortlist: assets whose pricing would unlock ≥1 top candidate pool, with the
+  proposed source for each.
+
+STOP-and-report — quick founder skim (including the pricing shortlist),
+continue on his go.
+
+## P0b — Price coverage extension (conditional, founder-gated at P0)
+
+For the shortlist assets the founder approves: add them to the EXISTING pricing
+pipeline following its conventions — every price row carries its source, no
+hardcoded constants, staleness behaves like every other asset (7-day vetting
+window applies). Derived mid-prices must state the source pool and require real
+liquidity (≥ ~$100k in the source pool — a thin pool's mid-price is noise).
+Exotic/illiquid assets with no robust source stay unpriced and their pools stay
+out — that is the honest boundary, not a failure. The YieldBlox exotic-pricing
+gap (+63.8% flag) is a known instance of what skipping this rigor costs.
 
 ## P1 — Registry + seed
 
@@ -88,6 +113,8 @@ reasons. Docs flagged: `current-state.md` (§ perimeter), `status-board.md`
 
 ## Out of scope
 
-New price sources / unpriced assets · new venues · DeFindex · stellar-native
-pool modeling · any action-path change (Blend-only actions unchanged) · VPS
-resize (separate op, founder-handled).
+New venues · DeFindex · stellar-native pool modeling · any action-path change
+(Blend-only actions unchanged) · VPS resize (separate op, founder-handled) ·
+pricing assets that unlock no candidate pool (P0b is strictly demand-driven) ·
+external price providers not already integrated (CoinGecko-style additions are
+their own lot).
