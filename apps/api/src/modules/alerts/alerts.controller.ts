@@ -57,6 +57,12 @@ export class AlertsController {
     return this.alertsService.listTvlPools();
   }
 
+  // Pools eligible for APY rules (N4): validated lending venues with fresh APYs.
+  @Get('apy-pools')
+  listApyPools() {
+    return this.alertsService.listApyPools();
+  }
+
   @Get(':id')
   getRule(@Param('id') id: string, @Query('userId') userId?: string) {
     return this.alertsService.getRule(userId, id);

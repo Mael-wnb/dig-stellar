@@ -37,7 +37,20 @@ export type CreateAlertRuleBody = {
 export type UpdateAlertRuleBody = Partial<CreateAlertRuleBody>;
 
 // Lot N: creatable families = the ones the evaluator actually runs (honesty rule).
-const SUPPORTED_METRICS = new Set(['health_factor', 'price', 'tvl_drop_pct']);
+const SUPPORTED_METRICS = new Set([
+  'health_factor',
+  'price',
+  'tvl_drop_pct',
+  'supply_apy',
+  'borrow_apy',
+]);
+
+type SupportedMetric =
+  | 'health_factor'
+  | 'price'
+  | 'tvl_drop_pct'
+  | 'supply_apy'
+  | 'borrow_apy';
 const OPERATORS = new Set(['lt', 'lte', 'gt', 'gte']);
 const DEFAULT_COOLDOWN_SECONDS = 3600;
 
@@ -81,15 +94,13 @@ export class AlertsService {
 
   // --- field validators (shared by create + patch) -------------------------
 
-  private validateMetric(
-    metric: unknown,
-  ): 'health_factor' | 'price' | 'tvl_drop_pct' {
+  private validateMetric(metric: unknown): SupportedMetric {
     if (typeof metric !== 'string' || !SUPPORTED_METRICS.has(metric)) {
       throw new BadRequestException(
-        `Unsupported metric. Supported today: 'health_factor', 'price', 'tvl_drop_pct'.`,
+        `Unsupported metric. Supported today: 'health_factor', 'price', 'tvl_drop_pct', 'supply_apy', 'borrow_apy'.`,
       );
     }
-    return metric as 'health_factor' | 'price' | 'tvl_drop_pct';
+    return metric as SupportedMetric;
   }
 
   private validateOperator(operator: unknown): 'lt' | 'lte' | 'gt' | 'gte' {
@@ -172,10 +183,10 @@ export class AlertsService {
   // --- CRUD ----------------------------------------------------------------
 
   // Family invariants (Lot N): a price rule's subject is an asset, never a
-  // wallet/pool; a tvl-drop rule's subject is a specific pool; a health-factor
-  // rule's subjects are wallet/pool, never an asset.
+  // wallet/pool; tvl-drop and APY rules' subject is a specific pool; a
+  // health-factor rule's subjects are wallet/pool, never an asset.
   private assertFamilyShape(input: {
-    metric: 'health_factor' | 'price' | 'tvl_drop_pct';
+    metric: SupportedMetric;
     userWalletId: string | null;
     poolEntityId: string | null;
     assetId: string | null;
@@ -191,15 +202,19 @@ export class AlertsService {
       }
       return;
     }
-    if (input.metric === 'tvl_drop_pct') {
+    if (
+      input.metric === 'tvl_drop_pct' ||
+      input.metric === 'supply_apy' ||
+      input.metric === 'borrow_apy'
+    ) {
       if (input.poolEntityId === null) {
         throw new BadRequestException(
-          'a tvl_drop_pct rule requires poolEntityId (a specific pool).',
+          `a ${input.metric} rule requires poolEntityId (a specific pool).`,
         );
       }
       if (input.userWalletId !== null || input.assetId !== null) {
         throw new BadRequestException(
-          'a tvl_drop_pct rule is pool-scoped: userWalletId and assetId must be null.',
+          `a ${input.metric} rule is pool-scoped: userWalletId and assetId must be null.`,
         );
       }
       return;
@@ -275,6 +290,13 @@ export class AlertsService {
   // reserve-batch history on the live refresh path. Not user-scoped.
   async listTvlPools() {
     const pools = await this.alerts.listTvlPools();
+    return { count: pools.length, pools };
+  }
+
+  // Lot N (N4) — pools eligible for APY rules, with per-side availability
+  // (borrow APY only where the pool actually has one). Not user-scoped.
+  async listApyPools() {
+    const pools = await this.alerts.listApyPools();
     return { count: pools.length, pools };
   }
 

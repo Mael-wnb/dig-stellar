@@ -24,7 +24,8 @@ const emit = defineEmits<{ (e: 'close'): void; (e: 'create', payload: CreateRule
 const props = withDefaults(defineProps<{
   wallets?: Array<{ address: string; label: string }>
   assets?: Array<{ id: string; label: string; sub: string }>
-  pools?: Array<{ id: string; label: string; sub: string }>
+  // apy/borrowApy flags (N4): which APY sides this pool actually has.
+  pools?: Array<{ id: string; label: string; sub: string; apy?: boolean; borrowApy?: boolean }>
 }>(), { wallets: () => [], assets: () => [], pools: () => [] })
 
 // ── Definitions (faithful to Paul's builder; Lot N adds the Asset scope) ────
@@ -38,7 +39,7 @@ const SCOPES: Array<{ key: AlertScope; label: string; sub: string; icon: string[
 // 'price' moved from the venue scope to the asset scope (Lot N): the evaluator
 // prices assets, not venues — a venue-price family will never exist.
 const METRICS_BY_SCOPE: Record<AlertScope, Array<[AlertMetric, string]>> = {
-  venue: [['apy', 'APY'], ['tvl', 'TVL delta'], ['util', 'Utilization'], ['netflow', 'Netflow']],
+  venue: [['apy', 'Supply APY'], ['borrowapy', 'Borrow APY'], ['tvl', 'TVL delta'], ['util', 'Utilization'], ['netflow', 'Netflow']],
   wallet: [['balance', 'Balance change'], ['exposure', 'Net exposure'], ['health', 'Health factor'], ['posvalue', 'Position value']],
   asset: [['price', 'Price']],
   protocol: [['tvl', 'TVL delta'], ['volume', 'Volume spike'], ['netflow', 'Netflow'], ['health', 'Protocol health']],
@@ -47,11 +48,12 @@ const METRICS_BY_SCOPE: Record<AlertScope, Array<[AlertMetric, string]>> = {
 const SCOPE_NOUN: Record<AlertScope, string> = { venue: 'pool', wallet: 'wallet', asset: 'asset', protocol: 'protocol' }
 
 const METRIC_LABEL: Record<AlertMetric, string> = {
-  apy: 'APY', health: 'Health factor', netflow: '1h netflow', tvl: 'TVL', util: 'Utilization',
+  apy: 'Supply APY', borrowapy: 'Borrow APY', health: 'Health factor', netflow: '1h netflow',
+  tvl: 'TVL', util: 'Utilization',
   price: 'Price', balance: 'Balance', exposure: 'Net exposure', posvalue: 'Position value', volume: '24h volume',
 }
 const UNIT: Record<AlertMetric, string> = {
-  apy: '%', health: '', netflow: '$', tvl: '%', util: '%', price: '$',
+  apy: '%', borrowapy: '%', health: '', netflow: '$', tvl: '%', util: '%', price: '$',
   balance: '%', exposure: '$', posvalue: '$', volume: '%',
 }
 
@@ -69,7 +71,7 @@ const SAMPLE_WALLETS = [
 ]
 const walletList = computed(() => (props.wallets.length ? props.wallets : SAMPLE_WALLETS))
 
-function targetsFor(scope: AlertScope): Array<{ id: string; label: string; sub: string; tint: string; color: string }> {
+function targetsFor(scope: AlertScope): Array<{ id: string; label: string; sub: string; tint: string; color: string; apy?: boolean; borrowApy?: boolean }> {
   if (scope === 'wallet') {
     const w = walletList.value.map(x => ({
       // W2: short-address fallback when the wallet has no label.
@@ -92,10 +94,11 @@ function targetsFor(scope: AlertScope): Array<{ id: string; label: string; sub: 
       { id: 'stellar-native', label: 'Stellar Native DEX', sub: 'Classic AMM', tint: '#241633', color: '#7B45D6' },
     ]
   }
-  // venue scope (N3): the vetted TVL-eligible pool list — real pools with
-  // reserve-batch history, never the old hardcoded samples.
+  // venue scope (N3/N4): the vetted pool list — real pools with reserve-batch
+  // history (APY side flags carried for the per-target metric gate).
   return props.pools.map(p => ({
     id: p.id, label: p.label, sub: p.sub, tint: '#17233A', color: '#2E6FD6',
+    apy: p.apy === true, borrowApy: p.borrowApy === true,
   }))
 }
 
@@ -111,6 +114,8 @@ const severity = ref<AlertSeverity>('warning')
 const DEFAULT_THRESHOLD: Partial<Record<AlertMetric, string>> = {
   health: '1.25',
   tvl: '10',
+  apy: '5',
+  borrowapy: '10',
 }
 
 function pickMetric(m: AlertMetric) {
@@ -145,8 +150,16 @@ const operators = computed<Array<[AlertOperator, string]>>(() => {
   if (metric.value === 'tvl') return [['pct', 'drops by more than']]
   return supported.value ? OPERATORS.filter(([op]) => op !== 'pct') : OPERATORS
 })
+// N4: APY metrics are per-target — a pool without the chosen APY side (AMM
+// pools; borrow on supply-only pools) cannot arm the rule.
+const targetSupportsMetric = computed(() => {
+  if (metric.value === 'apy') return selectedTarget.value?.apy === true
+  if (metric.value === 'borrowapy') return selectedTarget.value?.borrowApy === true
+  return true
+})
 const canCreate = computed(() =>
   supported.value &&
+  targetSupportsMetric.value &&
   selectedTarget.value !== undefined &&
   threshold.value.trim() !== '' &&
   !Number.isNaN(Number(threshold.value)),
@@ -286,6 +299,9 @@ function submit() {
         <!-- honest scope note -->
         <p v-if="!supported" class="text-[12px] text-[#C98A1E] mb-5">
           This alert type isn't evaluated by the engine yet — coming soon. Pick a supported metric to create a rule.
+        </p>
+        <p v-else-if="!targetSupportsMetric" class="text-[12px] text-[#C98A1E] mb-5">
+          {{ selectedTarget?.label ?? 'This pool' }} doesn't have a {{ metric === 'borrowapy' ? 'borrow' : 'supply' }} APY — pick a lending pool for APY alerts.
         </p>
         <!-- honest cadence note: rules ride the periodic sweep, not a live stream -->
         <p v-else class="text-[12px] text-[#5E5F5D] mb-5">

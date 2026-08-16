@@ -128,7 +128,7 @@ export type LatestPoolHealth = {
 export type AlertRule = {
   id: string;
   userId: string;
-  metric: 'health_factor' | 'price' | 'tvl_drop_pct';
+  metric: 'health_factor' | 'price' | 'tvl_drop_pct' | 'supply_apy' | 'borrow_apy';
   userWalletId: string | null; // null = all wallets (health_factor family)
   poolEntityId: string | null; // null = all pools (health_factor family)
   assetId: string | null; // price family subject; null for other families
@@ -154,7 +154,7 @@ export type AlertRuleState = {
 
 // Fully-normalized create input (the service validates/defaults before calling).
 export type CreateRuleInput = {
-  metric: 'health_factor' | 'price' | 'tvl_drop_pct';
+  metric: 'health_factor' | 'price' | 'tvl_drop_pct' | 'supply_apy' | 'borrow_apy';
   operator: 'lt' | 'lte' | 'gt' | 'gte';
   threshold: number;
   cooldownSeconds: number;
@@ -260,6 +260,33 @@ export type TvlPool = {
   slug: string | null;
   name: string;
   venueName: string | null;
+};
+
+// Lot N (N4) — latest weighted APYs for a pool. FRACTIONS as stored in
+// pool_metrics_latest (0.0215 = 2.15%); the evaluator converts to percent.
+export type PoolApy = {
+  entityId: string;
+  supplyApy: number | null;
+  borrowApy: number | null;
+  asOf: unknown;
+};
+
+type PoolApyRow = {
+  entity_id: string;
+  weighted_supply_apy: unknown;
+  weighted_borrow_apy: unknown;
+  as_of: unknown;
+};
+
+// Lot N (N4) — a pool eligible for APY rules (modal target list + side flags).
+export type ApyPool = {
+  entityId: string;
+  slug: string | null;
+  name: string;
+  venueName: string | null;
+  supplyApy: number | null;
+  borrowApy: number | null;
+  asOf: unknown;
 };
 
 // Lot N (N2) — last-seen status of a monitored Blend pool (pool_status_state).
@@ -842,6 +869,77 @@ export class AlertsRepository {
       slug: row.slug,
       name: (row.name ?? row.slug ?? '').trim() || `pool ${row.id.slice(0, 8)}`,
       venueName: row.venue_name,
+    }));
+  }
+
+  // -------------------------------------------------------------------------
+  // Lot N (N4) — pool APY reads over pool_metrics_latest
+  // -------------------------------------------------------------------------
+
+  // Latest weighted APYs per pool for the evaluator (one query per sweep).
+  async getPoolApys(entityIds: string[]): Promise<Map<string, PoolApy>> {
+    const ids = Array.from(new Set(entityIds.filter(Boolean)));
+    if (ids.length === 0) return new Map();
+
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `
+      select entity_id, weighted_supply_apy, weighted_borrow_apy, as_of
+      from pool_metrics_latest
+      where entity_id = any($1::uuid[])
+        and metric_type = 'latest'
+      `,
+      ids
+    )) as PoolApyRow[];
+
+    const map = new Map<string, PoolApy>();
+    for (const row of rows) {
+      map.set(row.entity_id, {
+        entityId: row.entity_id,
+        supplyApy: toNumber(row.weighted_supply_apy),
+        borrowApy: toNumber(row.weighted_borrow_apy),
+        asOf: row.as_of,
+      });
+    }
+    return map;
+  }
+
+  // Pools eligible for APY rules (the modal's vetted target list, with per-side
+  // availability). Restricted to LENDING venues: they are the validated APY
+  // producers — DeFindex vault APYs exist in pool_metrics_latest but the
+  // adapter is explicitly not validated (CLAUDE.md scope note), so offering
+  // alerts on them would violate the honesty rule.
+  async listApyPools(): Promise<ApyPool[]> {
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `
+      select e.id, e.slug, e.name, v.name as venue_name,
+             pml.weighted_supply_apy, pml.weighted_borrow_apy, pml.as_of
+      from pool_metrics_latest pml
+      join entities e on e.id = pml.entity_id
+      join venues v on v.id = e.venue_id
+      where pml.metric_type = 'latest'
+        and v.venue_type = 'lending'
+        and e.is_active = true
+        and pml.weighted_supply_apy is not null
+        and pml.as_of > now() - interval '7 days'
+      order by v.name, e.name
+      `
+    )) as Array<
+      PoolApyRow & {
+        id: string;
+        slug: string | null;
+        name: string | null;
+        venue_name: string | null;
+      }
+    >;
+
+    return rows.map((row) => ({
+      entityId: row.id,
+      slug: row.slug,
+      name: (row.name ?? row.slug ?? '').trim() || `pool ${row.id.slice(0, 8)}`,
+      venueName: row.venue_name,
+      supplyApy: toNumber(row.weighted_supply_apy),
+      borrowApy: toNumber(row.weighted_borrow_apy),
+      asOf: row.as_of,
     }));
   }
 

@@ -22,6 +22,8 @@ import {
 } from '../modules/alerts/alerts.repository';
 import { evaluate } from '../modules/alerts/evaluate';
 import {
+  apyRuleSide,
+  buildApyCopy,
   buildPoolStatusCopy,
   buildPriceCopy,
   buildTvlDropCopy,
@@ -411,6 +413,134 @@ async function main() {
               windowHours,
               asOf: latestIso,
               // The subject of a TVL alert is the pool's page.
+              link: labelParts?.slug
+                ? { view: 'pool', poolId: labelParts.slug }
+                : undefined,
+            },
+          });
+
+          if (out.emit === 'alert_fired') fired += 1;
+          else resolved += 1;
+        }
+      } catch (error) {
+        console.error(`[evaluate-alerts] rule ${rule.id} failed`);
+        console.error(error);
+      }
+    }
+
+    // ── Family 4: supply_apy / borrow_apy (N4) — pool APY thresholds on
+    // pool_metrics_latest. Stored as fractions; the rule threshold is in
+    // PERCENT, so the observed value is converted (× 100) before evaluate().
+    // Edge state in alert_rule_subject_state keyed by the pool.
+    const apyPoolIds = Array.from(
+      new Set(
+        families.apy
+          .map((r) => r.poolEntityId)
+          .filter((id): id is string => id !== null)
+      )
+    );
+    const apyByPool = await repo.getPoolApys(apyPoolIds);
+    const apyPoolLabels = await repo.getPoolLabels(apyPoolIds);
+
+    for (const rule of families.apy) {
+      rulesEvaluated += 1;
+      try {
+        if (
+          rule.poolEntityId === null ||
+          rule.threshold === null ||
+          (rule.metric !== 'supply_apy' && rule.metric !== 'borrow_apy')
+        )
+          continue;
+
+        const side = apyRuleSide(rule.metric);
+        const apy = apyByPool.get(rule.poolEntityId);
+        const fraction =
+          side === 'supply' ? apy?.supplyApy ?? null : apy?.borrowApy ?? null;
+        if (!apy || fraction === null) {
+          // No such APY for this pool (e.g. borrow on a pool without one) —
+          // never fire, never resolve; state untouched.
+          console.warn(
+            `[evaluate-alerts] apy rule ${rule.id}: no ${side} APY for pool ${rule.poolEntityId} — skipped`
+          );
+          continue;
+        }
+
+        const asOfIso = toIso(apy.asOf);
+        const asOfDate = asOfIso ? new Date(asOfIso) : null;
+        // Stale-pipeline guard: metrics older than a day are dead data — skip.
+        if (
+          asOfDate === null ||
+          now.getTime() - asOfDate.getTime() > 24 * 3600 * 1000
+        ) {
+          console.warn(
+            `[evaluate-alerts] apy rule ${rule.id}: pool metrics as_of ${asOfIso ?? 'unknown'} is stale — skipped`
+          );
+          continue;
+        }
+
+        const valuePct = fraction * 100;
+
+        const subjectStates = await repo.getSubjectState(rule.id);
+        const prevSubject =
+          subjectStates.find((s) => s.subjectKey === rule.poolEntityId) ?? null;
+        const prev: AlertRuleState | null = prevSubject
+          ? {
+              ruleId: prevSubject.ruleId,
+              userWalletId: '',
+              poolEntityId: '',
+              status: prevSubject.status,
+              lastValue: prevSubject.lastValue,
+              lastEvaluatedAt: prevSubject.lastEvaluatedAt,
+              lastFiredAt: prevSubject.lastFiredAt,
+            }
+          : null;
+
+        const out = evaluate({ rule, current: valuePct, prev, now });
+
+        await repo.upsertSubjectState({
+          ruleId: rule.id,
+          subjectKey: rule.poolEntityId,
+          status: out.nextStatus,
+          lastValue: out.nextState.lastValue,
+          lastEvaluatedAt: now.toISOString(),
+          lastFiredAt: toIso(out.nextState.lastFiredAt),
+        });
+
+        if (out.emit !== null) {
+          const labelParts = apyPoolLabels.get(rule.poolEntityId);
+          const poolLabel = labelParts
+            ? labelParts.venueLabel
+              ? `${labelParts.venueLabel} ${labelParts.name}`
+              : labelParts.name
+            : `pool ${rule.poolEntityId.slice(0, 8)}`;
+
+          const copy = buildApyCopy({
+            emit: out.emit,
+            poolLabel,
+            side,
+            operator: rule.operator,
+            thresholdPct: rule.threshold,
+            valuePct,
+            asOf: asOfDate,
+            now,
+          });
+
+          await repo.insertNotification({
+            userId: rule.userId,
+            ruleId: rule.id,
+            kind: out.emit,
+            title: copy.title,
+            body: copy.body,
+            payload: {
+              poolEntityId: rule.poolEntityId,
+              poolLabel,
+              metric: rule.metric,
+              side,
+              value: valuePct, // percent, full precision (machine-grade)
+              threshold: rule.threshold,
+              operator: rule.operator,
+              asOf: asOfIso,
+              // The subject of an APY alert is the pool's page.
               link: labelParts?.slug
                 ? { view: 'pool', poolId: labelParts.slug }
                 : undefined,

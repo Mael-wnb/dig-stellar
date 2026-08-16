@@ -8,12 +8,18 @@
 // a family is creatable IFF its evaluator actually runs — unknown metrics can
 // only appear if the DB gets ahead of the code, and then we skip loudly).
 
-export type AlertFamily = 'health_factor' | 'price' | 'tvl_drop_pct';
+export type AlertFamily =
+  | 'health_factor'
+  | 'price'
+  | 'tvl_drop_pct'
+  | 'supply_apy'
+  | 'borrow_apy';
 
 export type FamilyPartition<T> = {
   healthFactor: T[];
   price: T[];
   tvlDrop: T[];
+  apy: T[]; // supply_apy + borrow_apy — one evaluator, column picked per rule
   unknown: T[];
 };
 
@@ -24,12 +30,15 @@ export function partitionRulesByFamily<T extends { metric: string }>(
     healthFactor: [],
     price: [],
     tvlDrop: [],
+    apy: [],
     unknown: [],
   };
   for (const rule of rules) {
     if (rule.metric === 'health_factor') out.healthFactor.push(rule);
     else if (rule.metric === 'price') out.price.push(rule);
     else if (rule.metric === 'tvl_drop_pct') out.tvlDrop.push(rule);
+    else if (rule.metric === 'supply_apy' || rule.metric === 'borrow_apy')
+      out.apy.push(rule);
     else out.unknown.push(rule);
   }
   return out;
@@ -167,6 +176,63 @@ export function buildTvlDropCopy(input: TvlDropCopyInput): {
   return {
     title: `TVL drop resolved: ${poolLabel} back within ${thresholdPct}%`,
     body: `${poolLabel} TVL is back within your ${thresholdPct}% threshold: ${move} (${range}) — as of ${at}.`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// APY family (N4) — pool supply/borrow APY thresholds, the "opportunity"
+// family. pool_metrics_latest stores APYs as FRACTIONS (0.0215 = 2.15%); the
+// OBSERVED VALUE fed to the state machine — and the user's threshold — are
+// both in PERCENT, so the evaluator converts (fraction × 100) before calling
+// evaluate().
+// ---------------------------------------------------------------------------
+
+export function apyRuleSide(
+  metric: 'supply_apy' | 'borrow_apy',
+): 'supply' | 'borrow' {
+  return metric === 'supply_apy' ? 'supply' : 'borrow';
+}
+
+export function formatApyPct(valuePct: number): string {
+  if (!Number.isFinite(valuePct)) return 'n/a';
+  return `${valuePct.toFixed(2)}%`;
+}
+
+export type ApyCopyInput = {
+  emit: 'alert_fired' | 'alert_resolved';
+  poolLabel: string;
+  side: 'supply' | 'borrow';
+  operator: 'lt' | 'lte' | 'gt' | 'gte';
+  thresholdPct: number;
+  valuePct: number; // observed APY in percent (full precision; rounded for display)
+  asOf: Date; // pool_metrics_latest.as_of
+  now: Date;
+};
+
+// "Blend Fixed supply APY rose to 8.40% (alert threshold > 8%) — as of 09:12 UTC."
+export function buildApyCopy(input: ApyCopyInput): {
+  title: string;
+  body: string;
+} {
+  const { emit, poolLabel, side, operator, thresholdPct, valuePct, asOf, now } =
+    input;
+  const sideLabel = side === 'supply' ? 'supply APY' : 'borrow APY';
+  const opSym =
+    operator === 'lt' ? '<' : operator === 'lte' ? '≤' : operator === 'gt' ? '>' : '≥';
+  const highIsBreach = operator === 'gt' || operator === 'gte';
+  const v = formatApyPct(valuePct);
+  const at = formatAsOf(asOf, now);
+
+  if (emit === 'alert_fired') {
+    const directionWord = highIsBreach ? 'rose to' : 'dropped to';
+    return {
+      title: `${side === 'supply' ? 'Supply' : 'Borrow'} APY alert: ${poolLabel} at ${v}`,
+      body: `${poolLabel} ${sideLabel} ${directionWord} ${v} (alert threshold ${opSym} ${thresholdPct}%) — as of ${at}.`,
+    };
+  }
+  return {
+    title: `${side === 'supply' ? 'Supply' : 'Borrow'} APY back: ${poolLabel} at ${v}`,
+    body: `${poolLabel} ${sideLabel} back to ${v} — as of ${at}.`,
   };
 }
 

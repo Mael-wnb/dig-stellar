@@ -6,12 +6,15 @@
 // against health rows regardless of metric).
 
 import {
+  apyRuleSide,
+  buildApyCopy,
   buildPoolStatusCopy,
   buildPriceCopy,
   buildTvlDropCopy,
   computeTvlDropPct,
   diffPoolStatus,
   displaySymbol,
+  formatApyPct,
   formatAsOf,
   formatDropPct,
   formatUsdCompact,
@@ -78,12 +81,24 @@ describe('partitionRulesByFamily (cross-family dispatch)', () => {
     expect(out.unknown).toHaveLength(0);
   });
 
+  it('supply/borrow APY rules land in the shared apy bucket, never elsewhere (N4)', () => {
+    const supply = rule('supply_apy', { operator: 'gt', threshold: 8 });
+    const borrow = rule('borrow_apy', { operator: 'gte', threshold: 12 });
+    const out = partitionRulesByFamily([supply, borrow]);
+    expect(out.healthFactor).toHaveLength(0);
+    expect(out.price).toHaveLength(0);
+    expect(out.tvlDrop).toHaveLength(0);
+    expect(out.apy).toEqual([supply, borrow]);
+    expect(out.unknown).toHaveLength(0);
+  });
+
   it('a metric with no evaluator lands in unknown (skipped, never evaluated)', () => {
     const future = rule('volume_spike_pct');
     const out = partitionRulesByFamily([future]);
     expect(out.healthFactor).toHaveLength(0);
     expect(out.price).toHaveLength(0);
     expect(out.tvlDrop).toHaveLength(0);
+    expect(out.apy).toHaveLength(0);
     expect(out.unknown).toEqual([future]);
   });
 });
@@ -288,6 +303,81 @@ describe('tvl-drop family (N3) — drop computation, edge reuse, copy', () => {
     expect(formatUsdCompact(950_300)).toBe('$950.3K');
     expect(formatUsdCompact(12.4)).toBe('$12.40');
     expect(formatUsdCompact(2_100_000_000)).toBe('$2.1B');
+  });
+});
+
+describe('apy family (N4) — percent conversion, copy, edge reuse', () => {
+  it('maps the metric to its side', () => {
+    expect(apyRuleSide('supply_apy')).toBe('supply');
+    expect(apyRuleSide('borrow_apy')).toBe('borrow');
+  });
+
+  it('formats APY percent with 2 decimals', () => {
+    expect(formatApyPct(8.4)).toBe('8.40%');
+    expect(formatApyPct(0.0011)).toBe('0.00%');
+  });
+
+  it('fired copy carries observed value, threshold and as_of', () => {
+    const { title, body } = buildApyCopy({
+      emit: 'alert_fired',
+      poolLabel: 'Blend Fixed',
+      side: 'supply',
+      operator: 'gt',
+      thresholdPct: 8,
+      valuePct: 8.4,
+      asOf: new Date('2026-08-16T09:12:00Z'),
+      now: new Date('2026-08-16T09:15:00Z'),
+    });
+    expect(title).toBe('Supply APY alert: Blend Fixed at 8.40%');
+    expect(body).toBe(
+      'Blend Fixed supply APY rose to 8.40% (alert threshold > 8%) — as of 09:12 UTC.',
+    );
+  });
+
+  it('a falls-below borrow rule words the direction the other way', () => {
+    const { body } = buildApyCopy({
+      emit: 'alert_fired',
+      poolLabel: 'Blend Fixed',
+      side: 'borrow',
+      operator: 'lt',
+      thresholdPct: 5,
+      valuePct: 4.1,
+      asOf: new Date('2026-08-16T09:12:00Z'),
+      now: new Date('2026-08-16T09:15:00Z'),
+    });
+    expect(body).toBe(
+      'Blend Fixed borrow APY dropped to 4.10% (alert threshold < 5%) — as of 09:12 UTC.',
+    );
+  });
+
+  it('resolved copy states the value it came back to', () => {
+    const { title, body } = buildApyCopy({
+      emit: 'alert_resolved',
+      poolLabel: 'Blend Fixed',
+      side: 'supply',
+      operator: 'gt',
+      thresholdPct: 8,
+      valuePct: 7.1,
+      asOf: new Date('2026-08-16T10:00:00Z'),
+      now: new Date('2026-08-16T10:02:00Z'),
+    });
+    expect(title).toBe('Supply APY back: Blend Fixed at 7.10%');
+    expect(body).toBe(
+      'Blend Fixed supply APY back to 7.10% — as of 10:00 UTC.',
+    );
+  });
+
+  it('reuses the edge machine over percent values (fire above, resolve back)', () => {
+    const apyRule = rule('supply_apy', { operator: 'gt', threshold: 8 });
+    const first = evaluate({ rule: apyRule, current: 8.4, prev: null, now: NOW });
+    expect(first.emit).toBe('alert_fired');
+    const back = evaluate({
+      rule: apyRule,
+      current: 7.1,
+      prev: first.nextState,
+      now: new Date(NOW.getTime() + 20 * 60 * 1000),
+    });
+    expect(back.emit).toBe('alert_resolved');
   });
 });
 

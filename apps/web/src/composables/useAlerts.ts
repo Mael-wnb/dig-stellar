@@ -27,10 +27,12 @@ import { useNotifications } from './useNotifications'
 import { fetchWalletOverview } from '../api/wallets'
 import type { WalletItem } from '../types/wallet'
 import {
+  fetchApyPools,
   fetchPricedAssets,
   fetchTvlPools,
   type AlertRule as BackendRule,
   type AlertOperator as BackendOperator,
+  type ApyPool,
   type CreateAlertRuleInput,
   type PricedAsset,
   type TvlPool,
@@ -39,7 +41,7 @@ import type { AppNotification, NotificationLink } from '../api/notifications'
 
 export type AlertScope = 'venue' | 'wallet' | 'protocol' | 'asset'
 export type AlertMetric =
-  | 'apy' | 'tvl' | 'util' | 'netflow'                    // venue
+  | 'apy' | 'borrowapy' | 'tvl' | 'util' | 'netflow'      // venue
   | 'balance' | 'exposure' | 'health' | 'posvalue'        // wallet
   | 'volume'                                              // protocol
   | 'price'                                               // asset
@@ -90,7 +92,7 @@ export interface CreateRulePayload {
 export const SUPPORTED_METRICS: Record<AlertScope, Set<AlertMetric>> = {
   wallet: new Set<AlertMetric>(['health']),
   asset: new Set<AlertMetric>(['price']),
-  venue: new Set<AlertMetric>(['tvl']),
+  venue: new Set<AlertMetric>(['tvl', 'apy', 'borrowapy']),
   protocol: new Set<AlertMetric>([]),
 }
 export function isSupported(scope: AlertScope, metric: AlertMetric): boolean {
@@ -106,14 +108,15 @@ export const SEVERITY_STYLE: Record<AlertSeverity, { color: string; tint: string
 
 export function metricIconKey(n: { metric?: AlertMetric; category?: string }): string {
   if (n.category === 'critical' || n.metric === 'health') return 'heart'
-  if (n.metric === 'apy' || n.metric === 'volume' || n.metric === 'tvl' || n.metric === 'price') return 'trend'
+  if (n.metric === 'apy' || n.metric === 'borrowapy' || n.metric === 'volume' || n.metric === 'tvl' || n.metric === 'price') return 'trend'
   if (n.metric === 'netflow') return 'drop'
   if (n.metric === 'balance' || n.metric === 'exposure' || n.metric === 'posvalue') return 'wallet'
   return 'bell'
 }
 
 const METRIC_KEY: Record<AlertMetric, string> = {
-  apy: 'apy', tvl: 'tvl', util: 'utilization', netflow: 'netflow_1h', price: 'price',
+  apy: 'supply_apy', borrowapy: 'borrow_apy', tvl: 'tvl', util: 'utilization',
+  netflow: 'netflow_1h', price: 'price',
   balance: 'balance_change', exposure: 'net_exposure', health: 'health_factor',
   posvalue: 'position_value', volume: 'volume_24h',
 }
@@ -232,15 +235,27 @@ export function useAlerts() {
     return m
   })
 
-  // TVL-eligible pool directory (N3): the vetted target list for TVL-drop
-  // rules, also used to label existing rules by pool name.
+  // Pool directories (N3/N4): TVL-eligible pools are the venue-scope target
+  // list; APY eligibility (per side) is merged in as flags so the modal can
+  // gate APY metrics per target. Also used to label existing rules.
   const tvlPools = ref<TvlPool[]>([])
+  const apyPools = ref<ApyPool[]>([])
+  const apyPoolById = computed(() => {
+    const m = new Map<string, ApyPool>()
+    for (const p of apyPools.value) m.set(p.entityId, p)
+    return m
+  })
   const pools = computed(() =>
-    tvlPools.value.map((p) => ({
-      id: p.entityId,
-      label: p.venueName ? `${p.venueName} ${p.name}` : p.name,
-      sub: p.venueName ?? '',
-    })),
+    tvlPools.value.map((p) => {
+      const apy = apyPoolById.value.get(p.entityId)
+      return {
+        id: p.entityId,
+        label: p.venueName ? `${p.venueName} ${p.name}` : p.name,
+        sub: p.venueName ?? '',
+        apy: apy != null && apy.supplyApy !== null,
+        borrowApy: apy != null && apy.borrowApy !== null,
+      }
+    }),
   )
   const poolById = computed(() => {
     const m = new Map<string, TvlPool>()
@@ -298,6 +313,26 @@ export function useAlerts() {
         }
       }
 
+      if (r.metric === 'supply_apy' || r.metric === 'borrow_apy') {
+        const pool = r.poolEntityId ? poolById.value.get(r.poolEntityId) : undefined
+        const label = pool
+          ? (pool.venueName ? `${pool.venueName} ${pool.name}` : pool.name)
+          : `${(r.poolEntityId ?? '').slice(0, 8)}…`
+        const isSupply = r.metric === 'supply_apy'
+        return {
+          id: r.id,
+          name: `${label} · ${isSupply ? 'Supply' : 'Borrow'} APY`,
+          scope: 'venue',
+          scope_ref: label,
+          metric: isSupply ? 'apy' : 'borrowapy',
+          operator: toViewOperator(r.operator),
+          threshold,
+          severity: 'info',
+          enabled: r.enabled,
+          condition: `${r.metric} ${sym} ${threshold}% · ${label}`,
+        }
+      }
+
       const label = scopeRefLabel(r.userWalletId)
       return {
         id: r.id,
@@ -326,6 +361,9 @@ export function useAlerts() {
       let metric: AlertMetric | undefined = 'health'
       if (payloadMetric === 'price') {
         metric = 'price'
+      } else if (payloadMetric === 'supply_apy' || payloadMetric === 'borrow_apy') {
+        // The opportunity family — informational either way (lowest criticality).
+        metric = payloadMetric === 'supply_apy' ? 'apy' : 'borrowapy'
       } else if (payloadMetric === 'tvl_drop_pct') {
         metric = 'tvl' // trend icon
         if (fired) {
@@ -389,6 +427,13 @@ export function useAlerts() {
       // honest empty state for the venue scope.
       tvlPools.value = []
     }
+    try {
+      const data = await fetchApyPools()
+      apyPools.value = data.pools ?? []
+    } catch {
+      // non-fatal: APY metrics simply show as unavailable for every target.
+      apyPools.value = []
+    }
   }
 
   async function loadWallets() {
@@ -422,6 +467,22 @@ export function useAlerts() {
         assetId: payload.scope_ref,
         userWalletId: null,
         poolEntityId: null,
+        enabled: true,
+      }
+      await createBackendRule(input)
+      return
+    }
+
+    if (payload.scope === 'venue' && (payload.metric === 'apy' || payload.metric === 'borrowapy')) {
+      // scope_ref is the pool entity id. Threshold is in percent; direction is
+      // the user's lt/gt choice (both are meaningful for an APY threshold).
+      const input: CreateAlertRuleInput = {
+        metric: payload.metric === 'apy' ? 'supply_apy' : 'borrow_apy',
+        operator: toBackendOperator(payload.operator),
+        threshold: payload.threshold,
+        poolEntityId: payload.scope_ref,
+        userWalletId: null,
+        assetId: null,
         enabled: true,
       }
       await createBackendRule(input)
