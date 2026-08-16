@@ -110,6 +110,7 @@ type PoolListRow = {
   total_borrowed_usd: unknown;
   weighted_supply_apy: unknown;
   weighted_borrow_apy: unknown;
+  metrics_metadata: unknown;
   as_of: unknown;
 };
 
@@ -366,6 +367,7 @@ export class StellarService {
         pml.total_borrowed_usd,
         pml.weighted_supply_apy,
         pml.weighted_borrow_apy,
+        pml.metadata as metrics_metadata,
         pml.as_of
       from entities e
       join venues v on v.id = e.venue_id
@@ -375,6 +377,32 @@ export class StellarService {
       `,
       ...params
     )) as PoolListRow[];
+
+    // 24h swap counts for the pools table (same source as pool detail / flows:
+    // normalized_events, ':trade'/':swap' keys). One grouped scan, per entity.
+    // swap_events_ever distinguishes "covered, genuinely 0 in 24h" (→ 0) from
+    // "events not ingested for this pool" (→ absent → null → UI dash).
+    const swapRows = (await this.prisma.$queryRawUnsafe(`
+      select
+        e.slug as entity_slug,
+        count(*) filter (
+          where (ne.event_key like '%:trade' or ne.event_key like '%:swap')
+            and ne.occurred_at >= now() - interval '24 hours'
+        )::int as swaps_24h,
+        count(*) filter (
+          where ne.event_key like '%:trade' or ne.event_key like '%:swap'
+        )::int as swap_events_ever
+      from normalized_events ne
+      join entities e on e.id = ne.entity_id
+      group by e.slug
+    `)) as Array<{ entity_slug: string; swaps_24h: unknown; swap_events_ever: unknown }>;
+
+    const swapsByEntity = new Map<string, number>();
+    for (const sr of swapRows) {
+      if ((toNumber(sr.swap_events_ever) ?? 0) > 0) {
+        swapsByEntity.set(sr.entity_slug, toNumber(sr.swaps_24h) ?? 0);
+      }
+    }
 
     const tokenRows = (await this.prisma.$queryRawUnsafe(`
       select
@@ -417,31 +445,50 @@ export class StellarService {
       });
     }
 
-    return rows.map((row) => ({
-      id: row.entity_slug,
-      name: row.entity_name,
-      type: row.entity_type,
-      protocol: {
-        id: row.protocol_slug,
-        name: row.protocol_name,
-        type: row.protocol_type,
-        logoUrl: row.protocol_logo_url ?? null,
-      },
-      chain: row.chain,
-      contractAddress: row.contract_address,
-      tokens: tokensByEntity.get(row.entity_slug) ?? [],
-      metrics: {
-        tvlUsd: toNumber(row.tvl_usd),
-        volume24hUsd: toNumber(row.volume_24h_usd) ?? 0,
-        fees24hUsd: toNumber(row.fees_24h_usd) ?? 0,
-        totalSuppliedUsd: toNumber(row.total_supplied_usd),
-        totalBorrowedUsd: toNumber(row.total_borrowed_usd),
-        supplyApy: toNumber(row.weighted_supply_apy),
-        borrowApy: toNumber(row.weighted_borrow_apy),
-      },
-      updatedAt: row.as_of,
-      ...freshnessFields(row.as_of),
-    }));
+    return rows.map((row) => {
+      // Honest 24h swaps: AMM pools with Soroban event coverage count from
+      // normalized_events; stellar-native (Horizon, no Soroban events) reads
+      // the indexer-computed trades24h from its metrics metadata — the same
+      // rule pool detail applies. Lending/vaults and uncovered pools stay
+      // null so the UI renders "—", never a fake zero.
+      const isAmm = row.protocol_type === 'amm' || row.entity_type === 'amm_pool';
+      let swaps24h: number | null = null;
+      if (isAmm) {
+        if (row.protocol_slug === 'stellar-native') {
+          const meta = (row.metrics_metadata ?? null) as { trades24h?: unknown } | null;
+          swaps24h = meta ? toNumber(meta.trades24h) : null;
+        } else {
+          swaps24h = swapsByEntity.get(row.entity_slug) ?? null;
+        }
+      }
+
+      return {
+        id: row.entity_slug,
+        name: row.entity_name,
+        type: row.entity_type,
+        protocol: {
+          id: row.protocol_slug,
+          name: row.protocol_name,
+          type: row.protocol_type,
+          logoUrl: row.protocol_logo_url ?? null,
+        },
+        chain: row.chain,
+        contractAddress: row.contract_address,
+        tokens: tokensByEntity.get(row.entity_slug) ?? [],
+        metrics: {
+          tvlUsd: toNumber(row.tvl_usd),
+          volume24hUsd: toNumber(row.volume_24h_usd) ?? 0,
+          fees24hUsd: toNumber(row.fees_24h_usd) ?? 0,
+          totalSuppliedUsd: toNumber(row.total_supplied_usd),
+          totalBorrowedUsd: toNumber(row.total_borrowed_usd),
+          supplyApy: toNumber(row.weighted_supply_apy),
+          borrowApy: toNumber(row.weighted_borrow_apy),
+          swaps24h,
+        },
+        updatedAt: row.as_of,
+        ...freshnessFields(row.as_of),
+      };
+    });
   }
 
   async getPoolDetail(poolSlug: string) {
