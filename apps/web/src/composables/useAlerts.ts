@@ -21,6 +21,7 @@
 // are preserved verbatim — only the data layer under them was rewired.
 
 import { computed, ref } from 'vue'
+import { displayPoolName } from '../utils/format'
 import { useAppUser } from './useAppUser'
 import { useAlertRules } from './useAlertRules'
 import { useNotifications } from './useNotifications'
@@ -250,7 +251,8 @@ export function useAlerts() {
       const apy = apyPoolById.value.get(p.entityId)
       return {
         id: p.entityId,
-        label: p.venueName ? `${p.venueName} ${p.name}` : p.name,
+        // Q2: pool names may carry the internal 'native' symbol — display-map it.
+        label: p.venueName ? `${p.venueName} ${displayPoolName(p.name)}` : displayPoolName(p.name),
         sub: p.venueName ?? '',
         apy: apy != null && apy.supplyApy !== null,
         borrowApy: apy != null && apy.borrowApy !== null,

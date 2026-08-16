@@ -75,7 +75,7 @@ const headerAssets = computed<Array<{ primary: string | null; letter: string }>>
   if (!p) return []
   const marks = (p.tokens ?? []).map((t) => ({
     primary: t.logoUrl ?? null,
-    letter: (t.symbol || '•').charAt(0).toUpperCase(),
+    letter: (displaySymbol(t.symbol) || '•').charAt(0).toUpperCase(),
   }))
   if (isAmm.value) return marks.slice(0, 2)
   if (isVault.value) {
@@ -457,11 +457,9 @@ function openAction() {
                 v-if="headerAssets.length"
                 :assets="headerAssets"
                 :size="46"
-                :radius="13"
                 :font-size="19"
-                :img-scale="0.6"
               />
-              <BrandLogo v-else :primary="pool.protocol?.logoUrl" :fallback="theme.logo" :letter="theme.letter" :tint="theme.tint" :color="theme.color" :size="46" :radius="13" :font-size="19" :img-scale="0.6" />
+              <BrandLogo v-else :primary="pool.protocol?.logoUrl" :fallback="theme.logo" :letter="theme.letter" :tint="theme.tint" :color="theme.color" :size="46" :radius="13" :font-size="19" :img-scale="0.72" />
               <div class="min-w-0">
                 <div class="text-[22px] font-bold tracking-[-0.02em] truncate">{{ pairName }}</div>
                 <div class="text-[13px]" style="color: var(--dig-faint)">
@@ -669,7 +667,7 @@ function openAction() {
             <div v-for="(r, i) in reserveBars" :key="i" class="mb-[16px] last:mb-0">
               <div class="flex items-center justify-between text-[13px] mb-[7px]">
                 <span class="flex items-center gap-[8px] font-semibold">
-                  <BrandLogo :primary="r.logoUrl" :letter="(r.symbol || '•').charAt(0)" tint="#242422" color="#B7B3AB" :size="20" :radius="6" :font-size="10" :img-scale="0.72" />
+                  <BrandLogo variant="asset" :primary="r.logoUrl" :letter="(r.symbol || '•').charAt(0)" tint="#242422" color="#B7B3AB" :size="20" :font-size="10" />
                   {{ r.symbol }}
                 </span>
                 <span class="tabular-nums" style="color: var(--dig-faint)">{{ r.amount }}</span>
@@ -767,7 +765,7 @@ function openAction() {
             <tr v-for="r in pool.reserves" :key="r.assetId" style="border-top: 1px solid #262624">
               <td class="py-[13px] font-semibold">
                 <span class="flex items-center gap-[8px]">
-                  <BrandLogo :primary="r.logoUrl" :letter="(displaySymbol(r.symbol) || '•').charAt(0)" tint="#242422" color="#B7B3AB" :size="22" :radius="6" :font-size="11" :img-scale="0.72" />
+                  <BrandLogo variant="asset" :primary="r.logoUrl" :letter="(displaySymbol(r.symbol) || '•').charAt(0)" tint="#242422" color="#B7B3AB" :size="22" :font-size="11" />
                   {{ displaySymbol(r.symbol) }}
                 </span>
               </td>

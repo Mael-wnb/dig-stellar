@@ -38,6 +38,26 @@ export interface ProtocolSummary {
     trades24h?: number | null
   }
   
+  // Q4 (Lot Q): /v1/protocols item — per-venue aggregates plus the top
+  // underlying assets by TVL (up to 3 served) and the honest total count so
+  // the UI can render a "+N" overflow chip instead of truncating silently.
+  export interface ProtocolAssetMark {
+    symbol: string | null
+    logoUrl: string | null
+    tvlUsd: number | null
+  }
+
+  export interface ProtocolListItem {
+    id: string
+    name: string
+    type: string
+    chain: string
+    logoUrl?: string | null
+    tvlUsd?: number | null
+    topAssets: ProtocolAssetMark[]
+    assetCount: number
+  }
+
   export interface PoolListItem {
     id: string
     name: string

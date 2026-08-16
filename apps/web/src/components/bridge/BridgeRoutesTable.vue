@@ -47,8 +47,8 @@ const arrow = (key: string, sort: { key: string; dir: string }) => (sort.key ===
             :style="activeChain === r.chain ? 'background:#242422; box-shadow:inset 2px 0 0 #D5FF2F;' : 'background:transparent;'"
             @click="emit('scope', r.chain)">
       <span class="flex items-center gap-[11px]">
-        <BrandLogo :fallback="r.logo" :letter="r.mark" :tint="r.tint" :color="r.color"
-                   :size="30" :radius="9" :font-size="12" :img-scale="0.62" />
+        <BrandLogo variant="asset" :fallback="r.logo" :letter="r.mark" :tint="r.tint" :color="r.color"
+                   :size="30" :font-size="12" />
         <span class="flex items-center gap-1.5 text-[13.5px] font-semibold text-[#e2e6e1]">
           {{ r.chain }} <span class="text-[#6E6A62]">→</span> <span class="text-[#B7B3AB]">Stellar</span>
         </span>

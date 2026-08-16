@@ -460,7 +460,7 @@ const assetsView = computed(() => {
               style="border-bottom: 1px solid var(--dig-line-soft)"
               @click="!assetsView.scoped && toggleAsset(a.key)"
             >
-              <BrandLogo :primary="null" :letter="(a.symbol || '•').charAt(0).toUpperCase()" tint="#242422" color="#B7B3AB" :size="26" :radius="8" :font-size="12" />
+              <BrandLogo variant="asset" :primary="null" :letter="(a.symbol || '•').charAt(0).toUpperCase()" tint="#242422" color="#B7B3AB" :size="26" :font-size="12" />
               <span class="text-[13.5px] font-semibold">{{ a.symbol }}</span>
               <span class="text-[13px] tabular-nums" style="color: var(--dig-faint)" :title="formatTokenAmountExact(a.amount)">{{ formatTokenAmountCompact(a.amount) }}</span>
               <span class="ml-auto text-[13.5px] font-semibold tabular-nums">{{ a.usd === null ? '—' : formatUsd(a.usd) }}</span>
@@ -490,7 +490,7 @@ const assetsView = computed(() => {
               style="border-bottom: 1px solid var(--dig-line-soft)"
               @click="toggleAsset('__other__')"
             >
-              <BrandLogo :primary="null" letter="·" tint="#242422" color="#B7B3AB" :size="26" :radius="8" :font-size="12" />
+              <BrandLogo variant="asset" :primary="null" letter="·" tint="#242422" color="#B7B3AB" :size="26" :font-size="12" />
               <span class="text-[13.5px] font-semibold" style="color: var(--dig-faint)">Other</span>
               <span class="text-[12px]" style="color: var(--dig-faint)">{{ assetsView.other.rows.length }} small balances</span>
               <span class="ml-auto text-[13.5px] font-semibold tabular-nums">{{ formatUsd(assetsView.other.usd) }}</span>

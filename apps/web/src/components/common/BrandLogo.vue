@@ -3,6 +3,12 @@
 //   backend logoUrl (primary) → bundled asset (fallback) → monogram letter.
 // A dead URL (@error) drops to the next candidate, so a broken-image icon can
 // never render. Sizing is prop-driven so each call site keeps its exact look.
+//
+// Q1 (Lot Q): two shape variants —
+//   • 'tile'  (default) rounded-square chip, logo floats inside (protocols/venues)
+//   • 'asset' plain circle, image fills it edge-to-end (tokens/assets)
+// Tokens are round, apps are square: pass variant="asset" for anything that is
+// a token/asset mark; radius/imgScale are ignored in that mode.
 import { computed, ref, watch } from 'vue'
 
 const props = withDefaults(
@@ -13,11 +19,12 @@ const props = withDefaults(
     tint: string // chip background
     color: string // monogram/text color
     size?: number // px (square)
-    radius?: number // px
+    radius?: number // px (tile variant only)
     fontSize?: number // px, monogram letter
-    imgScale?: number // 0–1, image size relative to the chip
+    imgScale?: number // 0–1, image size relative to the chip (tile variant only)
+    variant?: 'tile' | 'asset'
   }>(),
-  { size: 42, radius: 12, fontSize: 18, imgScale: 0.6 },
+  { size: 42, radius: 12, fontSize: 18, imgScale: 0.6, variant: 'tile' },
 )
 
 // Track which candidate URLs have failed to load so we skip past them.
@@ -38,6 +45,8 @@ const activeSrc = computed<string | null>(() => {
   return candidates.find((u) => !failed.value.has(u)) ?? null
 })
 
+const isAsset = computed(() => props.variant === 'asset')
+
 function onError() {
   const src = activeSrc.value
   if (src) failed.value = new Set(failed.value).add(src)
@@ -52,7 +61,7 @@ function onError() {
       color,
       width: `${size}px`,
       height: `${size}px`,
-      borderRadius: `${radius}px`,
+      borderRadius: isAsset ? '9999px' : `${radius}px`,
       fontSize: `${fontSize}px`,
     }"
   >
@@ -60,8 +69,12 @@ function onError() {
       v-if="activeSrc"
       :src="activeSrc"
       alt=""
-      class="object-contain"
-      :style="{ width: `${imgScale * 100}%`, height: `${imgScale * 100}%` }"
+      :class="isAsset ? 'object-cover' : 'object-contain'"
+      :style="
+        isAsset
+          ? { width: '100%', height: '100%' }
+          : { width: `${imgScale * 100}%`, height: `${imgScale * 100}%` }
+      "
       @error="onError"
     />
     <template v-else>{{ letter }}</template>

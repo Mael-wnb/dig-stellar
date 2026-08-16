@@ -81,6 +81,18 @@ type ProtocolRow = {
   as_of: unknown;
 };
 
+// Q4 (Lot Q): per-venue underlying-asset ranking (top by TVL) for the
+// protocols page. One row per (venue, asset) from the latest reserve snapshot
+// of each active entity, priced with the latest asset price.
+type ProtocolAssetRow = {
+  venue_slug: string;
+  symbol: string | null;
+  logo_url: string | null;
+  tvl_usd: unknown;
+  rn: unknown;
+  asset_count: unknown;
+};
+
 type PoolListRow = {
   entity_slug: string;
   entity_name: string;
@@ -219,6 +231,76 @@ export class StellarService {
       order by v.slug asc
     `)) as ProtocolRow[];
 
+    // Q4 (Lot Q): per-venue underlying assets ranked by TVL (latest reserve
+    // snapshot per entity × latest asset price). Additive — venues without
+    // reserve snapshots (stellar-native keeps reserves in pool_snapshots
+    // metadata) simply get an empty list, never a guessed one.
+    const assetRows = (await this.prisma.$queryRawUnsafe(`
+      with latest as (
+        select rs.entity_id, max(rs.snapshot_at) as snapshot_at
+        from reserve_snapshots rs
+        join entities e on e.id = rs.entity_id and e.is_active = true
+        group by rs.entity_id
+      ),
+      venue_assets as (
+        select
+          v.slug as venue_slug,
+          rs.asset_id,
+          sum(coalesce(rs.d_supply_scaled, 0)) as amount
+        from reserve_snapshots rs
+        join latest l
+          on l.entity_id = rs.entity_id and l.snapshot_at = rs.snapshot_at
+        join entities e on e.id = rs.entity_id
+        join venues v on v.id = e.venue_id
+        group by v.slug, rs.asset_id
+      ),
+      priced as (
+        select
+          va.venue_slug,
+          a.symbol,
+          a.logo_url,
+          va.amount * coalesce(
+            (
+              select ap.price_usd
+              from asset_prices ap
+              where ap.asset_id = va.asset_id
+              order by ap.observed_at desc
+              limit 1
+            ),
+            0
+          ) as tvl_usd
+        from venue_assets va
+        join assets a on a.id = va.asset_id
+      )
+      select
+        venue_slug,
+        symbol,
+        logo_url,
+        tvl_usd,
+        row_number() over (partition by venue_slug order by tvl_usd desc) as rn,
+        count(*) over (partition by venue_slug) as asset_count
+      from priced
+      order by venue_slug asc, rn asc
+    `)) as ProtocolAssetRow[];
+
+    const assetsByVenue = new Map<
+      string,
+      { topAssets: Array<{ symbol: string | null; logoUrl: string | null; tvlUsd: number | null }>; assetCount: number }
+    >();
+    for (const ar of assetRows) {
+      const cur =
+        assetsByVenue.get(ar.venue_slug) ??
+        { topAssets: [], assetCount: toNumber(ar.asset_count) ?? 0 };
+      if ((toNumber(ar.rn) ?? 0) <= 3) {
+        cur.topAssets.push({
+          symbol: ar.symbol,
+          logoUrl: ar.logo_url ?? null,
+          tvlUsd: toNumber(ar.tvl_usd),
+        });
+      }
+      assetsByVenue.set(ar.venue_slug, cur);
+    }
+
     return rows.map((row) => ({
       id: row.slug,
       name: row.name,
@@ -230,6 +312,9 @@ export class StellarService {
       fees24hUsd: toNumber(row.fees_24h_usd) ?? 0,
       avgSupplyApy: toNumber(row.avg_supply_apy),
       avgBorrowApy: toNumber(row.avg_borrow_apy),
+      // Q4: top underlying assets by TVL + honest total count for "+N" chips.
+      topAssets: assetsByVenue.get(row.slug)?.topAssets ?? [],
+      assetCount: assetsByVenue.get(row.slug)?.assetCount ?? 0,
       updatedAt: row.as_of,
       ...freshnessFields(row.as_of),
     }));

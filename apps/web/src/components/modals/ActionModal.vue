@@ -47,7 +47,7 @@ const activeTab = ref('primary')
         <div class="flex items-center justify-between mb-[16px]">
           <div class="flex items-center gap-[11px]">
             <span class="w-[34px] h-[34px] rounded-[10px] flex items-center justify-center font-bold text-[14px]" :style="{ background: theme.tint, color: theme.color }">
-              <img v-if="theme.logo" :src="theme.logo" alt="" class="w-[60%] h-[60%] object-contain" />
+              <img v-if="theme.logo" :src="theme.logo" alt="" class="w-[72%] h-[72%] object-contain" />
               <template v-else>{{ theme.letter }}</template>
             </span>
             <div>

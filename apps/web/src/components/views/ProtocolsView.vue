@@ -7,12 +7,41 @@ import { computed, ref, watch } from 'vue'
 import { useProtocol } from '../../composables/useProtocol'
 import { useView } from '../../composables/useView'
 import { venueTheme } from '../../data/venueTheme'
-import { displayPoolName, formatUsd, formatCount } from '../../utils/format'
-import type { PoolListItem } from '../../types/protocol'
+import { displayPoolName, displaySymbol, formatUsd, formatCount } from '../../utils/format'
+import type { PoolListItem, ProtocolAssetMark } from '../../types/protocol'
+import { fetchProtocols } from '../../api/protocols'
 import BrandLogo from '../common/BrandLogo.vue'
 import PairLogo from '../common/PairLogo.vue'
 
 const { pools, loadingProtocols, error, reload } = useProtocol()
+
+// Q4 (Lot Q): per-venue top assets by TVL (+ honest total count) from
+// /v1/protocols. Additive enhancement — the cards render without asset chips
+// until (or unless) the payload arrives.
+const protocolAssets = ref<Map<string, { topAssets: ProtocolAssetMark[]; assetCount: number }>>(new Map())
+fetchProtocols()
+  .then((list) => {
+    protocolAssets.value = new Map(
+      list.map((v) => [v.id, { topAssets: v.topAssets ?? [], assetCount: v.assetCount ?? 0 }]),
+    )
+  })
+  .catch(() => {
+    /* cards stay chip-less; the pools table is unaffected */
+  })
+
+// Q4: honest venue-level Type from venue_type (served as protocol.type on
+// pools). stellar-native is venue_type 'amm' in the registry but the venue is
+// the classic DEX — labelled per the founder's enumeration.
+const VENUE_TYPE_LABEL: Record<string, string> = {
+  lending: 'Lending',
+  amm: 'AMM',
+  vault: 'Yield vaults',
+  bridge: 'Bridge',
+}
+function venueTypeLabel(venueId: string, venueType: string, fallback: string): string {
+  if (venueId === 'stellar-native') return 'DEX (orderbook)'
+  return VENUE_TYPE_LABEL[venueType] ?? fallback
+}
 
 // F5 (Lot F): pair-asset marks for a pool. AMM → both legs; vault → underlying.
 // Symbol/logoUrl come from /v1/pools (F3); an absent logo falls back to the
@@ -20,7 +49,8 @@ const { pools, loadingProtocols, error, reload } = useProtocol()
 function assetMarks(p: PoolListItem): Array<{ primary: string | null; letter: string }> {
   return (p.tokens ?? []).map((t) => ({
     primary: t.logoUrl ?? null,
-    letter: (t.symbol || '•').charAt(0).toUpperCase(),
+    // Q2: monogram from the DISPLAY symbol ('native' → XLM → 'X', never 'N').
+    letter: (displaySymbol(t.symbol) || '•').charAt(0).toUpperCase(),
   }))
 }
 const { openPool } = useView()
@@ -46,7 +76,7 @@ const KIND_LABEL: Record<PoolKind, string> = { lending: 'Lending', vault: 'Vault
 // ── per-protocol summary cards ───────────────────────────────────────────────
 const protocolCards = computed(() => {
   interface Acc {
-    id: string; name: string; kind: PoolKind; logoUrl: string | null; tvl: number; vol: number; fees: number
+    id: string; name: string; kind: PoolKind; vtype: string; logoUrl: string | null; tvl: number; vol: number; fees: number
     count: number; stale: boolean; topPool: string
     // TVL-weighted APY accumulators (only over pools where the metric applies).
     sApyW: number; sTvl: number; bApyW: number; bTvl: number
@@ -58,7 +88,7 @@ const protocolCards = computed(() => {
     const tvl = p.metrics.tvlUsd ?? 0
     const cur =
       map.get(id) ??
-      { id, name: p.protocol.name, kind, logoUrl: p.protocol.logoUrl ?? null, tvl: 0, vol: 0, fees: 0, count: 0, stale: false, topPool: p.id, sApyW: 0, sTvl: 0, bApyW: 0, bTvl: 0 }
+      { id, name: p.protocol.name, kind, vtype: p.protocol.type, logoUrl: p.protocol.logoUrl ?? null, tvl: 0, vol: 0, fees: 0, count: 0, stale: false, topPool: p.id, sApyW: 0, sTvl: 0, bApyW: 0, bTvl: 0 }
     cur.tvl += tvl
     if (kind === 'amm') {
       cur.vol += p.metrics.volume24hUsd ?? 0
@@ -98,7 +128,21 @@ const protocolCards = computed(() => {
                 { label: '24h vol', value: formatUsd(c.vol), color: 'var(--dig-text)' },
                 { label: 'Fees 24h', value: formatUsd(c.fees), color: 'var(--dig-text)' },
               ]
-      return { ...c, theme: venueTheme(c.id), typeLabel: KIND_LABEL[c.kind], metrics }
+      // Q4: up to 3 top-TVL underlying assets as circular marks + honest "+N".
+      const va = protocolAssets.value.get(c.id)
+      const assets = (va?.topAssets ?? []).map((a) => ({
+        primary: a.logoUrl ?? null,
+        letter: (displaySymbol(a.symbol) || '•').charAt(0).toUpperCase(),
+      }))
+      const moreAssets = Math.max(0, (va?.assetCount ?? 0) - assets.length)
+      return {
+        ...c,
+        theme: venueTheme(c.id),
+        typeLabel: venueTypeLabel(c.id, c.vtype, KIND_LABEL[c.kind]),
+        metrics,
+        assets,
+        moreAssets,
+      }
     })
 })
 
@@ -296,13 +340,23 @@ function arrow(k: SortKey | null): string {
           @click="openPool(c.topPool)"
         >
           <div class="flex items-center gap-[12px]">
-            <BrandLogo :primary="c.logoUrl" :fallback="c.theme.logo" :letter="c.theme.letter" :tint="c.theme.tint" :color="c.theme.color" :size="42" :radius="12" :font-size="19" :img-scale="0.6" />
-            <div class="min-w-0">
+            <BrandLogo :primary="c.logoUrl" :fallback="c.theme.logo" :letter="c.theme.letter" :tint="c.theme.tint" :color="c.theme.color" :size="42" :radius="12" :font-size="19" :img-scale="0.72" />
+            <div class="min-w-0 flex-1">
               <div class="text-[16px] font-bold flex items-center gap-[7px]">
                 {{ c.name }}
                 <span v-if="c.stale" class="w-[7px] h-[7px] rounded-full" style="background: var(--dig-amber)" title="Some pools stale"></span>
               </div>
               <div class="text-[12px]" style="color: var(--dig-faint)">{{ c.typeLabel }} · {{ c.count }} pools</div>
+            </div>
+            <!-- Q4: top underlying assets by TVL (circular, per Q1) + honest "+N" -->
+            <div v-if="c.assets.length" class="flex items-center gap-[6px] flex-shrink-0">
+              <PairLogo :assets="c.assets" :size="22" :font-size="10" />
+              <span
+                v-if="c.moreAssets > 0"
+                class="text-[11px] font-semibold px-[6px] py-[2px] rounded-full"
+                style="background: var(--dig-surface-3); color: var(--dig-faint)"
+                :title="`${c.moreAssets} more assets`"
+              >+{{ c.moreAssets }}</span>
             </div>
           </div>
           <div class="grid grid-cols-3 gap-[14px] mt-[20px]">
@@ -362,11 +416,9 @@ function arrow(k: SortKey | null): string {
                   v-if="r.assets.length"
                   :assets="r.assets"
                   :size="30"
-                  :radius="9"
                   :font-size="12"
-                  :img-scale="0.62"
                 />
-                <BrandLogo v-else :primary="r.logoUrl" :fallback="r.theme.logo" :letter="r.theme.letter" :tint="r.theme.tint" :color="r.theme.color" :size="30" :radius="9" :font-size="12" :img-scale="0.62" />
+                <BrandLogo v-else :primary="r.logoUrl" :fallback="r.theme.logo" :letter="r.theme.letter" :tint="r.theme.tint" :color="r.theme.color" :size="30" :radius="9" :font-size="12" :img-scale="0.72" />
                 <div class="min-w-0">
                   <div class="text-[14px] font-semibold truncate flex items-center gap-[6px]">
                     {{ r.pair }}

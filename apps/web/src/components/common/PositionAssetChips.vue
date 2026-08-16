@@ -93,14 +93,13 @@ function legTitle(leg: WalletPositionItem, sideLabel: string): string {
         :title="legTitle(leg, g.label)"
       >
         <BrandLogo
+          variant="asset"
           :primary="leg.logoUrl"
           :letter="(displaySymbol(leg.assetSymbol) || '•').charAt(0)"
           tint="#242422"
           color="#B7B3AB"
           :size="size"
-          :radius="5"
           :font-size="Math.round(size * 0.5)"
-          :img-scale="0.72"
         />
         <span class="tabular-nums font-semibold">{{ formatTokenAmountCompact(leg.amountScaled) }}</span>
         <span style="color: var(--dig-faint)">{{ displaySymbol(leg.assetSymbol) }}</span>

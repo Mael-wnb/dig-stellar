@@ -73,7 +73,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-aqua-usdc-clpool",
-      "name": "AQUA-USDC Aquarius Concentrated Pool",
+      "name": "AQUA/USDC Concentrated",
       "entity_type": "amm_pool",
       "contract_address": "CBRUQ7I6C6OGHMDYWD6XQUZFB6KJ3LLPNE34EPKSPFZ2YMBJ2GIWYYZ7",
       "is_active": true,
@@ -92,7 +92,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-aqua-usdc-pool",
-      "name": "AQUA-USDC Aquarius Pool",
+      "name": "AQUA/USDC",
       "entity_type": "amm_pool",
       "contract_address": "CA6GAFOJCW4MGQQBUCQUSA3CLIH25G4SNKB2JHYKZCVWZTNW5VXMSC4O",
       "is_active": true,
@@ -110,7 +110,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-btc-eth-pool",
-      "name": "BTC-ETH Aquarius Pool",
+      "name": "BTC/ETH",
       "entity_type": "amm_pool",
       "contract_address": "CDOGKTAHIINHYDL3BUYDVKIQDDJI35IBMLOUHC3AZC6FNJFT5ZC7BYDJ",
       "is_active": true,
@@ -128,7 +128,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-btc-usdc-clpool",
-      "name": "BTC-USDC Aquarius Concentrated Pool",
+      "name": "BTC/USDC Concentrated",
       "entity_type": "amm_pool",
       "contract_address": "CCZXH6N6DSJLAMXCYODGD255GTFILMNU4R5AHPE7PED4A4EZEOPYAWL5",
       "is_active": true,
@@ -147,7 +147,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-cetes-usdc-pool",
-      "name": "CETES-USDC Aquarius Pool",
+      "name": "CETES/USDC",
       "entity_type": "amm_pool",
       "contract_address": "CCKGQSQG5JLZBMYMB4HT6M4H7FUC3NK5C75MIHN6627LRAY5B2SYL2AD",
       "is_active": true,
@@ -165,7 +165,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-eth-usdc-pool",
-      "name": "ETH-USDC Aquarius Pool",
+      "name": "ETH/USDC",
       "entity_type": "amm_pool",
       "contract_address": "CCZC4HGM2BW7TIIS4KBDQEZX67DFZLOL6TZXGUGD6SJZS6IJ5JUAEZZR",
       "is_active": true,
@@ -183,7 +183,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-native-aqua-clpool",
-      "name": "native-AQUA Aquarius Concentrated Pool",
+      "name": "XLM/AQUA Concentrated",
       "entity_type": "amm_pool",
       "contract_address": "CA4HTZNY2RBZWEQE5GBMNREZMFRPAZSVJ6OGPC7T3VM7NHRJYFAVID2S",
       "is_active": true,
@@ -202,7 +202,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-native-aqua-pool",
-      "name": "native-AQUA Aquarius Pool",
+      "name": "XLM/AQUA",
       "entity_type": "amm_pool",
       "contract_address": "CCY2PXGMKNQHO7WNYXEWX76L2C5BH3JUW3RCATGUYKY7QQTRILBZIFWV",
       "is_active": true,
@@ -220,7 +220,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-native-solvbtc-pool",
-      "name": "native-SolvBTC Aquarius Pool",
+      "name": "XLM/SolvBTC",
       "entity_type": "amm_pool",
       "contract_address": "CD2O2B6PWKXDVFXMHXHQMF25C4TWOSQAENA7DNFR5G27F5CHJ7AJP5F6",
       "is_active": true,
@@ -238,7 +238,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-native-usdc-clpool",
-      "name": "native-USDC Aquarius Concentrated Pool",
+      "name": "XLM/USDC Concentrated",
       "entity_type": "amm_pool",
       "contract_address": "CBBMQBNHB2FYVZYV7VNHOJHUMTFJLR4PUMRVQYNW6RHIKZO2NQMIBUCV",
       "is_active": true,
@@ -257,7 +257,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-native-usdc-pool",
-      "name": "native-USDC Aquarius Pool",
+      "name": "XLM/USDC",
       "entity_type": "amm_pool",
       "contract_address": "CA6PUJLBYKZKUEKLZJMKBZLEKP2OTHANDEOWSFF44FTSYLKQPIICCJBE",
       "is_active": true,
@@ -275,7 +275,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-native-yxlm-clpool",
-      "name": "native-yXLM Aquarius Concentrated Pool",
+      "name": "XLM/yXLM Concentrated",
       "entity_type": "amm_pool",
       "contract_address": "CADMDTCQHSC2GCYPDCYQ7FBYVOXED3E3WGCYJHHT524ZBALM7VYHFS7F",
       "is_active": true,
@@ -294,7 +294,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-native-yxlm-pool",
-      "name": "native-yXLM Aquarius Pool",
+      "name": "XLM/yXLM",
       "entity_type": "amm_pool",
       "contract_address": "CCFGZJTHQZGDZP5PK6WMLKHKJ72ACSVMJGCI2NFR7Q6EAVSKWLJB3ZH3",
       "is_active": true,
@@ -312,7 +312,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-pyusd-usdc-clpool",
-      "name": "PYUSD-USDC Aquarius Concentrated Pool",
+      "name": "PYUSD/USDC Concentrated",
       "entity_type": "amm_pool",
       "contract_address": "CAPIOQNULTKVYOJT6X2W2XKGNIVUWZDY72Y42YG6HQKJ7DU7YTHIDQYX",
       "is_active": true,
@@ -331,7 +331,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-pyusd-usdc-pool",
-      "name": "PYUSD-USDC Aquarius Pool",
+      "name": "PYUSD/USDC",
       "entity_type": "amm_pool",
       "contract_address": "CDMH535JSD224YXPET3B4SJOLXTQQ24GRSCWACGYBKSH2DKFJYWI7SUW",
       "is_active": true,
@@ -351,7 +351,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-usdc-tesouro-pool",
-      "name": "USDC-TESOURO Aquarius Pool",
+      "name": "USDC/TESOURO",
       "entity_type": "amm_pool",
       "contract_address": "CDPF7GMA3OLVUBLEVKNKXKEFSS3EQAXN75RHT7DR4SYIHFS5LH5JOTD7",
       "is_active": true,
@@ -369,7 +369,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-usdc-yusdc-pool",
-      "name": "USDC-yUSDC Aquarius Pool",
+      "name": "USDC/yUSDC",
       "entity_type": "amm_pool",
       "contract_address": "CCWNKTTMHZ4VRR3FYQT3G253MHOGRLUEVTO6YPENM7ZN65DGC345LHI6",
       "is_active": true,
@@ -387,7 +387,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-usdglo-usdc-pool",
-      "name": "USDGLO-USDC Aquarius Pool",
+      "name": "USDGLO/USDC",
       "entity_type": "amm_pool",
       "contract_address": "CAC56QNJ2CX456TPC5S4MSOU3DBULG4TGN7AZ2SAYGBLD3GICFMZBIT2",
       "is_active": true,
@@ -405,7 +405,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-usdy-usdc-pool",
-      "name": "USDY-USDC Aquarius Pool",
+      "name": "USDY/USDC",
       "entity_type": "amm_pool",
       "contract_address": "CAFHLHGZXOVNCGFJ7DOXL7JDNMBCEZKDI3LS5NRQH3GXC7CSIMQZHUSM",
       "is_active": true,
@@ -423,7 +423,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-ustry-usdc-pool",
-      "name": "USTRY-USDC Aquarius Pool",
+      "name": "USTRY/USDC",
       "entity_type": "amm_pool",
       "contract_address": "CCX2TYR4AQTPPMTZOIMP3YIBHAYLLSTXVP47PAGTL753PCQFSKV32MIA",
       "is_active": true,
@@ -441,7 +441,7 @@
     {
       "venue_slug": "aquarius",
       "slug": "aquarius-xsolvbtc-solvbtc-pool",
-      "name": "xSolvBTC-SolvBTC Aquarius Pool",
+      "name": "xSolvBTC/SolvBTC",
       "entity_type": "amm_pool",
       "contract_address": "CCNXGPE4AQCSNEBZO3XJDKKDI3CRLYMVS6UWBBTVDLALLWMJEXBORQ2A",
       "is_active": true,
@@ -597,7 +597,7 @@
     {
       "venue_slug": "soroswap",
       "slug": "soroswap-native-eurc-pair",
-      "name": "native-EURC Soroswap LP Token",
+      "name": "XLM/EURC",
       "entity_type": "amm_pool",
       "contract_address": "CATUJXDUO7SSSTAKSUV5YU6RSTB4B5AVIHQDV26QTCXOB46T6SLMWNMY",
       "is_active": true,
@@ -611,7 +611,7 @@
     {
       "venue_slug": "soroswap",
       "slug": "soroswap-native-usdc-pair",
-      "name": "native-USDC Soroswap LP Token",
+      "name": "XLM/USDC",
       "entity_type": "amm_pool",
       "contract_address": "CAM7DY53G63XA4AJRS24Z6VFYAFSSF76C3RZ45BE5YU3FQS5255OOABP",
       "is_active": true,
@@ -625,7 +625,7 @@
     {
       "venue_slug": "soroswap",
       "slug": "soroswap-usdc-eurc-pair",
-      "name": "USDC-EURC Soroswap LP Token",
+      "name": "USDC/EURC",
       "entity_type": "amm_pool",
       "contract_address": "CC7CDFY2VGDODJ7WPO3JIK2MXLOAXL4LRQCC43UJDBAIJ4SVFO3HNPOC",
       "is_active": true,
@@ -639,7 +639,7 @@
     {
       "venue_slug": "soroswap",
       "slug": "soroswap-ustry-usdc-pair",
-      "name": "USTRY-USDC Soroswap LP Token",
+      "name": "USTRY/USDC",
       "entity_type": "amm_pool",
       "contract_address": "CDIXSYDR7S5OLT56JM7G5Y5LHH6NEFINZOE2YG2TJEXHHYWKLV3FDCCU",
       "is_active": true,

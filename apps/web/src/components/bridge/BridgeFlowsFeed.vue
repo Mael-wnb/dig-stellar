@@ -51,8 +51,8 @@ const arrow = (key: string, sort: { key: string; dir: string }) => (sort.key ===
          class="grid items-center px-2 py-[11px] border-b border-[#2C2C29]"
          style="grid-template-columns:1.8fr 1fr 0.9fr 1fr 0.9fr 0.9fr;">
       <span class="flex items-center gap-[11px]">
-        <BrandLogo :fallback="f.logo" :letter="f.mark" :tint="f.tint" :color="f.color"
-                   :size="28" :radius="8" :font-size="11" :img-scale="0.62" />
+        <BrandLogo variant="asset" :fallback="f.logo" :letter="f.mark" :tint="f.tint" :color="f.color"
+                   :size="28" :font-size="11" />
         <span class="flex items-center gap-1.5 text-[13px] font-semibold text-[#e2e6e1]">
           {{ f.chain }} <span class="text-[#6E6A62]">→</span> <span class="text-[#B7B3AB]">Stellar</span>
         </span>

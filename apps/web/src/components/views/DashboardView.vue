@@ -226,7 +226,7 @@ const {
         class="dig-row flex items-center gap-[12px] px-[8px] py-[12px] rounded-[11px] cursor-pointer -mx-[8px] w-[calc(100%+16px)] text-left"
         @click="openPool(p.topPool)"
       >
-        <BrandLogo :primary="p.logoUrl" :fallback="p.theme.logo" :letter="p.theme.letter" :tint="p.theme.tint" :color="p.theme.color" :size="34" :radius="10" :font-size="15" :img-scale="0.6" />
+        <BrandLogo :primary="p.logoUrl" :fallback="p.theme.logo" :letter="p.theme.letter" :tint="p.theme.tint" :color="p.theme.color" :size="34" :radius="10" :font-size="15" :img-scale="0.72" />
         <div>
           <div class="text-[14px] font-semibold flex items-center gap-[7px]">
             {{ p.name }}

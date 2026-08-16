@@ -5,9 +5,11 @@
 //   • AMM pools    → the two pair assets
 //   • yield vaults → the underlying asset (single mark)
 //   • lending      → not used here; keep a plain BrandLogo (protocol mark)
-// Each mark carries a ring in the chip-surface colour so the overlap reads
-// cleanly. No protocol badge: the venue name is already written next to the
-// mark at every call site, so a third mini-logo would just be clutter.
+// Q1 (Lot Q): marks are circles (BrandLogo variant="asset" — tokens are round,
+// apps are square). Only the overlapping (front) marks carry a thin ring in the
+// chip-surface colour, so the overlap reads cleanly without framing the back
+// mark. No protocol badge: the venue name is already written next to the mark
+// at every call site, so a third mini-logo would just be clutter.
 import { computed } from 'vue'
 import BrandLogo from './BrandLogo.vue'
 
@@ -22,18 +24,14 @@ interface AssetMark {
 const props = withDefaults(
   defineProps<{
     assets: AssetMark[] // 1 (vault) or 2 (pair) marks
-    size?: number // px, each asset chip (square)
-    radius?: number // px
+    size?: number // px, each asset chip (diameter)
     fontSize?: number // px, monogram letter
-    imgScale?: number // 0–1, image size within the chip
     overlap?: number // 0–1, horizontal advance per chip (0.72 → ~28% overlap)
     ring?: string // ring/separator colour (the chip surface)
   }>(),
   {
     size: 30,
-    radius: 9,
     fontSize: 12,
-    imgScale: 0.62,
     overlap: 0.72,
     ring: 'var(--dig-surface)',
   },
@@ -57,24 +55,22 @@ const width = computed(
     <span
       v-for="(a, i) in assets"
       :key="i"
-      class="absolute top-0"
+      class="absolute top-0 rounded-full"
       :style="{
         left: `${i * step}px`,
         zIndex: i + 1,
-        borderRadius: `${radius}px`,
-        boxShadow: `0 0 0 2px ${ring}`,
+        boxShadow: i > 0 ? `0 0 0 2px ${ring}` : 'none',
       }"
     >
       <BrandLogo
+        variant="asset"
         :primary="a.primary"
         :fallback="a.fallback"
         :letter="a.letter"
         :tint="a.tint ?? ASSET_TINT"
         :color="a.color ?? ASSET_COLOR"
         :size="size"
-        :radius="radius"
         :font-size="fontSize"
-        :img-scale="imgScale"
       />
     </span>
   </span>

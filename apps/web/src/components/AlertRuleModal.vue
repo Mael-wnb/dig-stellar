@@ -242,7 +242,8 @@ function submit() {
             :style="targetId === t.id ? 'border-color:#D5FF2F; background:#202312;' : 'border-color:#2F2F2C; background:#242422;'"
             @click="targetId = t.id"
           >
-            <span class="w-6 h-6 flex-shrink-0 rounded-[7px]"
+            <!-- Q1: token targets are circles, everything else keeps the square tile -->
+            <span class="w-6 h-6 flex-shrink-0" :class="scope === 'asset' ? 'rounded-full' : 'rounded-[7px]'"
                   :style="{ background: t.tint, boxShadow: `inset 0 0 0 1.5px ${t.color}` }" />
             <span class="min-w-0 text-left">
               <span class="block text-[12.5px] font-semibold" :style="{ color: targetId === t.id ? '#E2E6E1' : '#B7B3AB' }">{{ t.label }}</span>

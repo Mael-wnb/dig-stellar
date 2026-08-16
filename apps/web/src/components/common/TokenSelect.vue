@@ -93,7 +93,7 @@ function onKeydown(e: KeyboardEvent) {
       aria-haspopup="listbox"
       @click="toggle"
     >
-      <BrandLogo :primary="logoFor(selected)" :letter="selected.code.slice(0, 1)" tint="#242422" color="#B7B3AB" :size="24" :radius="999" :font-size="11" :img-scale="1" />
+      <BrandLogo variant="asset" :primary="logoFor(selected)" :letter="selected.code.slice(0, 1)" tint="#242422" color="#B7B3AB" :size="24" :font-size="11" />
       <span class="text-[14px] font-bold" style="color: var(--dig-text)">{{ selected.code }}</span>
       <svg
         width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -119,7 +119,7 @@ function onKeydown(e: KeyboardEvent) {
         class="dig-row flex items-center gap-[10px] px-[8px] py-[7px] rounded-[10px] cursor-pointer text-left"
         @click="pick(a)"
       >
-        <BrandLogo :primary="logoFor(a)" :letter="a.code.slice(0, 1)" tint="#242422" color="#B7B3AB" :size="28" :radius="999" :font-size="12" :img-scale="1" />
+        <BrandLogo variant="asset" :primary="logoFor(a)" :letter="a.code.slice(0, 1)" tint="#242422" color="#B7B3AB" :size="28" :font-size="12" />
         <span class="min-w-0">
           <span class="block text-[13px] font-bold leading-[1.2]" style="color: var(--dig-text)">{{ a.code }}</span>
           <span class="block text-[11px] truncate" style="color: var(--dig-faint)">{{ nameFor(a) }}</span>
