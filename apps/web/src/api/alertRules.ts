@@ -12,8 +12,8 @@ import { apiFetch } from './client'
 
 export type AlertOperator = 'lt' | 'lte' | 'gt' | 'gte'
 
-// Lot N: two evaluated families — wallet health-factor and asset price.
-export type AlertRuleMetric = 'health_factor' | 'price'
+// Lot N: evaluated families — wallet health-factor, asset price, pool TVL drop.
+export type AlertRuleMetric = 'health_factor' | 'price' | 'tvl_drop_pct'
 
 // Matches the back DTO (mapRule).
 export interface AlertRule {
@@ -62,6 +62,22 @@ export async function fetchPricedAssets(): Promise<{
   return apiFetch<{ count: number; assets: PricedAsset[] }>(
     '/alert-rules/priced-assets'
   )
+}
+
+// GET /v1/alert-rules/tvl-pools — pools eligible for TVL-drop rules (N3):
+// active entities with reserve-batch history on the live refresh path.
+export interface TvlPool {
+  entityId: string
+  slug: string | null
+  name: string
+  venueName: string | null
+}
+
+export async function fetchTvlPools(): Promise<{
+  count: number
+  pools: TvlPool[]
+}> {
+  return apiFetch<{ count: number; pools: TvlPool[] }>('/alert-rules/tvl-pools')
 }
 
 export type UpdateAlertRuleInput = Partial<CreateAlertRuleInput>

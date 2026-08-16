@@ -44,11 +44,17 @@ export class AlertsController {
     return this.alertsService.listRules(userId);
   }
 
-  // Static path — declared BEFORE ':id' so it never matches as a rule id.
+  // Static paths — declared BEFORE ':id' so they never match as a rule id.
   // The vetted asset list for price rules (market data, not user-scoped).
   @Get('priced-assets')
   listPricedAssets() {
     return this.alertsService.listPricedAssets();
+  }
+
+  // Pools eligible for TVL-drop rules (N3): reserve-batch history required.
+  @Get('tvl-pools')
+  listTvlPools() {
+    return this.alertsService.listTvlPools();
   }
 
   @Get(':id')

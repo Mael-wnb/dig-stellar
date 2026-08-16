@@ -28,10 +28,12 @@ import { fetchWalletOverview } from '../api/wallets'
 import type { WalletItem } from '../types/wallet'
 import {
   fetchPricedAssets,
+  fetchTvlPools,
   type AlertRule as BackendRule,
   type AlertOperator as BackendOperator,
   type CreateAlertRuleInput,
   type PricedAsset,
+  type TvlPool,
 } from '../api/alertRules'
 import type { AppNotification, NotificationLink } from '../api/notifications'
 
@@ -88,7 +90,7 @@ export interface CreateRulePayload {
 export const SUPPORTED_METRICS: Record<AlertScope, Set<AlertMetric>> = {
   wallet: new Set<AlertMetric>(['health']),
   asset: new Set<AlertMetric>(['price']),
-  venue: new Set<AlertMetric>([]),
+  venue: new Set<AlertMetric>(['tvl']),
   protocol: new Set<AlertMetric>([]),
 }
 export function isSupported(scope: AlertScope, metric: AlertMetric): boolean {
@@ -230,6 +232,22 @@ export function useAlerts() {
     return m
   })
 
+  // TVL-eligible pool directory (N3): the vetted target list for TVL-drop
+  // rules, also used to label existing rules by pool name.
+  const tvlPools = ref<TvlPool[]>([])
+  const pools = computed(() =>
+    tvlPools.value.map((p) => ({
+      id: p.entityId,
+      label: p.venueName ? `${p.venueName} ${p.name}` : p.name,
+      sub: p.venueName ?? '',
+    })),
+  )
+  const poolById = computed(() => {
+    const m = new Map<string, TvlPool>()
+    for (const p of tvlPools.value) m.set(p.entityId, p)
+    return m
+  })
+
   // scope_ref display for a rule: the wallet's label, or "All wallets" when the rule
   // spans every wallet (userWalletId === null).
   function scopeRefLabel(userWalletId: string | null): string {
@@ -261,6 +279,25 @@ export function useAlerts() {
         }
       }
 
+      if (r.metric === 'tvl_drop_pct') {
+        const pool = r.poolEntityId ? poolById.value.get(r.poolEntityId) : undefined
+        const label = pool
+          ? (pool.venueName ? `${pool.venueName} ${pool.name}` : pool.name)
+          : `${(r.poolEntityId ?? '').slice(0, 8)}…`
+        return {
+          id: r.id,
+          name: `${label} · TVL drop`,
+          scope: 'venue',
+          scope_ref: label,
+          metric: 'tvl',
+          operator: toViewOperator(r.operator),
+          threshold,
+          severity: 'warning',
+          enabled: r.enabled,
+          condition: `tvl_drop ${sym} ${threshold}% / 24h · ${label}`,
+        }
+      }
+
       const label = scopeRefLabel(r.userWalletId)
       return {
         id: r.id,
@@ -289,6 +326,12 @@ export function useAlerts() {
       let metric: AlertMetric | undefined = 'health'
       if (payloadMetric === 'price') {
         metric = 'price'
+      } else if (payloadMetric === 'tvl_drop_pct') {
+        metric = 'tvl' // trend icon
+        if (fired) {
+          severity = 'warning'
+          category = 'critical'
+        }
       } else if (payloadMetric === 'pool_status') {
         metric = undefined // bell icon — pool status is not a rule metric
         if (fired) {
@@ -318,7 +361,7 @@ export function useAlerts() {
     loading.value = true
     error.value = null
     try {
-      await Promise.all([loadRules(), loadNotifications(), loadWallets(), loadAssets()])
+      await Promise.all([loadRules(), loadNotifications(), loadWallets(), loadAssets(), loadPools()])
     } catch (e: any) {
       error.value = e?.message ?? 'Failed to load alerts'
     } finally {
@@ -334,6 +377,17 @@ export function useAlerts() {
       // non-fatal: price rules render with a short-id label, the modal shows
       // an honest "no priced assets" state.
       pricedAssets.value = []
+    }
+  }
+
+  async function loadPools() {
+    try {
+      const data = await fetchTvlPools()
+      tvlPools.value = data.pools ?? []
+    } catch {
+      // non-fatal: tvl rules render with a short-id label, the modal shows an
+      // honest empty state for the venue scope.
+      tvlPools.value = []
     }
   }
 
@@ -374,6 +428,23 @@ export function useAlerts() {
       return
     }
 
+    if (payload.scope === 'venue' && payload.metric === 'tvl') {
+      // scope_ref is the pool entity id from the vetted tvl-pools list. The
+      // backend family is a DROP percentage — operator is always gte ("fires
+      // when the 24h drop exceeds the threshold"), whatever the view showed.
+      const input: CreateAlertRuleInput = {
+        metric: 'tvl_drop_pct',
+        operator: 'gte',
+        threshold: payload.threshold,
+        poolEntityId: payload.scope_ref,
+        userWalletId: null,
+        assetId: null,
+        enabled: true,
+      }
+      await createBackendRule(input)
+      return
+    }
+
     // scope_ref is a wallet address, or the sentinel 'all' (⇒ all wallets ⇒ null).
     const userWalletId =
       payload.scope_ref === 'all'
@@ -400,7 +471,7 @@ export function useAlerts() {
   }
 
   return {
-    rules, feed, wallets, assets, loading, error,
+    rules, feed, wallets, assets, pools, loading, error,
     load, createRule, toggleRule, removeRule,
   }
 }

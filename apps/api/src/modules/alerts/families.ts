@@ -8,21 +8,28 @@
 // a family is creatable IFF its evaluator actually runs — unknown metrics can
 // only appear if the DB gets ahead of the code, and then we skip loudly).
 
-export type AlertFamily = 'health_factor' | 'price';
+export type AlertFamily = 'health_factor' | 'price' | 'tvl_drop_pct';
 
 export type FamilyPartition<T> = {
   healthFactor: T[];
   price: T[];
+  tvlDrop: T[];
   unknown: T[];
 };
 
 export function partitionRulesByFamily<T extends { metric: string }>(
   rules: T[],
 ): FamilyPartition<T> {
-  const out: FamilyPartition<T> = { healthFactor: [], price: [], unknown: [] };
+  const out: FamilyPartition<T> = {
+    healthFactor: [],
+    price: [],
+    tvlDrop: [],
+    unknown: [],
+  };
   for (const rule of rules) {
     if (rule.metric === 'health_factor') out.healthFactor.push(rule);
     else if (rule.metric === 'price') out.price.push(rule);
+    else if (rule.metric === 'tvl_drop_pct') out.tvlDrop.push(rule);
     else out.unknown.push(rule);
   }
   return out;
@@ -82,6 +89,84 @@ export function buildPriceCopy(input: PriceCopyInput): {
   return {
     title: `Price alert resolved: ${symbol} back ${backDir} ${t}`,
     body: `${symbol} is back ${backDir} ${t} — ${v} at ${at}.`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// TVL-drop family (N3) — pool TVL drop % over the ~24h batch window.
+// The OBSERVED VALUE the state machine evaluates is the drop percentage:
+// positive = TVL fell, negative = TVL grew. A rule (operator gte, threshold X)
+// breaches when the drop crosses X% and resolves when it comes back within.
+// ---------------------------------------------------------------------------
+
+// Drop % between the two batch TVLs. null when the previous TVL is not a
+// usable base (zero/negative — a percentage of nothing is meaningless).
+export function computeTvlDropPct(
+  prevTvlUsd: number,
+  latestTvlUsd: number,
+): number | null {
+  if (!Number.isFinite(prevTvlUsd) || !Number.isFinite(latestTvlUsd)) return null;
+  if (prevTvlUsd <= 0) return null;
+  return ((prevTvlUsd - latestTvlUsd) / prevTvlUsd) * 100;
+}
+
+// Compact USD for TVL copy: $8.0M / $950.3K / $12.40.
+export function formatUsdCompact(value: number): string {
+  if (!Number.isFinite(value)) return 'n/a';
+  const abs = Math.abs(value);
+  if (abs >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
+  if (abs >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
+  if (abs >= 1e3) return `$${(value / 1e3).toFixed(1)}K`;
+  return `$${value.toFixed(2)}`;
+}
+
+// Signed drop for display: drop 12.4 → "−12.4%", drop -3.2 (growth) → "+3.2%".
+export function formatDropPct(dropPct: number): string {
+  const abs = Math.abs(dropPct).toFixed(1);
+  return dropPct >= 0 ? `−${abs}%` : `+${abs}%`;
+}
+
+export type TvlDropCopyInput = {
+  emit: 'alert_fired' | 'alert_resolved';
+  poolLabel: string;
+  dropPct: number;
+  prevTvlUsd: number;
+  latestTvlUsd: number;
+  thresholdPct: number;
+  windowHours: number; // ACTUAL hours between the two batches (honesty)
+  asOf: Date; // latest batch snapshot_at
+  now: Date;
+};
+
+// "Blend Fixed TVL −12.4% over 24h ($8.0M → $7.0M) — as of 14:32 UTC."
+export function buildTvlDropCopy(input: TvlDropCopyInput): {
+  title: string;
+  body: string;
+} {
+  const {
+    emit,
+    poolLabel,
+    dropPct,
+    prevTvlUsd,
+    latestTvlUsd,
+    thresholdPct,
+    windowHours,
+    asOf,
+    now,
+  } = input;
+  const move = `${formatDropPct(dropPct)} over ${windowHours}h`;
+  const range = `${formatUsdCompact(prevTvlUsd)} → ${formatUsdCompact(latestTvlUsd)}`;
+  const at = formatAsOf(asOf, now);
+
+  if (emit === 'alert_fired') {
+    return {
+      title: `TVL drop: ${poolLabel} ${move}`,
+      body: `${poolLabel} TVL ${move} (${range}) — as of ${at}.`,
+    };
+  }
+  return {
+    title: `TVL drop resolved: ${poolLabel} back within ${thresholdPct}%`,
+    body: `${poolLabel} TVL is back within your ${thresholdPct}% threshold: ${move} (${range}) — as of ${at}.`,
   };
 }
 

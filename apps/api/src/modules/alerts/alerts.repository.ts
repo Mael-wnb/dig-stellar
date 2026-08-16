@@ -128,7 +128,7 @@ export type LatestPoolHealth = {
 export type AlertRule = {
   id: string;
   userId: string;
-  metric: 'health_factor' | 'price';
+  metric: 'health_factor' | 'price' | 'tvl_drop_pct';
   userWalletId: string | null; // null = all wallets (health_factor family)
   poolEntityId: string | null; // null = all pools (health_factor family)
   assetId: string | null; // price family subject; null for other families
@@ -154,7 +154,7 @@ export type AlertRuleState = {
 
 // Fully-normalized create input (the service validates/defaults before calling).
 export type CreateRuleInput = {
-  metric: 'health_factor' | 'price';
+  metric: 'health_factor' | 'price' | 'tvl_drop_pct';
   operator: 'lt' | 'lte' | 'gt' | 'gte';
   threshold: number;
   cooldownSeconds: number;
@@ -187,10 +187,12 @@ export type ListNotificationsOptions = {
 };
 
 // Pool label parts for fire-time copy: the entity (pool) display name + the
-// venue/protocol label reachable via entities.venue_id -> venues.
+// venue/protocol label reachable via entities.venue_id -> venues. slug feeds
+// the notification's route hint (deep-link to the pool page).
 export type PoolLabel = {
   name: string;
   venueLabel: string | null;
+  slug: string | null;
 };
 
 // Lot N — generic edge state for wallet-less families (price; later pool
@@ -234,6 +236,31 @@ type LatestAssetPriceRow = {
 // is older than this is no longer on the refresh path and must not be offered
 // for new price rules (honesty rule: creatable IFF the evaluator has data).
 const PRICED_ASSET_MAX_AGE = '7 days';
+
+// Lot N (N3) — the two-batch TVL window the tvl_drop_pct evaluator consumes.
+export type PoolTvlWindow = {
+  entityId: string;
+  latestTvlUsd: number | null;
+  prevTvlUsd: number | null;
+  latestAt: unknown;
+  prevAt: unknown;
+};
+
+type PoolTvlWindowRow = {
+  entity_id: string;
+  latest_tvl_usd: unknown;
+  prev_tvl_usd: unknown;
+  latest_at: unknown;
+  prev_at: unknown;
+};
+
+// Lot N (N3) — a pool eligible for TVL-drop rules (modal target list).
+export type TvlPool = {
+  entityId: string;
+  slug: string | null;
+  name: string;
+  venueName: string | null;
+};
 
 // Lot N (N2) — last-seen status of a monitored Blend pool (pool_status_state).
 export type PoolStatusState = {
@@ -582,7 +609,7 @@ export class AlertsRepository {
       // Prefer display names; fall back to slugs. (both names are NOT NULL today.)
       const name = (row.name ?? row.slug ?? '').trim();
       const venueLabel = (row.venue_name ?? row.venue_slug ?? '').trim() || null;
-      if (name) map.set(row.id, { name, venueLabel });
+      if (name) map.set(row.id, { name, venueLabel, slug: row.slug });
     }
     return map;
   }
@@ -689,6 +716,133 @@ export class AlertsRepository {
       params.lastEvaluatedAt,
       params.lastFiredAt
     );
+  }
+
+  // -------------------------------------------------------------------------
+  // Lot N (N3) — pool TVL windows over reserve_snapshots batches
+  // -------------------------------------------------------------------------
+
+  // Per pool: TVL of the LATEST complete batch vs the batch closest to 24h
+  // before it. Batches are atomic per (entity, snapshot_at) since the
+  // dead-reserves fix, so "the batch" is simply all rows sharing the newest
+  // snapshot_at — never a per-asset latest (that resurrects removed reserves).
+  // The supplied side mirrors compute-pool-metrics.ts: lending pools hold the
+  // supplied amount in b_supply_scaled; AMM pools hold the reserve amount in
+  // d_supply_scaled. Both batches are valued with the SAME latest price per
+  // asset, so the ratio isolates real liquidity movement at current valuation.
+  // The previous batch must sit 12–36h behind the latest one — closer would
+  // fake a "24h" window, farther is a different claim; pools without such a
+  // batch (young history, e.g. stellar-native which writes no reserve batches
+  // at all) are simply absent from the result → the evaluator skips them.
+  async getPoolTvlWindows(entityIds: string[]): Promise<Map<string, PoolTvlWindow>> {
+    const ids = Array.from(new Set(entityIds.filter(Boolean)));
+    if (ids.length === 0) return new Map();
+
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `
+      with batches as (
+        select distinct rs.entity_id, rs.snapshot_at
+        from reserve_snapshots rs
+        where rs.entity_id = any($1::uuid[])
+      ),
+      latest as (
+        select entity_id, max(snapshot_at) as snap
+        from batches
+        group by entity_id
+      ),
+      prev as (
+        select b.entity_id, b.snapshot_at as snap,
+               row_number() over (
+                 partition by b.entity_id
+                 order by abs(extract(epoch from (l.snap - interval '24 hours' - b.snapshot_at)))
+               ) as rn
+        from batches b
+        join latest l using (entity_id)
+        where b.snapshot_at <= l.snap - interval '12 hours'
+          and b.snapshot_at >= l.snap - interval '36 hours'
+      ),
+      picked as (
+        select l.entity_id, l.snap as latest_snap, p.snap as prev_snap
+        from latest l
+        join prev p on p.entity_id = l.entity_id and p.rn = 1
+      ),
+      tvl as (
+        select rs.entity_id, rs.snapshot_at,
+               sum(
+                 coalesce(
+                   case when v.venue_type = 'lending'
+                     then rs.b_supply_scaled
+                     else rs.d_supply_scaled
+                   end, 0
+                 ) * coalesce(px.price_usd, 0)
+               ) as tvl_usd
+        from reserve_snapshots rs
+        join entities e on e.id = rs.entity_id
+        join venues v on v.id = e.venue_id
+        join picked pk on pk.entity_id = rs.entity_id
+          and rs.snapshot_at in (pk.latest_snap, pk.prev_snap)
+        left join lateral (
+          select ap.price_usd from asset_prices ap
+          where ap.asset_id = rs.asset_id
+          order by ap.observed_at desc limit 1
+        ) px on true
+        group by rs.entity_id, rs.snapshot_at
+      )
+      select pk.entity_id,
+             tl.tvl_usd as latest_tvl_usd,
+             tp.tvl_usd as prev_tvl_usd,
+             pk.latest_snap as latest_at,
+             pk.prev_snap as prev_at
+      from picked pk
+      join tvl tl on tl.entity_id = pk.entity_id and tl.snapshot_at = pk.latest_snap
+      join tvl tp on tp.entity_id = pk.entity_id and tp.snapshot_at = pk.prev_snap
+      `,
+      ids
+    )) as PoolTvlWindowRow[];
+
+    const map = new Map<string, PoolTvlWindow>();
+    for (const row of rows) {
+      map.set(row.entity_id, {
+        entityId: row.entity_id,
+        latestTvlUsd: toNumber(row.latest_tvl_usd),
+        prevTvlUsd: toNumber(row.prev_tvl_usd),
+        latestAt: row.latest_at,
+        prevAt: row.prev_at,
+      });
+    }
+    return map;
+  }
+
+  // Pools eligible for TVL-drop rules (the modal's vetted target list): active
+  // entities with reserve-batch history on the live refresh path (last 7 days).
+  // stellar-native and vaults write no reserve batches → naturally excluded.
+  async listTvlPools(): Promise<TvlPool[]> {
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `
+      select e.id, e.slug, e.name, v.name as venue_name
+      from entities e
+      join venues v on v.id = e.venue_id
+      where e.is_active = true
+        and exists (
+          select 1 from reserve_snapshots rs
+          where rs.entity_id = e.id
+            and rs.snapshot_at > now() - interval '7 days'
+        )
+      order by v.name, e.name
+      `
+    )) as Array<{
+      id: string;
+      slug: string | null;
+      name: string | null;
+      venue_name: string | null;
+    }>;
+
+    return rows.map((row) => ({
+      entityId: row.id,
+      slug: row.slug,
+      name: (row.name ?? row.slug ?? '').trim() || `pool ${row.id.slice(0, 8)}`,
+      venueName: row.venue_name,
+    }));
   }
 
   // -------------------------------------------------------------------------

@@ -37,7 +37,7 @@ export type CreateAlertRuleBody = {
 export type UpdateAlertRuleBody = Partial<CreateAlertRuleBody>;
 
 // Lot N: creatable families = the ones the evaluator actually runs (honesty rule).
-const SUPPORTED_METRICS = new Set(['health_factor', 'price']);
+const SUPPORTED_METRICS = new Set(['health_factor', 'price', 'tvl_drop_pct']);
 const OPERATORS = new Set(['lt', 'lte', 'gt', 'gte']);
 const DEFAULT_COOLDOWN_SECONDS = 3600;
 
@@ -81,13 +81,15 @@ export class AlertsService {
 
   // --- field validators (shared by create + patch) -------------------------
 
-  private validateMetric(metric: unknown): 'health_factor' | 'price' {
+  private validateMetric(
+    metric: unknown,
+  ): 'health_factor' | 'price' | 'tvl_drop_pct' {
     if (typeof metric !== 'string' || !SUPPORTED_METRICS.has(metric)) {
       throw new BadRequestException(
-        `Unsupported metric. Supported today: 'health_factor', 'price'.`,
+        `Unsupported metric. Supported today: 'health_factor', 'price', 'tvl_drop_pct'.`,
       );
     }
-    return metric as 'health_factor' | 'price';
+    return metric as 'health_factor' | 'price' | 'tvl_drop_pct';
   }
 
   private validateOperator(operator: unknown): 'lt' | 'lte' | 'gt' | 'gte' {
@@ -170,9 +172,10 @@ export class AlertsService {
   // --- CRUD ----------------------------------------------------------------
 
   // Family invariants (Lot N): a price rule's subject is an asset, never a
-  // wallet/pool; a health-factor rule's subjects are wallet/pool, never an asset.
+  // wallet/pool; a tvl-drop rule's subject is a specific pool; a health-factor
+  // rule's subjects are wallet/pool, never an asset.
   private assertFamilyShape(input: {
-    metric: 'health_factor' | 'price';
+    metric: 'health_factor' | 'price' | 'tvl_drop_pct';
     userWalletId: string | null;
     poolEntityId: string | null;
     assetId: string | null;
@@ -188,9 +191,38 @@ export class AlertsService {
       }
       return;
     }
+    if (input.metric === 'tvl_drop_pct') {
+      if (input.poolEntityId === null) {
+        throw new BadRequestException(
+          'a tvl_drop_pct rule requires poolEntityId (a specific pool).',
+        );
+      }
+      if (input.userWalletId !== null || input.assetId !== null) {
+        throw new BadRequestException(
+          'a tvl_drop_pct rule is pool-scoped: userWalletId and assetId must be null.',
+        );
+      }
+      return;
+    }
     if (input.assetId !== null) {
       throw new BadRequestException(
         'assetId only applies to price rules; must be null for health_factor.',
+      );
+    }
+  }
+
+  // tvl_drop_pct condition sanity: the observed value is a DROP percentage, so
+  // only "drop ≥/> X" is meaningful, and X must be a positive percentage — an
+  // lt/lte or zero threshold would breach permanently on a stable pool.
+  private assertTvlDropCondition(operator: string, threshold: number): void {
+    if (operator !== 'gt' && operator !== 'gte') {
+      throw new BadRequestException(
+        'a tvl_drop_pct rule requires operator gt or gte (fires when the drop exceeds the threshold).',
+      );
+    }
+    if (threshold <= 0) {
+      throw new BadRequestException(
+        'a tvl_drop_pct threshold must be a positive drop percentage.',
       );
     }
   }
@@ -215,6 +247,9 @@ export class AlertsService {
     };
 
     this.assertFamilyShape(input);
+    if (input.metric === 'tvl_drop_pct') {
+      this.assertTvlDropCondition(input.operator, input.threshold);
+    }
 
     if (input.userWalletId !== null) {
       await this.assertWalletOwned(userId, input.userWalletId);
@@ -234,6 +269,13 @@ export class AlertsService {
   async listPricedAssets() {
     const assets = await this.alerts.listPricedAssets();
     return { count: assets.length, assets };
+  }
+
+  // Lot N (N3) — pools eligible for TVL-drop rules: active entities with
+  // reserve-batch history on the live refresh path. Not user-scoped.
+  async listTvlPools() {
+    const pools = await this.alerts.listTvlPools();
+    return { count: pools.length, pools };
   }
 
   async getRule(rawUserId: string | undefined, id: string): Promise<AlertRule> {
@@ -286,12 +328,14 @@ export class AlertsService {
       patch.assetId = this.validateOptionalUuid(b.assetId, 'assetId');
     if (has(b, 'enabled')) patch.enabled = this.validateEnabled(b.enabled);
 
-    // A patched subject must keep the rule's family shape valid — merge with the
-    // current (ownership-scoped) row and re-check the invariants.
+    // A patched subject or condition must keep the rule's family shape valid —
+    // merge with the current (ownership-scoped) row and re-check the invariants.
     if (
       patch.userWalletId !== undefined ||
       patch.poolEntityId !== undefined ||
-      patch.assetId !== undefined
+      patch.assetId !== undefined ||
+      patch.operator !== undefined ||
+      patch.threshold !== undefined
     ) {
       const current = await this.alerts.getRule(userId, ruleId);
       if (!current) {
@@ -309,6 +353,12 @@ export class AlertsService {
             : current.poolEntityId,
         assetId: patch.assetId !== undefined ? patch.assetId : current.assetId,
       });
+      if (current.metric === 'tvl_drop_pct') {
+        this.assertTvlDropCondition(
+          patch.operator ?? current.operator,
+          patch.threshold ?? current.threshold ?? Number.NaN,
+        );
+      }
     }
 
     if (patch.userWalletId !== undefined && patch.userWalletId !== null) {

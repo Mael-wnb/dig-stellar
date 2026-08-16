@@ -8,9 +8,13 @@
 import {
   buildPoolStatusCopy,
   buildPriceCopy,
+  buildTvlDropCopy,
+  computeTvlDropPct,
   diffPoolStatus,
   displaySymbol,
   formatAsOf,
+  formatDropPct,
+  formatUsdCompact,
   formatUsdPrice,
   partitionRulesByFamily,
 } from './families';
@@ -65,11 +69,21 @@ describe('partitionRulesByFamily (cross-family dispatch)', () => {
     expect(out.price).toEqual([p1]);
   });
 
+  it('a tvl-drop rule lands in its own bucket, never health/price (N3)', () => {
+    const tvl = rule('tvl_drop_pct', { operator: 'gte', threshold: 10 });
+    const out = partitionRulesByFamily([tvl]);
+    expect(out.healthFactor).toHaveLength(0);
+    expect(out.price).toHaveLength(0);
+    expect(out.tvlDrop).toEqual([tvl]);
+    expect(out.unknown).toHaveLength(0);
+  });
+
   it('a metric with no evaluator lands in unknown (skipped, never evaluated)', () => {
-    const future = rule('tvl_drop_pct');
+    const future = rule('volume_spike_pct');
     const out = partitionRulesByFamily([future]);
     expect(out.healthFactor).toHaveLength(0);
     expect(out.price).toHaveLength(0);
+    expect(out.tvlDrop).toHaveLength(0);
     expect(out.unknown).toEqual([future]);
   });
 });
@@ -189,6 +203,91 @@ describe('price copy (observed value + as_of, honesty rules)', () => {
     expect(displaySymbol(null, null, '12345678-dead-beef')).toBe(
       'asset 12345678',
     );
+  });
+});
+
+describe('tvl-drop family (N3) — drop computation, edge reuse, copy', () => {
+  it('computes the drop % (positive = fell, negative = grew, null on no base)', () => {
+    expect(computeTvlDropPct(8_000_000, 7_000_000)).toBeCloseTo(12.5);
+    expect(computeTvlDropPct(8_000_000, 8_240_000)).toBeCloseTo(-3);
+    expect(computeTvlDropPct(0, 1_000_000)).toBeNull();
+    expect(computeTvlDropPct(-5, 3)).toBeNull();
+  });
+
+  it('reuses the edge machine: fires on crossing the drop threshold, no double-fire, resolves', () => {
+    const tvlRule = rule('tvl_drop_pct', {
+      operator: 'gte',
+      threshold: 10,
+      cooldownSeconds: 3600,
+    });
+    const first = evaluate({ rule: tvlRule, current: 12.5, prev: null, now: NOW });
+    expect(first.emit).toBe('alert_fired');
+
+    const stillDown = evaluate({
+      rule: tvlRule,
+      current: 13.1,
+      prev: first.nextState,
+      now: new Date(NOW.getTime() + 15 * 60 * 1000),
+    });
+    expect(stillDown.emit).toBeNull();
+    expect(stillDown.nextStatus).toBe('breached');
+
+    const recovered = evaluate({
+      rule: tvlRule,
+      current: 4.2,
+      prev: first.nextState,
+      now: new Date(NOW.getTime() + 30 * 60 * 1000),
+    });
+    expect(recovered.emit).toBe('alert_resolved');
+    expect(recovered.nextStatus).toBe('ok');
+  });
+
+  it('fired copy matches the brief: drop %, window, compact USD range, as_of', () => {
+    const { title, body } = buildTvlDropCopy({
+      emit: 'alert_fired',
+      poolLabel: 'Blend Fixed',
+      dropPct: 12.4,
+      prevTvlUsd: 8_000_000,
+      latestTvlUsd: 7_000_000,
+      thresholdPct: 10,
+      windowHours: 24,
+      asOf: new Date('2026-08-15T14:32:00Z'),
+      now: NOW,
+    });
+    expect(title).toBe('TVL drop: Blend Fixed −12.4% over 24h');
+    expect(body).toBe(
+      'Blend Fixed TVL −12.4% over 24h ($8.0M → $7.0M) — as of 14:32 UTC.',
+    );
+  });
+
+  it('resolved copy states the threshold it came back within', () => {
+    const { title, body } = buildTvlDropCopy({
+      emit: 'alert_resolved',
+      poolLabel: 'Blend Fixed',
+      dropPct: 3.1,
+      prevTvlUsd: 8_000_000,
+      latestTvlUsd: 7_752_000,
+      thresholdPct: 10,
+      windowHours: 25,
+      asOf: new Date('2026-08-15T14:32:00Z'),
+      now: NOW,
+    });
+    expect(title).toBe('TVL drop resolved: Blend Fixed back within 10%');
+    expect(body).toBe(
+      'Blend Fixed TVL is back within your 10% threshold: −3.1% over 25h ($8.0M → $7.8M) — as of 14:32 UTC.',
+    );
+  });
+
+  it('a growth window is displayed with a plus sign', () => {
+    expect(formatDropPct(-3.2)).toBe('+3.2%');
+    expect(formatDropPct(12.4)).toBe('−12.4%');
+  });
+
+  it('formats compact USD across magnitudes', () => {
+    expect(formatUsdCompact(8_000_000)).toBe('$8.0M');
+    expect(formatUsdCompact(950_300)).toBe('$950.3K');
+    expect(formatUsdCompact(12.4)).toBe('$12.40');
+    expect(formatUsdCompact(2_100_000_000)).toBe('$2.1B');
   });
 });
 

@@ -18,12 +18,14 @@ import {
 const emit = defineEmits<{ (e: 'close'): void; (e: 'create', payload: CreateRulePayload): void }>()
 
 // Wallet targets normally come from the wallet store; fall back to a sample if
-// not passed. Asset targets (Lot N, price rules) come from the vetted
-// priced-assets list — NO fallback sample: no priced assets ⇒ honest empty state.
+// not passed. Asset targets (N1, price rules) and pool targets (N3, TVL rules)
+// come from the vetted backend lists — NO fallback samples: an empty list shows
+// an honest empty state instead of decorative fakes.
 const props = withDefaults(defineProps<{
   wallets?: Array<{ address: string; label: string }>
   assets?: Array<{ id: string; label: string; sub: string }>
-}>(), { wallets: () => [], assets: () => [] })
+  pools?: Array<{ id: string; label: string; sub: string }>
+}>(), { wallets: () => [], assets: () => [], pools: () => [] })
 
 // ── Definitions (faithful to Paul's builder; Lot N adds the Asset scope) ────
 const SCOPES: Array<{ key: AlertScope; label: string; sub: string; icon: string[] }> = [
@@ -90,11 +92,11 @@ function targetsFor(scope: AlertScope): Array<{ id: string; label: string; sub: 
       { id: 'stellar-native', label: 'Stellar Native DEX', sub: 'Classic AMM', tint: '#241633', color: '#7B45D6' },
     ]
   }
-  return [
-    { id: 'blend-usdc', label: 'USDC Lending', sub: 'Blend', tint: '#17233A', color: '#2E6FD6' },
-    { id: 'aqua-xlm-usdc', label: 'XLM / USDC', sub: 'Aquarius', tint: '#0F302C', color: '#159A8C' },
-    { id: 'soro-eurc-usdc', label: 'EURC / USDC', sub: 'Soroswap', tint: '#37231A', color: '#D86A3E' },
-  ]
+  // venue scope (N3): the vetted TVL-eligible pool list — real pools with
+  // reserve-batch history, never the old hardcoded samples.
+  return props.pools.map(p => ({
+    id: p.id, label: p.label, sub: p.sub, tint: '#17233A', color: '#2E6FD6',
+  }))
 }
 
 // ── State (default to the wallet · health family) ───────────────────────────
@@ -106,7 +108,17 @@ const threshold = ref<string>('1.25')
 const severity = ref<AlertSeverity>('warning')
 
 // Sensible starting threshold per family (the user always edits it).
-const DEFAULT_THRESHOLD: Partial<Record<AlertMetric, string>> = { health: '1.25' }
+const DEFAULT_THRESHOLD: Partial<Record<AlertMetric, string>> = {
+  health: '1.25',
+  tvl: '10',
+}
+
+function pickMetric(m: AlertMetric) {
+  metric.value = m
+  // TVL drop has a single one-direction operator; other families start at 'lt'.
+  operator.value = m === 'tvl' ? 'pct' : 'lt'
+  threshold.value = DEFAULT_THRESHOLD[m] ?? ''
+}
 
 function pickScope(s: AlertScope) {
   scope.value = s
@@ -116,9 +128,7 @@ function pickScope(s: AlertScope) {
   // prefer a supported metric if one exists in this scope, else the first
   const metrics = METRICS_BY_SCOPE[s]
   const supported = metrics.find(([m]) => isSupported(s, m))
-  metric.value = (supported ?? metrics[0])[0]
-  operator.value = 'lt'
-  threshold.value = DEFAULT_THRESHOLD[metric.value] ?? ''
+  pickMetric((supported ?? metrics[0])[0])
 }
 
 const targets = computed(() => targetsFor(scope.value))
@@ -128,11 +138,13 @@ const selectedTarget = computed(() => targets.value.find(t => t.id === targetId.
 const selectedMetricLabel = computed(() => METRIC_LABEL[metric.value])
 const unit = computed(() => (operator.value === 'pct' ? '%' : UNIT[metric.value]))
 const supported = computed(() => isSupported(scope.value, metric.value))
-// For a creatable family only the operators the backend evaluates are offered
-// ('pct' has no backend equivalent — showing it would silently create 'lt').
-const operators = computed<Array<[AlertOperator, string]>>(() =>
-  supported.value ? OPERATORS.filter(([op]) => op !== 'pct') : OPERATORS,
-)
+// For a creatable family only the operators the backend evaluates are offered.
+// TVL drop is a one-direction family: the backend fires when the 24h drop
+// exceeds the threshold, so the only honest wording is "drops by more than".
+const operators = computed<Array<[AlertOperator, string]>>(() => {
+  if (metric.value === 'tvl') return [['pct', 'drops by more than']]
+  return supported.value ? OPERATORS.filter(([op]) => op !== 'pct') : OPERATORS
+})
 const canCreate = computed(() =>
   supported.value &&
   selectedTarget.value !== undefined &&
@@ -205,7 +217,9 @@ function submit() {
         <!-- 2 · Which target -->
         <p class="text-xs font-semibold text-[#5E5F5D] mb-[9px] capitalize">2 · Which {{ scopeNoun }}</p>
         <p v-if="!targets.length" class="text-[12px] text-[#C98A1E] mb-5">
-          No priced assets available right now — the tracked-asset list comes from the data pipeline.
+          {{ scope === 'asset'
+            ? 'No priced assets available right now — the tracked-asset list comes from the data pipeline.'
+            : 'No eligible targets available right now — the list comes from the data pipeline.' }}
         </p>
         <div v-else class="grid grid-cols-2 gap-2 mb-5 max-h-[150px] overflow-y-auto">
           <button
@@ -237,7 +251,7 @@ function submit() {
               : (isSupported(scope, m)
                   ? 'border-color:#2F2F2C; color:#5E5F5D; background:#242422;'
                   : 'border-color:#2A2A27; color:#4A4B47; background:#1E1E1E; cursor:not-allowed;')"
-            @click="isSupported(scope, m) && (metric = m)"
+            @click="isSupported(scope, m) && pickMetric(m)"
           >
             {{ label }}
             <span v-if="!isSupported(scope, m)"

@@ -96,10 +96,12 @@ create index if not exists notifications_user_unread_idx
 -- with `psql -f` on top of the tables above.
 
 -- 4a. Widen the metric family list. The inline CHECK on alert_rules.metric got
--- the auto-generated name alert_rules_metric_check.
+-- the auto-generated name alert_rules_metric_check. N3 adds 'tvl_drop_pct'
+-- (pool TVL drop % over ~24h; subject = pool_entity_id, edge state in
+-- alert_rule_subject_state keyed by the pool entity id).
 alter table alert_rules drop constraint if exists alert_rules_metric_check;
 alter table alert_rules add constraint alert_rules_metric_check
-  check (metric in ('health_factor', 'price'));
+  check (metric in ('health_factor', 'price', 'tvl_drop_pct'));
 
 -- 4b. Price rules reference an asset (assets.id, stellar_v1.sql). Plain typed
 -- uuid, no FK — same convention as pool_entity_id (see header note). NULL for

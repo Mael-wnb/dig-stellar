@@ -14,7 +14,7 @@ import { useNotifications } from '../composables/useNotifications'
 import { useModals } from '../composables/useModals'
 import { useView } from '../composables/useView'
 
-const { rules, feed, wallets, assets, loading, error, load, createRule, toggleRule, removeRule } = useAlerts()
+const { rules, feed, wallets, assets, pools, loading, error, load, createRule, toggleRule, removeRule } = useAlerts()
 // Shared unread state (drives the bell + sidebar badge). "Mark all read" here
 // clears the same in-app notifications the bell surfaces.
 const { unreadCount, markAllAsRead, markAsRead } = useNotifications()
@@ -257,6 +257,7 @@ const iconFor = (n: { metric?: any; category?: string }) => ICONS[metricIconKey(
         v-if="modalOpen"
         :wallets="wallets"
         :assets="assets"
+        :pools="pools"
         @close="modalOpen = false"
         @create="onCreate"
       />

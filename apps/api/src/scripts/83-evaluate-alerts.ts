@@ -24,6 +24,8 @@ import { evaluate } from '../modules/alerts/evaluate';
 import {
   buildPoolStatusCopy,
   buildPriceCopy,
+  buildTvlDropCopy,
+  computeTvlDropPct,
   diffPoolStatus,
   displaySymbol,
   formatAsOf,
@@ -283,6 +285,135 @@ async function main() {
               operator: rule.operator,
               asOf: asOfIso,
               // No route hint: assets have no page of their own (honest).
+            },
+          });
+
+          if (out.emit === 'alert_fired') fired += 1;
+          else resolved += 1;
+        }
+      } catch (error) {
+        console.error(`[evaluate-alerts] rule ${rule.id} failed`);
+        console.error(error);
+      }
+    }
+
+    // ── Family 3: tvl_drop_pct (N3) — pool TVL drop % over the ~24h batch
+    // window. Source: reserve_snapshots complete batches (latest vs closest to
+    // 24h before it), TVL formula mirroring compute-pool-metrics — NOT the
+    // /series logic. Edge state in alert_rule_subject_state keyed by the pool.
+    const tvlPoolIds = Array.from(
+      new Set(
+        families.tvlDrop
+          .map((r) => r.poolEntityId)
+          .filter((id): id is string => id !== null)
+      )
+    );
+    const tvlWindows = await repo.getPoolTvlWindows(tvlPoolIds);
+    const tvlPoolLabels = await repo.getPoolLabels(tvlPoolIds);
+
+    for (const rule of families.tvlDrop) {
+      rulesEvaluated += 1;
+      try {
+        // Shape is service-enforced; skip defensively rather than mis-evaluate.
+        if (rule.poolEntityId === null || rule.threshold === null) continue;
+
+        const win = tvlWindows.get(rule.poolEntityId);
+        if (!win || win.latestTvlUsd === null || win.prevTvlUsd === null) {
+          // Not enough batch history for an honest 24h claim — never fire.
+          console.warn(
+            `[evaluate-alerts] tvl rule ${rule.id}: no 24h batch window for pool ${rule.poolEntityId} — skipped`
+          );
+          continue;
+        }
+
+        const latestIso = toIso(win.latestAt);
+        const prevIso = toIso(win.prevAt);
+        if (latestIso === null || prevIso === null) continue;
+        const latestAt = new Date(latestIso);
+        const prevAt = new Date(prevIso);
+
+        // Stale-pipeline guard: if the newest batch is over a day old the
+        // "drop over 24h" claim is dead data — skip, state untouched.
+        if (now.getTime() - latestAt.getTime() > 24 * 3600 * 1000) {
+          console.warn(
+            `[evaluate-alerts] tvl rule ${rule.id}: latest batch ${latestIso} is stale — skipped`
+          );
+          continue;
+        }
+
+        const dropPct = computeTvlDropPct(win.prevTvlUsd, win.latestTvlUsd);
+        if (dropPct === null) continue;
+
+        const subjectStates = await repo.getSubjectState(rule.id);
+        const prevSubject =
+          subjectStates.find((s) => s.subjectKey === rule.poolEntityId) ?? null;
+        const prev: AlertRuleState | null = prevSubject
+          ? {
+              ruleId: prevSubject.ruleId,
+              userWalletId: '',
+              poolEntityId: '',
+              status: prevSubject.status,
+              lastValue: prevSubject.lastValue,
+              lastEvaluatedAt: prevSubject.lastEvaluatedAt,
+              lastFiredAt: prevSubject.lastFiredAt,
+            }
+          : null;
+
+        const out = evaluate({ rule, current: dropPct, prev, now });
+
+        await repo.upsertSubjectState({
+          ruleId: rule.id,
+          subjectKey: rule.poolEntityId,
+          status: out.nextStatus,
+          lastValue: out.nextState.lastValue,
+          lastEvaluatedAt: now.toISOString(),
+          lastFiredAt: toIso(out.nextState.lastFiredAt),
+        });
+
+        if (out.emit !== null) {
+          const labelParts = tvlPoolLabels.get(rule.poolEntityId);
+          const poolLabel = labelParts
+            ? labelParts.venueLabel
+              ? `${labelParts.venueLabel} ${labelParts.name}`
+              : labelParts.name
+            : `pool ${rule.poolEntityId.slice(0, 8)}`;
+          const windowHours = Math.round(
+            (latestAt.getTime() - prevAt.getTime()) / 3600000
+          );
+
+          const copy = buildTvlDropCopy({
+            emit: out.emit,
+            poolLabel,
+            dropPct,
+            prevTvlUsd: win.prevTvlUsd,
+            latestTvlUsd: win.latestTvlUsd,
+            thresholdPct: rule.threshold,
+            windowHours,
+            asOf: latestAt,
+            now,
+          });
+
+          await repo.insertNotification({
+            userId: rule.userId,
+            ruleId: rule.id,
+            kind: out.emit,
+            title: copy.title,
+            body: copy.body,
+            payload: {
+              poolEntityId: rule.poolEntityId,
+              poolLabel,
+              metric: rule.metric,
+              value: dropPct, // full precision (machine-grade)
+              threshold: rule.threshold,
+              operator: rule.operator,
+              tvlPrevUsd: win.prevTvlUsd,
+              tvlLatestUsd: win.latestTvlUsd,
+              windowHours,
+              asOf: latestIso,
+              // The subject of a TVL alert is the pool's page.
+              link: labelParts?.slug
+                ? { view: 'pool', poolId: labelParts.slug }
+                : undefined,
             },
           });
 
