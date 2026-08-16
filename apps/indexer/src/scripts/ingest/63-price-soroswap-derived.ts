@@ -56,7 +56,17 @@ async function main() {
     );
 
     if ((snapshotRes.rowCount ?? 0) < 2) {
-      throw new Error(`Missing reserve snapshots for ${entitySlug}`);
+      // First cycle after seeding a new pair: the derived-price step runs
+      // BEFORE the soroswap reserve writer, so a just-seeded pair has no
+      // snapshots yet. Skip instead of failing — the pair prices on the next
+      // cycle once run-soroswap-pair-refresh has written its first reserves.
+      console.log({
+        completedAt: nowIso(),
+        entitySlug,
+        inserted: 0,
+        skipped: `no reserve snapshots yet (${snapshotRes.rowCount ?? 0}/2) — expected on the first cycle after seeding`,
+      });
+      return;
     }
 
     const reserves = snapshotRes.rows as Array<{
