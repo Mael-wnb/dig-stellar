@@ -49,8 +49,10 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
 - T3-D1 addendum — **AMM perimeter widened (Aug 16, Lot P):** Aquarius 4→21 pools (≈$41M), Soroswap
   1→4 pairs (≈$1.18M), +5 priced assets (USDY/yXLM/yUSDC/BTC/ETH). Locally validated (2 refresh runs
   green, TVL cross-check 24/25 within ±3.1%, total 381s vs 251s baseline — inside cadence).
-  **VPS seed pending founder SSH confirmation.** Known issue flagged: stale CoinGecko `cetes` feed
-  (≈½ market price; predates Lot P). Evidence: `docs/evidence/lot-p/`.
+  **VPS seed pending founder SSH confirmation.** The cross-check exposed a dead CoinGecko `cetes`
+  feed (≈½ market price; predated Lot P) — ruled + fixed same day (manual rule $0.069, vetted vs
+  pool-implied + Aqua oracle, confidence: low; robust Aquarius-derived fix on the fast-follow
+  list). Evidence: `docs/evidence/lot-p/`.
 - Closest tranche-critical targets: T3-D2 KPIs (adoption — distribution push starts now; the
   execution evidence itself is now complete), T3-D3 (**Lot C design-handoff port DONE** —
   shell + 5 views + modals on real data, `/v1/pools/:slug/flows` + `/series` added; observability +

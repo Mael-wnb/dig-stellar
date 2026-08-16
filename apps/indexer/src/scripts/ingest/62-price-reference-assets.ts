@@ -247,15 +247,18 @@ function resolvePriceFromRule(params: {
 
   if (rule.kind === 'manual') {
     const envPrice = getOptionalNumberEnv(rule.envVar);
+    const confidence = rule.confidence ?? 'medium';
+    const note = rule.note ? { note: rule.note } : {};
 
     if (envPrice !== null) {
       return {
         priceUsd: envPrice,
         source: 'manual_env',
         metadata: {
-          confidence: 'medium',
+          confidence,
           method: 'pricing_config_manual_env',
           envVar: rule.envVar,
+          ...note,
         },
       };
     }
@@ -265,9 +268,10 @@ function resolvePriceFromRule(params: {
         priceUsd: rule.fallbackPriceUsd,
         source: 'manual_fallback',
         metadata: {
-          confidence: 'medium',
+          confidence,
           method: 'pricing_config_manual_fallback',
           envVar: rule.envVar,
+          ...note,
         },
       };
     }

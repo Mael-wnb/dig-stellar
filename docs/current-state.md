@@ -350,9 +350,13 @@ contract id venue-verified): 17 Aquarius (incl. 6 concentrated — same contract
 unchanged) + 2 Soroswap (USDC/EURC, USTRY/USDC). Five assets joined the pricing config (USDY, yXLM,
 yUSDC, BTC, ETH — proxies/pegs carry `confidence: medium`). The long-dead Soroswap native/EURC pair
 is live again on-chain ($415k) and was re-enabled as part of the same seed. TVL cross-check vs the
-venues: 24/25 pools within ±3.1%; the one outlier (CETES/USDC −25%) exposed a **pre-existing stale
-CoinGecko `cetes` feed** (~½ the on-chain market price — also understates CETES reserves in 3 Blend
-pools), flagged for a founder decision, not silently patched. Evidence: `docs/evidence/lot-p/`.
+venues: 24/25 pools within ±3.1%; the one outlier (CETES/USDC −25%) exposed a **pre-existing dead
+CoinGecko `cetes` feed** (~½ the on-chain market price — also understated CETES reserves in 3 Blend
+pools). Founder ruling same day: CETES switched to a manual rule ($0.069, vetted against the
+pool-implied price + Aqua oracle, `confidence: low`, dated note in `asset_prices.metadata`;
+`MANUAL_CETES_USD` overridable). An Aquarius-derived mid-price is the planned robust fix
+(fast-follow). USTRY/TESOURO (same issuer, own CG ids) cross-check fine and stay CG-priced as
+watch-items. Evidence: `docs/evidence/lot-p/`.
 
 All five protocols aggregate at the protocol level (`protocol_metrics_latest`), with a synchronous
 `as_of` within one `job:refresh` cycle, observed advancing across consecutive cycles.

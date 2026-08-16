@@ -87,13 +87,53 @@ TESOURO, same issuer via their own CG ids, cross-check fine at −0.5% / +2.0%).
 alternative CETES listing.
 
 **Impact beyond Lot P:** CETES has been priced this way since YieldBlox onboarding — the CETES
-reserves in 3 Blend pools (etherfuse, fixed, orbit) are understated by the same ×2. Options for
-the founder (deliberately NOT decided unilaterally — it moves product-wide TVLs and alerts):
-(a) derive CETES from the newly indexed aquarius-cetes-usdc-pool mid-price ($2.4M liquidity,
-clears the ≥$100k bar; needs a small aquarius-derived pricing step — 63 is soroswap-only);
-(b) `MANUAL_CETES_USD` env override as a stopgap (the rule's fallback already supports it);
-(c) leave as-is and accept the documented understatement. Recommendation: (b) now, (a) as the
-robust fix.
+reserves in 3 Blend pools (etherfuse, fixed, orbit) were understated by the same ×2.
+
+### Founder ruling (2026-08-16) — RESOLVED
+
+CoinGecko feed confirmed dead founder-side ($6/day volume, orderbook price). The
+`fallbackEnvVar` mechanism cannot help — CG *succeeds* with a wrong price — so the CETES rule
+switched from `coingecko` to `manual`: committed fallback **$0.069** (the pool-implied /
+Aqua-oracle agreement, both within 0.6% of each other), `MANUAL_CETES_USD` overridable,
+**`confidence: low`** and a dated provenance note carried into `asset_prices.metadata`
+(the manual rule kind gained optional `confidence`/`note` overrides for exactly this; the
+existing EURC manual rule keeps its `medium` default). Verified in `asset_prices`:
+`0.069 | manual_fallback | low | vetted 2026-08-16: aquarius-cetes-usdc-pool implied price
++ Aqua oracle agreement; CG feed dead`.
+
+**Watch-items (unchanged, per the same ruling):** USTRY and TESOURO — same issuer, priced via
+their own CG ids (`etherfuse-ustry` / `etherfuse-tesouro`) — cross-checked at −0.45% / +2.04%
+in P2, so they stay CG-priced; if either drifts past the ~5% tolerance in a future
+cross-check, suspect the same dead-feed failure mode before anything else.
+
+### CETES revaluation (run 3, after the rule switch)
+
+| Pool | Before (CG $0.0345) | After (manual $0.069) | Delta |
+|---|---:|---:|---:|
+| aquarius-cetes-usdc-pool | $1,787,076 | $2,382,570 | **−25.0% → +0.06%** vs venue ($2,381,133 fresh) |
+| blend-etherfuse-pool | $135,826 | $163,774 | +20.6% (its CETES reserve revalued ×2) |
+| blend-fixed-pool | $178,069,223 | $178,036,228 | ≈0 (negligible CETES; market drift) |
+| blend-orbit-pool | $190,729 | $190,750 | ≈0 (negligible CETES) |
+| blend-yieldblox-pool | $3,077,354 | $3,077,695 | ≈0 (negligible CETES) |
+
+The understatement was material in aquarius-cetes-usdc-pool and blend-etherfuse only — fixed /
+orbit / yieldblox hold negligible CETES today. Any protocol-TVL step-change on 2026-08-16 from
+these rows is this correction, not an outage (same precedent as the frozen-reserves hotfix).
+
+Run 3 (`p2-refresh-run3-cetes-fix-local.txt`): all 10 steps green, total 443.4s. Timing note:
+steady-state totals ranged **381–443s** across runs 2–3; the variance is `stellar-native`
+Horizon latency (188s → 245s), not the AMM perimeter (aquarius stable at 166–170s). 443s sits
+close to the 7.5-min lever bar — if the VPS shows the same on a hot cycle, the 100s of Aquarius
+inter-pool spacing remains the designated first lever.
+
+## Fast-follow list (deferred by founder ruling, post-deadline)
+
+- **Aquarius-derived mid-price step** (the robust CETES fix; 63 is soroswap-only today) —
+  source pool `aquarius-cetes-usdc-pool` ($2.4M ≥ the $100k liquidity bar).
+- Deferred shortlist assets: XAUm (`matrixdock-gold`), SHX (`stronghold-token`), XRP
+  (`ripple`), yBTC (BTC proxy), yETH (ETH proxy), BLND (`blend-protocol`) — would unlock the
+  remaining ≥$50k pools from the P0 §6 table.
+- USDM1 / USST / sUSD stay excluded — the honest boundary (P0 §6 record stands).
 
 ## Invariants & tests
 
