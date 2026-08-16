@@ -19,4 +19,12 @@ export const PRICING_RULES_BY_SYMBOL: Record<string, PricingRule> = {
   // YieldBlox (blend-yieldblox-pool) reserve assets not already covered above.
   AQUA: { kind: 'coingecko', id: 'aquarius', fallbackEnvVar: 'MANUAL_AQUA_USD' },
   USDGLO: { kind: 'coingecko', id: 'glo-dollar', fallbackEnvVar: 'MANUAL_USDGLO_USD' },
+  // Lot P (P0b, founder-approved top tier 2026-08-16). Proxy/peg rules carry the
+  // same confidence:medium caveat as SolvBTC above — 1:1-redeemable wrappers whose
+  // peg the venue's own price confirmed at vetting time (docs/evidence/lot-p/).
+  USDY: { kind: 'coingecko', id: 'ondo-us-dollar-yield', fallbackEnvVar: 'MANUAL_USDY_USD' },
+  yXLM: { kind: 'proxy', base: 'XLM' },
+  yUSDC: { kind: 'stable', priceUsd: 1 },
+  BTC: { kind: 'proxy', base: 'BTC' },
+  ETH: { kind: 'coingecko', id: 'ethereum', fallbackEnvVar: 'MANUAL_ETH_USD' },
 };

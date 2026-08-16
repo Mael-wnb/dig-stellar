@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-13T12:06:19.482Z",
+  "generatedAt": "2026-08-16T10:50:59.683Z",
   "source": "registry-export.ts (live DB snapshot of the vetted perimeter)",
   "venues": [
     {
@@ -72,6 +72,153 @@
   "entities": [
     {
       "venue_slug": "aquarius",
+      "slug": "aquarius-aqua-usdc-clpool",
+      "name": "AQUA-USDC Aquarius Concentrated Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CBRUQ7I6C6OGHMDYWD6XQUZFB6KJ3LLPNE34EPKSPFZ2YMBJ2GIWYYZ7",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 30,
+          "pool_type": "concentrated",
+          "tick_spacing": 60
+        },
+        "source": "lot-p-p1",
+        "token0": "CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK",
+        "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-aqua-usdc-pool",
+      "name": "AQUA-USDC Aquarius Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CA6GAFOJCW4MGQQBUCQUSA3CLIH25G4SNKB2JHYKZCVWZTNW5VXMSC4O",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 30,
+          "pool_type": "constant_product"
+        },
+        "source": "lot-p-p1",
+        "token0": "CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK",
+        "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-btc-eth-pool",
+      "name": "BTC-ETH Aquarius Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CDOGKTAHIINHYDL3BUYDVKIQDDJI35IBMLOUHC3AZC6FNJFT5ZC7BYDJ",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 10,
+          "pool_type": "constant_product"
+        },
+        "source": "lot-p-p1",
+        "token0": "CAO7DDJNGMOYQPRYDY5JVZ5YEK4UQBSMGLAEWRCUOTRMDSBMGWSAATDZ",
+        "token1": "CBH4M45TQBLDPXOK6L7VYKMEJWFITBOL64BN3WDAIIDT4LNUTWTTOCKF",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-btc-usdc-clpool",
+      "name": "BTC-USDC Aquarius Concentrated Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CCZXH6N6DSJLAMXCYODGD255GTFILMNU4R5AHPE7PED4A4EZEOPYAWL5",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 30,
+          "pool_type": "concentrated",
+          "tick_spacing": 60
+        },
+        "source": "lot-p-p1",
+        "token0": "CAO7DDJNGMOYQPRYDY5JVZ5YEK4UQBSMGLAEWRCUOTRMDSBMGWSAATDZ",
+        "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-cetes-usdc-pool",
+      "name": "CETES-USDC Aquarius Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CCKGQSQG5JLZBMYMB4HT6M4H7FUC3NK5C75MIHN6627LRAY5B2SYL2AD",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 10,
+          "pool_type": "constant_product"
+        },
+        "source": "lot-p-p1",
+        "token0": "CAL6ER2TI6CTRAY6BFXWNWA7WTYXUXTQCHUBCIBU5O6KM3HJFG6Z6VXV",
+        "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-eth-usdc-pool",
+      "name": "ETH-USDC Aquarius Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CCZC4HGM2BW7TIIS4KBDQEZX67DFZLOL6TZXGUGD6SJZS6IJ5JUAEZZR",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 30,
+          "pool_type": "constant_product"
+        },
+        "source": "lot-p-p1",
+        "token0": "CBH4M45TQBLDPXOK6L7VYKMEJWFITBOL64BN3WDAIIDT4LNUTWTTOCKF",
+        "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-native-aqua-clpool",
+      "name": "native-AQUA Aquarius Concentrated Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CA4HTZNY2RBZWEQE5GBMNREZMFRPAZSVJ6OGPC7T3VM7NHRJYFAVID2S",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 30,
+          "pool_type": "concentrated",
+          "tick_spacing": 60
+        },
+        "source": "lot-p-p1",
+        "token0": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+        "token1": "CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-native-aqua-pool",
+      "name": "native-AQUA Aquarius Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CCY2PXGMKNQHO7WNYXEWX76L2C5BH3JUW3RCATGUYKY7QQTRILBZIFWV",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 30,
+          "pool_type": "constant_product"
+        },
+        "source": "lot-p-p1",
+        "token0": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+        "token1": "CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
       "slug": "aquarius-native-solvbtc-pool",
       "name": "native-SolvBTC Aquarius Pool",
       "entity_type": "amm_pool",
@@ -85,6 +232,25 @@
         "source": "aquarius_final_registry",
         "token0": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
         "token1": "CBIJBDNZNF4X35BJ4FFZWCDBSCKOP5NB4PLG4SNENRMLAPYG4P5FM6VN",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-native-usdc-clpool",
+      "name": "native-USDC Aquarius Concentrated Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CBBMQBNHB2FYVZYV7VNHOJHUMTFJLR4PUMRVQYNW6RHIKZO2NQMIBUCV",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 10,
+          "pool_type": "concentrated",
+          "tick_spacing": 20
+        },
+        "source": "lot-p-p1",
+        "token0": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+        "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
         "reserveCount": 2
       }
     },
@@ -108,6 +274,62 @@
     },
     {
       "venue_slug": "aquarius",
+      "slug": "aquarius-native-yxlm-clpool",
+      "name": "native-yXLM Aquarius Concentrated Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CADMDTCQHSC2GCYPDCYQ7FBYVOXED3E3WGCYJHHT524ZBALM7VYHFS7F",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 10,
+          "pool_type": "concentrated",
+          "tick_spacing": 20
+        },
+        "source": "lot-p-p1",
+        "token0": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+        "token1": "CBZVSNVB55ANF24QVJL2K5QCLOAB6XITGTGXYEAF6NPTXYKEJUYQOHFC",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-native-yxlm-pool",
+      "name": "native-yXLM Aquarius Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CCFGZJTHQZGDZP5PK6WMLKHKJ72ACSVMJGCI2NFR7Q6EAVSKWLJB3ZH3",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 10,
+          "pool_type": "stable"
+        },
+        "source": "lot-p-p1",
+        "token0": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+        "token1": "CBZVSNVB55ANF24QVJL2K5QCLOAB6XITGTGXYEAF6NPTXYKEJUYQOHFC",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-pyusd-usdc-clpool",
+      "name": "PYUSD-USDC Aquarius Concentrated Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CAPIOQNULTKVYOJT6X2W2XKGNIVUWZDY72Y42YG6HQKJ7DU7YTHIDQYX",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 10,
+          "pool_type": "concentrated",
+          "tick_spacing": 20
+        },
+        "source": "lot-p-p1",
+        "token0": "CCCRWH6Q3FNP3I2I57BDLM5AFAT7O6OF6GKQOC6SSJNDAVRZ57SPHGU2",
+        "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
       "slug": "aquarius-pyusd-usdc-pool",
       "name": "PYUSD-USDC Aquarius Pool",
       "entity_type": "amm_pool",
@@ -122,6 +344,96 @@
         },
         "source": "aquarius_final_registry",
         "token0": "CCCRWH6Q3FNP3I2I57BDLM5AFAT7O6OF6GKQOC6SSJNDAVRZ57SPHGU2",
+        "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-usdc-tesouro-pool",
+      "name": "USDC-TESOURO Aquarius Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CDPF7GMA3OLVUBLEVKNKXKEFSS3EQAXN75RHT7DR4SYIHFS5LH5JOTD7",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 30,
+          "pool_type": "constant_product"
+        },
+        "source": "lot-p-p1",
+        "token0": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "token1": "CD6M4R2322BYCY2LNWM74PEBQAQ63SA3DUJLI3L4225U4ZVCLMSCBCIS",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-usdc-yusdc-pool",
+      "name": "USDC-yUSDC Aquarius Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CCWNKTTMHZ4VRR3FYQT3G253MHOGRLUEVTO6YPENM7ZN65DGC345LHI6",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 1,
+          "pool_type": "stable"
+        },
+        "source": "lot-p-p1",
+        "token0": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "token1": "CDOFW7HNKLUZRLFZST4EW7V3AV4JI5IHMT6BPXXSY2IEFZ4NE5TWU2P4",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-usdglo-usdc-pool",
+      "name": "USDGLO-USDC Aquarius Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CAC56QNJ2CX456TPC5S4MSOU3DBULG4TGN7AZ2SAYGBLD3GICFMZBIT2",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 10,
+          "pool_type": "stable"
+        },
+        "source": "lot-p-p1",
+        "token0": "CB226ZOEYXTBPD3QEGABTJYSKZVBP2PASEISLG3SBMTN5CE4QZUVZ3CE",
+        "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-usdy-usdc-pool",
+      "name": "USDY-USDC Aquarius Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CAFHLHGZXOVNCGFJ7DOXL7JDNMBCEZKDI3LS5NRQH3GXC7CSIMQZHUSM",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 10,
+          "pool_type": "constant_product"
+        },
+        "source": "lot-p-p1",
+        "token0": "CB3YA656OYIHU57657I5KGSBRHE5I3OZU4VFC22PYAOANFZHEWNYGAGP",
+        "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "aquarius",
+      "slug": "aquarius-ustry-usdc-pool",
+      "name": "USTRY-USDC Aquarius Pool",
+      "entity_type": "amm_pool",
+      "contract_address": "CCX2TYR4AQTPPMTZOIMP3YIBHAYLLSTXVP47PAGTL753PCQFSKV32MIA",
+      "is_active": true,
+      "metadata": {
+        "info": {
+          "fee": 30,
+          "pool_type": "constant_product"
+        },
+        "source": "lot-p-p1",
+        "token0": "CBLV4ATSIWU67CFSQU2NVRKINQIKUZ2ODSZBUJTJ43VJVRSBTZYOPNUR",
         "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
         "reserveCount": 2
       }
@@ -309,6 +621,34 @@
         "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
         "reserveCount": 2
       }
+    },
+    {
+      "venue_slug": "soroswap",
+      "slug": "soroswap-usdc-eurc-pair",
+      "name": "USDC-EURC Soroswap LP Token",
+      "entity_type": "amm_pool",
+      "contract_address": "CC7CDFY2VGDODJ7WPO3JIK2MXLOAXL4LRQCC43UJDBAIJ4SVFO3HNPOC",
+      "is_active": true,
+      "metadata": {
+        "source": "lot-p-p1",
+        "token0": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "token1": "CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV",
+        "reserveCount": 2
+      }
+    },
+    {
+      "venue_slug": "soroswap",
+      "slug": "soroswap-ustry-usdc-pair",
+      "name": "USTRY-USDC Soroswap LP Token",
+      "entity_type": "amm_pool",
+      "contract_address": "CDIXSYDR7S5OLT56JM7G5Y5LHH6NEFINZOE2YG2TJEXHHYWKLV3FDCCU",
+      "is_active": true,
+      "metadata": {
+        "source": "lot-p-p1",
+        "token0": "CBLV4ATSIWU67CFSQU2NVRKINQIKUZ2ODSZBUJTJ43VJVRSBTZYOPNUR",
+        "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "reserveCount": 2
+      }
     }
   ],
   "assets": [
@@ -326,6 +666,18 @@
     },
     {
       "chain": "stellar-mainnet",
+      "contract_address": "CAO7DDJNGMOYQPRYDY5JVZ5YEK4UQBSMGLAEWRCUOTRMDSBMGWSAATDZ",
+      "asset_type": "soroban_token",
+      "symbol": "BTC",
+      "name": "BTC:GDPJALI4AZKUU2W426U5WKMAT6CN3AJRPIIRYR2YM54TL2GDWO5O2MZM",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
       "contract_address": "CAL6ER2TI6CTRAY6BFXWNWA7WTYXUXTQCHUBCIBU5O6KM3HJFG6Z6VXV",
       "asset_type": "soroban_token",
       "symbol": "CETES",
@@ -334,6 +686,18 @@
       "logo_url": null,
       "metadata": {
         "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CBH4M45TQBLDPXOK6L7VYKMEJWFITBOL64BN3WDAIIDT4LNUTWTTOCKF",
+      "asset_type": "soroban_token",
+      "symbol": "ETH",
+      "name": "ETH:GBFXOHVAS43OIWNIO7XLRJAHT3BICFEIKOJLZVXNT572MISM4CMGSOCC",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "source": "lot-p-p1"
       }
     },
     {
@@ -439,6 +803,18 @@
     },
     {
       "chain": "stellar-mainnet",
+      "contract_address": "CB3YA656OYIHU57657I5KGSBRHE5I3OZU4VFC22PYAOANFZHEWNYGAGP",
+      "asset_type": "soroban_token",
+      "symbol": "USDY",
+      "name": "USDY:GAJMPX5NBOG6TQFPQGRABJEEB2YE7RFRLUKJDZAZGAD5GFX4J7TADAZ6",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
       "contract_address": "CBLV4ATSIWU67CFSQU2NVRKINQIKUZ2ODSZBUJTJ43VJVRSBTZYOPNUR",
       "asset_type": "soroban_token",
       "symbol": "USTRY",
@@ -461,9 +837,161 @@
         "source": "aquarius_active_pool_assets",
         "generatedAt": "2026-03-20T18:13:52.451Z"
       }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CDOFW7HNKLUZRLFZST4EW7V3AV4JI5IHMT6BPXXSY2IEFZ4NE5TWU2P4",
+      "asset_type": "soroban_token",
+      "symbol": "yUSDC",
+      "name": "yUSDC:GDGTVWSM4MGS4T7Z6W4RPWOCHE2I6RDFCIFZGS3DOA63LWQTRNZNTTFF",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CBZVSNVB55ANF24QVJL2K5QCLOAB6XITGTGXYEAF6NPTXYKEJUYQOHFC",
+      "asset_type": "soroban_token",
+      "symbol": "yXLM",
+      "name": "yXLM:GARDNV3Q7YGT4AKSDF25LT32YSCCW4EV22Y2TV3I2PU2MMXJTEDL5T55",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "source": "lot-p-p1"
+      }
     }
   ],
   "entityAssets": [
+    {
+      "entity_slug": "aquarius-aqua-usdc-clpool",
+      "asset_contract_address": "CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-aqua-usdc-clpool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-aqua-usdc-pool",
+      "asset_contract_address": "CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-aqua-usdc-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-btc-eth-pool",
+      "asset_contract_address": "CAO7DDJNGMOYQPRYDY5JVZ5YEK4UQBSMGLAEWRCUOTRMDSBMGWSAATDZ",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-btc-eth-pool",
+      "asset_contract_address": "CBH4M45TQBLDPXOK6L7VYKMEJWFITBOL64BN3WDAIIDT4LNUTWTTOCKF",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-btc-usdc-clpool",
+      "asset_contract_address": "CAO7DDJNGMOYQPRYDY5JVZ5YEK4UQBSMGLAEWRCUOTRMDSBMGWSAATDZ",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-btc-usdc-clpool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-cetes-usdc-pool",
+      "asset_contract_address": "CAL6ER2TI6CTRAY6BFXWNWA7WTYXUXTQCHUBCIBU5O6KM3HJFG6Z6VXV",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-cetes-usdc-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-eth-usdc-pool",
+      "asset_contract_address": "CBH4M45TQBLDPXOK6L7VYKMEJWFITBOL64BN3WDAIIDT4LNUTWTTOCKF",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-eth-usdc-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-native-aqua-clpool",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-native-aqua-clpool",
+      "asset_contract_address": "CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-native-aqua-pool",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-native-aqua-pool",
+      "asset_contract_address": "CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
     {
       "entity_slug": "aquarius-native-solvbtc-pool",
       "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
@@ -481,6 +1009,22 @@
       }
     },
     {
+      "entity_slug": "aquarius-native-usdc-clpool",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-native-usdc-clpool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
       "entity_slug": "aquarius-native-usdc-pool",
       "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
       "role": "token0",
@@ -497,6 +1041,54 @@
       }
     },
     {
+      "entity_slug": "aquarius-native-yxlm-clpool",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-native-yxlm-clpool",
+      "asset_contract_address": "CBZVSNVB55ANF24QVJL2K5QCLOAB6XITGTGXYEAF6NPTXYKEJUYQOHFC",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-native-yxlm-pool",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-native-yxlm-pool",
+      "asset_contract_address": "CBZVSNVB55ANF24QVJL2K5QCLOAB6XITGTGXYEAF6NPTXYKEJUYQOHFC",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-pyusd-usdc-clpool",
+      "asset_contract_address": "CCCRWH6Q3FNP3I2I57BDLM5AFAT7O6OF6GKQOC6SSJNDAVRZ57SPHGU2",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-pyusd-usdc-clpool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
       "entity_slug": "aquarius-pyusd-usdc-pool",
       "asset_contract_address": "CCCRWH6Q3FNP3I2I57BDLM5AFAT7O6OF6GKQOC6SSJNDAVRZ57SPHGU2",
       "role": "token0",
@@ -510,6 +1102,86 @@
       "role": "token1",
       "metadata": {
         "source": "aquarius_final_registry"
+      }
+    },
+    {
+      "entity_slug": "aquarius-usdc-tesouro-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-usdc-tesouro-pool",
+      "asset_contract_address": "CD6M4R2322BYCY2LNWM74PEBQAQ63SA3DUJLI3L4225U4ZVCLMSCBCIS",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-usdc-yusdc-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-usdc-yusdc-pool",
+      "asset_contract_address": "CDOFW7HNKLUZRLFZST4EW7V3AV4JI5IHMT6BPXXSY2IEFZ4NE5TWU2P4",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-usdglo-usdc-pool",
+      "asset_contract_address": "CB226ZOEYXTBPD3QEGABTJYSKZVBP2PASEISLG3SBMTN5CE4QZUVZ3CE",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-usdglo-usdc-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-usdy-usdc-pool",
+      "asset_contract_address": "CB3YA656OYIHU57657I5KGSBRHE5I3OZU4VFC22PYAOANFZHEWNYGAGP",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-usdy-usdc-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-ustry-usdc-pool",
+      "asset_contract_address": "CBLV4ATSIWU67CFSQU2NVRKINQIKUZ2ODSZBUJTJ43VJVRSBTZYOPNUR",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "aquarius-ustry-usdc-pool",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
       }
     },
     {
@@ -782,6 +1454,38 @@
       "role": "token1",
       "metadata": {
         "source": "59-soroswap-final-registry"
+      }
+    },
+    {
+      "entity_slug": "soroswap-usdc-eurc-pair",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "soroswap-usdc-eurc-pair",
+      "asset_contract_address": "CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "soroswap-ustry-usdc-pair",
+      "asset_contract_address": "CBLV4ATSIWU67CFSQU2NVRKINQIKUZ2ODSZBUJTJ43VJVRSBTZYOPNUR",
+      "role": "token0",
+      "metadata": {
+        "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "soroswap-ustry-usdc-pair",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "token1",
+      "metadata": {
+        "source": "lot-p-p1"
       }
     }
   ]
