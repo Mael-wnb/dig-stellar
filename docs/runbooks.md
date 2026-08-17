@@ -170,6 +170,7 @@ psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stella
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_network_tvl.sql   # G0 (T3-D3): network_tvl_snapshots — one TVL point per refresh cycle (written at tail of step 7)
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_ops_metrics.sql   # E2 (Lot E — T3-D3): rpc_metrics_runs + refresh_step_runs — written at end of each job:refresh; R1 adds action_events.metadata (re-run once)
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_action_witness.sql # R1 (Lot R — T3-D2): action_witnesses — verified execution witnesses (apply BEFORE deploying the R1 api)
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v4_faucet.sql   # R2 (Lot R — T3-D2): faucet_claims — money path, depends on action_witnesses; deploys dark (FAUCET_ENABLED unset)
 ```
 Manually-applied schemas (local AND VPS): `stellar_v1.sql`, `stellar_v1_metrics.sql`,
 `stellar_v1_bridge.sql` (Allbridge bridge flows — T2-D3), `stellar_v2_multiwallet.sql`,
@@ -511,3 +512,44 @@ curl -s -X POST $API/v1/actions/blend/position -H "Content-Type: application/jso
   Freighter extension network must match; set both to Testnet for T1-D3.
 - **Stale protocol data in UI** → check `as_of` freshness in `*_metrics_latest`; re-run
   `pnpm -C apps/indexer job:refresh`.
+
+## Reward faucet (Lot R — T3-D2)
+
+The faucet pays 5 XLM from a DIG-owned hot wallet after a verified qualifying action
+(security model: `docs/security-invariants.md` §9). Everything defaults DARK
+(`FAUCET_ENABLED` unset).
+
+### Setup (founder, one-time per network)
+
+1. Generate the keypair **locally** (never in chat, never committed):
+   `node -e "const {Keypair}=require('@stellar/stellar-sdk');const k=Keypair.random();console.log(k.publicKey());console.log(k.secret())"`
+2. Fund the public address with **exactly 200 XLM** from treasury (the hard exposure cap —
+   never more; refills are manual and deliberate).
+3. VPS env (`apps/api/.env`): `FAUCET_SECRET_KEY=<secret>`, `FAUCET_NETWORK=testnet|mainnet`,
+   optional `FAUCET_REWARD_XLM` / `FAUCET_MAX_CLAIMS` / `FAUCET_HOURLY_CLAIM_CAP` /
+   `FAUCET_MIN_NOTIONAL_XLM`. Leave `FAUCET_ENABLED` unset until go-live.
+4. Apply `stellar_v1_action_witness.sql` + `stellar_v4_faucet.sql` (see "Apply raw SQL schemas").
+5. nginx: add `/v1/actions/witness` and `/v1/faucet/` to the Lot S strict rate-limit zone.
+
+### Go-live sequence (mainnet)
+
+1. **Clear testnet E2E claim rows first** — the one-claim-per-wallet/user unique indexes are
+   GLOBAL across networks: `delete from faucet_claims where network = 'testnet';`
+2. Set `FAUCET_NETWORK=mainnet`, `FAUCET_ENABLED=true`, restart the api (pm2).
+3. Founder executes ONE real qualifying action + claim as the go-live proof; verify the payout
+   hash and the `/v1/ops/metrics` faucet block.
+
+### Operate
+
+- **Watch a drain**: `/v1/ops/metrics` → `faucet` block (`claims.paid24h`, `remainingClaims`,
+  `treasurySpendableXlm`). Payouts auto-halt when spendable < reward.
+- **Pause**: set `FAUCET_ENABLED=false` + restart. The promo surfaces disappear by themselves.
+- **Drain back to treasury**: pause first, then send the balance back with a normal payment
+  from the hot wallet (or account-merge if retiring the wallet for good).
+- **`failed` claim row**: the payout errored; `failure_reason` says whether it MAY have paid
+  (ambiguous submit). Verify the treasury's outgoing payments on stellar.expert. If it paid:
+  set the row `paid` with the real `payout_tx_hash`. If it did not: either delete the row
+  (frees the wallet/user to claim again) or leave it (permanently blocks them). NEVER resubmit
+  blindly — that is the double-pay path.
+- **Row stuck in `pending` > 5 min**: the post-payout UPDATE failed — same explorer-verify
+  procedure as `failed`, then resolve the row manually.

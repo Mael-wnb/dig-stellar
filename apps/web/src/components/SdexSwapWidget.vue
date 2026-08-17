@@ -9,6 +9,8 @@ import {
 import { useWalletSession } from "../composables/useWalletSession";
 import { useActiveSigner } from "../composables/useActiveSigner";
 import { useAppUser } from "../composables/useAppUser";
+import { useFaucet } from "../composables/useFaucet";
+import FaucetClaimPanel from "./FaucetClaimPanel.vue";
 import { useNetwork, toWalletNetwork } from "../composables/useNetwork";
 import { validateSwapXdr, type SwapIntent, type AssetId } from "../lib/validateSwapXdr";
 import {
@@ -42,6 +44,14 @@ const { connectedAddress, signTransaction } = useWalletSession();
 const { activeSignerAddress } = useActiveSigner();
 const { network } = useNetwork();
 const { userId } = useAppUser();
+
+// R3 (Lot R): upfront reward note — rendered ONLY while the campaign is live
+// on THIS network (never a stale promise), plus the post-swap claim panel.
+const { campaign: faucetCampaign, campaignLiveFor, refreshCampaign } = useFaucet();
+const faucetPromo = computed(() =>
+  campaignLiveFor(network.value) ? faucetCampaign.value : null,
+);
+onMounted(() => void refreshCampaign());
 
 const rpcUrl = computed(() =>
   network.value === "testnet" ? TESTNET_RPC_URL : MAINNET_RPC_URL,
@@ -450,6 +460,18 @@ function reset() {
         per-transaction cap applies during the launch period.
       </div>
 
+      <!-- FAUCET PROMO (Lot R, R3): the offer is seen BEFORE the action.
+           Disappears by itself when the budget is spent or the flag is off. -->
+      <div
+        v-if="faucetPromo"
+        class="rounded-[12px] px-[14px] py-[9px] text-[12px]"
+        style="background: var(--dig-surface-2); border: 1px solid rgba(213,255,47,0.35); color: var(--dig-faint)"
+      >
+        <span class="font-semibold" style="color: var(--dig-accent)">Earn {{ faucetPromo.rewardXlm }} XLM</span>
+        — your first swap (≥ {{ faucetPromo.minNotionalXlm }} XLM) earns a reward ·
+        {{ faucetPromo.remainingClaims }} claims left
+      </div>
+
       <!-- SIGNER GUARDRAIL -->
       <div
         v-if="isConnected && signerBlockReason"
@@ -589,6 +611,15 @@ function reset() {
           New swap
         </button>
       </div>
+
+      <!-- FAUCET CLAIM (Lot R, R3): purely additive — renders nothing while
+           the campaign is dark; keyed on the hash so a new swap re-checks. -->
+      <FaucetClaimPanel
+        v-if="status === 'success' && txHash && connectedAddress"
+        :key="txHash"
+        :wallet="connectedAddress"
+        :network="network"
+      />
 
       <!-- ERROR -->
       <div

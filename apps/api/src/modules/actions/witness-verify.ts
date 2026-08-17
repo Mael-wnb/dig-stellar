@@ -14,13 +14,17 @@
 //     unreachable in practice today — kept for shape-completeness.)
 //   - an invoke_host_function moving funds FROM the wallet INTO a registry
 //     Blend pool (a SAC transfer in asset_balance_changes) → kind 'blend-deposit'
+//   - the mirror (pool → wallet)                            → kind 'blend-withdraw'
+//     (founder amendment 2026-08-17: witnessed withdraws count toward the
+//     T3-D2 200-tx KPI ledger, but are NEVER faucet-qualifying — the R2
+//     eligibility filters on kind.)
 // Generic "Soroban swap invokes" are NOT recognized: without a vetted router
 // registry there is no honest way to tell a swap from any other invoke, and no
 // Dig build path produces one — the mandatory build-link would reject it anyway.
 
 import { Asset } from '@stellar/stellar-sdk';
 
-export type WitnessKind = 'sdex-swap' | 'blend-deposit';
+export type WitnessKind = 'sdex-swap' | 'blend-deposit' | 'blend-withdraw';
 
 /** An asset as it appears on a Horizon op record. */
 export interface WitnessAsset {
@@ -165,28 +169,41 @@ export function findQualifyingOp(
     }
 
     if (op.type === 'invoke_host_function') {
-      // Deposit-shaped iff a SAC transfer moved funds wallet → registry pool.
-      // (A withdraw transfers pool → wallet and therefore never matches.)
-      const transfer = (op.asset_balance_changes ?? []).find(
+      // Deposit-shaped iff a SAC transfer moved funds wallet → registry pool;
+      // withdraw-shaped iff the mirror (pool → wallet). Deposit is checked
+      // first — only one direction can carry the wallet's own funds per op.
+      const changes = op.asset_balance_changes ?? [];
+      const deposit = changes.find(
         (c) =>
           c.type === 'transfer' &&
           (c.from ?? '').toUpperCase() === wallet &&
           poolSet.has(c.to ?? ''),
       );
+      const withdraw = deposit
+        ? undefined
+        : changes.find(
+            (c) =>
+              c.type === 'transfer' &&
+              poolSet.has(c.from ?? '') &&
+              (c.to ?? '').toUpperCase() === wallet,
+          );
+      const transfer = deposit ?? withdraw;
       if (!transfer) continue;
+      const kind = deposit ? 'blend-deposit' : 'blend-withdraw';
+      const legLabel = deposit ? 'deposit' : 'withdraw';
       const asset = assetFrom(transfer.asset_type, transfer.asset_code, transfer.asset_issuer);
       const amount = Number(transfer.amount ?? '0');
       if (!(amount > 0)) continue;
       return {
-        kind: 'blend-deposit',
+        kind,
         opIndex: i,
-        legs: [{ label: 'deposit', asset, amount }],
+        legs: [{ label: legLabel, asset, amount }],
         summary: {
           opType: op.type,
           opIndex: i,
-          pool: transfer.to,
-          depositAsset: assetLabel(asset),
-          depositAmount: transfer.amount,
+          pool: deposit ? transfer.to : transfer.from,
+          [`${legLabel}Asset`]: assetLabel(asset),
+          [`${legLabel}Amount`]: transfer.amount,
         },
       };
     }

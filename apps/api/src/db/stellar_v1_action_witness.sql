@@ -25,7 +25,7 @@ create table if not exists action_witnesses (
   network text not null,                     -- 'testnet' | 'mainnet'
   wallet_address text not null,              -- tx source; public on-chain data (same rationale as action_events)
   user_id uuid not null,                     -- owning user_wallets.user_id at verification time
-  kind text not null,                        -- 'sdex-swap' | 'blend-deposit'
+  kind text not null,                        -- 'sdex-swap' | 'blend-deposit' | 'blend-withdraw' (withdraws: KPI ledger only, NEVER faucet-qualifying)
   op_summary jsonb not null,                 -- audit trail: qualifying op, legs, prices used
   notional_xlm numeric,                      -- XLM-equivalent at verification-time prices; NULL = could not price honestly
   min_notional_xlm numeric not null,         -- the threshold in force when verified

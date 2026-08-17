@@ -82,6 +82,13 @@ Three table families coexist in the **same** Postgres DB:
   (`83-evaluate-alerts.ts`) on a periodic OS-cron sweep (`job:wallet-alert`); read by
   `/v1/alert-rules` + `/v1/notifications` (`apps/api/src/modules/alerts/`). Health-factor is the
   first rule family, consuming v2's `wallet_pool_health`.
+- **raw SQL v4 — faucet (Lot R)** — `faucet_claims` (one 5 XLM reward per wallet AND per user,
+  ever, after a verified qualifying action — **a money path**). Schema in `stellar_v4_faucet.sql`;
+  depends on `action_witnesses` (`stellar_v1_action_witness.sql`, the Horizon-verified execution
+  ledger written by `POST /v1/actions/witness` — also the T3-D2 executed-tx KPI evidence). Written
+  and read only by `apps/api/src/modules/faucet/` (`/v1/faucet/*`; drain visibility in
+  `/v1/ops/metrics`) — the ONLY module holding a server-side key, isolated from the user action
+  paths per `docs/security-invariants.md` §9. Deploys dark (`FAUCET_ENABLED` unset).
 - **Prisma models** — `Protocol`, `Venue`, `Snapshot` (PascalCase). **Legacy / parallel, NOT served
   to the product.** Written by `run:blend` / `run:horizon` / `run:once`; read only by the
   prefix-less `/protocols`, `/venues`, `/snapshots` routes (`AppController`). Elsewhere the Prisma

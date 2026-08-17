@@ -86,6 +86,7 @@ type PriceRow = { contract_address: string; price_usd: unknown };
 const BUILD_KIND_FOR: Record<WitnessKind, string> = {
   'sdex-swap': 'sdex-swap-build',
   'blend-deposit': 'blend-deposit-build',
+  'blend-withdraw': 'blend-withdraw-build',
 };
 
 function toNum(value: unknown): number | null {

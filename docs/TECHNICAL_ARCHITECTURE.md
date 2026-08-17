@@ -290,6 +290,15 @@ flowchart LR
 
 ## 6. Data Model
 
+> **As-built note (2026-08-17).** The shipped product pipeline runs on **raw SQL table
+> families**, not this Prisma pseudo-schema (authoritative list: CLAUDE.md "Data architecture
+> (as-built)" + `apps/api/src/db/stellar_v*.sql`): **v1** analytics (entities / venues /
+> assets / snapshots / metrics / prices, plus `action_events` and `action_witnesses` — the
+> Lot R execution-witness KPI ledger), **v2** multi-wallet, **v3** alerting, and
+> **v4 — faucet** (`faucet_claims`, Lot R reward claims — the only server-side-key money
+> path, see `docs/security-invariants.md` §9). The pseudo-schema below is retained as the
+> original design reference.
+
 The following is representative Prisma-style pseudo-schema — exact field types and indexes are defined in `packages/db/prisma/schema.prisma`.
 
 ```

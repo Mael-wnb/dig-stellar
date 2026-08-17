@@ -24,6 +24,8 @@ import FreshnessChip from '../FreshnessChip.vue'
 import BridgeSection from '../bridge/BridgeSection.vue'
 import YourPositionsPanel from '../common/YourPositionsPanel.vue'
 import NetworkTvlChart from '../NetworkTvlChart.vue'
+// R3 (Lot R): upfront reward-campaign card — renders only while live.
+import FaucetPromoBanner from '../FaucetPromoBanner.vue'
 import { useNetworkTvl } from '../../composables/useNetworkTvl'
 
 const { setView, openPool } = useView()
@@ -194,6 +196,10 @@ const {
         </button>
       </div>
     </div>
+
+    <!-- FAUCET PROMO (Lot R, R3): the offer is seen BEFORE any action.
+         Self-hiding when the campaign is dark or the budget is spent. -->
+    <FaucetPromoBanner />
 
     <!-- Stat strip -->
     <div class="grid gap-[16px]" style="grid-template-columns: repeat(4, 1fr)">

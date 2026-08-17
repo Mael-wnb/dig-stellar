@@ -28,14 +28,17 @@ Status markers: ✅ implemented · 🔲 to implement before Mainnet ungating (Lo
   line, or DB column may accept, persist, or transit a secret key, mnemonic, or
   signed-envelope-with-secret material.
 - **INV-1.2** ✅ Action endpoints (`POST /v1/actions/*`) take `{public address, action params}` and
-  return **unsigned XDR** (plus quote/metadata). No server-side signing code path exists — the
-  `stellar-sdk` `Keypair` signing APIs must not appear in `apps/api` action code.
+  return **unsigned XDR** (plus quote/metadata). No server-side signing code path exists for
+  anything a USER owns — the `stellar-sdk` `Keypair` signing APIs must not appear in `apps/api`
+  action code. *Sole scoped exception (Lot R, 2026-08-17): the reward-faucet treasury — DIG's own
+  wallet, DIG's own funds, isolated in `modules/faucet/faucet-payout.service.ts`. See §9.*
 - **INV-1.3** ✅ Signing happens **exclusively in-wallet** via Stellar Wallets Kit. The web app
   never handles raw secrets either (no manual secret-key input field, ever).
 - **INV-1.4** ✅ Submission uses the wallet-signed envelope as returned by the Kit, unmodified.
 
 Review check: grep the diff for `Keypair`, `secret`, `sign(` in `apps/api`; confirm no new DB
-columns or logs carry envelope + signature material beyond what submission requires.
+columns or logs carry envelope + signature material beyond what submission requires. A hit
+anywhere OUTSIDE `modules/faucet/faucet-payout.service.ts` (the §9 exception) is a defect.
 
 ## 2. Client-side XDR validation before signing
 
@@ -275,3 +278,36 @@ For every action-path PR:
    security-validation evidence for the SCF claim.
 
 Doc updates: mirror the flag + caps regime into `runbooks.md` and `deployment.md` once implemented.
+
+## 9. Reward-faucet treasury (Lot R, 2026-08-17) — the ONLY server-side key
+
+The Lot R faucet pays 5 XLM from a DIG-owned hot wallet after a verified qualifying action.
+This is the FIRST time a funded secret key lives server-side. It changes nothing about user
+funds — the §1 non-custodial boundary for anything a USER owns is untouched.
+
+- **INV-9.1** The treasury is **DIG's own money, never the user's**. A dedicated fresh keypair,
+  funded manually with **200 XLM — the hard exposure cap**. Worst case if everything fails, the
+  hot wallet drains: bounded, accepted, and the only reason this is beta-shippable. Never fund
+  beyond the cap; refills are manual and deliberate.
+- **INV-9.2** `FAUCET_SECRET_KEY` exists ONLY in the VPS env — never committed, never logged,
+  never in an error message or API payload, never in chat. The keypair is generated locally by
+  the founder.
+- **INV-9.3** Code isolation: `modules/faucet/` imports nothing from the user action paths
+  (`modules/actions/**`) and vice versa. Key access + `Keypair` signing are confined to
+  **`faucet-payout.service.ts`**, which can express exactly ONE transaction shape: a single
+  native payment of the reward with memo `dig-reward`. The pinned-shape spec
+  (`faucet-payout.spec.ts`) is part of this invariant.
+- **INV-9.4** Kill-switch `FAUCET_ENABLED` defaults **false** — the faucet deploys dark; the
+  founder flips it. While dark, the treasury is never queried and no key state is observable.
+- **INV-9.5** Payment discipline: payouts are strictly serial; **a failed payout is NEVER
+  auto-retried** (an ambiguous failure may still have paid) — the claim row blocks the
+  wallet/user until founder review. One claim per wallet AND per user, ever, DB-enforced.
+- **INV-9.6** Brakes: 40-claim campaign budget, max 10 claims per rolling hour (a full drain
+  takes ≥ 4h of sustained abuse), payouts auto-halt when treasury spendable < reward.
+- **INV-9.7** Public surfaces (`/v1/faucet/*`, `/v1/ops/metrics`) never expose the treasury
+  address or anything about the key beyond the spendable balance. Both faucet endpoints sit in
+  the Lot S strict nginx rate-limit zone.
+
+Review check (every faucet-path PR): grep the diff for `FAUCET_SECRET_KEY` and `Keypair` —
+confined to `faucet-payout.service.ts`; confirm no new transaction shapes; confirm the red
+tests (double claim, disabled flag, below-notional, exhausted, velocity, drained) still pass.

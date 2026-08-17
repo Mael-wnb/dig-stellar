@@ -55,6 +55,15 @@ faucet, no claims, no keys, nothing money-touching).
 - Smoke rows deleted after the run.
 - Schema files re-applied twice — idempotent, no errors.
 
+## Amendment (founder-ratified 2026-08-17, pre-R2)
+
+Withdraw tx hashes are now witnessed too: kind **`blend-withdraw`** (pool →
+wallet SAC transfer on a registry pool, linked to a `blend-withdraw-build`
+event). Stored with the same verification bar but **never faucet-qualifying**
+— R2 eligibility filters on kind. Purpose: `action_witnesses` becomes the
+automatic T3-D2 200-tx KPI ledger, replacing the manual hash list. The web
+Blend card reports withdraw hashes on success and pending states.
+
 ## Boundaries / notes for R2 review
 
 - Generic "Soroban swap invokes" are NOT recognized (no honest recognizer

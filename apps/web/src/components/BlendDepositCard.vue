@@ -10,6 +10,8 @@ import {
 import { useWalletSession } from "../composables/useWalletSession";
 import { useActiveSigner } from "../composables/useActiveSigner";
 import { useAppUser } from "../composables/useAppUser";
+import { useFaucet } from "../composables/useFaucet";
+import FaucetClaimPanel from "./FaucetClaimPanel.vue";
 import { useNetwork, toWalletNetwork } from "../composables/useNetwork";
 import { blendPoolFor } from "../config/blendPools";
 import { formatTokenAmountCompact, formatTokenAmountExact } from "../utils/format";
@@ -40,6 +42,14 @@ const { connectedAddress, signTransaction } = useWalletSession();
 const { activeSignerAddress } = useActiveSigner();
 const { network } = useNetwork();
 const { userId } = useAppUser();
+
+// R3 (Lot R): upfront reward note (supply side only — withdraws never earn)
+// + the post-deposit claim panel. Live-campaign-gated: never a stale promise.
+const { campaign: faucetCampaign, campaignLiveFor, refreshCampaign } = useFaucet();
+const faucetPromo = computed(() =>
+  campaignLiveFor(network.value) ? faucetCampaign.value : null,
+);
+onMounted(() => void refreshCampaign());
 
 // Per-pool, per-network Blend config (pool id, reserve SACs, classic USDC issuer,
 // endpoints). This is the CLIENT-SIDE intent source for the validation gates — never
@@ -543,7 +553,7 @@ async function onDeposit() {
     status.value = "success";
     // R1 (Lot R): report the executed deposit for server-side verification.
     // Fire-and-forget — never blocks or fails the deposit flow.
-    reportDepositWitness(hash);
+    reportTxWitness(hash);
     loadBalances(); // reflect the new balances
     if (position.value) loadPosition(); // and the new supplied position
   } catch (err: unknown) {
@@ -553,7 +563,7 @@ async function onDeposit() {
       // so it simply lands once (if) the tx settles within the retry window.
       txHash.value = err.hash;
       status.value = "pending";
-      reportDepositWitness(err.hash);
+      reportTxWitness(err.hash);
       return;
     }
     errorMessage.value = readApiError(err, "Deposit failed.");
@@ -561,8 +571,13 @@ async function onDeposit() {
   }
 }
 
-/** Deposit-only (a withdraw is not a qualifying action — Lot R). */
-function reportDepositWitness(hash: string): void {
+/**
+ * Reports an executed tx for server-side witnessing (Lot R). Deposits feed
+ * faucet eligibility; withdraws are witnessed too (founder amendment
+ * 2026-08-17) as KPI-ledger evidence only — the server decides the kind and
+ * the faucet never qualifies a withdraw.
+ */
+function reportTxWitness(hash: string): void {
   reportActionWitness({
     txHash: hash,
     network: network.value,
@@ -605,12 +620,16 @@ async function onWithdraw() {
 
     txHash.value = hash;
     status.value = "success";
+    // Founder amendment 2026-08-17: witness withdraws too (KPI ledger only —
+    // never faucet-qualifying, the server enforces that by kind).
+    reportTxWitness(hash);
     loadBalances(); // the withdrawn funds are back in the wallet
     loadPosition(); // and the supplied position has shrunk
   } catch (err: unknown) {
     if (err instanceof TxPendingTimeout) {
       txHash.value = err.hash;
       status.value = "pending";
+      reportTxWitness(err.hash);
       return;
     }
     errorMessage.value = readApiError(err, "Withdraw failed.");
@@ -688,6 +707,17 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
       class="bg-[#202020] border border-[rgba(213,255,47,0.3)] rounded-md p-3 text-[11px] text-[#9a9b99]"
     >
       Blend supply &amp; withdraw are <span class="text-[#d5ff2f] font-semibold">Testnet-only</span> in this beta.
+    </div>
+
+    <!-- FAUCET PROMO (Lot R, R3): the offer is seen BEFORE the action. Supply
+         side only — withdraws never earn. Disappears with the campaign. -->
+    <div
+      v-if="faucetPromo && !isWithdraw && !mainnetBlendBlocked"
+      class="bg-[#202020] border border-[rgba(213,255,47,0.35)] rounded-md p-3 text-[11px] text-[#9a9b99]"
+    >
+      <span class="text-[#d5ff2f] font-semibold">Earn {{ faucetPromo.rewardXlm }} XLM</span>
+      — your first Blend supply (≥ {{ faucetPromo.minNotionalXlm }} XLM) earns a reward ·
+      {{ faucetPromo.remainingClaims }} claims left
     </div>
 
     <!-- A5: the requested pool is not in the vetted client registry (e.g. the
@@ -984,6 +1014,15 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
         </button>
       </div>
 
+      <!-- FAUCET CLAIM (Lot R, R3): deposits only — withdraws never earn.
+           Purely additive; renders nothing while the campaign is dark. -->
+      <FaucetClaimPanel
+        v-if="status === 'success' && !isWithdraw && txHash && connectedAddress"
+        :key="txHash"
+        :wallet="connectedAddress"
+        :network="network"
+      />
+
       <!-- STILL PENDING — confirmation polling timed out. Not a failure: the tx was
            accepted and may still be included, so no failure copy is allowed here. -->
       <div
@@ -1010,6 +1049,15 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
           Done
         </button>
       </div>
+
+      <!-- FAUCET CLAIM on pending too: the witness verifies server-side once
+           the tx settles, and the panel's polling absorbs the wait. -->
+      <FaucetClaimPanel
+        v-if="status === 'pending' && !isWithdraw && txHash && connectedAddress"
+        :key="txHash"
+        :wallet="connectedAddress"
+        :network="network"
+      />
 
       <!-- ERROR -->
       <div

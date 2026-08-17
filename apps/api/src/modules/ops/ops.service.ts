@@ -13,6 +13,7 @@
 // names are fixed internal labels.
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../db/prisma.service';
+import { FaucetService } from '../faucet/faucet.service';
 
 const WINDOW = '24h';
 const WINDOW_INTERVAL = '24 hours';
@@ -72,7 +73,10 @@ function toInt(value: unknown): number {
 
 @Injectable()
 export class OpsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly faucetService: FaucetService,
+  ) {}
 
   async getMetrics() {
     const rpcRows = (await this.prisma.$queryRawUnsafe(
@@ -158,6 +162,9 @@ export class OpsService {
       scope: 'indexer refresh pipeline',
       rpc,
       steps,
+      // R2 (Lot R): faucet drain visibility — enabled flag, claim counts,
+      // treasury SPENDABLE balance (no address, no key state beyond balance).
+      faucet: await this.faucetService.getOpsSnapshot(),
     };
   }
 

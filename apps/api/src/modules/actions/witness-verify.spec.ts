@@ -83,14 +83,26 @@ describe('findQualifyingOp', () => {
     expect(q?.summary.pool).toBe(POOL);
   });
 
-  it('rejects a withdraw-shaped invoke (pool → wallet) and transfers to unknown contracts', () => {
-    const withdraw: HorizonOpRecordLike = {
-      type: 'invoke_host_function',
-      source_account: WALLET,
-      asset_balance_changes: [
-        { type: 'transfer', asset_type: 'native', from: POOL, to: WALLET, amount: '25.0000000' },
+  it('qualifies a withdraw-shaped invoke (pool → wallet) as blend-withdraw (KPI ledger, amendment 2026-08-17)', () => {
+    const q = findQualifyingOp(
+      [
+        {
+          type: 'invoke_host_function',
+          source_account: WALLET,
+          asset_balance_changes: [
+            { type: 'transfer', asset_type: 'native', from: POOL, to: WALLET, amount: '25.0000000' },
+          ],
+        },
       ],
-    };
+      WALLET,
+      [POOL],
+    );
+    expect(q?.kind).toBe('blend-withdraw');
+    expect(q?.legs).toEqual([{ label: 'withdraw', asset: { native: true }, amount: 25 }]);
+    expect(q?.summary.pool).toBe(POOL);
+  });
+
+  it('rejects invoke transfers involving unknown contracts (neither direction matches a registry pool)', () => {
     const unknownPool: HorizonOpRecordLike = {
       type: 'invoke_host_function',
       source_account: WALLET,
@@ -98,7 +110,6 @@ describe('findQualifyingOp', () => {
         { type: 'transfer', asset_type: 'native', from: WALLET, to: OTHER, amount: '25.0000000' },
       ],
     };
-    expect(findQualifyingOp([withdraw], WALLET, [POOL])).toBeNull();
     expect(findQualifyingOp([unknownPool], WALLET, [POOL])).toBeNull();
   });
 
