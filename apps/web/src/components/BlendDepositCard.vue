@@ -4,10 +4,12 @@ import {
   buildBlendDeposit,
   buildBlendWithdraw,
   fetchBlendPosition,
+  reportActionWitness,
   type BlendPositionResponse,
 } from "../api/actions";
 import { useWalletSession } from "../composables/useWalletSession";
 import { useActiveSigner } from "../composables/useActiveSigner";
+import { useAppUser } from "../composables/useAppUser";
 import { useNetwork, toWalletNetwork } from "../composables/useNetwork";
 import { blendPoolFor } from "../config/blendPools";
 import { formatTokenAmountCompact, formatTokenAmountExact } from "../utils/format";
@@ -37,6 +39,7 @@ const props = defineProps<{ poolSlug?: string }>();
 const { connectedAddress, signTransaction } = useWalletSession();
 const { activeSignerAddress } = useActiveSigner();
 const { network } = useNetwork();
+const { userId } = useAppUser();
 
 // Per-pool, per-network Blend config (pool id, reserve SACs, classic USDC issuer,
 // endpoints). This is the CLIENT-SIDE intent source for the validation gates — never
@@ -538,18 +541,33 @@ async function onDeposit() {
 
     txHash.value = hash;
     status.value = "success";
+    // R1 (Lot R): report the executed deposit for server-side verification.
+    // Fire-and-forget — never blocks or fails the deposit flow.
+    reportDepositWitness(hash);
     loadBalances(); // reflect the new balances
     if (position.value) loadPosition(); // and the new supplied position
   } catch (err: unknown) {
     if (err instanceof TxPendingTimeout) {
       // Still pending ≠ failed: surface the hash + explorer link, claim nothing.
+      // The witness is still reported: it verifies server-side against Horizon,
+      // so it simply lands once (if) the tx settles within the retry window.
       txHash.value = err.hash;
       status.value = "pending";
+      reportDepositWitness(err.hash);
       return;
     }
     errorMessage.value = readApiError(err, "Deposit failed.");
     status.value = "error";
   }
+}
+
+/** Deposit-only (a withdraw is not a qualifying action — Lot R). */
+function reportDepositWitness(hash: string): void {
+  reportActionWitness({
+    txHash: hash,
+    network: network.value,
+    userId: userId.value ?? undefined,
+  });
 }
 
 /**

@@ -15,6 +15,7 @@ import {
   isMainnetBlendEnabled,
   mainnetMaxSendXlm,
   isWhitelistedMainnetAsset,
+  resolveBlendPool,
   MAINNET_ASSET_WHITELIST,
 } from './network-registry';
 
@@ -100,6 +101,14 @@ function normalizeAssetField(field: AssetField, label: string): AssetRef {
     );
   }
   return { code, issuer: field.issuer };
+}
+
+/**
+ * Compact 'CODE:ISSUER' / 'XLM' form for action_events metadata (R1, Lot R) —
+ * matches the op-summary asset notation used elsewhere.
+ */
+function assetKey(ref: AssetRef): string {
+  return ref.issuer ? `${ref.code}:${ref.issuer}` : ref.code;
 }
 
 /** Same-asset check on the canonical refs (native XLM has no issuer to compare). */
@@ -214,10 +223,26 @@ export class ActionsController {
     // E3 adoption counter — fire-and-forget (recordActionEvent never throws).
     // Three outcomes: trustline-only build (2-step gate), successful deposit
     // build, or failed simulation (empty xdr — nothing was built, no event).
+    // R1 metadata: what was built (the service already resolved this slug, so
+    // resolveBlendPool cannot throw here).
+    const depositMeta = {
+      venue: 'blend',
+      pool: resolveBlendPool(resolvedNetwork, pool).poolSlug,
+      asset,
+      amount,
+    };
     if (result.trustlineRequired) {
-      void this.opsService.recordActionEvent('trustline-build', resolvedNetwork, address);
+      void this.opsService.recordActionEvent('trustline-build', resolvedNetwork, address, {
+        ...depositMeta,
+        step: 'trustline',
+      });
     } else if (result.xdr) {
-      void this.opsService.recordActionEvent('blend-deposit-build', resolvedNetwork, address);
+      void this.opsService.recordActionEvent(
+        'blend-deposit-build',
+        resolvedNetwork,
+        address,
+        depositMeta,
+      );
     }
 
     return result;
@@ -272,6 +297,12 @@ export class ActionsController {
         'blend-withdraw-build',
         resolvedNetwork,
         address,
+        {
+          venue: 'blend',
+          pool: resolveBlendPool(resolvedNetwork, pool).poolSlug,
+          asset,
+          amount,
+        },
       );
     }
 
@@ -330,7 +361,12 @@ export class ActionsController {
     });
 
     // E3 adoption counter — quotes carry no acting address (null by design).
-    void this.opsService.recordActionEvent('sdex-quote', resolvedNetwork, null);
+    void this.opsService.recordActionEvent('sdex-quote', resolvedNetwork, null, {
+      venue: 'sdex',
+      from: assetKey(from),
+      to: assetKey(to),
+      amount,
+    });
 
     return result;
   }
@@ -380,7 +416,13 @@ export class ActionsController {
 
     // E3 adoption counter — buildSdexSwap throws on failure, so reaching here
     // means a signable XDR was produced.
-    void this.opsService.recordActionEvent('sdex-swap-build', resolvedNetwork, address);
+    void this.opsService.recordActionEvent('sdex-swap-build', resolvedNetwork, address, {
+      venue: 'sdex',
+      from: assetKey(from),
+      to: assetKey(to),
+      amount,
+      minReceive,
+    });
 
     return result;
   }

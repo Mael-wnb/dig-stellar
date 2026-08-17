@@ -1,10 +1,14 @@
-# Lot R — Swap Reward Faucet (claim 5 XLM after a verified swap)
+# Lot R — Action Reward Faucet (claim 5 XLM after a verified swap OR Blend deposit)
 
-Execution brief for Claude Code. Founder-scoped 2026-08-16: a user who has executed
-a swap through Dig can claim **5 XLM** (mainnet) once. Purpose: adoption push for
-the T3-D2 KPI window. **THIS IS A MONEY PATH — A2/A3 review bar** — and it is the
-FIRST time a funded secret key lives server-side. Depends on **Lot S** (rate
-limiting) being deployed first. Evidence: `docs/evidence/lot-r/`.
+Execution brief for Claude Code. Founder-scoped 2026-08-16, amended 2026-08-17: a
+user who has executed a qualifying action through Dig — a **swap OR a Blend
+deposit** (both count toward the T3-D2 "50+ wallets / 200+ txs" KPI, which covers
+swaps AND vault/lending interactions) — can claim **5 XLM** (mainnet) once.
+Purpose: adoption push for the KPI window, with the offer VISIBLE UPFRONT (the
+incentive must be seen before the action, not discovered after). **THIS IS A
+MONEY PATH — A2/A3 review bar** — and it is the FIRST time a funded secret key
+lives server-side. Depends on **Lot S** (deployed 2026-08-17). Evidence:
+`docs/evidence/lot-r/`.
 
 ## Security model (read before scoping)
 
@@ -19,25 +23,32 @@ limiting) being deployed first. Evidence: `docs/evidence/lot-r/`.
   fund it beyond the cap; refills are manual and deliberate.
 - Kill-switch: `FAUCET_ENABLED` (default OFF — deploy dark, founder flips it).
 
-## R1 — Execution witness (E3b, standalone value)
+## R1 — Execution witness (E3b, standalone value) + build metadata
 
-The eligibility primitive: proof a wallet EXECUTED a swap through Dig (builds
-alone prove nothing — `action_events` is build-side).
+The eligibility primitive: proof a wallet EXECUTED a qualifying action through
+Dig (builds alone prove nothing — `action_events` is build-side).
 
 - `POST /v1/actions/witness { txHash }`: the web submits the hash after a
-  successful swap submit (it already has it for the explorer link).
+  successful submit (it already has it for the explorer link) — for BOTH swap
+  and Blend deposit flows.
 - Server verification, all on Horizon (never trust the client): tx exists and
   `successful`; source account = a wallet known to us; the tx contains a
-  swap-shaped op (pathPayment / manageBuyOffer / Soroban swap invoke) whose
-  source matches; tx created within a sane window of a recorded swap build for
-  that wallet (link to `action_events`). Store in `action_witnesses`
+  qualifying op whose source matches — swap-shaped (pathPayment /
+  manageBuyOffer / Soroban swap invoke) OR a Blend submit invoke against a
+  registry pool; tx created within a sane window of a recorded matching build
+  for that wallet (link to `action_events`). Store in `action_witnesses`
   (tx_hash PK — idempotent, re-witnessing is a no-op; wallet, user_id, kind,
   op summary, ledger close time, verified_at).
-- Min notional for faucet eligibility: the swapped amount ≥ **1 XLM
+- Min notional for faucet eligibility: the swapped/deposited amount ≥ **1 XLM
   equivalent** at verification-time prices (raises farming cost; stored on the
   witness row so the rule is auditable).
+- **Also in R1 (closes the analytics gap found 2026-08-17):** add a
+  `metadata jsonb` to `action_events`, populated at build time — asset pair /
+  asset, amounts, venue/pool slug, network. Additive migration; historical
+  rows stay NULL (honest — no backfill invention).
 - Standalone win: witnesses turn the build-side analytics into settled-volume
-  analytics — note it in the evidence.
+  analytics — note it in the evidence, and regenerate the analytics doc's
+  funnel section (tracked → building → executed) once data exists.
 
 ## R2 — Claims backend
 
@@ -45,8 +56,10 @@ alone prove nothing — `action_events` is build-side).
   (pending|paid|failed), payout_tx_hash, amounts, timestamps. UNIQUE(wallet_id)
   AND UNIQUE(user_id) — one claim per wallet AND per user, ever, DB-enforced.
 - `GET /v1/faucet/eligibility?wallet=`: eligible iff FAUCET_ENABLED && a
-  verified swap witness ≥ min notional exists && no prior claim (either key)
-  && treasury balance ≥ 5 XLM. Response says WHICH condition fails (honest UX).
+  verified qualifying witness (swap OR Blend deposit, ≥ min notional) exists
+  && no prior claim (either key) && treasury balance ≥ 5 XLM. Response says
+  WHICH condition fails (honest UX). Also exposes campaign state for the promo
+  surface: `{ active, remainingClaims }` (paid count vs the 40-claim budget).
 - `POST /v1/faucet/claim`: re-checks everything server-side inside a
   transaction, inserts `pending`, then pays: a single 5 XLM payment from the
   hot wallet to the claiming wallet (memo `dig-reward`), submits, records
@@ -60,16 +73,25 @@ alone prove nothing — `action_events` is build-side).
   therefore takes ≥ 4 hours of sustained abuse, which the founder can see.
 - Rate limits: both endpoints in Lot S's strict nginx zone.
 
-## R3 — Web (banner post-swap)
+## R3 — Web (visible incentive + post-action claim)
 
-- After a successful swap submit + witness POST: if eligibility returns true,
-  a banner on the swap success state — "Your swap qualifies — claim 5 XLM".
-  One click → claim → paid state shows the payout tx + explorer link.
+Founder amendment 2026-08-17: the offer must be SEEN BEFORE the action — a
+reward nobody knows about incentivizes nothing.
+
+- **Promo surface (upfront)**: a compact campaign card/banner on the dashboard
+  AND a one-line note inside the swap widget + Blend deposit card: "Your first
+  swap or Blend supply (≥ 1 XLM) earns 5 XLM — first 40 claims." Rendered ONLY
+  when the campaign is live (`active && remainingClaims > 0` from the
+  eligibility endpoint) — it disappears by itself when the budget is spent or
+  the flag is off, never a stale promise. Show `remainingClaims` (honest
+  scarcity beats fake urgency).
+- **Post-action claim**: after a successful swap or deposit submit + witness
+  POST, if eligible — banner on the success state: "Your action qualifies —
+  claim 5 XLM". One click → claim → paid state shows the payout tx + explorer
+  link.
 - Ineligible states render the honest reason (already claimed / faucet paused /
-  swap below 1 XLM) — never a dead button.
-- No permanent UI surface elsewhere (founder decision: post-swap banner only).
-- The banner never blocks or delays the swap flow itself — it appends to the
-  success state.
+  amount below 1 XLM / campaign exhausted) — never a dead button.
+- The promo and the claim never block or delay the action flows themselves.
 
 ## R4 — Ops & funding (founder + runbook)
 

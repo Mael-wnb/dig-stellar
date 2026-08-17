@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { buildSdexSwap, quoteSdexSwap, type SdexAssetRef } from "../api/actions";
+import {
+  buildSdexSwap,
+  quoteSdexSwap,
+  reportActionWitness,
+  type SdexAssetRef,
+} from "../api/actions";
 import { useWalletSession } from "../composables/useWalletSession";
 import { useActiveSigner } from "../composables/useActiveSigner";
+import { useAppUser } from "../composables/useAppUser";
 import { useNetwork, toWalletNetwork } from "../composables/useNetwork";
 import { validateSwapXdr, type SwapIntent, type AssetId } from "../lib/validateSwapXdr";
 import {
@@ -35,6 +41,7 @@ const XLM_RESERVE = 1;
 const { connectedAddress, signTransaction } = useWalletSession();
 const { activeSignerAddress } = useActiveSigner();
 const { network } = useNetwork();
+const { userId } = useAppUser();
 
 const rpcUrl = computed(() =>
   network.value === "testnet" ? TESTNET_RPC_URL : MAINNET_RPC_URL,
@@ -379,6 +386,15 @@ async function onSwap() {
     if (result.status === "PENDING" || result.status === "SUCCESS") {
       txHash.value = result.hash ?? "";
       status.value = "success";
+      // R1 (Lot R): report the executed swap for server-side verification.
+      // Fire-and-forget — never blocks or fails the swap flow.
+      if (txHash.value) {
+        reportActionWitness({
+          txHash: txHash.value,
+          network: network.value,
+          userId: userId.value ?? undefined,
+        });
+      }
       loadBalances(); // reflect the new balances
     } else {
       // The network did not accept the submission (e.g. a fee bid under surge

@@ -64,6 +64,68 @@ export async function quoteSdexSwap(
   });
 }
 
+// --- Execution witness (Lot R, R1) ----------------------------------------
+
+export type WitnessRequest = {
+  /** The submitted tx hash (the same one the explorer link uses). */
+  txHash: string;
+  network?: "testnet" | "mainnet";
+  /** The app user id (localStorage uuid) so the API pins the owning wallet. */
+  userId?: string;
+};
+
+export type WitnessResponse = {
+  witnessed: boolean;
+  /** On witnessed=false: which server-side check failed. */
+  reason?:
+    | "tx-not-found"
+    | "tx-not-successful"
+    | "unknown-wallet"
+    | "no-qualifying-op"
+    | "no-matching-build";
+  alreadyWitnessed?: boolean;
+  kind?: "sdex-swap" | "blend-deposit";
+  notionalXlm?: number | null;
+  minNotionalXlm?: number;
+  meetsMinNotional?: boolean;
+};
+
+export async function submitActionWitness(
+  payload: WitnessRequest
+): Promise<WitnessResponse> {
+  return apiFetch<WitnessResponse>("/actions/witness", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Fire-and-forget witness reporting after a successful swap / Blend deposit
+ * submit. NEVER blocks or fails the action flow (Lot R rule). Retries a few
+ * times because the widgets report the hash as soon as the network ACCEPTS the
+ * tx (PENDING) — Horizon may not see it as successful for a few ledgers.
+ * Re-witnessing is idempotent server-side, so retrying is always safe.
+ */
+export function reportActionWitness(payload: WitnessRequest): void {
+  const RETRYABLE = new Set(["tx-not-found", "tx-not-successful"]);
+  const DELAYS_MS = [4000, 6000, 6000, 6000];
+  void (async () => {
+    for (const delayMs of DELAYS_MS) {
+      await new Promise((r) => setTimeout(r, delayMs));
+      try {
+        const res = await submitActionWitness(payload);
+        if (res.witnessed || !RETRYABLE.has(res.reason ?? "")) {
+          console.log("[witness]", payload.txHash, res);
+          return;
+        }
+      } catch {
+        // transient (network / 503) — retry on the next delay
+      }
+    }
+    console.warn("[witness] gave up after retries", payload.txHash);
+  })();
+}
+
 // --- Blend deposit (Testnet) ----------------------------------------------
 
 export type BlendDepositRequest = {

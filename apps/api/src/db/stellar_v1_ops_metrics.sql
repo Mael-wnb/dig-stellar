@@ -59,3 +59,9 @@ create index if not exists idx_action_events_created_at
 
 create index if not exists idx_action_events_kind_created_at
   on action_events(kind, created_at desc);
+
+-- R1 (Lot R — T3-D2): build-time metadata, populated by the API at insert time
+-- (asset pair / asset, amounts, venue/pool slug). Closes the analytics gap found
+-- 2026-08-17: kind+address alone cannot say WHAT was built. Nullable, no
+-- default: historical rows stay NULL — honest, no backfill invention.
+alter table action_events add column if not exists metadata jsonb;

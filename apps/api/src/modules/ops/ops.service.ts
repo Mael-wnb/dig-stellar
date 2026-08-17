@@ -163,17 +163,22 @@ export class OpsService {
 
   // E3: fire-and-forget adoption event. A logging failure must NEVER fail the
   // action build itself — swallow and warn. Callers do not await this.
+  // R1 (Lot R): optional build-time metadata (asset pair / asset, amounts,
+  // venue/pool slug) — requires the `metadata` column from
+  // stellar_v1_ops_metrics.sql to be applied BEFORE this ships.
   async recordActionEvent(
     kind: ActionEventKind,
     network: string,
     address: string | null,
+    metadata?: Record<string, unknown> | null,
   ): Promise<void> {
     try {
       await this.prisma.$executeRawUnsafe(
-        `insert into action_events (kind, network, address) values ($1, $2, $3)`,
+        `insert into action_events (kind, network, address, metadata) values ($1, $2, $3, $4::jsonb)`,
         kind,
         network,
         address,
+        metadata == null ? null : JSON.stringify(metadata),
       );
     } catch (err) {
       console.warn(
