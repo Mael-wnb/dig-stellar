@@ -47,7 +47,11 @@ export async function fetchFaucetEligibility(
   wallet?: string
 ): Promise<FaucetEligibility> {
   const qs = wallet ? `?wallet=${encodeURIComponent(wallet)}` : "";
-  return apiFetch<FaucetEligibility>(`/faucet/eligibility${qs}`);
+  // R3c: a POLLED endpoint must never be served from cache (prod showed 304s
+  // freezing the panel). Belt-and-braces with the API's Cache-Control: no-store.
+  return apiFetch<FaucetEligibility>(`/faucet/eligibility${qs}`, {
+    cache: "no-store",
+  });
 }
 
 export async function claimFaucetReward(

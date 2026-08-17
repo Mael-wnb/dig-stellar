@@ -610,16 +610,19 @@ function reset() {
         <button type="button" class="w-fit mt-[2px] cursor-pointer hover:underline" style="color: var(--dig-faint)" @click="reset">
           New swap
         </button>
-      </div>
 
-      <!-- FAUCET CLAIM (Lot R, R3): purely additive — renders nothing while
-           the campaign is dark; keyed on the hash so a new swap re-checks. -->
-      <FaucetClaimPanel
-        v-if="status === 'success' && txHash && connectedAddress"
-        :key="txHash"
-        :wallet="connectedAddress"
-        :network="network"
-      />
+        <!-- FAUCET CLAIM (Lot R, R3/R3c): INSIDE the success block — never
+             between v-if/v-else-if siblings (that chain-break took down the
+             Blend form in prod, 2026-08-17). Renders nothing while dark;
+             keyed on the hash so a new swap re-checks. -->
+        <FaucetClaimPanel
+          v-if="txHash && connectedAddress"
+          :key="txHash"
+          :wallet="connectedAddress"
+          :network="network"
+          :tx-hash="txHash"
+        />
+      </div>
 
       <!-- ERROR -->
       <div

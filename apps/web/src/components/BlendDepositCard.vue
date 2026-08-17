@@ -709,16 +709,11 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
       Blend supply &amp; withdraw are <span class="text-[#d5ff2f] font-semibold">Testnet-only</span> in this beta.
     </div>
 
-    <!-- FAUCET PROMO (Lot R, R3): the offer is seen BEFORE the action. Supply
-         side only — withdraws never earn. Disappears with the campaign. -->
-    <div
-      v-if="faucetPromo && !isWithdraw && !mainnetBlendBlocked"
-      class="bg-[#202020] border border-[rgba(213,255,47,0.35)] rounded-md p-3 text-[11px] text-[#9a9b99]"
-    >
-      <span class="text-[#d5ff2f] font-semibold">Earn {{ faucetPromo.rewardXlm }} XLM</span>
-      — your first Blend supply (≥ {{ faucetPromo.minNotionalXlm }} XLM) earns a reward ·
-      {{ faucetPromo.remainingClaims }} claims left
-    </div>
+    <!-- (R3c fix) The faucet promo note used to sit HERE, between this card's
+         v-if="mainnetBlendBlocked" and v-else-if="!isVettedPool" — which broke
+         the chain and made the whole form's v-else unreachable whenever the
+         campaign was live (prod bug 2026-08-17). It now lives INSIDE the form
+         block below. NEVER insert an element into this if/else-if/else chain. -->
 
     <!-- A5: the requested pool is not in the vetted client registry (e.g. the
          indexer lists a pool the registry has not vetted yet). Refuse to render any
@@ -743,6 +738,18 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
     </div>
 
     <template v-else>
+      <!-- FAUCET PROMO (Lot R, R3/R3c): the offer is seen BEFORE the action.
+           Supply side only — withdraws never earn. INSIDE the form block so it
+           can never gate the form itself. Disappears with the campaign. -->
+      <div
+        v-if="faucetPromo && !isWithdraw"
+        class="bg-[#202020] border border-[rgba(213,255,47,0.35)] rounded-md p-3 text-[11px] text-[#9a9b99]"
+      >
+        <span class="text-[#d5ff2f] font-semibold">Earn {{ faucetPromo.rewardXlm }} XLM</span>
+        — your first Blend supply (≥ {{ faucetPromo.minNotionalXlm }} XLM) earns a reward ·
+        {{ faucetPromo.remainingClaims }} claims left
+      </div>
+
       <!-- MODE — supply ↔ withdraw, the two halves of the same position.
            A5b: the supply tab is DISABLED when the pool's live status blocks
            deposits (contract would reject with #1206); withdraw stays available —
@@ -1012,16 +1019,19 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
         <button type="button" class="text-[#9a9b99] hover:text-[#d5ff2f] w-fit mt-1" @click="reset">
           {{ isWithdraw ? "New withdraw" : "New deposit" }}
         </button>
-      </div>
 
-      <!-- FAUCET CLAIM (Lot R, R3): deposits only — withdraws never earn.
-           Purely additive; renders nothing while the campaign is dark. -->
-      <FaucetClaimPanel
-        v-if="status === 'success' && !isWithdraw && txHash && connectedAddress"
-        :key="txHash"
-        :wallet="connectedAddress"
-        :network="network"
-      />
+        <!-- FAUCET CLAIM (Lot R, R3/R3c): deposits only — withdraws never earn.
+             INSIDE the success block (never between v-if/v-else-if siblings —
+             that broke the chain in prod, 2026-08-17). Renders nothing while
+             the campaign is dark. -->
+        <FaucetClaimPanel
+          v-if="!isWithdraw && txHash && connectedAddress"
+          :key="txHash"
+          :wallet="connectedAddress"
+          :network="network"
+          :tx-hash="txHash"
+        />
+      </div>
 
       <!-- STILL PENDING — confirmation polling timed out. Not a failure: the tx was
            accepted and may still be included, so no failure copy is allowed here. -->
@@ -1048,16 +1058,18 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
         <button type="button" class="text-[#9a9b99] hover:text-[#d5ff2f] w-fit mt-1" @click="reset">
           Done
         </button>
-      </div>
 
-      <!-- FAUCET CLAIM on pending too: the witness verifies server-side once
-           the tx settles, and the panel's polling absorbs the wait. -->
-      <FaucetClaimPanel
-        v-if="status === 'pending' && !isWithdraw && txHash && connectedAddress"
-        :key="txHash"
-        :wallet="connectedAddress"
-        :network="network"
-      />
+        <!-- FAUCET CLAIM on pending too: the witness verifies server-side once
+             the tx settles, and the panel's polling absorbs the wait. Inside
+             the block for the same chain-integrity reason as above. -->
+        <FaucetClaimPanel
+          v-if="!isWithdraw && txHash && connectedAddress"
+          :key="txHash"
+          :wallet="connectedAddress"
+          :network="network"
+          :tx-hash="txHash"
+        />
+      </div>
 
       <!-- ERROR -->
       <div

@@ -17,6 +17,7 @@ import {
   Body,
   Query,
   BadRequestException,
+  Header,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -37,7 +38,11 @@ export class FaucetController {
    * wallet-less form is what the R3 promo surface polls — it must stay cheap
    * (one COUNT query, no Horizon).
    */
+  // R3c: this endpoint is POLLED (promo + claim panel) — it must never be
+  // cached by the browser or an intermediary (prod incident 2026-08-17: 304s
+  // froze the claim panel on stale eligibility).
   @Get('eligibility')
+  @Header('Cache-Control', 'no-store')
   async eligibility(@Query('wallet') wallet?: string) {
     if (wallet != null && !STELLAR_PUBKEY_RE.test(wallet)) {
       throw new BadRequestException('wallet must be a Stellar public key (G…)');

@@ -12,6 +12,20 @@ export function getApiBaseUrl(): string {
   return API_BASE_URL;
 }
 
+/**
+ * Error carrying the HTTP status so callers can react to specific codes
+ * (e.g. 429 from the edge rate limiter → backoff + honest "retrying" copy,
+ * Lot R R3c). message stays what it always was — existing catch sites keep
+ * working unchanged.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
@@ -28,7 +42,10 @@ export async function apiFetch<T>(
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(text || `API request failed: ${response.status}`);
+    throw new ApiError(
+      text || `API request failed: ${response.status}`,
+      response.status,
+    );
   }
 
   return response.json() as Promise<T>;
