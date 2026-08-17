@@ -234,11 +234,40 @@ regime (see `docs/tasks/lot-a1-mainnet-swap.md` for the implementation brief):
 - **INV-6.3** Failures are logged server-side with enough context to debug (public address, action,
   error class) — and nothing more (no envelopes with signatures in long-term logs).
 
-## 7. Review process
+## 7. Beta API access model & rate limiting (Lot S — §S3)
+
+An honest statement of what protects the user-scoped API during the beta:
+
+- **The model:** `userId` (a UUID kept in the web app's localStorage) acts as the
+  bearer token. Whoever presents a userId can read and mutate that user's wallets,
+  alert rules and notifications. There are no accounts, no sessions, no signatures.
+  **Its limits:** userIds can leak (URLs are query-string based, so they appear in
+  server/nginx logs and browser history) and cannot be revoked or rotated except by
+  abandoning the account. This is accepted beta scope; a real auth system is
+  post-beta. Nothing custodial is behind it — no keys, no signing capability, only
+  watch data and alert preferences (section 1 invariants are independent of this model).
+- **What makes it tolerable now:** (1) userIds are 122-bit random UUIDs — not
+  guessable, and every user-scoped endpoint validates the UUID shape (400) then
+  scopes queries `WHERE user_id = $userId`, returning **404 for anything not owned
+  — never 403 —** so the API is not an existence oracle for other users' resources
+  (pattern verified across wallets/alert-rules/notifications in the S0 sweep;
+  regression-guarded by `alerts.ownership.spec.ts`). (2) Since Lot S the whole
+  surface sits behind per-IP nginx rate limits (zones in `deployment.md`), which
+  turns bulk userId probing from free into expensive.
+- **Known quirk (standing W1 debt, still open):** on several wallet *read* routes an
+  ABSENT userId falls back to the shared demo account by design. Invalid userIds are
+  always 400 — the fallback applies only when the parameter is missing entirely.
+- **Ops endpoints are deliberately public** (founder decision, S0 2026-08-17):
+  `/v1/ops/metrics` and `/v1/ops/adoption` stay unauthenticated for grant
+  transparency — adoption counters are citable KPI evidence. Their payloads are
+  verified to contain no secrets, env values or internal URLs; they do reveal
+  aggregate usage levels, which is accepted.
+
+## 8. Review process
 
 For every action-path PR:
 
-1. Diff reviewed against sections 1–6; each touched invariant named in the PR description.
+1. Diff reviewed against sections 1–7; each touched invariant named in the PR description.
 2. Red-path evidence for anything new: at least one deliberately-invalid XDR rejected client-side,
    one over-cap request rejected by the API.
 3. Before each ungating step (swap, then deposit): run the full checklist top to bottom and record

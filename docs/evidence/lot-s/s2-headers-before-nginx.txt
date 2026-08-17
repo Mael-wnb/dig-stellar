@@ -1,0 +1,26 @@
+== BEFORE nginx changes (API S2 fixes already live) — 2026-08-17T08:14:46Z ==
+--- GET /v1/pools headers ---
+HTTP/1.1 200 OK
+Server: nginx/1.18.0 (Ubuntu)
+Date: Mon, 17 Aug 2026 08:14:48 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 37720
+Connection: keep-alive
+Vary: Origin
+Access-Control-Allow-Credentials: true
+ETag: W/"9358-HvRVquV+uEsQLLm8lVALHcAQxSk"
+
+--- OPTIONS preflight (allowed origin) ---
+HTTP/1.1 204 No Content
+Server: nginx/1.18.0 (Ubuntu)
+Date: Mon, 17 Aug 2026 08:14:48 GMT
+Content-Length: 0
+Connection: keep-alive
+Access-Control-Allow-Origin: https://stellar.getdig.ai
+Vary: Origin, Access-Control-Request-Headers
+Access-Control-Allow-Credentials: true
+Access-Control-Allow-Methods: GET,HEAD,PUT,PATCH,POST,DELETE
+Access-Control-Max-Age: 3600
+
+--- GET with disallowed origin (was 500 in S0) ---
+status=200

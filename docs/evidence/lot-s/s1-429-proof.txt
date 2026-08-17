@@ -1,0 +1,46 @@
+== Lot S1 — rate-limit proof (2026-08-17, ~08:20–08:35 UTC) ==
+Bursts were run FROM THE VPS over one keepalive connection (a cold-TLS client at
+transatlantic RTT physically cannot exceed ~5 r/s — an earlier attempt of 80
+sequential curls from the dev machine passed 80/80, which is itself evidence that
+a normal remote client never trips the limits).
+
+--- GENERAL zone (rate=10r/s burst=60 nodelay): 100 x GET /health, one connection ---
+200 x64, then 429 x36  (trip point 65 = burst 60 + ~4 refilled during the burst)
+
+--- ACTIONS zone (rate=30r/m burst=10 nodelay): 15 x POST /v1/actions/sdex/quote ---
+400 x11, then 429 x4   (400 = Nest validation of the empty test body — expected;
+                        trip point 12 = burst 10 + 1 refill)
+
+--- MUTATIONS zone (rate=2r/s burst=20 nodelay): 30 x POST /v1/notifications/read-all ---
+400 x21, then 429 x9   (trip point 22 = burst 20 + 1 refill; run after a 12 s
+                        cooldown so the general zone was full — an earlier run
+                        without cooldown tripped at 5 via the still-drained
+                        general zone, i.e. the zones compose correctly)
+
+--- GET exemption from the mutations zone ---
+30 x GET /v1/notifications/unread-count immediately after draining the mutations
+zone: 400 x30 (Nest missing-userId response), zero 429 — reads are keyed out of
+the mutations zone by the $request_method map.
+
+--- 429 response is honest JSON with Retry-After + readable cross-origin ---
+HTTP/1.1 429 Too Many Requests
+Retry-After: 1
+Access-Control-Allow-Origin: https://stellar.getdig.ai
+Access-Control-Allow-Credentials: true
+
+{"statusCode":429,"error":"Too Many Requests","message":"Rate limit exceeded - please slow down."}
+
+--- NORMAL NAVIGATION stays clean ---
+3 rapid simulated page loads (20 parallel requests each across the real dashboard
+endpoints, from the dev machine): 60/60 served, zero 429. (Non-200s in the raw
+output are application-level: missing userId params / a fabricated slug.)
+
+--- PORT 3000 closure (S2, verified from outside the VPS) ---
+http://stellar-api.getdig.ai:3000/v1/pools  -> connection timeout (exit 28)
+    [ufw: deny incoming, allow 22/80/443 — enabled by founder]
+    [app: binds 127.0.0.1 — ss shows LISTEN 127.0.0.1:3000]
+https://stellar-api.getdig.ai/v1/pools      -> 200 via nginx throughout
+
+Config: /etc/nginx/sites-available/stellar-api.getdig.ai (zones documented in
+docs/deployment.md). Pre-change config backed up on the VPS at
+/root/nginx-backup-lot-s/.

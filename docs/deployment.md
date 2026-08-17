@@ -36,6 +36,71 @@ pnpm -C apps/indexer tsx src/scripts/bootstrap/allbridge-upsert-core.ts
 
 ---
 
+## VPS edge — nginx rate limiting & hardening (Lot S, 2026-08-17)
+
+The public entry is nginx (`/etc/nginx/sites-available/stellar-api.getdig.ai`,
+symlinked into `sites-enabled`). **This config is ops state that must survive a VPS
+rebuild — recreate it from this section.** Evidence: `docs/evidence/lot-s/`.
+
+### Network posture
+- The API binds **`127.0.0.1:3000`** (`main.ts`; override with `HOST=0.0.0.0` only
+  for environments that need it, e.g. Docker). nginx is the only public path.
+- ufw: default deny incoming; allow `22/tcp`, `80/tcp`, `443/tcp`.
+- The `default` vhost (`sites-available/default`) does `return 444;` — IP-direct
+  scanner probes get a closed connection, not a file listing.
+
+### Rate-limit zones (values from the observed baseline, S0 2026-08-17)
+Keyed by `$binary_remote_addr`, all `nodelay`; `limit_req_status 429` with a JSON
+body + `Retry-After: 1` via an `@rate_limited` named location (ACAO echoed so the
+web app can read the 429 cross-origin).
+
+| Zone | Applies to | Rate | Burst | Sizing rationale |
+|---|---|---|---|---|
+| `api_general` | all locations | 10 r/s | 60 | worst observed legit minute 62 req/min; burst ≈ a full page load (~20 req) ×3 |
+| `api_actions` | `location /v1/actions/` | 30 r/min | 10 | builds cost RPC simulation; observed 29 POSTs/2 days |
+| `api_mutations` | POST/PATCH/DELETE under `/v1/` (via `$request_method` map → empty key exempts reads) | 2 r/s | 20 | mutations are click-driven |
+
+If the web app ever grows a legitimately chattier page, re-measure before raising
+values — limits come from observed traffic, not guesses.
+
+### Other edge settings
+`server_tokens off` · `client_max_body_size 100k` (largest legit body is a small
+JSON action payload; XDR travels in responses) · headers on every response:
+HSTS (`max-age=31536000`), `X-Content-Type-Options: nosniff`,
+`X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`.
+
+### API process — pm2 supervised (Lot S follow-up, 2026-08-17)
+The API runs under **pm2** (name `dig-stellar-api`, direct `dist/main.js` definition,
+cwd `apps/api` so dotenv finds `.env`). The pm2 daemon is boot-persistent via the
+`pm2-root` systemd unit (`systemctl is-enabled pm2-root` → enabled), and the process
+list is saved (`pm2 save` → `/root/.pm2/dump.pm2`), so a VPS reboot restores the API
+without manual action. Verified 2026-08-17: `pm2 kill && pm2 resurrect` (reboot
+simulation) brings the API back healthy on `127.0.0.1:3000`.
+
+Deploy / restart procedure:
+```bash
+export PATH=/root/.nvm/versions/node/v20.19.4/bin:$PATH   # non-interactive PATH has node 18
+cd /root/dig-stellar && git pull
+pnpm --dir apps/api build
+cd apps/api
+GIT_SHA=$(git -C /root/dig-stellar rev-parse --short HEAD) pm2 restart dig-stellar-api --update-env
+pm2 save                                  # ALWAYS after a definition/env change
+curl -s http://127.0.0.1:3000/health      # verify (version must equal the new SHA)
+```
+If the process definition itself must be recreated:
+```bash
+cd /root/dig-stellar/apps/api
+pm2 delete dig-stellar-api
+GIT_SHA=$(git -C /root/dig-stellar rev-parse --short HEAD) pm2 start dist/main.js --name dig-stellar-api --time
+pm2 save
+```
+Logs: `~/.pm2/logs/dig-stellar-api-{out,error}.log` (pm2-logrotate active).
+Do NOT start the API with nohup/setsid — a second instance loses the `:3000` port
+race against pm2's respawn and dies; only pm2 owns this process.
+Pre-Lot-S nginx config backed up at `/root/nginx-backup-lot-s/` on the VPS.
+
+---
+
 ## Why this architecture
 - Vercel is convenient for the frontend
 - API and indexer benefit from a more controllable runtime
