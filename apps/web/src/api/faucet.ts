@@ -8,13 +8,18 @@ import { apiFetch } from "./client";
 export type FaucetCampaign = {
   active: boolean;
   remainingClaims: number;
+  /** Campaign budget — for the "34/40 left" progress (R3b). */
+  maxClaims: number;
   rewardXlm: number;
   network: "testnet" | "mainnet";
   minNotionalXlm: number;
+  /** ISO deadline or null (R3b). Server-enforced; countdown-only client-side. */
+  endsAt: string | null;
 };
 
 export type FaucetIneligibleReason =
   | "faucet-disabled"
+  | "campaign-ended"
   | "campaign-exhausted"
   | "temporarily-paused"
   | "no-qualifying-witness"

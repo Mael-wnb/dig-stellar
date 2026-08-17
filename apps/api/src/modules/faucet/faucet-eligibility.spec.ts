@@ -7,6 +7,9 @@ import {
   type WalletFacts,
 } from './faucet-eligibility';
 
+const NOW = 1_700_000_000_000;
+const HOUR = 3_600_000;
+
 /** A fully-eligible baseline; each test flips exactly one fact. */
 const eligibleFacts = (): WalletFacts => ({
   enabled: true,
@@ -14,6 +17,8 @@ const eligibleFacts = (): WalletFacts => ({
   countedClaims: 5,
   claimsLastHour: 2,
   hourlyCap: 10,
+  endsAtMs: null,
+  nowMs: NOW,
   witnessState: 'ok',
   priorClaim: null,
   treasurySpendableXlm: 150,
@@ -40,6 +45,12 @@ describe('campaignState', () => {
   it('stays active under a velocity pause (temporary, wallet-level only)', () => {
     expect(campaignState({ ...eligibleFacts(), claimsLastHour: 10 }).active).toBe(true);
   });
+
+  it('R3b deadline: past endsAt deactivates, future endsAt does not, null = no deadline', () => {
+    expect(campaignState({ ...eligibleFacts(), endsAtMs: NOW - 1 }).active).toBe(false);
+    expect(campaignState({ ...eligibleFacts(), endsAtMs: NOW + 36 * HOUR }).active).toBe(true);
+    expect(campaignState({ ...eligibleFacts(), endsAtMs: null }).active).toBe(true);
+  });
 });
 
 describe('walletEligibility', () => {
@@ -49,6 +60,7 @@ describe('walletEligibility', () => {
 
   const cases: Array<[string, Partial<WalletFacts>, string]> = [
     ['disabled flag', { enabled: false }, 'faucet-disabled'],
+    ['expired deadline (server-enforced, R3b)', { endsAtMs: NOW - 1 }, 'campaign-ended'],
     ['exhausted budget', { countedClaims: 40 }, 'campaign-exhausted'],
     ['velocity brake at the cap', { claimsLastHour: 10 }, 'temporarily-paused'],
     ['no witness', { witnessState: 'none' }, 'no-qualifying-witness'],

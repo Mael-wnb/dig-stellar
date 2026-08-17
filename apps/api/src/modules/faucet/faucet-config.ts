@@ -70,6 +70,19 @@ export function faucetMinNotionalXlm(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
+/**
+ * Optional campaign deadline (FAUCET_ENDS_AT, ISO date). R3b rule: when set it
+ * is ENFORCED server-side (a past date closes eligibility) and surfaced to the
+ * promo as a real countdown; when unset (or unparseable) there is NO deadline
+ * and no time pressure is shown anywhere — never fake urgency.
+ */
+export function faucetEndsAt(): Date | null {
+  const raw = process.env.FAUCET_ENDS_AT?.trim();
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
 export function faucetHorizonUrl(network: FaucetNetwork): string {
   return HORIZON_URLS[network];
 }

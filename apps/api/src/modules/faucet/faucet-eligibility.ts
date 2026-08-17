@@ -22,6 +22,7 @@ export type WitnessState = 'none' | 'below-min' | 'ok';
 
 export type IneligibleReason =
   | 'faucet-disabled'
+  | 'campaign-ended'
   | 'campaign-exhausted'
   | 'temporarily-paused'
   | 'no-qualifying-witness'
@@ -44,6 +45,13 @@ export interface CampaignFacts {
   /** Claims created in the last rolling hour on the faucet network. */
   claimsLastHour: number;
   hourlyCap: number;
+  /**
+   * Campaign deadline in epoch ms, or null = no deadline (R3b). A past
+   * deadline closes the campaign server-side — never merely decorative.
+   */
+  endsAtMs: number | null;
+  /** "Now" in epoch ms — an input so the rules stay pure and testable. */
+  nowMs: number;
 }
 
 export interface CampaignState {
@@ -51,14 +59,23 @@ export interface CampaignState {
   remainingClaims: number;
 }
 
+/** True iff a deadline exists and has passed. */
+export function campaignEnded(f: Pick<CampaignFacts, 'endsAtMs' | 'nowMs'>): boolean {
+  return f.endsAtMs != null && f.nowMs >= f.endsAtMs;
+}
+
 /**
- * Campaign state for the promo surface (R3): active while the flag is on and
- * budget remains. A velocity pause does NOT deactivate the campaign — it is
- * temporary by construction and surfaces as a wallet-level reason instead.
+ * Campaign state for the promo surface (R3): active while the flag is on,
+ * budget remains, and the deadline (if any) has not passed. A velocity pause
+ * does NOT deactivate the campaign — it is temporary by construction and
+ * surfaces as a wallet-level reason instead.
  */
 export function campaignState(f: CampaignFacts): CampaignState {
   const remainingClaims = Math.max(0, f.maxClaims - f.countedClaims);
-  return { active: f.enabled && remainingClaims > 0, remainingClaims };
+  return {
+    active: f.enabled && remainingClaims > 0 && !campaignEnded(f),
+    remainingClaims,
+  };
 }
 
 export interface WalletFacts extends CampaignFacts {
@@ -82,6 +99,7 @@ export function walletEligibility(f: WalletFacts): WalletEligibility {
   const no = (reason: IneligibleReason): WalletEligibility => ({ eligible: false, reason });
 
   if (!f.enabled) return no('faucet-disabled');
+  if (campaignEnded(f)) return no('campaign-ended');
   if (campaignState(f).remainingClaims <= 0) return no('campaign-exhausted');
   if (f.claimsLastHour >= f.hourlyCap) return no('temporarily-paused');
   if (f.witnessState === 'none') return no('no-qualifying-witness');

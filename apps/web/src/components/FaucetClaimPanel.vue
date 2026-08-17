@@ -54,6 +54,7 @@ const REASON_COPY: Record<string, string> = {
   "claim-failed-pending-review":
     "A previous claim needs manual review — no action needed on your side.",
   "temporarily-paused": "Rewards are temporarily paused (hourly limit) — try again within the hour.",
+  "campaign-ended": "The reward campaign has ended.",
   "campaign-exhausted": "All rewards have been claimed — the campaign is over.",
   "treasury-drained": "Rewards are paused while the reward pool refills.",
   "treasury-unavailable": "Rewards are momentarily unavailable — try again shortly.",

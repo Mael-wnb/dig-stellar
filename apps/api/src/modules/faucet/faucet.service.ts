@@ -22,6 +22,7 @@ import {
   faucetMaxClaims,
   faucetHourlyClaimCap,
   faucetMinNotionalXlm,
+  faucetEndsAt,
   type FaucetNetwork,
 } from './faucet-config';
 import {
@@ -37,9 +38,16 @@ import { FaucetPayoutService, PayoutError } from './faucet-payout.service';
 export interface CampaignPayload {
   active: boolean;
   remainingClaims: number;
+  /** Campaign budget — lets the promo render "34/40 left" honestly (R3b). */
+  maxClaims: number;
   rewardXlm: number;
   network: FaucetNetwork;
   minNotionalXlm: number;
+  /**
+   * ISO deadline or null (R3b). The server ENFORCES it (past = inactive +
+   * 'campaign-ended'); the promo's countdown only renders this value.
+   */
+  endsAt: string | null;
 }
 
 export interface EligibilityPayload {
@@ -114,9 +122,11 @@ export class FaucetService {
     const facts = await this.campaignFacts(network);
     const campaign: CampaignPayload = {
       ...campaignState(facts),
+      maxClaims: facts.maxClaims,
       rewardXlm: faucetRewardXlm(),
       network,
       minNotionalXlm: faucetMinNotionalXlm(),
+      endsAt: facts.endsAtMs != null ? new Date(facts.endsAtMs).toISOString() : null,
     };
     if (!wallet) return { campaign };
 
@@ -285,6 +295,8 @@ export class FaucetService {
       countedClaims: counts.counted,
       claimsLastHour: counts.lastHour,
       hourlyCap: faucetHourlyClaimCap(),
+      endsAtMs: faucetEndsAt()?.getTime() ?? null,
+      nowMs: Date.now(),
     };
   }
 
