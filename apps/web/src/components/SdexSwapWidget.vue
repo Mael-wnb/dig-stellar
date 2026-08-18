@@ -257,7 +257,7 @@ function friendlyBuildError(err: unknown): string {
       };
       if (body.code === "INSUFFICIENT_SPENDABLE_BALANCE") {
         const avail = body.spendable != null ? displayBalance(body.spendable) : "0";
-        return `Insufficient balance: ${avail} ${fromCode.value} available — the rest is reserved by the Stellar network.`;
+        return `Insufficient balance: ${avail} ${fromCode.value} available. The rest is reserved by the Stellar network.`;
       }
       if (typeof body.message === "string") return body.message;
     } catch {
@@ -382,7 +382,7 @@ async function onSwap() {
     };
     const check = validateSwapXdr(xdr, intent);
     if (!check.ok) {
-      errorMessage.value = `Refused to sign — XDR did not match your request: ${check.violations.join("; ")}`;
+      errorMessage.value = `Refused to sign. The XDR did not match your request: ${check.violations.join("; ")}`;
       status.value = "error";
       return;
     }
@@ -456,7 +456,7 @@ function reset() {
         class="rounded-[12px] px-[14px] py-[11px] text-[12px]"
         style="background: rgba(255,184,107,0.08); border: 1px solid rgba(255,184,107,0.5); color: var(--dig-amber)"
       >
-        <span class="font-semibold">Mainnet</span> — this swap moves real funds. A
+        <span class="font-semibold">Mainnet:</span> this swap moves real funds. A
         per-transaction cap applies during the launch period.
       </div>
 
@@ -468,7 +468,7 @@ function reset() {
         style="background: var(--dig-surface-2); border: 1px solid rgba(213,255,47,0.35); color: var(--dig-faint)"
       >
         <span class="font-semibold" style="color: var(--dig-accent)">Earn {{ faucetPromo.rewardXlm }} XLM</span>
-        — your first swap (≥ {{ faucetPromo.minNotionalXlm }} XLM) earns a reward ·
+        with your first swap (≥ {{ faucetPromo.minNotionalXlm }} XLM).
         {{ faucetPromo.remainingClaims }} claims left
       </div>
 
@@ -636,7 +636,7 @@ function reset() {
           v-if="rejectedBeforeInclusion"
           style="color: var(--dig-faint)"
         >
-          The transaction was rejected before inclusion — it never reached a ledger,
+          The transaction was rejected before inclusion. It never reached a ledger,
           so nothing was charged and no funds moved.
         </span>
         <span class="break-all" style="color: var(--dig-faint)">{{ errorMessage }}</span>

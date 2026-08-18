@@ -90,14 +90,14 @@ export function buildPriceCopy(input: PriceCopyInput): {
     const dir = highIsBreach ? 'above' : 'below';
     return {
       title: `Price alert: ${symbol} ${dir} ${t}`,
-      body: `${symbol} crossed ${dir} ${t} — ${v} at ${at}.`,
+      body: `${symbol} crossed ${dir} ${t}: ${v} at ${at}.`,
     };
   }
   // Resolved: the price came back through the threshold in the other direction.
   const backDir = highIsBreach ? 'below' : 'above';
   return {
     title: `Price alert resolved: ${symbol} back ${backDir} ${t}`,
-    body: `${symbol} is back ${backDir} ${t} — ${v} at ${at}.`,
+    body: `${symbol} is back ${backDir} ${t}: ${v} at ${at}.`,
   };
 }
 
@@ -170,12 +170,12 @@ export function buildTvlDropCopy(input: TvlDropCopyInput): {
   if (emit === 'alert_fired') {
     return {
       title: `TVL drop: ${poolLabel} ${move}`,
-      body: `${poolLabel} TVL ${move} (${range}) — as of ${at}.`,
+      body: `${poolLabel} TVL ${move} (${range}), as of ${at}.`,
     };
   }
   return {
     title: `TVL drop resolved: ${poolLabel} back within ${thresholdPct}%`,
-    body: `${poolLabel} TVL is back within your ${thresholdPct}% threshold: ${move} (${range}) — as of ${at}.`,
+    body: `${poolLabel} TVL is back within your ${thresholdPct}% threshold: ${move} (${range}), as of ${at}.`,
   };
 }
 
@@ -227,12 +227,12 @@ export function buildApyCopy(input: ApyCopyInput): {
     const directionWord = highIsBreach ? 'rose to' : 'dropped to';
     return {
       title: `${side === 'supply' ? 'Supply' : 'Borrow'} APY alert: ${poolLabel} at ${v}`,
-      body: `${poolLabel} ${sideLabel} ${directionWord} ${v} (alert threshold ${opSym} ${thresholdPct}%) — as of ${at}.`,
+      body: `${poolLabel} ${sideLabel} ${directionWord} ${v} (alert threshold ${opSym} ${thresholdPct}%), as of ${at}.`,
     };
   }
   return {
     title: `${side === 'supply' ? 'Supply' : 'Borrow'} APY back: ${poolLabel} at ${v}`,
-    body: `${poolLabel} ${sideLabel} back to ${v} — as of ${at}.`,
+    body: `${poolLabel} ${sideLabel} back to ${v}, as of ${at}.`,
   };
 }
 

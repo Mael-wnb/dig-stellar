@@ -32,7 +32,7 @@ const fmtBucket = (iso: string): string => {
   const d = new Date(iso)
   if (!Number.isFinite(d.getTime())) return ''
   const hh = String(d.getUTCHours()).padStart(2, '0')
-  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()} · ${hh}:00 UTC`
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${hh}:00 UTC`
 }
 const fmtDate = (iso: string | null | undefined): string => {
   if (!iso) return ''
@@ -183,7 +183,7 @@ const changeLabel = computed(() => (changeAt.value ? fmtDate(changeAt.value) : '
     <!-- cold start: no points yet -->
     <div v-else-if="!hasData" class="h-[120px] flex flex-col items-center justify-center text-center">
       <p class="text-[12.5px]" style="color: var(--dig-text)">Building network-TVL history</p>
-      <p class="text-[11.5px] mt-[3px] max-w-[320px]" style="color: var(--dig-faint)">The first points are recorded on each refresh cycle — the 7-day curve fills in from here.</p>
+      <p class="text-[11.5px] mt-[3px] max-w-[320px]" style="color: var(--dig-faint)">The first points are recorded on each refresh cycle. The 7-day curve fills in from here.</p>
     </div>
 
     <template v-else>
@@ -225,13 +225,13 @@ const changeLabel = computed(() => (changeAt.value ? fmtDate(changeAt.value) : '
 
       <!-- honest "building history" note while the window isn't fully covered -->
       <p v-if="sinceLabel" class="text-[11px] mt-[8px]" style="color: var(--dig-faint)">
-        Building history since {{ sinceLabel }} — the curve fills toward 7 days as snapshots accrue.
+        Building history since {{ sinceLabel }}. The curve fills toward 7 days as snapshots accrue.
       </p>
 
       <!-- honest methodology-change footnote: the step-down is definitional, not a market move -->
       <p v-if="changeLabel" class="text-[11px] mt-[6px]" style="color: var(--dig-faint)">
         Methodology change on {{ changeLabel }}: total value tracked is now the sum of tracked venues only
-        (DeFindex excluded — its funds sit inside Blend).
+        (DeFindex excluded: its funds sit inside Blend).
       </p>
     </template>
   </div>

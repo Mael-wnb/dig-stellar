@@ -121,7 +121,7 @@ const positionCount = computed(() =>
           <div class="flex items-center gap-[10px]">
             <div class="min-w-0">
               <div class="text-[13px] font-semibold truncate">{{ p.poolName }}</div>
-              <div class="text-[11.5px] truncate" style="color: var(--dig-faint)">Blend · {{ p.wallet }}</div>
+              <div class="text-[11.5px] truncate" style="color: var(--dig-faint)">Blend, {{ p.wallet }}</div>
             </div>
             <div class="ml-auto text-right flex-shrink-0">
               <div class="text-[13px] font-semibold tabular-nums">{{ formatUsd(p.suppliedUsd) }}</div>

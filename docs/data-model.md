@@ -1,4 +1,4 @@
-# Data Model — As-Built
+# Data Model (As-Built)
 
 This document describes the actual database schema as deployed and verified in the codebase.
 Three distinct families of tables coexist in the same Postgres instance.
@@ -9,17 +9,17 @@ Three distinct families of tables coexist in the same Postgres instance.
 
 | Schema family | Tables | Defined in | Written by | Read by |
 |---|---|---|---|---|
-| **v1 — production pipeline** | `venues`, `entities`, `assets`, `entity_assets`, `normalized_events`, `pool_snapshots`, `reserve_snapshots`, `asset_prices`, `pool_metrics_latest`, `protocol_metrics_latest`, `sync_cursors` | `apps/api/src/db/stellar_v1.sql` + `stellar_v1_metrics.sql` | `job:refresh` pipeline (indexer) | `/v1/protocols`, `/v1/pools`, `/v1/pools/:slug` (StellarController) |
-| **v1 — bridge flows** | `bridge_flows` | `apps/api/src/db/stellar_v1_bridge.sql` | `job:refresh` (Step 8 — `run-allbridge-bridge-refresh.ts`) | `/v1/bridge/*` (planned — on-read aggregation, T2-D3) |
-| **v2 — wallet layer** | `user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions`, `wallet_pool_health` | `apps/api/src/db/stellar_v2_multiwallet.sql` | wallet refresh scripts (`80-stellar-wallet-balance-snapshots.ts`, `81-stellar-wallet-blend-positions.ts`) | `/v1/wallets/*` (WalletsController) |
-| **Prisma legacy** | `"Protocol"`, `"Venue"`, `"Snapshot"` | `packages/db/prisma/schema.prisma` + migration `20260312113641_init` | `run:blend`, `run:horizon`, `run:once` | `/protocols`, `/venues`, `/venues/:key/snapshots` (AppController) — **not served under `/v1/`** |
+| **v1, production pipeline** | `venues`, `entities`, `assets`, `entity_assets`, `normalized_events`, `pool_snapshots`, `reserve_snapshots`, `asset_prices`, `pool_metrics_latest`, `protocol_metrics_latest`, `sync_cursors` | `apps/api/src/db/stellar_v1.sql` + `stellar_v1_metrics.sql` | `job:refresh` pipeline (indexer) | `/v1/protocols`, `/v1/pools`, `/v1/pools/:slug` (StellarController) |
+| **v1, bridge flows** | `bridge_flows` | `apps/api/src/db/stellar_v1_bridge.sql` | `job:refresh` (Step 8, `run-allbridge-bridge-refresh.ts`) | `/v1/bridge/*` (planned: on-read aggregation, T2-D3) |
+| **v2, wallet layer** | `user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions`, `wallet_pool_health` | `apps/api/src/db/stellar_v2_multiwallet.sql` | wallet refresh scripts (`80-stellar-wallet-balance-snapshots.ts`, `81-stellar-wallet-blend-positions.ts`) | `/v1/wallets/*` (WalletsController) |
+| **Prisma legacy** | `"Protocol"`, `"Venue"`, `"Snapshot"` | `packages/db/prisma/schema.prisma` + migration `20260312113641_init` | `run:blend`, `run:horizon`, `run:once` | `/protocols`, `/venues`, `/venues/:key/snapshots` (AppController); **not served under `/v1/`** |
 
 The v1 and v2 schemas are applied manually via the SQL files (no Prisma migration).
 The Prisma schema is applied via `pnpm -C packages/db prisma:migrate`.
 
 ---
 
-## Schema v1 — Production Pipeline
+## Schema v1: Production Pipeline
 
 Defined in `apps/api/src/db/stellar_v1.sql` and `apps/api/src/db/stellar_v1_metrics.sql`.
 
@@ -51,7 +51,7 @@ Top-level protocol registry. One row per protocol (blend, soroswap, aquarius, st
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | Updated on upsert |
 
-No freshness field — venues are stable configuration, not time-series.
+No freshness field; venues are stable configuration, not time-series.
 
 ### `entities`
 
@@ -224,14 +224,14 @@ The API reads the latest price per asset via `ORDER BY observed_at DESC LIMIT 1`
 
 ### `pool_metrics_latest`
 
-Latest derived metrics per entity — upserted on every refresh cycle. Not a time-series.
+Latest derived metrics per entity, upserted on every refresh cycle. Not a time-series.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | uuid PK | |
 | `venue_id` | uuid FK → `venues.id` CASCADE | |
 | `entity_id` | uuid FK → `entities.id` CASCADE | |
-| `as_of` | timestamptz NOT NULL | **Freshness field** — set to `nowIso()` at write time |
+| `as_of` | timestamptz NOT NULL | **Freshness field**, set to `nowIso()` at write time |
 | `metric_type` | text NOT NULL | Currently always `latest` |
 | `tvl_usd` | numeric | |
 | `volume_24h_usd` | numeric | |
@@ -246,7 +246,7 @@ Latest derived metrics per entity — upserted on every refresh cycle. Not a tim
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | Updated on upsert |
 
-Unique constraint: `(entity_id, metric_type)` — exactly one active row per pool.
+Unique constraint: `(entity_id, metric_type)`, exactly one active row per pool.
 Indexes: `entity_id`, `as_of DESC`.
 
 Primary read target for `GET /v1/pools` and `GET /v1/pools/:slug`.
@@ -269,7 +269,7 @@ Latest derived metrics aggregated at the venue (protocol) level. Upserted on eve
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
 
-Unique constraint: `(venue_id)` — exactly one active row per protocol.
+Unique constraint: `(venue_id)`, exactly one active row per protocol.
 Indexes: `venue_id`, `as_of DESC`.
 
 Written by `70-protocol-persist-metrics.ts`. Primary read target for `GET /v1/protocols`.
@@ -291,7 +291,7 @@ Unique constraint: `(source, cursor_key)`.
 
 ---
 
-## Schema v1 — Bridge Flows (T2-D3)
+## Schema v1: Bridge Flows (T2-D3)
 
 Defined in `apps/api/src/db/stellar_v1_bridge.sql` (applied manually, like the other v1 files).
 References v1 `venues` and `assets`.
@@ -300,8 +300,8 @@ References v1 `venues` and `assets`.
 
 One row per Allbridge Core bridge event on Stellar. Tracks **inflows** (other chain → Stellar,
 the SCF claim) and **outflows** (Stellar → other chain, bonus) with per-counterparty-chain
-attribution. Mono-token today (USDC — the only token Allbridge Core bridges on Stellar). Flows are
-aggregated **on read** (no pre-computed `*_metrics_latest` table) — volume is low.
+attribution. Mono-token today (USDC, the only token Allbridge Core bridges on Stellar). Flows are
+aggregated **on read** (no pre-computed `*_metrics_latest` table); volume is low.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -322,7 +322,7 @@ aggregated **on read** (no pre-computed `*_metrics_latest` table) — volume is 
 | `event_id` | text NOT NULL | Soroban RPC event id |
 | `tx_hash` | text NOT NULL | |
 | `ledger` | bigint NOT NULL | |
-| `occurred_at` | timestamptz NOT NULL | **freshness** — `ledgerClosedAt` from RPC |
+| `occurred_at` | timestamptz NOT NULL | **freshness**: `ledgerClosedAt` from RPC |
 | `metadata` | jsonb | event name, raw recipient, `receive_token`, `receive_tokens` invocation args |
 | `created_at` | timestamptz | default now() |
 
@@ -339,7 +339,7 @@ view, not deep history.
 
 ---
 
-## Schema v2 — Wallet Layer
+## Schema v2: Wallet Layer
 
 Defined in `apps/api/src/db/stellar_v2_multiwallet.sql`.
 References `assets` and `entities` from schema v1 (cross-schema FK via `asset_id`, `venue_id`, `entity_id`).
@@ -356,14 +356,14 @@ One row per wallet address tracked in the system. `user_id` is a UUID minted cli
 | `address` | varchar(128) NOT NULL | Stellar public key |
 | `label` | varchar(128) | Optional display label |
 | `is_primary` | boolean | Showcase/default wallet. First wallet for a user is auto-primary. App-maintained singleton. |
-| `is_active` | boolean | Refresh gate — the indexer only snapshots active wallets. Default true on every insert path. |
-| `is_active_signer` | boolean NOT NULL default false | **T2-D1.** Active-signer designation: the single wallet that can sign actions (singleton per user). Default false = watch-only, so every tracked wallet is watch-only until promoted. Orthogonal to `is_primary` and `is_active` — never merged. Connecting a wallet via the Wallets Kit promotes it (singleton; demotes the previous). |
+| `is_active` | boolean | Refresh gate: the indexer only snapshots active wallets. Default true on every insert path. |
+| `is_active_signer` | boolean NOT NULL default false | **T2-D1.** Active-signer designation: the single wallet that can sign actions (singleton per user). Default false = watch-only, so every tracked wallet is watch-only until promoted. Orthogonal to `is_primary` and `is_active`, never merged. Connecting a wallet via the Wallets Kit promotes it (singleton; demotes the previous). |
 | `metadata` | jsonb | |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
 
 Unique constraint: `(user_id, chain, address)`.
-Partial unique index `user_wallets_one_signer_per_user` on `(user_id) where is_active_signer` —
+Partial unique index `user_wallets_one_signer_per_user` on `(user_id) where is_active_signer`
 DB-enforces the active-signer singleton (stronger than the app-maintained `is_primary`).
 Indexes: `user_id`, `(user_id, chain)`, `(chain, address)`.
 
@@ -376,7 +376,7 @@ Latest balance is resolved via `DISTINCT ON (user_wallet_id, asset_id, asset_con
 |---|---|---|
 | `id` | uuid PK | |
 | `user_wallet_id` | uuid FK → `user_wallets.id` CASCADE | |
-| `asset_id` | uuid FK → `assets.id` SET NULL | Nullable — not all assets are in the v1 registry |
+| `asset_id` | uuid FK → `assets.id` SET NULL | Nullable; not all assets are in the v1 registry |
 | `asset_contract_id` | varchar(128) | Raw contract ID, always populated |
 | `asset_symbol` | varchar(64) | Denormalized for display |
 | `balance_raw` | numeric(78, 0) NOT NULL | On-chain units |
@@ -402,7 +402,7 @@ and/or one `borrow` row per reserve the wallet holds. `position_type` ∈ `suppl
 Amounts are in underlying-asset units (the Blend SDK's Float helpers, decimal-scaled via b/dRate);
 `amount_raw` = `amount_scaled × 10^decimals`. Soroswap/Aquarius LP positions are not yet resolved.
 **Read by** `GET /v1/wallets/:walletId/positions` and the `defi` block of `GET /v1/wallets/overview`
-(Gap B part 2) — both filter to the wallet's **latest `snapshot_at`** so repaid/exited positions
+(Gap B part 2); both filter to the wallet's **latest `snapshot_at`** so repaid/exited positions
 don't linger (snapshot tables don't tombstone closed rows).
 
 | Column | Type | Notes |
@@ -429,14 +429,14 @@ Indexes: `user_wallet_id`, `snapshot_at DESC`, `(user_wallet_id, snapshot_at DES
 ### `wallet_pool_health`
 
 Per-(wallet, pool) Blend risk summary (T2-D1 Gap B). The **health factor is first-class** here
-because D2's alert evaluator queries it flat — a queried value must be a column, not jsonb. This is
+because D2's alert evaluator queries it flat: a queried value must be a column, not jsonb. This is
 the pool-level rollup; the per-asset supply/borrow rows live in `wallet_protocol_positions`
 (mirrors the v1 `reserve_snapshots` per-asset vs `pool_metrics_latest` per-pool split).
 Snapshot-based, so D2 can read both the current HF and the previous one for delta detection.
 Written by `81-stellar-wallet-blend-positions.ts`. Values come from the Blend SDK's
 `PositionsEstimate` (never hand-rolled), denominated in USD via the pool's Reflector oracle.
 **Read by** `GET /v1/wallets/:walletId/positions` (per-pool HF) and the `defi.poolHealth` block of
-`GET /v1/wallets/overview` (consolidated risk across all tracked wallets) — filtered to each
+`GET /v1/wallets/overview` (consolidated risk across all tracked wallets), filtered to each
 wallet's latest `snapshot_at`.
 
 | Column | Type | Notes |
@@ -461,7 +461,7 @@ A wallet with **no** Blend position in a pool gets **no row** for that pool (emp
 
 ---
 
-## Prisma Schema — Legacy (not served under /v1/)
+## Prisma Schema: Legacy (not served under /v1/)
 
 Defined in `packages/db/prisma/schema.prisma`.
 Applied via `pnpm -C packages/db prisma:migrate`.

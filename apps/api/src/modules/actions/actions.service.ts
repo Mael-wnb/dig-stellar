@@ -936,7 +936,7 @@ export class ActionsService {
       const available = spendable.toFixed(7);
       throw new BadRequestException({
         code: 'INSUFFICIENT_SPENDABLE_BALANCE',
-        message: `Insufficient spendable ${label} balance: ${available} available — the rest is reserved by the Stellar network`,
+        message: `Insufficient spendable ${label} balance: ${available} available. The rest is reserved by the Stellar network`,
         asset: label,
         spendable: available,
         requested,

@@ -130,8 +130,8 @@ onBeforeUnmount(() => {
         </div>
         <div class="text-[12px]" style="color: var(--dig-faint)">
           Your first swap AND your first Blend supply (each ≥
-          {{ campaign.minNotionalXlm }} XLM) each earn {{ campaign.rewardXlm }} XLM —
-          first-come, up to {{ campaign.families?.length ?? 2 }} rewards per wallet.
+          {{ campaign.minNotionalXlm }} XLM) each earn {{ campaign.rewardXlm }} XLM.
+          First-come, up to {{ campaign.families?.length ?? 2 }} rewards per wallet.
         </div>
       </div>
     </div>

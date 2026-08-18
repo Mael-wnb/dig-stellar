@@ -1,17 +1,17 @@
-# Dig — Stellar DeFi Intelligence & Execution Gateway
+# Dig: Stellar DeFi Intelligence & Execution Gateway
 
 ## Positioning
 
 The simplest gateway to Stellar DeFi: an intelligence layer that detects, scores, and ranks
 yield and liquidity opportunities across the ecosystem; a frictionless onboarding and
 non-custodial execution layer so users can act in one click; and native cross-chain USDC
-onboarding to bring external capital into Stellar — turning passive analytics into action.
+onboarding to bring external capital into Stellar, turning passive analytics into action.
 
 This builds directly on Dig's existing Stellar indexing and analytics infrastructure: a hybrid
 Horizon + Soroban RPC pipeline that already ingests and normalizes real-time data from
 integrated protocols (e.g., Blend, Aquarius, Soroswap) into a unified Postgres store, served
 through internal API endpoints, with grouped multi-wallet portfolio tracking already in place.
-That infrastructure is the foundation this project extends — the work below is the intelligence,
+That infrastructure is the foundation this project extends; the work below is the intelligence,
 onboarding, execution, cross-chain, notification, and mobile layers built on top of it.
 
 **Two integration families** structure the work:
@@ -26,7 +26,7 @@ onboarding, execution, cross-chain, notification, and mobile layers built on top
 
 ---
 
-## Tranche 1 — Intelligence & Discovery
+## Tranche 1: Intelligence & Discovery
 
 ### [Deliverable 1] Opportunity Detection & Ranking Engine
 
@@ -64,7 +64,7 @@ onboarding, execution, cross-chain, notification, and mobile layers built on top
   Lower the entry barrier to the platform by integrating Privy embedded wallets alongside the
   existing Stellar Wallets Kit / Freighter flow. New users onboard with email, social login, or
   passkeys and receive a self-custodial Stellar wallet (key secured via TEE and key-splitting, never
-  fully held by any single party, exportable by the user) — no extension or seed phrase required.
+  fully held by any single party, exportable by the user); no extension or seed phrase required.
   This extends the existing grouped multi-wallet portfolio so onboarded and externally-connected
   wallets are tracked together.
 - **How to measure completion:**
@@ -77,7 +77,7 @@ onboarding, execution, cross-chain, notification, and mobile layers built on top
 
 ---
 
-## Tranche 2 — From Information to Action
+## Tranche 2: From Information to Action
 
 ### [Deliverable 1] One-Click Execution Layer (v1)
 
@@ -126,7 +126,7 @@ onboarding, execution, cross-chain, notification, and mobile layers built on top
 
 ---
 
-## Tranche 3 — Mobile, Mainnet & Hardening
+## Tranche 3: Mobile, Mainnet & Hardening
 
 ### [Deliverable 1] Mobile Monitoring App
 
@@ -134,7 +134,7 @@ onboarding, execution, cross-chain, notification, and mobile layers built on top
   Deliver a store-distributed mobile app focused on monitoring, by packaging the existing web
   application as a native shell (Capacitor) and consuming the existing read APIs. Users follow
   tracked wallets, positions, and surfaced opportunities, and receive native push notifications
-  (APNs / FCM). Read-only by design — signing and execution remain in the web flow for this scope,
+  (APNs / FCM). Read-only by design: signing and execution remain in the web flow for this scope,
   which keeps the app free of in-app key handling.
 - **How to measure completion:**
   - A mobile app is available via App Store / Play Store.

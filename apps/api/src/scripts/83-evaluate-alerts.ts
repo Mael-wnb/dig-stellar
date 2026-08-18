@@ -160,7 +160,7 @@ async function main() {
             // Honesty rule (Lot N): copy carries the observation's as_of.
             const asOfIso = toIso(row.snapshotAt);
             const asOfSuffix = asOfIso
-              ? ` — as of ${formatAsOf(new Date(asOfIso), now)}`
+              ? `, as of ${formatAsOf(new Date(asOfIso), now)}`
               : '';
 
             const payload = {

@@ -66,7 +66,7 @@ const TESTNET_ASSETS: Record<BlendAssetCode, BlendPoolAsset> = {
     code: "XLM",
     sac: "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
     decimals: 7,
-    note: "Native — no trustline; funded by friendbot.",
+    note: "Native: no trustline, funded by friendbot.",
   },
   USDC: {
     code: "USDC",
@@ -82,14 +82,14 @@ const MAINNET_ASSETS: Record<BlendAssetCode, BlendPoolAsset> = {
     // Native XLM SAC on Pubnet (== Asset.native().contractId(PUBLIC)).
     sac: "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
     decimals: 7,
-    note: "Native — no trustline. The simplest first mainnet deposit.",
+    note: "Native: no trustline. The simplest first mainnet deposit.",
   },
   USDC: {
     code: "USDC",
     // Circle USDC SAC on Pubnet (== USDC:GA5ZSE….contractId(PUBLIC)).
     sac: "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
     decimals: 7,
-    note: "Circle USDC — a first deposit signs a trustline (step 1/2).",
+    note: "Circle USDC: a first deposit signs a trustline (step 1/2).",
   },
 };
 

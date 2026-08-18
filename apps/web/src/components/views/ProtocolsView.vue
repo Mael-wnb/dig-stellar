@@ -325,7 +325,7 @@ function arrow(k: SortKey | null): string {
       <span class="text-[13px]" style="color: var(--dig-faint)">Loading protocols…</span>
     </div>
     <div v-else-if="error" class="rounded-[18px] p-[40px] text-center flex flex-col items-center gap-[12px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
-      <span class="text-[13px]" style="color: var(--dig-red)">Couldn't load protocols · {{ error }}</span>
+      <span class="text-[13px]" style="color: var(--dig-red)">Couldn't load protocols: {{ error }}</span>
       <button type="button" class="dig-ghost h-[36px] px-[16px] rounded-[10px] text-[13px] font-semibold cursor-pointer" style="background: var(--dig-surface-3); border: 1px solid var(--dig-line); color: var(--dig-text)" @click="reload">Retry</button>
     </div>
 
@@ -346,7 +346,7 @@ function arrow(k: SortKey | null): string {
                 {{ c.name }}
                 <span v-if="c.stale" class="w-[7px] h-[7px] rounded-full" style="background: var(--dig-amber)" title="Some pools stale"></span>
               </div>
-              <div class="text-[12px]" style="color: var(--dig-faint)">{{ c.typeLabel }} · {{ c.count }} pools</div>
+              <div class="text-[12px]" style="color: var(--dig-faint)">{{ c.typeLabel }}, {{ c.count }} pools</div>
             </div>
             <!-- Q4: top underlying assets by TVL (circular, per Q1) + honest "+N" -->
             <div v-if="c.assets.length" class="flex items-center gap-[6px] flex-shrink-0">

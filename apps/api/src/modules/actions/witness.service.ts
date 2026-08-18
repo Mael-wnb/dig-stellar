@@ -135,7 +135,7 @@ export class WitnessService {
       tx = await horizon.transactions().transaction(txHash).call();
     } catch (err) {
       if (isHorizonNotFound(err)) return fail('tx-not-found');
-      throw new ServiceUnavailableException('Horizon is unavailable — retry later.');
+      throw new ServiceUnavailableException('Horizon is unavailable. Retry later.');
     }
     if (!tx.successful) return fail('tx-not-successful');
 
@@ -151,7 +151,7 @@ export class WitnessService {
       const ops = await horizon.operations().forTransaction(txHash).limit(200).call();
       opRecords = ops.records as unknown as HorizonOpRecordLike[];
     } catch {
-      throw new ServiceUnavailableException('Horizon is unavailable — retry later.');
+      throw new ServiceUnavailableException('Horizon is unavailable. Retry later.');
     }
     const poolIds = blendPoolsFor(network).map((p) => p.poolId);
     const qualifying = findQualifyingOp(opRecords, sourceAddress, poolIds);

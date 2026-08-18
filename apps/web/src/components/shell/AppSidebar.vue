@@ -178,7 +178,7 @@ const networkLabel = 'Stellar mainnet'
           style="background: #3FA46A; box-shadow: 0 0 0 3px #12301F"
         />
         <span class="text-[12px] font-medium" style="color: var(--dig-muted)">Live</span>
-        <span class="text-[12px]" style="color: var(--dig-faint)">·</span>
+        <span class="text-[12px]" style="color: var(--dig-faint)">/</span>
         <span class="text-[12px] font-medium" style="color: var(--dig-muted)">{{ networkLabel }}</span>
       </div>
       <div class="flex gap-[8px] mt-[12px]">

@@ -167,7 +167,7 @@ const iconFor = (n: { metric?: any; category?: string }) => ICONS[metricIconKey(
             </div>
             <p class="text-[13px] text-[#5E5F5D] mt-[3px] leading-[1.45]">{{ a.body }}</p>
             <p class="text-xs text-[#5E5F5D] mt-1.5">
-              <template v-if="a.scope_ref">{{ a.scope_ref }} · </template>{{ timeAgo(a.created_at) }}
+              <template v-if="a.scope_ref">{{ a.scope_ref }}, </template>{{ timeAgo(a.created_at) }}
             </p>
           </div>
           <!-- Optional inline action (present only if the notification carries one) -->
@@ -198,7 +198,7 @@ const iconFor = (n: { metric?: any; category?: string }) => ICONS[metricIconKey(
           </div>
           <p class="text-xs text-[#5E5F5D] mt-[5px] ml-[17px] leading-[1.45]">
             Notifies you when a Blend pool where you hold a position changes status
-            (Active / On-Ice / Frozen). Always on — checked every sweep.
+            (Active / On-Ice / Frozen). Always on, checked every sweep.
           </p>
         </div>
 

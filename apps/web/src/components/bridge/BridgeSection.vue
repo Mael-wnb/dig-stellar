@@ -40,7 +40,7 @@ const RANGES: Win[] = ['24h', '7d', '30d']
 
 const scopeLabel = computed(() => (props.chainScope ? `${props.chainScope} → Stellar` : 'All routes → Stellar'))
 const winLabel = computed(() => props.window.toUpperCase())
-const flowsTitle = computed(() => (props.chainScope ? `Recent bridge flows · ${props.chainScope}` : 'Recent bridge flows'))
+const flowsTitle = computed(() => (props.chainScope ? `Recent bridge flows: ${props.chainScope}` : 'Recent bridge flows'))
 
 const fmtUsd = (v: number, signed = false) => {
   const a = Math.abs(v)
@@ -60,14 +60,14 @@ const noData = computed(
 const stats = computed(() =>
   noData.value
     ? [
-        { label: `Inflow · ${winLabel.value}`, value: '—', color: '#5E5F5D' },
-        { label: `Outflow · ${winLabel.value}`, value: '—', color: '#5E5F5D' },
-        { label: `Net · ${winLabel.value}`, value: '—', color: '#5E5F5D' },
+        { label: `Inflow (${winLabel.value})`, value: '—', color: '#5E5F5D' },
+        { label: `Outflow (${winLabel.value})`, value: '—', color: '#5E5F5D' },
+        { label: `Net (${winLabel.value})`, value: '—', color: '#5E5F5D' },
       ]
     : [
-        { label: `Inflow · ${winLabel.value}`, value: fmtUsd(props.totals.inflowUsd, true), color: '#2E9E63' },
-        { label: `Outflow · ${winLabel.value}`, value: '−' + fmtUsd(props.totals.outflowUsd), color: '#D0522E' },
-        { label: `Net · ${winLabel.value}`, value: fmtUsd(props.totals.netUsd, true), color: props.totals.netUsd < 0 ? '#E0603E' : '#E2E6E1' },
+        { label: `Inflow (${winLabel.value})`, value: fmtUsd(props.totals.inflowUsd, true), color: '#2E9E63' },
+        { label: `Outflow (${winLabel.value})`, value: '−' + fmtUsd(props.totals.outflowUsd), color: '#D0522E' },
+        { label: `Net (${winLabel.value})`, value: fmtUsd(props.totals.netUsd, true), color: props.totals.netUsd < 0 ? '#E0603E' : '#E2E6E1' },
       ]
 )
 
@@ -91,7 +91,7 @@ const staleLink = computed(() => {
          class="flex items-start gap-2 mb-4 rounded-[8px] pl-3 pr-3.5 py-2.5 text-[12px] leading-[1.45] text-[#9a9b99]"
          style="background:#242422; border-left:2px solid #E6B93B;">
       <span>
-        No bridge activity for {{ daysSinceLastFlow }} days — the underlying bridge protocol
+        No bridge activity for {{ daysSinceLastFlow }} days. The underlying bridge protocol
         (Allbridge) may be paused or experiencing low activity.
       </span>
       <a v-if="staleLink" :href="staleLink" target="_blank" rel="noopener"
@@ -114,7 +114,7 @@ const staleLink = computed(() => {
               <span class="inline-flex w-[15px] h-[15px] rounded-full items-center justify-center text-[11px]" style="background:rgba(0,0,0,.25);">×</span>
             </button>
           </div>
-          <div class="text-[12px] text-[#9a9b99] mt-0.5">{{ scopeLabel }} · Allbridge attribution</div>
+          <div class="text-[12px] text-[#9a9b99] mt-0.5">{{ scopeLabel }}, Allbridge attribution</div>
         </div>
       </div>
       <div class="flex gap-1.5">

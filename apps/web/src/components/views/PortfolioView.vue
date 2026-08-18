@@ -191,7 +191,7 @@ const breakdown = computed(() => {
 const scopeTitle = computed(() => {
   if (scope.value === 'all') return 'Positions across all wallets'
   const w = wallets.value.find((x) => x.id === scope.value)
-  return w ? `Positions · ${walletLabel(w)}` : 'Positions'
+  return w ? `Positions: ${walletLabel(w)}` : 'Positions'
 })
 
 // ── W3: Assets — what the wallets HOLD (liquid; kept DISTINCT from DeFi) ─────
@@ -309,7 +309,7 @@ const assetsView = computed(() => {
     hasAny: all.length > 0,
     scoped,
     totalUsd,
-    title: scopeWallet ? `Assets · ${walletLabel(scopeWallet)}` : 'Assets',
+    title: scopeWallet ? `Assets: ${walletLabel(scopeWallet)}` : 'Assets',
   }
 })
 </script>
@@ -325,7 +325,7 @@ const assetsView = computed(() => {
         <div class="rounded-[16px] px-[20px] py-[18px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
           <div class="text-[12px] font-medium" style="color: var(--dig-faint)">Liquid balances</div>
           <div class="text-[24px] font-bold tracking-[-0.02em] mt-[6px] tabular-nums">{{ formatUsd(totalPortfolioUsd) }}</div>
-          <div class="text-[12px] mt-[4px]" style="color: var(--dig-faint)">{{ wallets.length }} wallets · Mainnet</div>
+          <div class="text-[12px] mt-[4px]" style="color: var(--dig-faint)">{{ wallets.length }} wallets on Mainnet</div>
         </div>
         <div class="rounded-[16px] px-[20px] py-[18px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
           <div class="text-[12px] font-medium" style="color: var(--dig-faint)">DeFi supplied</div>

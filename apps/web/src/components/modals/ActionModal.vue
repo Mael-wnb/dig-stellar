@@ -52,7 +52,7 @@ const activeTab = ref('primary')
             </span>
             <div>
               <div class="text-[16px] font-bold">{{ primaryLabel }}</div>
-              <div class="text-[12px]" style="color: var(--dig-faint)">{{ ctx.name }} · {{ ctx.venue }}</div>
+              <div class="text-[12px]" style="color: var(--dig-faint)">{{ ctx.name }}, {{ ctx.venue }}</div>
             </div>
           </div>
           <button type="button" class="dig-chip cursor-pointer text-[20px] w-[30px] h-[30px] flex items-center justify-center rounded-[8px]" style="color: var(--dig-faint)" @click="emit('close')">×</button>

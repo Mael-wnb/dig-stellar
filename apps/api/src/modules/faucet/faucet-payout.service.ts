@@ -208,7 +208,7 @@ function toPayoutError(err: unknown): PayoutError {
     return new PayoutError(`horizon-rejected: ${detail}`, false);
   }
   return new PayoutError(
-    `submit-ambiguous (status ${status ?? 'none'}) — MAY have paid, verify payout on explorer before resolving`,
+    `submit-ambiguous (status ${status ?? 'none'}): MAY have paid, verify payout on explorer before resolving`,
     true,
   );
 }

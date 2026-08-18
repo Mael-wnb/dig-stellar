@@ -17,7 +17,7 @@ const staleMinutes = computed(() =>
 
 const label = computed(() => {
   if (props.isStale === true) {
-    return `Stale — data older than ${staleMinutes.value}m`
+    return `Stale: data older than ${staleMinutes.value}m`
   }
   if (props.updatedAt) {
     return `Updated ${relativeTime(props.updatedAt)}`

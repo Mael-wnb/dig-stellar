@@ -86,7 +86,7 @@ async function onTrack() {
           {{ isConnecting ? 'Opening wallet…' : 'Connect signer wallet' }}
         </button>
         <div class="text-[11.5px] mt-[8px] text-center" style="color: var(--dig-faint)">
-          Freighter · xBull · Albedo · WalletConnect — via Stellar Wallets Kit
+          Freighter, xBull, Albedo, WalletConnect (via Stellar Wallets Kit)
         </div>
 
         <!-- Divider -->
@@ -125,7 +125,7 @@ async function onTrack() {
 
         <div class="flex items-center gap-[8px] mt-[16px] text-[12px]" style="color: var(--dig-faint)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"></path></svg>
-          Non-custodial — Dig never sees your keys. Watch-only can't sign.
+          Non-custodial: Dig never sees your keys. Watch-only can't sign.
         </div>
       </div>
     </div>

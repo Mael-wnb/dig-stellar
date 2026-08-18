@@ -230,7 +230,7 @@ const supplyBlockedCopy = computed(() => {
       : s.label === "Setup"
         ? "is still in setup"
         : `reports pool status ${s.code}`;
-  return `${poolLabel.value} ${why} — deposits are disabled. Withdrawals remain available.`;
+  return `${poolLabel.value} ${why}. Deposits are disabled. Withdrawals remain available.`;
 });
 
 // A frozen pool can't take a deposit: if the status arrives while the supply pane
@@ -379,7 +379,7 @@ function assertDepositXdr(xdr: string, passphrase: string): void {
   const check = validateDepositXdr(xdr, blendIntent(passphrase));
   if (!check.ok) {
     throw new Error(
-      `Refused to sign — deposit XDR did not match your request: ${check.violations.join("; ")}`,
+      `Refused to sign. The deposit XDR did not match your request: ${check.violations.join("; ")}`,
     );
   }
 }
@@ -388,7 +388,7 @@ function assertWithdrawXdr(xdr: string, passphrase: string): void {
   const check = validateWithdrawXdr(xdr, blendIntent(passphrase));
   if (!check.ok) {
     throw new Error(
-      `Refused to sign — withdraw XDR did not match your request: ${check.violations.join("; ")}`,
+      `Refused to sign. The withdraw XDR did not match your request: ${check.violations.join("; ")}`,
     );
   }
 }
@@ -405,7 +405,7 @@ function assertTrustlineXdr(xdr: string, passphrase: string): void {
   const check = validateTrustlineXdr(xdr, intent);
   if (!check.ok) {
     throw new Error(
-      `Refused to sign — trustline XDR did not match your request: ${check.violations.join("; ")}`,
+      `Refused to sign. The trustline XDR did not match your request: ${check.violations.join("; ")}`,
     );
   }
 }
@@ -529,7 +529,7 @@ async function onDeposit() {
       });
       if (built.trustlineRequired) {
         throw new Error(
-          "Trustline not visible yet — give it a few seconds and try again.",
+          "Trustline not visible yet. Give it a few seconds and try again.",
         );
       }
     }
@@ -727,7 +727,7 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
         In-app supply &amp; withdraw are not available for this pool yet.
       </span>
       <span>
-        Your funds are unaffected — manage this pool directly on
+        Your funds are unaffected: manage this pool directly on
         <a
           href="https://mainnet.blend.capital"
           target="_blank"
@@ -746,7 +746,7 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
         class="bg-[#202020] border border-[rgba(213,255,47,0.35)] rounded-md p-3 text-[11px] text-[#9a9b99]"
       >
         <span class="text-[#d5ff2f] font-semibold">Earn {{ faucetPromo.rewardXlm }} XLM</span>
-        — your first Blend supply (≥ {{ faucetPromo.minNotionalXlm }} XLM) earns a reward ·
+        with your first Blend supply (≥ {{ faucetPromo.minNotionalXlm }} XLM).
         {{ faucetPromo.remainingClaims }} claims left
       </div>
 
@@ -787,11 +787,11 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
         class="bg-[#202020] border border-[rgba(255,184,107,0.5)] rounded-md p-3 text-[11px] text-[#ffb86b] flex flex-col gap-1"
       >
         <span v-if="!isWithdraw">
-          <span class="font-semibold">Mainnet</span> — this deposit supplies real funds to
+          <span class="font-semibold">Mainnet:</span> this deposit supplies real funds to
           Blend as collateral. A per-transaction cap applies during the launch period.
         </span>
         <span v-else>
-          <span class="font-semibold">Mainnet</span> — this returns your supplied funds
+          <span class="font-semibold">Mainnet:</span> this returns your supplied funds
           from Blend to this wallet.
         </span>
         <span class="text-[#9a9b99]">
@@ -900,7 +900,7 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
         class="bg-[#202020] border border-[rgba(255,184,107,0.4)] rounded-md p-2 text-[10px] text-[#ffb86b]"
       >
         You have an open borrow in this pool. Blend only lets you withdraw collateral
-        that keeps your position healthy — a withdraw that would push it under fails
+        that keeps your position healthy: a withdraw that would push it under fails
         before anything is signed.
       </div>
 
@@ -964,7 +964,7 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
 
       <p v-if="exceedsPosition" class="text-[10px] text-[#ffb86b] -mt-1">
         You have {{ formatTokenAmountCompact(supplied) }}
-        {{ asset }} supplied — use Max to withdraw all of it.
+        {{ asset }} supplied. Use Max to withdraw all of it.
       </p>
 
       <!-- ACTION -->
@@ -978,16 +978,16 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
         <template v-else-if="isBusy">{{ stepLabel }}…</template>
         <template v-else-if="!isConnected">Connect wallet first</template>
         <template v-else-if="!isActiveSignerConnected">Connect your active signer</template>
-        <template v-else-if="usdcUnavailable">No testnet USDC — use XLM</template>
+        <template v-else-if="usdcUnavailable">No testnet USDC, use XLM</template>
         <template v-else-if="isWithdraw && positionLoading">Reading position…</template>
         <template v-else-if="isWithdraw && hasNoPosition">Nothing to withdraw</template>
         <template v-else-if="isWithdraw">Withdraw {{ asset }} from Blend</template>
-        <template v-else-if="supplyBlocked">Deposits disabled — pool {{ statusBadge.toLowerCase() }}</template>
+        <template v-else-if="supplyBlocked">Deposits disabled (pool {{ statusBadge.toLowerCase() }})</template>
         <template v-else>Deposit {{ asset }} to Blend</template>
       </button>
 
       <p v-if="isBusy && stepLabel" class="text-[10px] text-[#d5ff2f] text-center">
-        {{ stepLabel }} — confirm in your wallet.
+        {{ stepLabel }}: confirm in your wallet.
       </p>
 
       <!-- SUCCESS -->
@@ -1045,7 +1045,7 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
         </span>
         <span class="text-[#9a9b99]">
           Confirmation is taking longer than usual. The transaction was accepted by the
-          network and has <span class="font-semibold">not</span> failed — check its
+          network and has <span class="font-semibold">not</span> failed. Check its
           status on the explorer before retrying.
         </span>
         <a
@@ -1086,7 +1086,7 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
           v-if="failureKind === 'onchain'"
           class="text-[#9a9b99]"
         >
-          The transaction failed atomically on-chain — no funds were moved. Only the
+          The transaction failed atomically on-chain, so no funds were moved. Only the
           network fee was consumed.
         </span>
         <!-- Rejected at submission: never reached a ledger, nothing was charged. -->
@@ -1094,7 +1094,7 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
           v-else-if="failureKind === 'rejected'"
           class="text-[#9a9b99]"
         >
-          The transaction was rejected before inclusion — it never reached a ledger, so
+          The transaction was rejected before inclusion. It never reached a ledger, so
           nothing was charged and no funds moved.
         </span>
         <span class="text-[#9a9b99] break-all">{{ errorMessage }}</span>

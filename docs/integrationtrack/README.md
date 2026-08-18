@@ -1,4 +1,4 @@
-# Dig — Stellar DeFi Intelligence & Position Management Layer
+# Dig: Stellar DeFi Intelligence & Position Management Layer
 
 > Accelerator scope. An extension of Dig's existing Stellar work (SCF 43), built in the same
 > monorepo on top of the already-delivered indexing, analytics, transaction-builder, and
@@ -28,14 +28,14 @@ integration, CCTP capital import, and external notification delivery** built on 
 
 ## Documents
 
-- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — technical architecture and Stellar integration plan (with a reviewer FAQ)
-- [`milestones.md`](./milestones.md) — deliverables by tranche
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md): technical architecture and Stellar integration plan (with a reviewer FAQ)
+- [`milestones.md`](./milestones.md): deliverables by tranche
 
 ## Core principle
 
 Dig deploys **no custom contracts**. Every on-chain action is a direct call to an existing
 protocol contract, so using Dig carries the same smart-contract risk as using each protocol's
-own frontend — Dig adds aggregation, comparison, and pre-built transactions across protocols.
+own frontend; Dig adds aggregation, comparison, and pre-built transactions across protocols.
 
 ## Integration map
 
@@ -43,12 +43,12 @@ own frontend — Dig adds aggregation, comparison, and pre-built transactions ac
 
 | Building block | Role |
 |---|---|
-| Blend V2 | Lending + backstop — yield / health-factor / BLND emissions |
-| Aquarius | AMM liquidity — fees + AQUA emissions + bribes − impermanent loss |
+| Blend V2 | Lending + backstop: yield / health-factor / BLND emissions |
+| Aquarius | AMM liquidity: fees + AQUA emissions + bribes − impermanent loss |
 | Soroswap | AMM liquidity |
-| DeFindex | Yield vaults — auto-compound |
+| DeFindex | Yield vaults: auto-compound |
 | Etherfuse Stablebonds (e.g., CETES, USTRY) | RWA real-yield (tokenized sovereign bonds) |
-| SDEX | Native order book — limit orders |
+| SDEX | Native order book: limit orders |
 
 **Execution & onboarding rails**:
 

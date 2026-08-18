@@ -1,4 +1,4 @@
-# Dig Stellar — Technical Architecture (Revised)
+# Dig Stellar: Technical Architecture (Revised)
 
 This document is the single source of truth for the technical architecture of Dig's Stellar module. It explains how we collect data, compute analytics, support multi-wallet portfolio monitoring, generate alerts, and enable optional non-custodial actions.
 
@@ -150,7 +150,7 @@ This section exists so a reviewer can see at a glance which Stellar and Soroban 
 | SEP | Purpose | Our usage |
 |---|---|---|
 | SEP-10 | Web authentication with a Stellar account | Used for authenticated API requests; proves wallet control without exposing keys. |
-| SEP-7 | Transaction URIs (`web+stellar:tx?xdr=…`) | Used for cross-wallet handoff — users can route a generated proposal to any SEP-7-compatible wallet. Replaces the need for a custom "switch signer" flow. |
+| SEP-7 | Transaction URIs (`web+stellar:tx?xdr=…`) | Used for cross-wallet handoff; users can route a generated proposal to any SEP-7-compatible wallet. Replaces the need for a custom "switch signer" flow. |
 | SEP-11 (txrep) | Human-readable transaction envelopes | Used in the proposal UI to show a plain-English summary of the XDR the user is about to sign. |
 
 ### Not in Scope
@@ -163,32 +163,32 @@ We explicitly exclude passkey-based smart accounts, anchor integrations (SEP-24/
 
 The pipeline ingests from four source types, each with a specific role and latency profile.
 
-**Stellar RPC (primary)** — Stellar RPC is our main source for both classic and Soroban reads. We use `getLedgerEntries` for account and contract state, `getEvents` for real-time Soroban event subscriptions, and `simulateTransaction` for preflight. Stellar RPC retains most methods' history for ~7 days, which sets our in-RPC lookback window.
+**Stellar RPC (primary)**: Stellar RPC is our main source for both classic and Soroban reads. We use `getLedgerEntries` for account and contract state, `getEvents` for real-time Soroban event subscriptions, and `simulateTransaction` for preflight. Stellar RPC retains most methods' history for ~7 days, which sets our in-RPC lookback window.
 
-**Horizon (secondary)** — Horizon is used where Stellar RPC does not yet offer a good equivalent: operation history beyond the RPC window, path-payment quote generation (`/paths/strict-send`, `/paths/strict-receive`), order-book depth (`/order_book`), and `/claimable_balances` lookups. We treat Horizon as a legacy complement that may be further deprecated and isolate Horizon-dependent code behind a single adapter so it can be replaced.
+**Horizon (secondary)**: Horizon is used where Stellar RPC does not yet offer a good equivalent: operation history beyond the RPC window, path-payment quote generation (`/paths/strict-send`, `/paths/strict-receive`), order-book depth (`/order_book`), and `/claimable_balances` lookups. We treat Horizon as a legacy complement that may be further deprecated and isolate Horizon-dependent code behind a single adapter so it can be replaced.
 
-**Protocol-native sources** — Where a protocol exposes a well-maintained SDK or off-chain API (e.g., metadata, curated market lists), we use it. We do not rely on these for state-of-truth; any metric that enters an alert rule must be derivable from on-chain data as the source of truth.
+**Protocol-native sources**: Where a protocol exposes a well-maintained SDK or off-chain API (e.g., metadata, curated market lists), we use it. We do not rely on these for state-of-truth; any metric that enters an alert rule must be derivable from on-chain data as the source of truth.
 
-**Historical backfill** — Stellar RPC's 7-day window is insufficient for trend analytics. For backfill we use Stellar Data Lake / Hubble (SDF's BigQuery-hosted public dataset) for classic ledger history, and Galexie for self-hosted bulk ingestion if the project grows. Backfill runs once on adapter initialization and then opportunistically to repair gaps.
+**Historical backfill**: Stellar RPC's 7-day window is insufficient for trend analytics. For backfill we use Stellar Data Lake / Hubble (SDF's BigQuery-hosted public dataset) for classic ledger history, and Galexie for self-hosted bulk ingestion if the project grows. Backfill runs once on adapter initialization and then opportunistically to repair gaps.
 
-**RPC provider strategy** — We will not rely on public SDF endpoints in production; rate limits make them unsuitable for continuous indexing. For Mainnet launch (T3) we use a paid RPC provider (candidates: Validation Cloud, Nownodes, Blockdaemon) with a secondary endpoint for failover. For Testnet (T2) the free tiers and SDF public endpoints are sufficient. This is a committed line item in our operational budget.
+**RPC provider strategy**: We will not rely on public SDF endpoints in production; rate limits make them unsuitable for continuous indexing. For Mainnet launch (T3) we use a paid RPC provider (candidates: Validation Cloud, Nownodes, Blockdaemon) with a secondary endpoint for failover. For Testnet (T2) the free tiers and SDF public endpoints are sufficient. This is a committed line item in our operational budget.
 
 ---
 
 ## 5. Tiered Data Pipeline
 
-The original architecture treated all data with a single 5–15 minute snapshot cadence, which cannot support the alerting use case. The revised architecture runs three layers in parallel.
+The original architecture treated all data with a single 5-15 minute snapshot cadence, which cannot support the alerting use case. The revised architecture runs three layers in parallel.
 
-### 5.1 Layer 1 — Event Stream (sub-minute)
+### 5.1 Layer 1: Event Stream (sub-minute)
 
 A long-running subscriber connects to Stellar RPC `getEvents` with filters for the contract IDs of every integrated protocol. Events are consumed as they are emitted (Stellar ledger close ~5 s) and dispatched to two sinks:
 
 - **Position updater**: deposits, withdrawals, borrows, repayments, and liquidation events trigger immediate position recomputation for any tracked wallet involved.
 - **Alert evaluator**: events matching user-configured rules (e.g., liquidation threshold crossed, large netflow) generate alerts within one ledger close of the triggering event.
 
-This layer is the critical path for user-facing latency. Its data does not need to be persisted in full — events are an update stream, and the authoritative state lives in the snapshot and position tables.
+This layer is the critical path for user-facing latency. Its data does not need to be persisted in full; events are an update stream, and the authoritative state lives in the snapshot and position tables.
 
-### 5.2 Layer 2 — Periodic Snapshots (5–15 minutes)
+### 5.2 Layer 2: Periodic Snapshots (5-15 minutes)
 
 Scheduled jobs read aggregate protocol state and write time-windowed snapshots. These power dashboards and trend charts where sub-minute freshness is not required:
 
@@ -197,9 +197,9 @@ Scheduled jobs read aggregate protocol state and write time-windowed snapshots. 
 - Trading volume aggregations
 - Netflow aggregations across 1h / 24h / 7d windows
 
-Snapshots are stored in a partitioned time-series structure (see §6). The cadence is per-adapter — high-activity protocols can run on 5-minute cadence, slower markets on 15.
+Snapshots are stored in a partitioned time-series structure (see §6). The cadence is per-adapter: high-activity protocols can run on 5-minute cadence, slower markets on 15.
 
-### 5.3 Layer 3 — Historical Backfill (one-shot + repair)
+### 5.3 Layer 3: Historical Backfill (one-shot + repair)
 
 On adapter initialization, we pull historical data from Stellar Data Lake / Hubble to seed at least 30 days of snapshots for trend charts. Subsequent gaps (from indexer downtime, RPC outages) are detected via the freshness tracker (§5.4) and repaired from the data lake or Horizon.
 
@@ -208,10 +208,10 @@ On adapter initialization, we pull historical data from Stellar Data Lake / Hubb
 Every adapter reports its last successful ingest timestamp per venue. The system surfaces staleness at three levels:
 
 - **Fresh** (default): most recent ingest within expected cadence window.
-- **Stale** (soft): ingest missed by more than 2× the expected cadence — the UI shows a "data may be delayed" badge; alerts on this venue are held in a 10-minute buffer to avoid false positives from missing data.
-- **Broken** (hard): ingest missed for more than 30 minutes — the venue is excluded from aggregate rollups, a protocol-health alert fires to the team ops channel, and the adapter enters exponential backoff retry.
+- **Stale** (soft): ingest missed by more than 2× the expected cadence: the UI shows a "data may be delayed" badge; alerts on this venue are held in a 10-minute buffer to avoid false positives from missing data.
+- **Broken** (hard): ingest missed for more than 30 minutes: the venue is excluded from aggregate rollups, a protocol-health alert fires to the team ops channel, and the adapter enters exponential backoff retry.
 
-Unlike EVM chains, Stellar has deterministic finality — there are no reorgs to reconcile. This simplifies the pipeline: any event successfully read from a closed ledger is final.
+Unlike EVM chains, Stellar has deterministic finality; there are no reorgs to reconcile. This simplifies the pipeline: any event successfully read from a closed ledger is final.
 
 ### Pipeline Overview
 
@@ -293,13 +293,13 @@ flowchart LR
 > **As-built note (2026-08-17).** The shipped product pipeline runs on **raw SQL table
 > families**, not this Prisma pseudo-schema (authoritative list: CLAUDE.md "Data architecture
 > (as-built)" + `apps/api/src/db/stellar_v*.sql`): **v1** analytics (entities / venues /
-> assets / snapshots / metrics / prices, plus `action_events` and `action_witnesses` — the
+> assets / snapshots / metrics / prices, plus `action_events` and `action_witnesses`, the
 > Lot R execution-witness KPI ledger), **v2** multi-wallet, **v3** alerting, and
-> **v4 — faucet** (`faucet_claims`, Lot R reward claims — the only server-side-key money
+> **v4** faucet (`faucet_claims`, Lot R reward claims, the only server-side-key money
 > path, see `docs/security-invariants.md` §9). The pseudo-schema below is retained as the
 > original design reference.
 
-The following is representative Prisma-style pseudo-schema — exact field types and indexes are defined in `packages/db/prisma/schema.prisma`.
+The following is representative Prisma-style pseudo-schema; exact field types and indexes are defined in `packages/db/prisma/schema.prisma`.
 
 ```
 Protocol
@@ -323,7 +323,7 @@ Asset
   id            uuid
   code          string
   issuer        string (nullable for XLM native)
-  sacContractId string (nullable — address of the corresponding SAC)
+  sacContractId string (nullable; address of the corresponding SAC)
   decimals      int
 
 Snapshot (partitioned by month)
@@ -341,13 +341,13 @@ Snapshot (partitioned by month)
 
 Position
   id            uuid
-  accountId     string (Stellar account — "G…")
+  accountId     string (Stellar account, "G…")
   venueId       uuid (ref Venue)
   balanceRaw    string (stringified i128 from Soroban, nullable for classic)
   balanceUsd    numeric
   collateralUsd numeric (nullable)
   debtUsd       numeric (nullable)
-  healthFactor  numeric (nullable — Blend and similar only)
+  healthFactor  numeric (nullable; Blend and similar only)
   capturedAt    timestamptz
   isActive      boolean (soft-delete for closed positions)
 
@@ -358,7 +358,7 @@ TrackedAddress
   label         string
   isActiveSigner boolean
   multisigDetected boolean
-  thresholds    jsonb (low, med, high — populated if multisig)
+  thresholds    jsonb (low, med, high; populated if multisig)
 
 AlertRule
   id            uuid
@@ -380,13 +380,13 @@ Alert
   acknowledgedAt timestamptz (nullable)
 ```
 
-**Time-series strategy.** The `Snapshot` table is declaratively partitioned by `capturedAt` in monthly partitions. If query load demands, we migrate to TimescaleDB hypertables — the schema is designed to allow this without application-level change.
+**Time-series strategy.** The `Snapshot` table is declaratively partitioned by `capturedAt` in monthly partitions. If query load demands, we migrate to TimescaleDB hypertables; the schema is designed to allow this without application-level change.
 
 **Balance representation.** Soroban token balances are i128, which exceeds JS Number and is larger than Postgres bigint. We store raw balances as strings and compute USD values at ingest time using Reflector oracle prices plus protocol-native rates where applicable.
 
 ---
 
-## 7. Protocol Adapters — Specific Integrations
+## 7. Protocol Adapters: Specific Integrations
 
 Each adapter below specifies the actual read path and the specific contract/endpoint surface.
 
@@ -426,9 +426,9 @@ Each adapter below specifies the actual read path and the specific contract/endp
 
 ### 7.6 Reflector (oracle dependency, not a venue)
 
-Reflector is consumed by Blend and (optionally) by our own USD conversions. We read Reflector price feeds directly for consistency and do not present Reflector as a venue — it is infrastructure.
+Reflector is consumed by Blend and (optionally) by our own USD conversions. We read Reflector price feeds directly for consistency and do not present Reflector as a venue; it is infrastructure.
 
-### 7.7 Bridge Flows — Allbridge (T2 scope)
+### 7.7 Bridge Flows: Allbridge (T2 scope)
 
 Bridge inflow/outflow to Stellar is tracked via Allbridge's attribution data. Axelar and Near Intents remain out of scope for the grant period; we will reassess once Allbridge integration proves the dashboard pattern.
 
@@ -447,9 +447,9 @@ Bridge inflow/outflow to Stellar is tracked via Allbridge's attribution data. Ax
 
 For each supported action, the adapter specifies the operation sequence. For example, a first-time deposit to a Blend pool might bundle:
 
-1. `ChangeTrust` — if the user lacks a trustline for the deposit asset (classic operation).
-2. `InvokeHostFunction` — calling Blend's `submit()` with the deposit action (Soroban operation).
-3. Optionally `restore_footprint` — if the Soroban contract's persistent entries have expired TTL.
+1. `ChangeTrust`: if the user lacks a trustline for the deposit asset (classic operation).
+2. `InvokeHostFunction`: calling Blend's `submit()` with the deposit action (Soroban operation).
+3. Optionally `restore_footprint`, if the Soroban contract's persistent entries have expired TTL.
 
 All three are combined into a single `TransactionEnvelope` and preflighted. Fees are set to the max of the inclusion fee (classic) plus the resource fee returned by simulation, with a configurable safety margin (default 50%).
 
@@ -530,8 +530,8 @@ Stellar transaction failures are surfaced with the specific `TransactionResult` 
 ## 9. Alerting
 
 > **As-built diverges from this section.** The shipped T2-D2 engine is a periodic OS-cron
-> sweep (`job:wallet-alert`, scripts 82→81→83) + an HTTP-polling notification feed —
-> tables `alert_rules` / `alert_rule_state` / `notifications` — not the WebSocket-push
+> sweep (`job:wallet-alert`, scripts 82→81→83) + an HTTP-polling notification feed
+> (tables `alert_rules` / `alert_rule_state` / `notifications`), not the WebSocket-push
 > event-stream design with `AlertRule`/`Alert` entities described below. The text below
 > remains the long-term vision; for the current implementation see `docs/runbooks.md` and
 > `docs/alerting/`.
@@ -613,7 +613,7 @@ The non-custodial model protects against direct key theft, but it does not prote
 
 - The backend never stores private keys, secret seeds, or any data that would enable signing on behalf of a user.
 - Every XDR sent to a user for signing is structurally validated client-side against the declared user intent before the wallet is invoked.
-- No user-tracked address is usable for signing without explicit wallet connection — a watch-only address cannot be manipulated into a signing context.
+- No user-tracked address is usable for signing without explicit wallet connection; a watch-only address cannot be manipulated into a signing context.
 - Logs and metrics exclude PII and Stellar account addresses beyond hashed identifiers.
 
 ---

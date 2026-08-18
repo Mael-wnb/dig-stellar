@@ -232,9 +232,9 @@ export class OpsService {
       boundary:
         'Counts successful server-side BUILDS (quotes + signable XDRs). ' +
         'On-chain submission happens client-side (non-custodial); executed-tx ' +
-        'evidence is the action_witnesses ledger — every row is a ' +
+        'evidence is the action_witnesses ledger: every row is a ' +
         'Horizon-verified on-chain execution (Lot R). Counters start at ' +
-        'deploy — no historical backfill exists.',
+        'deploy; no historical backfill exists.',
       wallets: {
         total: toInt(wallets?.total),
         signers: toInt(wallets?.signers),

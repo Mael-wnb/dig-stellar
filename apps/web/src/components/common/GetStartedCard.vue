@@ -87,7 +87,7 @@ function depositBlend() {
     <div class="flex items-baseline justify-between flex-wrap gap-[8px]">
       <div class="font-bold tracking-[-0.02em]" :class="props.compact ? 'text-[14px]' : 'text-[16px]'">Get started</div>
       <div class="text-[12px]" style="color: var(--dig-faint)">
-        Your wallet is connected — here's how to open your first position.
+        Your wallet is connected. Here's how to open your first position.
       </div>
     </div>
 
@@ -97,7 +97,7 @@ function depositBlend() {
       class="mt-[14px] rounded-[12px] px-[14px] py-[11px] text-[12px]"
       style="background: rgba(255,184,107,0.08); border: 1px solid rgba(255,184,107,0.4); color: var(--dig-amber)"
     >
-      <span class="font-semibold">Mainnet — real funds.</span>
+      <span class="font-semibold">Mainnet: real funds.</span>
       A 100 XLM per-transaction cap applies during the launch period.
     </div>
 
@@ -139,7 +139,7 @@ function depositBlend() {
           <div v-if="apyLabel" class="text-[13px] font-bold tabular-nums" style="color: var(--dig-green)">{{ apyLabel }}</div>
         </div>
         <div v-if="apyLabel" class="text-[10.5px] mt-[2px]" style="color: var(--dig-faint)">
-          Current supply APY · variable
+          Current supply APY (variable)
         </div>
         <div class="text-[12px] mt-[6px] flex-1" style="color: var(--dig-faint)">
           Supply an asset as collateral and earn the pool's variable rate. Not a
@@ -157,7 +157,7 @@ function depositBlend() {
     </div>
 
     <div class="text-[11.5px] mt-[16px]" style="color: var(--dig-faint)">
-      Non-custodial — you sign everything in your own wallet. Dig never holds your keys or funds.
+      Non-custodial: you sign everything in your own wallet. Dig never holds your keys or funds.
     </div>
   </div>
 </template>

@@ -28,7 +28,7 @@ const KNOWN_BLEND_ERRORS: Record<number, string> = {
   1206: "The pool's current status, set by Blend governance, blocks this action.",
   1207: "This action would push the reserve's utilization outside its allowed rate.",
   1208: "This pool's per-account position limit has been reached.",
-  1210: "The pool's price oracle is stale — the pool refuses actions until it updates.",
+  1210: "The pool's price oracle is stale, so the pool refuses actions until it updates.",
   1220: "This deposit would exceed the pool's supply cap for this asset.",
   1223: "This reserve is currently disabled in the pool.",
   1224: "This amount is below the pool's minimum collateral requirement.",

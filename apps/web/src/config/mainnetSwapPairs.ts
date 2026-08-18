@@ -44,7 +44,7 @@ export const MAINNET_SWAP_PAIRS: TestnetSwapPair[] = [
     label: "XLM → USDC",
     from: { code: "XLM" },
     to: { code: "USDC", issuer: MAINNET_USDC_ISSUER },
-    note: "Circle USDC — deepest XLM book on Pubnet.",
+    note: "Circle USDC: deepest XLM book on Pubnet.",
   },
   {
     id: "xlm-eurc",
@@ -52,7 +52,7 @@ export const MAINNET_SWAP_PAIRS: TestnetSwapPair[] = [
     from: { code: "XLM" },
     // Circle EURC — verified 2026-08-01 against Circle's eurc-contract-addresses doc.
     to: { code: "EURC", issuer: "GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2" },
-    note: "Circle EURC (euro) — direct book fills both ways at cap.",
+    note: "Circle EURC (euro): direct book fills both ways at cap.",
   },
   {
     id: "xlm-aqua",
@@ -60,7 +60,7 @@ export const MAINNET_SWAP_PAIRS: TestnetSwapPair[] = [
     from: { code: "XLM" },
     // Aquarius AQUA — issuer declared in aqua.network's stellar.toml.
     to: { code: "AQUA", issuer: "GBNZILSTVQZ4R7IKQDGHYGY2QXL5QOFJYQMXPKWRRM5PAV7Y4M67AQUA" },
-    note: "Aquarius governance token — deep native book.",
+    note: "Aquarius governance token: deep native book.",
   },
   {
     id: "xlm-yxlm",
@@ -68,7 +68,7 @@ export const MAINNET_SWAP_PAIRS: TestnetSwapPair[] = [
     from: { code: "XLM" },
     // Ultra Capital yXLM — issuer declared in ultracapital.xyz's stellar.toml.
     to: { code: "yXLM", issuer: "GARDNV3Q7YGT4AKSDF25LT32YSCCW4EV22Y2TV3I2PU2MMXJTEDL5T55" },
-    note: "Ultra Capital yield-XLM — ~1:1 book.",
+    note: "Ultra Capital yield-XLM: ~1:1 book.",
   },
   {
     id: "xlm-pyusd",
@@ -76,7 +76,7 @@ export const MAINNET_SWAP_PAIRS: TestnetSwapPair[] = [
     from: { code: "XLM" },
     // Paxos PYUSD (PayPal USD) — issuer declared in token-metadata.paxos.com stellar.toml.
     to: { code: "PYUSD", issuer: "GDQE7IXJ4HUHV6RQHIUPRJSEZE4DRS5WY577O2FY6YQ5LVWZ7JZTU2V5" },
-    note: "PayPal USD (Paxos) — direct book fills both ways at cap.",
+    note: "PayPal USD (Paxos): direct book fills both ways at cap.",
   },
 ];
 

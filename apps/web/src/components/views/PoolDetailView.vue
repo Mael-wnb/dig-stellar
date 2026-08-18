@@ -130,7 +130,7 @@ const description = computed(() => {
   if (isVault.value) {
     const u = underlyingSymbol(p)
     const asset = u ? displaySymbol(u) : 'a single asset'
-    return `This DeFindex yield vault auto-compounds ${asset} into underlying Soroban strategies. Depositors earn a variable APY as the vault's share price grows — it does not swap or borrow, so it has no 24h volume or fees.`
+    return `This DeFindex yield vault auto-compounds ${asset} into underlying Soroban strategies. Depositors earn a variable APY as the vault's share price grows. It does not swap or borrow, so it has no 24h volume or fees.`
   }
   if (isLending.value) {
     return "This lending pool lets users supply and borrow assets on Stellar's Soroban smart-contract platform. Interest rates adjust dynamically based on utilization."
@@ -190,9 +190,9 @@ const freshness = computed(() => {
   if (!p) return { label: '—', color: 'var(--dig-faint)' }
   const age = ageLabel(p.ageSeconds)
   if (p.isStale) {
-    return { label: age ? `Stale · ${age}` : 'Stale', color: 'var(--dig-amber)' }
+    return { label: age ? `Stale (${age})` : 'Stale', color: 'var(--dig-amber)' }
   }
-  return { label: age ? `Fresh · ${age}` : 'Fresh', color: 'var(--dig-green)' }
+  return { label: age ? `Fresh (${age})` : 'Fresh', color: 'var(--dig-green)' }
 })
 
 // ── reserves breakdown bars (AMM) ────────────────────────────────────────────
@@ -231,7 +231,7 @@ const risks = computed(() => {
       const color =
         util >= 90 ? 'var(--dig-red)' : util >= 80 ? 'var(--dig-amber)' : 'var(--dig-green)'
       const state = util >= 90 ? 'High' : util >= 80 ? 'Elevated' : 'Healthy'
-      rows.push({ label: 'Utilization', value: `${util.toFixed(0)}% · ${state}`, color })
+      rows.push({ label: 'Utilization', value: `${util.toFixed(0)}% (${state})`, color })
     }
   }
   // Oracle / trustline flags intentionally omitted — not cheaply real (never
@@ -333,7 +333,7 @@ const flowStatTiles = computed(() => {
   const f = flows.value
   if (!f) return []
   return [
-    { label: `Net · ${f.window}`, value: signedUsd(f.totals.netUsd), color: f.totals.netUsd >= 0 ? 'var(--dig-green)' : 'var(--dig-red)', tint: f.totals.netUsd >= 0 ? '#12301F' : '#371C16', up: f.totals.netUsd >= 0 },
+    { label: `Net (${f.window})`, value: signedUsd(f.totals.netUsd), color: f.totals.netUsd >= 0 ? 'var(--dig-green)' : 'var(--dig-red)', tint: f.totals.netUsd >= 0 ? '#12301F' : '#371C16', up: f.totals.netUsd >= 0 },
     { label: 'Total inflow', value: formatUsd(f.totals.inflowUsd), color: 'var(--dig-green)', tint: '#12301F', up: true },
     { label: 'Total outflow', value: formatUsd(f.totals.outflowUsd), color: 'var(--dig-red)', tint: '#371C16', up: false },
   ]
@@ -388,7 +388,7 @@ const tvlChart = computed(() => {
 })
 
 const tvlCardTitle = computed(() =>
-  tvlChart.value ? 'TVL · on-chain history' : 'TVL & volume · 30d',
+  tvlChart.value ? 'TVL (on-chain history)' : 'TVL & volume (30d)',
 )
 
 // The real action flow: lending → Blend deposit, AMM → SDEX swap. DeFindex
@@ -432,7 +432,7 @@ function openAction() {
 
     <!-- Error -->
     <div v-else-if="error || !pool" class="rounded-[18px] p-[40px] text-center flex flex-col items-center gap-[12px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
-      <span class="text-[13px]" style="color: var(--dig-red)">{{ error ? `Couldn't load this pool · ${error}` : 'Pool not found.' }}</span>
+      <span class="text-[13px]" style="color: var(--dig-red)">{{ error ? `Couldn't load this pool: ${error}` : 'Pool not found.' }}</span>
       <button v-if="error" type="button" class="dig-ghost h-[36px] px-[16px] rounded-[10px] text-[13px] font-semibold cursor-pointer" style="background: var(--dig-surface-3); border: 1px solid var(--dig-line); color: var(--dig-text)" @click="reload">Retry</button>
     </div>
 
@@ -463,7 +463,7 @@ function openAction() {
               <div class="min-w-0">
                 <div class="text-[22px] font-bold tracking-[-0.02em] truncate">{{ pairName }}</div>
                 <div class="text-[13px]" style="color: var(--dig-faint)">
-                  {{ pool.protocol?.name }} · {{ typeLabel(pool.type) }}
+                  {{ pool.protocol?.name }}, {{ typeLabel(pool.type) }}
                 </div>
               </div>
               <div class="ml-auto flex gap-[8px]">
@@ -529,7 +529,7 @@ function openAction() {
               </div>
               <div class="flex items-center justify-between mt-[8px] text-[11px]" style="color: var(--dig-faint)">
                 <span>{{ tvlChart.first }}</span>
-                <span>Supplied × latest price · reconstructed from reserve snapshots</span>
+                <span>Supplied × latest price, reconstructed from reserve snapshots</span>
                 <span>{{ tvlChart.last }}</span>
               </div>
             </template>
@@ -561,7 +561,7 @@ function openAction() {
               <div>
                 <div class="text-[14px] font-semibold">Inflows &amp; outflows</div>
                 <div class="text-[12px] mt-[2px]" style="color: var(--dig-faint)">
-                  Deposits vs withdrawals · derived from the event stream<span v-if="flows.coverageSince"> · coverage since {{ flows.coverageSince }}</span>
+                  Deposits vs withdrawals, derived from the event stream<span v-if="flows.coverageSince">, coverage since {{ flows.coverageSince }}</span>
                 </div>
               </div>
               <div class="flex gap-[6px]">
@@ -746,7 +746,7 @@ function openAction() {
       >
         <div class="flex items-center justify-between mb-[14px]">
           <div class="text-[14px] font-semibold">Reserves &amp; rates</div>
-          <span class="text-[12px]" style="color: var(--dig-faint)">Per-asset on-chain state · normalized</span>
+          <span class="text-[12px]" style="color: var(--dig-faint)">Per-asset on-chain state, normalized</span>
         </div>
         <table class="w-full text-[13px] min-w-[720px] border-collapse">
           <thead>

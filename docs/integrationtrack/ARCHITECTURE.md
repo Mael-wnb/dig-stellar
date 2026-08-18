@@ -1,4 +1,4 @@
-# Dig — Stellar DeFi Intelligence & Position Management Layer — Technical Architecture
+# Dig: Stellar DeFi Intelligence & Position Management Layer (Technical Architecture)
 
 This document is the technical architecture for Dig's accelerator-scope product: a DeFi intelligence and position management layer for Stellar. It is self-contained, Stellar-specific throughout, and focuses on the new capabilities built on top of the existing indexing and analytics infrastructure. For the full reference implementation of the underlying pipeline, already built and deployed, see the repository's main `docs/TECHNICAL_ARCHITECTURE.md`.
 
@@ -8,11 +8,11 @@ This document is the technical architecture for Dig's accelerator-scope product:
 
 Dig is building the unified management layer for Stellar DeFi. Where existing tools stop at read-only analytics and per-protocol interfaces, this product lets an active DeFi user manage all positions, compare all yield sources, and act on every integrated protocol from a single interface.
 
-- **Rank** — continuously score and compare yield opportunities across lending, AMM liquidity, yield vaults, and tokenized real-world assets, with risk signals and net-of-cost returns.
-- **Manage** — provide deep position management on each protocol: backstop deposits, LP add/remove, reward claims, vault allocation, and health-factor monitoring.
-- **Act** — execute protocol actions in one click (or one atomic batch where the protocol supports it), with the transaction built server-side and signed exclusively in the user's wallet.
-- **Alert** — notify the user through Telegram and Discord when a position requires attention, with a direct link to the pre-built resolution action on Dig.
-- **Bridge** — move native USDC from external chains into Stellar via Circle CCTP.
+- **Rank**: continuously score and compare yield opportunities across lending, AMM liquidity, yield vaults, and tokenized real-world assets, with risk signals and net-of-cost returns.
+- **Manage**: provide deep position management on each protocol: backstop deposits, LP add/remove, reward claims, vault allocation, and health-factor monitoring.
+- **Act**: execute protocol actions in one click (or one atomic batch where the protocol supports it), with the transaction built server-side and signed exclusively in the user's wallet.
+- **Alert**: notify the user through Telegram and Discord when a position requires attention, with a direct link to the pre-built resolution action on Dig.
+- **Bridge**: move native USDC from external chains into Stellar via Circle CCTP.
 
 The product is non-custodial by construction: the backend stores only public addresses and user preferences, never holds private keys, and never signs on a user's behalf. Dig does not deploy its own Soroban contracts. Every on-chain action is a direct invocation of the integrated protocol's existing contracts.
 
@@ -20,15 +20,15 @@ The product is non-custodial by construction: the backend stores only public add
 
 ## 2. Relationship to the Existing Infrastructure
 
-This scope extends Dig's existing Stellar work, built in the same monorepo. The following layers already exist and are reused as the foundation — they are not rebuilt here:
+This scope extends Dig's existing Stellar work, built in the same monorepo. The following layers already exist and are reused as the foundation; they are not rebuilt here:
 
-- **Hybrid indexing pipeline** — a Horizon + Soroban RPC ingestion pipeline normalizing protocol data into a unified Postgres store, with a canonical refresh job producing latest per-pool and per-protocol metrics, reserve snapshots, and asset prices.
-- **Protocol read adapters** — adapters for Blend (pool reserves, positions, events), Aquarius (pools, rewards), Soroswap (pairs, reserves, swap events), DeFindex (vaults, strategies), and SDEX (order book, trades). Each produces normalized metrics in the unified schema.
-- **Grouped multi-wallet portfolio** — persistent grouping of multiple tracked addresses per user, with balance snapshots and per-wallet refresh.
-- **Non-custodial transaction builder** — server-side construction of multi-operation XDR envelopes, `simulateTransaction` preflight for Soroban actions, client-side XDR validation, SEP-11 txrep rendering, and in-wallet signing via Stellar Wallets Kit.
-- **In-app alerting** — event-stream and snapshot-delta rule evaluation, with in-app WebSocket delivery.
+- **Hybrid indexing pipeline**: a Horizon + Soroban RPC ingestion pipeline normalizing protocol data into a unified Postgres store, with a canonical refresh job producing latest per-pool and per-protocol metrics, reserve snapshots, and asset prices.
+- **Protocol read adapters**: adapters for Blend (pool reserves, positions, events), Aquarius (pools, rewards), Soroswap (pairs, reserves, swap events), DeFindex (vaults, strategies), and SDEX (order book, trades). Each produces normalized metrics in the unified schema.
+- **Grouped multi-wallet portfolio**: persistent grouping of multiple tracked addresses per user, with balance snapshots and per-wallet refresh.
+- **Non-custodial transaction builder**: server-side construction of multi-operation XDR envelopes, `simulateTransaction` preflight for Soroban actions, client-side XDR validation, SEP-11 txrep rendering, and in-wallet signing via Stellar Wallets Kit.
+- **In-app alerting**: event-stream and snapshot-delta rule evaluation, with in-app WebSocket delivery.
 
-The new layers below — deep protocol execution, intelligence/ranking, Etherfuse RWA integration, cross-chain onboarding, and external notification delivery — are built on top of these.
+The new layers below (deep protocol execution, intelligence/ranking, Etherfuse RWA integration, cross-chain onboarding, and external notification delivery) are built on top of these.
 
 ---
 
@@ -127,11 +127,11 @@ flowchart TB
 
 ---
 
-## 5. Stellar Building Blocks — Deep Integration Plan
+## 5. Stellar Building Blocks: Deep Integration Plan
 
 This is the heart of the architecture. For each integrated protocol, the table below shows what the existing foundation already reads (grant scope) and what this accelerator scope adds in terms of execution and position management.
 
-### 5.1 Blend V2 — From Analytics to Full Position Management
+### 5.1 Blend V2: From Analytics to Full Position Management
 
 **Existing (read-only foundation):**
 - Pool state via `get_reserve(asset)`: supplied, borrowed, rate model state
@@ -151,9 +151,9 @@ This is the heart of the architecture. For each integrated protocol, the table b
 | **Batch rebalance** | `pool.submit(from, spender, to, requests: Vec<Request>)` with multiple Requests of different types | Blend's `submit()` accepts a `Vec<Request>` with mixed types (0=Deposit, 1=Withdraw, 2=DepositCollateral, 3=WithdrawCollateral, 4=Borrow, 5=Repay). All operations execute atomically in one Soroban invocation; the entire call reverts if the resulting position is unhealthy. Dig surfaces rebalance scenarios (e.g., "withdraw collateral A + deposit collateral B") as one-click actions. |
 | **Backstop vs supply comparison** | Intelligence layer | The scoring engine compares backstop yield (BLND emissions, q4w risk, loss-absorption exposure) against direct supply yield (interest APY) for the same pool, so the user can choose. |
 
-**Blend SDK reference:** `@blend-capital/blend-sdk` — modules `pool` (PoolContract, RequestType, Positions) and `backstop` (BackstopClient, UserBalance, Q4W).
+**Blend SDK reference:** `@blend-capital/blend-sdk`, modules `pool` (PoolContract, RequestType, Positions) and `backstop` (BackstopClient, UserBalance, Q4W).
 
-### 5.2 Aquarius — LP Management, Reward Claims, and Analytics
+### 5.2 Aquarius: LP Management, Reward Claims, and Analytics
 
 **Existing (read-only foundation):**
 - Pool state via Soroban contract reads and classic `/liquidity_pools` (Horizon)
@@ -170,9 +170,9 @@ This is the heart of the architecture. For each integrated protocol, the table b
 | **Impermanent loss tracking** | Computed by Dig, not a contract call | For each LP position, Dig computes: (a) current position value from pool reserves and Reflector prices, (b) hold-equivalent value from entry amounts at current prices, (c) net P&L = fees earned + AQUA rewards - impermanent loss. Requires historical entry data from indexed deposit events. |
 | **Bribing visibility** | Aquarius Bribes API: `GET bribes-api.aqua.network/api/bribes/` + Market Keys API: `GET marketkeys-tracker.aqua.network/api/market-keys/` | Aquarius exposes a public REST API returning active bribes per market: `market_key`, `total_reward_amount`, `daily_amount`, `start_at/stop_at` (weekly periods), and AQUA equivalent. Cross-referencing with the Market Keys API resolves each `market_key` to its asset pair. Dig reads both APIs to compute bribe APR per pool (daily_amount x AQUA price / pool TVL) and integrates it into the opportunity score. 18 active bribe markets as of June 2026. |
 
-**Pool types:** Aquarius operates three pool types on Soroban — volatile (xy=k), stableswap (optimized for correlated assets), and concentrated liquidity (tick ranges). The adapter handles all three; the `pool_index: BytesN<32>` parameter identifies each pool uniquely.
+**Pool types:** Aquarius operates three pool types on Soroban: volatile (xy=k), stableswap (optimized for correlated assets), and concentrated liquidity (tick ranges). The adapter handles all three; the `pool_index: BytesN<32>` parameter identifies each pool uniquely.
 
-### 5.3 Soroswap — LP Management via Router
+### 5.3 Soroswap: LP Management via Router
 
 **Existing (read-only foundation):**
 - Factory enumeration, pair reserves, swap events, Router quote generation
@@ -187,7 +187,7 @@ This is the heart of the architecture. For each integrated protocol, the table b
 
 **Cross-DEX context:** Dig already reads quotes from the Soroswap Aggregator (which routes across Soroswap, Aquarius, and SDEX). The LP management added here lets users not just swap but also provide and withdraw liquidity, completing the AMM interaction surface.
 
-### 5.4 DeFindex — Vault Interaction and Strategy Transparency
+### 5.4 DeFindex: Vault Interaction and Strategy Transparency
 
 **Existing (read-only foundation):**
 - Vault state: `total_assets()`, `total_supply()`, `balance_of(user)`
@@ -204,9 +204,9 @@ This is the heart of the architecture. For each integrated protocol, the table b
 
 **Mainnet vaults (as of Q2 2026):** Fixed Pool (USDC, EURC, XLM), YieldBlox Pool (USDC, EURC, XLM, CETES, USTRY, AQUA, USDGLO), Orbit Pool (XLM, CETES, USTRY, oUSD). All on Blend autocompound strategies.
 
-**SDK:** `@defindex/sdk` — `depositToVault()`, `withdrawFromVault()`, `getUserShares()`.
+**SDK:** `@defindex/sdk` (`depositToVault()`, `withdrawFromVault()`, `getUserShares()`).
 
-### 5.5 Etherfuse — Real-World Asset Yield (new integration)
+### 5.5 Etherfuse: Real-World Asset Yield (new integration)
 
 **What it is:** Etherfuse issues tokenized sovereign bonds (Stablebonds) on Stellar as classic assets with trustlines. These carry real yield backed by government bonds, not token emissions.
 
@@ -222,7 +222,7 @@ This is the heart of the architecture. For each integrated protocol, the table b
 
 All issued by `GCRYUGD5NVARGXT56XEZI5CIFCQETYHAPQQTHO2O3IQZTHDH4LATMYWC` (Etherfuse official issuer, confirmed via `etherfuse.com/.well-known/stellar.toml`, status: "live"). SAC contract IDs available for Soroban interop (e.g., USTRY: `CBLV4ATSIWU67CFSQU2NVRKINQIKUZ2ODSZBUJTJ43VJVRSBTZYOPNUR`, CETES: `CAL6ER2TI6CTRAY6BFXWNWA7WTYXUXTQCHUBCIBU5O6KM3HJFG6Z6VXV`).
 
-**KYC model:** Deferred KYC — no KYC required to buy stablebonds with USDC. KYC is required only when redeeming to fiat. Geographic restriction: not available to US residents (standard for tokenized US treasuries).
+**KYC model:** Deferred KYC: no KYC required to buy stablebonds with USDC. KYC is required only when redeeming to fiat. Geographic restriction: not available to US residents (standard for tokenized US treasuries).
 
 **Integration path:**
 
@@ -233,7 +233,7 @@ All issued by `GCRYUGD5NVARGXT56XEZI5CIFCQETYHAPQQTHO2O3IQZTHDH4LATMYWC` (Etherf
 | **Buy via Etherfuse API** | `POST /ramp/quote` → `POST /ramp/swap` | For direct issuance at par rather than market price. Asset identifiers fetched from `GET /ramp/assets?blockchain=stellar`. |
 | **Portfolio tracking** | Existing `user_wallets` + trustline balance reads | Stablebond positions appear alongside DeFi positions in the consolidated portfolio. |
 
-### 5.6 SDEX — Native Order Book (deepened)
+### 5.6 SDEX: Native Order Book (deepened)
 
 **Existing (read-only foundation):**
 - Order book reads via Horizon `/order_book`
@@ -244,16 +244,16 @@ All issued by `GCRYUGD5NVARGXT56XEZI5CIFCQETYHAPQQTHO2O3IQZTHDH4LATMYWC` (Etherf
 
 | Capability | Operation | Detail |
 |---|---|---|
-| **Limit orders** | `ManageSellOffer(selling, buying, amount, price, offerId=0)` or `ManageBuyOffer(...)` | Place limit orders on the SDEX — a native Stellar feature no other L1 has in-protocol. This is a classic operation, so it can be bundled atomically with `ChangeTrust` and other classic ops in a single envelope. |
+| **Limit orders** | `ManageSellOffer(selling, buying, amount, price, offerId=0)` or `ManageBuyOffer(...)` | Place limit orders on the SDEX, a native Stellar feature no other L1 has in-protocol. This is a classic operation, so it can be bundled atomically with `ChangeTrust` and other classic ops in a single envelope. |
 | **Order management** | `ManageSellOffer(..., offerId=existing)` with amount=0 to cancel | View, modify, and cancel open orders from the Dig portfolio. |
 
-### 5.7 Circle CCTP — Cross-Chain USDC Import (new integration)
+### 5.7 Circle CCTP: Cross-Chain USDC Import (new integration)
 
 CCTP moves native USDC across chains by burning on the source chain and minting on the destination, with no wrapped assets and no third-party liquidity pool. V2 is live on Stellar mainnet since May 2026.
 
 **Stellar contracts (deployed by Circle, not Dig):**
-- **MessageTransmitter** — core messaging: emits, receives, and validates cross-chain messages with Circle attestations.
-- **CctpForwarder** — calls `receive_message` on MessageTransmitter, takes the mint, and transfers USDC to the `forwardRecipient` in a single atomic Soroban invocation (non-custodial).
+- **MessageTransmitter**, core messaging: emits, receives, and validates cross-chain messages with Circle attestations.
+- **CctpForwarder**: calls `receive_message` on MessageTransmitter, takes the mint, and transfers USDC to the `forwardRecipient` in a single atomic Soroban invocation (non-custodial).
 
 **Dig's flow:**
 
@@ -338,7 +338,7 @@ Ranked opportunities are served through `/v1/opportunities`, consumed by the das
 
 ## 8. Notification Layer
 
-The notification layer extends the existing in-app alerting with external delivery via Telegram and Discord bots. The bot does not allow signing — it alerts and links to Dig on desktop where the wallet is connected and the action is pre-built.
+The notification layer extends the existing in-app alerting with external delivery via Telegram and Discord bots. The bot does not allow signing; it alerts and links to Dig on desktop where the wallet is connected and the action is pre-built.
 
 ### 8.1 Architecture
 

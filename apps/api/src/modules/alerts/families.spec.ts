@@ -170,7 +170,7 @@ describe('price copy (observed value + as_of, honesty rules)', () => {
       now: NOW,
     });
     expect(title).toBe('Price alert: XLM above $0.1700');
-    expect(body).toBe('XLM crossed above $0.1700 — $0.1712 at 14:32 UTC.');
+    expect(body).toBe('XLM crossed above $0.1700: $0.1712 at 14:32 UTC.');
   });
 
   it('resolved copy states the return direction with the observed price', () => {
@@ -184,7 +184,7 @@ describe('price copy (observed value + as_of, honesty rules)', () => {
       now: new Date('2026-08-15T14:47:30Z'),
     });
     expect(title).toBe('Price alert resolved: XLM back below $0.1700');
-    expect(body).toBe('XLM is back below $0.1700 — $0.1690 at 14:47 UTC.');
+    expect(body).toBe('XLM is back below $0.1700: $0.1690 at 14:47 UTC.');
   });
 
   it('a below-threshold rule words the directions the other way around', () => {
@@ -197,7 +197,7 @@ describe('price copy (observed value + as_of, honesty rules)', () => {
       asOf: new Date('2026-08-15T09:00:00Z'),
       now: NOW,
     });
-    expect(body).toBe('EURC crossed below $1.10 — $1.08 at 09:00 UTC.');
+    expect(body).toBe('EURC crossed below $1.10: $1.08 at 09:00 UTC.');
   });
 
   it('an as_of older than 24h shows its full date', () => {
@@ -271,7 +271,7 @@ describe('tvl-drop family (N3) — drop computation, edge reuse, copy', () => {
     });
     expect(title).toBe('TVL drop: Blend Fixed −12.4% over 24h');
     expect(body).toBe(
-      'Blend Fixed TVL −12.4% over 24h ($8.0M → $7.0M) — as of 14:32 UTC.',
+      'Blend Fixed TVL −12.4% over 24h ($8.0M → $7.0M), as of 14:32 UTC.',
     );
   });
 
@@ -289,7 +289,7 @@ describe('tvl-drop family (N3) — drop computation, edge reuse, copy', () => {
     });
     expect(title).toBe('TVL drop resolved: Blend Fixed back within 10%');
     expect(body).toBe(
-      'Blend Fixed TVL is back within your 10% threshold: −3.1% over 25h ($8.0M → $7.8M) — as of 14:32 UTC.',
+      'Blend Fixed TVL is back within your 10% threshold: −3.1% over 25h ($8.0M → $7.8M), as of 14:32 UTC.',
     );
   });
 
@@ -330,7 +330,7 @@ describe('apy family (N4) — percent conversion, copy, edge reuse', () => {
     });
     expect(title).toBe('Supply APY alert: Blend Fixed at 8.40%');
     expect(body).toBe(
-      'Blend Fixed supply APY rose to 8.40% (alert threshold > 8%) — as of 09:12 UTC.',
+      'Blend Fixed supply APY rose to 8.40% (alert threshold > 8%), as of 09:12 UTC.',
     );
   });
 
@@ -346,7 +346,7 @@ describe('apy family (N4) — percent conversion, copy, edge reuse', () => {
       now: new Date('2026-08-16T09:15:00Z'),
     });
     expect(body).toBe(
-      'Blend Fixed borrow APY dropped to 4.10% (alert threshold < 5%) — as of 09:12 UTC.',
+      'Blend Fixed borrow APY dropped to 4.10% (alert threshold < 5%), as of 09:12 UTC.',
     );
   });
 
@@ -363,7 +363,7 @@ describe('apy family (N4) — percent conversion, copy, edge reuse', () => {
     });
     expect(title).toBe('Supply APY back: Blend Fixed at 7.10%');
     expect(body).toBe(
-      'Blend Fixed supply APY back to 7.10% — as of 10:00 UTC.',
+      'Blend Fixed supply APY back to 7.10%, as of 10:00 UTC.',
     );
   });
 

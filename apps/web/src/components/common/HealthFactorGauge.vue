@@ -47,9 +47,9 @@ const GRADIENT =
 
 const title = computed(() => {
   const hf = props.healthFactor
-  if (hf === null || !Number.isFinite(hf)) return 'No borrow — no liquidation risk'
+  if (hf === null || !Number.isFinite(hf)) return 'No borrow, no liquidation risk'
   const suffix = hf >= SCALE_MAX ? ' (scale clamped at 2.00)' : ''
-  return `Health factor ${hf.toFixed(4)} — liquidation at 1.00${suffix}`
+  return `Health factor ${hf.toFixed(4)}, liquidation at 1.00${suffix}`
 })
 </script>
 

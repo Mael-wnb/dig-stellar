@@ -54,7 +54,7 @@ export const TESTNET_SWAP_PAIRS: TestnetSwapPair[] = [
     from: { code: "XLM" },
     // Circle's canonical testnet USDC — deep XLM order book (multi-level).
     to: { code: "USDC", issuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5" },
-    note: "Deepest testnet book — the proven path.",
+    note: "Deepest testnet book, the proven path.",
   },
   {
     id: "xlm-yxlm",

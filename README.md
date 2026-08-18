@@ -1,4 +1,4 @@
-# Dig Stellar — Unified DeFi Analytics and Multi-Wallet Monitoring on Stellar
+# Dig Stellar: Unified DeFi Analytics and Multi-Wallet Monitoring on Stellar
 
 **Dig Stellar** is a Stellar-focused analytics and portfolio monitoring module designed to make DeFi activity across the ecosystem easier to understand, follow, and eventually act on.
 

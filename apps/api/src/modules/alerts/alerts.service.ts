@@ -118,7 +118,7 @@ export class AlertsService {
   private validateThreshold(threshold: unknown): number {
     if (typeof threshold !== 'number' || !Number.isFinite(threshold)) {
       throw new BadRequestException(
-        'threshold is required and must be a finite number (recommended HF band ~1.1–1.5).',
+        'threshold is required and must be a finite number (recommended HF band ~1.1-1.5).',
       );
     }
     return threshold;

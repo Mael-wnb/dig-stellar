@@ -33,7 +33,7 @@ export const TESTNET_BLEND_POOLS: TestnetBlendPool[] = [
     contractId: "CCEBVDYM32YNYCVNRXQKDFFPISJJCV557CDZEIRBEE4NCV4KHPQ44HGF",
     label: "Blend Testnet Pool (V2)",
     assets: [
-      { code: "XLM", note: "Native — no trustline; funded by friendbot." },
+      { code: "XLM", note: "Native: no trustline, funded by friendbot." },
       {
         code: "USDC",
         note: "Requires the SAC-backed testnet USDC (issuer GATALTGT…).",

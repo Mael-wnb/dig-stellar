@@ -31,7 +31,7 @@ defineEmits<{ (e: 'connect'): void }>()
     </div>
     <div class="font-bold tracking-[-0.02em]" :class="compact ? 'text-[15px]' : 'text-[18px]'">Track your Stellar DeFi portfolio</div>
     <div class="max-w-[420px]" :class="compact ? 'text-[12.5px] mt-[6px]' : 'text-[13px] mt-[8px]'" style="color: var(--dig-faint)">
-      See balances and Blend positions across every wallet — non-custodial, read-only
+      See balances and Blend positions across every wallet: non-custodial, read-only
       until you choose to act. You sign everything in your own wallet.
     </div>
     <button
@@ -44,7 +44,7 @@ defineEmits<{ (e: 'connect'): void }>()
       Connect wallet
     </button>
     <div class="text-[11.5px]" :class="compact ? 'mt-[10px]' : 'mt-[12px]'" style="color: var(--dig-faint)">
-      Or add any address as watch-only — no signing, just monitoring.
+      Or add any address as watch-only: no signing, just monitoring.
     </div>
   </div>
 </template>

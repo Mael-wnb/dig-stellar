@@ -126,7 +126,7 @@ const OP_SYMBOL: Record<AlertOperator, string> = { lt: '<', gt: '>', pct: 'Δ' }
 /** Mono condition string, e.g. "health_factor < 1.25 · Blend USDC". */
 export function conditionLabel(r: Pick<AlertRule, 'metric' | 'operator' | 'threshold' | 'scope_ref' | 'condition'>): string {
   if (r.condition) return r.condition
-  return `${METRIC_KEY[r.metric]} ${OP_SYMBOL[r.operator]} ${r.threshold} · ${r.scope_ref}`
+  return `${METRIC_KEY[r.metric]} ${OP_SYMBOL[r.operator]} ${r.threshold} - ${r.scope_ref}`
 }
 
 export function timeAgo(iso: string): string {
@@ -284,7 +284,7 @@ export function useAlerts() {
           : `${(r.assetId ?? '').slice(0, 8)}…`
         return {
           id: r.id,
-          name: `${label} · Price`,
+          name: `${label} - Price`,
           scope: 'asset',
           scope_ref: label,
           metric: 'price',
@@ -292,7 +292,7 @@ export function useAlerts() {
           threshold,
           severity: 'info',
           enabled: r.enabled,
-          condition: `price ${sym} ${formatUsdPrice(threshold)} · ${label}`,
+          condition: `price ${sym} ${formatUsdPrice(threshold)} - ${label}`,
         }
       }
 
@@ -303,7 +303,7 @@ export function useAlerts() {
           : `${(r.poolEntityId ?? '').slice(0, 8)}…`
         return {
           id: r.id,
-          name: `${label} · TVL drop`,
+          name: `${label} - TVL drop`,
           scope: 'venue',
           scope_ref: label,
           metric: 'tvl',
@@ -311,7 +311,7 @@ export function useAlerts() {
           threshold,
           severity: 'warning',
           enabled: r.enabled,
-          condition: `tvl_drop ${sym} ${threshold}% / 24h · ${label}`,
+          condition: `tvl_drop ${sym} ${threshold}% / 24h - ${label}`,
         }
       }
 
@@ -323,7 +323,7 @@ export function useAlerts() {
         const isSupply = r.metric === 'supply_apy'
         return {
           id: r.id,
-          name: `${label} · ${isSupply ? 'Supply' : 'Borrow'} APY`,
+          name: `${label} - ${isSupply ? 'Supply' : 'Borrow'} APY`,
           scope: 'venue',
           scope_ref: label,
           metric: isSupply ? 'apy' : 'borrowapy',
@@ -331,14 +331,14 @@ export function useAlerts() {
           threshold,
           severity: 'info',
           enabled: r.enabled,
-          condition: `${r.metric} ${sym} ${threshold}% · ${label}`,
+          condition: `${r.metric} ${sym} ${threshold}% - ${label}`,
         }
       }
 
       const label = scopeRefLabel(r.userWalletId)
       return {
         id: r.id,
-        name: `${label} · Health factor`,
+        name: `${label} - Health factor`,
         scope: 'wallet',
         scope_ref: label,
         metric: 'health',
@@ -346,7 +346,7 @@ export function useAlerts() {
         threshold,
         severity: severityForThreshold(r.threshold),
         enabled: r.enabled,
-        condition: `health_factor ${sym} ${threshold} · ${label}`,
+        condition: `health_factor ${sym} ${threshold} - ${label}`,
       }
     }),
   )

@@ -168,7 +168,7 @@ const canCreate = computed(() =>
 function submit() {
   if (!canCreate.value || !selectedTarget.value) return
   emit('create', {
-    name: `${selectedTarget.value.label} · ${selectedMetricLabel.value}`,
+    name: `${selectedTarget.value.label} - ${selectedMetricLabel.value}`,
     scope: scope.value,
     scope_ref: selectedTarget.value.id,
     metric: metric.value,
@@ -207,7 +207,7 @@ function submit() {
         </p>
 
         <!-- 1 · What to watch -->
-        <p class="text-xs font-semibold text-[#5E5F5D] mb-[9px]">1 · What to watch</p>
+        <p class="text-xs font-semibold text-[#5E5F5D] mb-[9px]">1. What to watch</p>
         <div class="grid grid-cols-4 gap-[9px] mb-5">
           <button
             v-for="sc in SCOPES"
@@ -228,11 +228,11 @@ function submit() {
         </div>
 
         <!-- 2 · Which target -->
-        <p class="text-xs font-semibold text-[#5E5F5D] mb-[9px] capitalize">2 · Which {{ scopeNoun }}</p>
+        <p class="text-xs font-semibold text-[#5E5F5D] mb-[9px] capitalize">2. Which {{ scopeNoun }}</p>
         <p v-if="!targets.length" class="text-[12px] text-[#C98A1E] mb-5">
           {{ scope === 'asset'
-            ? 'No priced assets available right now — the tracked-asset list comes from the data pipeline.'
-            : 'No eligible targets available right now — the list comes from the data pipeline.' }}
+            ? 'No priced assets available right now. The tracked-asset list comes from the data pipeline.'
+            : 'No eligible targets available right now. The list comes from the data pipeline.' }}
         </p>
         <div v-else class="grid grid-cols-2 gap-2 mb-5 max-h-[150px] overflow-y-auto">
           <button
@@ -253,7 +253,7 @@ function submit() {
         </div>
 
         <!-- 3 · Condition -->
-        <p class="text-xs font-semibold text-[#5E5F5D] mb-[9px]">3 · Condition</p>
+        <p class="text-xs font-semibold text-[#5E5F5D] mb-[9px]">3. Condition</p>
         <div class="flex gap-1.5 flex-wrap mb-3.5">
           <button
             v-for="[m, label] in metrics"
@@ -277,7 +277,7 @@ function submit() {
         <div class="flex items-center gap-2.5 flex-wrap px-[18px] py-4 bg-[#1C1C1A] border border-[#2C2C29] rounded-[13px] mb-2">
           <span class="text-[13.5px] text-[#5E5F5D]">Notify me when</span>
           <span class="text-[13.5px] font-bold text-[#D5FF2F]">{{ selectedTarget?.label ?? '—' }}</span>
-          <span class="text-[13.5px] text-[#5E5F5D]">·</span>
+          <span class="text-[13.5px] text-[#5E5F5D]">-</span>
           <span class="text-[13.5px] font-semibold text-[#E2E6E1]">{{ selectedMetricLabel }}</span>
           <span class="flex gap-1.5">
             <button
@@ -299,18 +299,18 @@ function submit() {
 
         <!-- honest scope note -->
         <p v-if="!supported" class="text-[12px] text-[#C98A1E] mb-5">
-          This alert type isn't evaluated by the engine yet — coming soon. Pick a supported metric to create a rule.
+          This alert type isn't evaluated by the engine yet (coming soon). Pick a supported metric to create a rule.
         </p>
         <p v-else-if="!targetSupportsMetric" class="text-[12px] text-[#C98A1E] mb-5">
-          {{ selectedTarget?.label ?? 'This pool' }} doesn't have a {{ metric === 'borrowapy' ? 'borrow' : 'supply' }} APY — pick a lending pool for APY alerts.
+          {{ selectedTarget?.label ?? 'This pool' }} doesn't have a {{ metric === 'borrowapy' ? 'borrow' : 'supply' }} APY. Pick a lending pool for APY alerts.
         </p>
         <!-- honest cadence note: rules ride the periodic sweep, not a live stream -->
         <p v-else class="text-[12px] text-[#5E5F5D] mb-5">
-          Rules are checked every ~15 minutes by the monitoring sweep — not in real time.
+          Rules are checked every ~15 minutes by the monitoring sweep, not in real time.
         </p>
 
         <!-- 4 · Severity -->
-        <p class="text-xs font-semibold text-[#5E5F5D] mb-[9px]">4 · Severity</p>
+        <p class="text-xs font-semibold text-[#5E5F5D] mb-[9px]">4. Severity</p>
         <div class="flex gap-[9px] mb-6">
           <button
             v-for="[sv, label, dot] in SEVERITIES"

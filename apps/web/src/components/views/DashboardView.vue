@@ -145,7 +145,7 @@ const {
     <div class="grid gap-[16px]" style="grid-template-columns: 1.5fr 1fr">
       <div class="rounded-[18px] p-[24px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
         <div class="flex items-center justify-between gap-[14px]">
-          <div class="text-[13px] font-medium" style="color: var(--dig-faint)">Stellar DeFi · network</div>
+          <div class="text-[13px] font-medium" style="color: var(--dig-faint)">Stellar DeFi network</div>
           <FreshnessChip :updated-at="netUpdatedAt" :is-stale="netStale" :stale-after-seconds="netStaleAfter" />
         </div>
         <div class="flex items-end gap-[14px] mt-[8px]">
@@ -251,7 +251,7 @@ const {
             {{ p.name }}
             <span v-if="p.stale" class="w-[7px] h-[7px] rounded-full" style="background: var(--dig-amber)" title="Some pools stale"></span>
           </div>
-          <div class="text-[12px]" style="color: var(--dig-faint)">{{ p.type }} · {{ p.count }} pools</div>
+          <div class="text-[12px]" style="color: var(--dig-faint)">{{ p.type }}, {{ p.count }} pools</div>
         </div>
         <div class="ml-auto text-right">
           <div class="text-[14px] font-semibold tabular-nums">{{ formatUsd(p.tvl) }}</div>

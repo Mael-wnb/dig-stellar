@@ -75,7 +75,7 @@ function legTitle(leg: WalletPositionItem, sideLabel: string): string {
       :class="dense ? 'gap-[5px]' : 'gap-[6px]'"
     >
       <!-- Separator between the supplied and borrowed runs ("·") -->
-      <span v-if="gi > 0" :style="{ color: 'var(--dig-line)' }" class="select-none">·</span>
+      <span v-if="gi > 0" :style="{ color: 'var(--dig-line)' }" class="select-none">/</span>
 
       <span
         v-if="showLabels"

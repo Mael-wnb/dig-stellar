@@ -91,12 +91,12 @@ let disposed = false;
 
 const WITNESS_REASON_COPY: Record<string, string> = {
   "no-matching-build":
-    "We couldn't link this transaction to an action built in Dig — rewards only apply to in-app actions.",
+    "We couldn't link this transaction to an action built in Dig. Rewards only apply to in-app actions.",
   "unknown-wallet": "This wallet isn't registered in Dig, so the action can't be verified.",
   "no-qualifying-op": "This transaction doesn't contain a qualifying swap or supply.",
   "tx-not-found": "The transaction isn't visible on the network yet.",
   "tx-not-successful": "The transaction isn't confirmed on the network yet.",
-  timeout: "We couldn't verify this action yet — the network may be slow.",
+  timeout: "We couldn't verify this action yet. The network may be slow.",
   unreachable: "We couldn't reach the server to verify this action.",
 };
 
@@ -104,26 +104,26 @@ const ELIGIBILITY_REASON_COPY: Record<string, string> = {
   "below-min-notional": "", // filled at render (needs the live min)
   "already-claimed": "", // filled at render (names the family)
   "claim-failed-pending-review":
-    "A previous claim needs manual review — no action needed on your side.",
-  "temporarily-paused": "Rewards are temporarily paused (hourly limit) — try again within the hour.",
+    "A previous claim needs manual review. No action needed on your side.",
+  "temporarily-paused": "Rewards are temporarily paused (hourly limit). Try again within the hour.",
   "campaign-not-started": "The reward campaign hasn't started yet.",
   "campaign-ended": "The reward campaign has ended.",
-  "campaign-exhausted": "All rewards have been claimed — the campaign is over.",
+  "campaign-exhausted": "All rewards have been claimed. The campaign is over.",
   "treasury-drained": "Rewards are paused while the reward pool refills.",
-  "treasury-unavailable": "Rewards are momentarily unavailable — try again shortly.",
+  "treasury-unavailable": "Rewards are momentarily unavailable. Try again shortly.",
   "payout-failed":
-    "Your claim was recorded but the payout hit an error — it will be resolved manually, nothing else to do.",
-  "claim-error": "Something went wrong recording the claim — try again shortly.",
+    "Your claim was recorded but the payout hit an error. It will be resolved manually, nothing else to do.",
+  "claim-error": "Something went wrong recording the claim. Try again shortly.",
 };
 
 const reasonCopy = computed(() => {
   if (!reason.value) return "";
   if (reason.value === "below-min-notional") {
-    return `This action was below the ${campaign.value?.minNotionalXlm ?? 1} XLM minimum — a larger swap or supply qualifies.`;
+    return `This action was below the ${campaign.value?.minNotionalXlm ?? 1} XLM minimum. A larger swap or supply qualifies.`;
   }
   if (reason.value === "already-claimed") {
     const label = props.family === "swap" ? "Swap" : "Blend supply";
-    return `${label} reward already claimed — one reward per action type this campaign.`;
+    return `${label} reward already claimed. One reward per action type this campaign.`;
   }
   return (
     WITNESS_REASON_COPY[reason.value] ??
@@ -305,7 +305,7 @@ onBeforeUnmount(() => {
   >
     <template v-if="state === 'checking'">
       <span style="color: var(--dig-faint)">
-        {{ rateLimited ? "Rate-limited — retrying…" : "Checking reward eligibility…" }}
+        {{ rateLimited ? "Rate-limited, retrying…" : "Checking reward eligibility…" }}
       </span>
     </template>
 
@@ -323,7 +323,7 @@ onBeforeUnmount(() => {
 
     <template v-else-if="state === 'eligible'">
       <span class="font-semibold" style="color: var(--dig-accent)">
-        Your action qualifies — claim {{ rewardXlm }} XLM
+        Your action qualifies: claim {{ rewardXlm }} XLM
       </span>
       <button
         type="button"
@@ -337,7 +337,7 @@ onBeforeUnmount(() => {
 
     <template v-else-if="state === 'claiming'">
       <span style="color: var(--dig-faint)">
-        {{ rateLimited ? "Rate-limited — retrying your claim…" : `Claiming your ${rewardXlm} XLM…` }}
+        {{ rateLimited ? "Rate-limited, retrying your claim…" : `Claiming your ${rewardXlm} XLM…` }}
       </span>
     </template>
 

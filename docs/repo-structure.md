@@ -1,7 +1,7 @@
-# Repository Structure — As-Built
+# Repository Structure (As-Built)
 
 Navigation map of the actual monorepo layout. Describes where logic lives, how data flows,
-and how the pieces connect. Verified against the code — do not update this doc from memory.
+and how the pieces connect. Verified against the code; do not update this doc from memory.
 
 ---
 
@@ -10,15 +10,15 @@ and how the pieces connect. Verified against the code — do not update this doc
 ```
 dig-stellar/
 ├── apps/
-│   ├── api/           NestJS 11 — the UI-facing HTTP API
-│   ├── indexer/       Ingestion jobs — writes to Postgres via raw SQL and Prisma
-│   └── web/           Vue 3 + Vite — product UI
+│   ├── api/           NestJS 11: the UI-facing HTTP API
+│   ├── indexer/       Ingestion jobs: writes to Postgres via raw SQL and Prisma
+│   └── web/           Vue 3 + Vite: product UI
 ├── packages/
 │   └── db/            Prisma schema + migrations (legacy Prisma schema only)
 └── docs/              Source-of-truth documentation
 ```
 
-Package manager: **pnpm** (indexer pins `pnpm@10.32.x`). No repo-wide build or test script —
+Package manager: **pnpm** (indexer pins `pnpm@10.32.x`). No repo-wide build or test script;
 each app owns its own.
 
 ---
@@ -30,12 +30,12 @@ each app owns its own.
 ```
 apps/api/src/
 ├── app.controller.ts          GET /protocols  /venues  /venues/:key/snapshots
-│                              Reads: Prisma ORM models (Protocol, Venue, Snapshot) — LEGACY
+│                              Reads: Prisma ORM models (Protocol, Venue, Snapshot), LEGACY
 ├── app.module.ts
 ├── app.service.ts             (unused stub)
 ├── main.ts
 ├── db/
-│   ├── prisma.service.ts      Shared PrismaClient — used as connection for $queryRawUnsafe
+│   ├── prisma.service.ts      Shared PrismaClient, used as connection for $queryRawUnsafe
 │   ├── stellar_v1.sql         DDL: venues, entities, assets, entity_assets,
 │   │                               normalized_events, pool_snapshots, reserve_snapshots,
 │   │                               asset_prices, sync_cursors
@@ -62,7 +62,7 @@ apps/api/src/
     │                               then (non-fatal) 81-stellar-wallet-blend-positions.ts
     └── network/
         ├── network.controller.ts   GET /v1/network/stats
-        └── network.service.ts      NO database access — fetches external APIs live:
+        └── network.service.ts      NO database access; fetches external APIs live:
                                     CoinGecko, api.llama.fi, stablecoins.llama.fi,
                                     api.stellar.expert, horizon.stellar.org/fee_stats
 ```
@@ -71,11 +71,11 @@ apps/api/src/
 
 | Route prefix | Controller | Schema accessed |
 |---|---|---|
-| `/protocols`, `/venues`, `/venues/:key/snapshots` | AppController | **Prisma ORM** — `"Protocol"`, `"Venue"`, `"Snapshot"` |
-| `/v1/protocols` | StellarController | **Raw SQL v1** — `venues`, `protocol_metrics_latest` |
-| `/v1/pools`, `/v1/pools/:slug` | StellarController | **Raw SQL v1** — `entities`, `venues`, `pool_metrics_latest`, `reserve_snapshots`, `asset_prices`, `normalized_events`, `entity_assets`, `assets` |
-| `/v1/wallets/*` | WalletsController | **Raw SQL v2** — `user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions`, `wallet_pool_health` (the latter two via `/:id/positions` + the overview `defi` block) |
-| `/v1/network/stats` | NetworkController | **No DB** — external HTTP only |
+| `/protocols`, `/venues`, `/venues/:key/snapshots` | AppController | **Prisma ORM**: `"Protocol"`, `"Venue"`, `"Snapshot"` |
+| `/v1/protocols` | StellarController | **Raw SQL v1**: `venues`, `protocol_metrics_latest` |
+| `/v1/pools`, `/v1/pools/:slug` | StellarController | **Raw SQL v1**: `entities`, `venues`, `pool_metrics_latest`, `reserve_snapshots`, `asset_prices`, `normalized_events`, `entity_assets`, `assets` |
+| `/v1/wallets/*` | WalletsController | **Raw SQL v2**: `user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions`, `wallet_pool_health` (the latter two via `/:id/positions` + the overview `defi` block) |
+| `/v1/network/stats` | NetworkController | **No DB**: external HTTP only |
 
 ---
 
@@ -85,10 +85,10 @@ apps/api/src/
 
 ```
 apps/indexer/src/
-├── run-once.ts          npm run:once  — seed Prisma tables (Protocol/Venue/Snapshot) — LEGACY
-├── run-blend.ts         npm run:blend — Blend → Prisma Snapshot — LEGACY PATH
-├── run-horizon.ts       npm run:horizon — Horizon activity → Prisma Snapshot — LEGACY PATH
-├── run-defindex.ts      npm run:defindex — scaffolded, not validated, out of scope for T1-D1
+├── run-once.ts          npm run:once  (seed Prisma tables Protocol/Venue/Snapshot), LEGACY
+├── run-blend.ts         npm run:blend (Blend → Prisma Snapshot), LEGACY PATH
+├── run-horizon.ts       npm run:horizon (Horizon activity → Prisma Snapshot), LEGACY PATH
+├── run-defindex.ts      npm run:defindex (scaffolded, not validated, out of scope for T1-D1)
 │
 ├── lib/
 │   └── protocols/       Protocol adapter logic (fetch / normalize / persist)
@@ -119,7 +119,7 @@ apps/indexer/src/
 │           └── types.ts
 │
 └── scripts/
-    ├── discovery/       Exploration and onboarding scripts (numbered 01–75;
+    ├── discovery/       Exploration and onboarding scripts (numbered 01-75;
     │                    75-blend-user-position-probe.ts de-risks the Gap B resolver)
     ├── bootstrap/       One-time setup scripts (upsert venue/entity/asset seed data)
     ├── shared/          db.ts, lookup.ts, prices.ts, pricing.ts, pricing-config.ts, scaling.ts
@@ -138,7 +138,7 @@ apps/indexer/src/
 ```
 job:refresh
   └── 72-run-refresh-job.ts          Sets env vars (STELLAR_RPC_URL, LEDGER_LOOKBACK, etc.)
-        └── 71-refresh-all-metrics.ts  Orchestrator — spawns steps sequentially:
+        └── 71-refresh-all-metrics.ts  Orchestrator, spawns steps sequentially:
               │
               ├── Step 1  62-price-reference-assets.ts
               │           Fetches CoinGecko prices for known assets → asset_prices
@@ -186,16 +186,16 @@ job:refresh
                           Writes: network_stats_latest
 ```
 
-Pool/entity discovery for steps 3–5 comes from a DB query in 71 (`select from entities join venues where v.slug = $1`), not from env vars. Entities must already exist in the DB (seeded by bootstrap scripts or prior onboarding).
+Pool/entity discovery for steps 3-5 comes from a DB query in 71 (`select from entities join venues where v.slug = $1`), not from env vars. Entities must already exist in the DB (seeded by bootstrap scripts or prior onboarding).
 
 ---
 
-## scripts/ingest/ — file classification
+## scripts/ingest/: file classification
 
 Three distinct categories of files exist in `apps/indexer/src/scripts/ingest/`.
 **Do not delete any file.** Legacy files are retained as reference.
 
-### (a) Active refresh — called by 71-refresh-all-metrics.ts
+### (a) Active refresh: called by 71-refresh-all-metrics.ts
 
 | File | Called at step |
 |---|---|
@@ -209,12 +209,12 @@ Three distinct categories of files exist in `apps/indexer/src/scripts/ingest/`.
 | `run-allbridge-bridge-refresh.ts` | Step 8 (Allbridge bridge flows; non-fatal) |
 | `73-network-stats-refresh.ts` | Step 9 (non-fatal) |
 
-### (b) Active onboarding — referenced in the Soroswap pair onboarding checklist
+### (b) Active onboarding: referenced in the Soroswap pair onboarding checklist
 
 These files are not called programmatically by the refresh pipeline, but are required steps in
 the manual onboarding workflow for adding a new Soroswap pair.
 The checklist is generated by `scripts/discovery/72-soroswap-onboard-from-token-pair.ts`
-(which prints `nextCommands` to stdout and JSON — it does not spawn them automatically).
+(which prints `nextCommands` to stdout and JSON; it does not spawn them automatically).
 
 | File | Role in onboarding |
 |---|---|
@@ -226,7 +226,7 @@ The checklist is generated by `scripts/discovery/72-soroswap-onboard-from-token-
 The full onboarding sequence also uses scripts from `scripts/discovery/` (55→61) and
 `scripts/bootstrap/soroswap-upsert-core.ts`.
 
-### (c) Legacy — not referenced by any active script or onboarding path
+### (c) Legacy: not referenced by any active script or onboarding path
 
 These are superseded by the current lib/protocols-based pipeline. Retained for reference.
 
@@ -245,17 +245,17 @@ These are superseded by the current lib/protocols-based pipeline. Retained for r
 | `blend-insert-snapshots.ts` | `run-blend-pool-refresh.ts` |
 | `run-aquarius-refresh.ts` | `run-aquarius-pool-refresh.ts` (note: distinct filename) |
 | `run-soroswap-refresh.ts` | `run-soroswap-pair-refresh.ts` (note: distinct filename) |
-| `soroswap-insert-events.ts` | See (b) — onboarding only |
-| `soroswap-insert-snapshots.ts` | See (b) — onboarding only |
+| `soroswap-insert-events.ts` | See (b), onboarding only |
+| `soroswap-insert-snapshots.ts` | See (b), onboarding only |
 
 Note: `soroswap-insert-events.ts` and `soroswap-insert-snapshots.ts` appear in both (b) and (c)
 because they are legacy in the refresh path but live in the onboarding path.
 
 ---
 
-## scripts/discovery/ — exploration and onboarding tooling
+## scripts/discovery/: exploration and onboarding tooling
 
-Numbered scripts (01–73) used during protocol exploration and pair onboarding. Not part of the
+Numbered scripts (01-73) used during protocol exploration and pair onboarding. Not part of the
 recurring refresh job. Notable active ones:
 
 | File | Purpose |
@@ -267,17 +267,17 @@ recurring refresh job. Notable active ones:
 
 ---
 
-## scripts/bootstrap/ — one-time setup
+## scripts/bootstrap/: one-time setup
 
 Run once per protocol to seed `venues`, `entities`, and `assets` before the refresh pipeline
 can operate. The refresh job queries these rows to find which pools to refresh.
 
 | File | Writes |
 |---|---|
-| `blend-upsert-core.ts` | Blend venue + the **fixed** pool entity/assets (from a discovery registry). Additional Blend pools (orbit, etherfuse, yieldblox) are seeded by running `run-blend-pool-refresh.ts` once with their contract id — it upserts the entity + reserves on-chain. See runbooks "Onboarding an additional Blend pool". |
+| `blend-upsert-core.ts` | Blend venue + the **fixed** pool entity/assets (from a discovery registry). Additional Blend pools (orbit, etherfuse, yieldblox) are seeded by running `run-blend-pool-refresh.ts` once with their contract id; it upserts the entity + reserves on-chain. See runbooks "Onboarding an additional Blend pool". |
 | `soroswap-upsert-core.ts` | venues + entities + assets for Soroswap |
 | `aquarius-upsert-core.ts` | venues + entities + assets for Aquarius |
-| `allbridge-upsert-core.ts` | `allbridge` venue (`venue_type='bridge'`) + USDC asset (no entities — single bridge contract) |
+| `allbridge-upsert-core.ts` | `allbridge` venue (`venue_type='bridge'`) + USDC asset (no entities; single bridge contract) |
 
 Stellar-native entities are created dynamically by `run-stellar-native-refresh.ts` itself (no bootstrap required).
 
@@ -320,25 +320,25 @@ packages/db/
 # Local services
 docker compose up -d                        # postgres:16 (5432) + redis:7 (6379)
 
-# Database — raw SQL schemas (apply manually)
+# Database: raw SQL schemas (apply manually)
 psql $DATABASE_URL -f apps/api/src/db/stellar_v1.sql
 psql $DATABASE_URL -f apps/api/src/db/stellar_v1_metrics.sql
 psql $DATABASE_URL -f apps/api/src/db/stellar_v2_multiwallet.sql
 
-# Database — Prisma legacy schema
+# Database: Prisma legacy schema
 pnpm -C packages/db prisma:migrate
 pnpm -C packages/db prisma:generate
 pnpm -C packages/db prisma:studio
 
-# Indexer — production refresh (canonical entry point)
+# Indexer: production refresh (canonical entry point)
 pnpm -C apps/indexer job:refresh            # 72 → 71 → all steps
 
-# Indexer — bootstrap (run once per protocol before first refresh)
+# Indexer: bootstrap (run once per protocol before first refresh)
 pnpm -C apps/indexer tsx src/scripts/bootstrap/blend-upsert-core.ts
 pnpm -C apps/indexer tsx src/scripts/bootstrap/soroswap-upsert-core.ts
 pnpm -C apps/indexer tsx src/scripts/bootstrap/aquarius-upsert-core.ts
 
-# Indexer — legacy top-level (Prisma tables, not v1 pipeline)
+# Indexer: legacy top-level (Prisma tables, not v1 pipeline)
 pnpm -C apps/indexer run:once               # Prisma seed
 pnpm -C apps/indexer run:blend              # Prisma Blend snapshot
 pnpm -C apps/indexer run:horizon            # Prisma Horizon snapshot
@@ -357,7 +357,7 @@ pnpm -C apps/web build                      # also runs vue-tsc typecheck
 
 ---
 
-## Key entry points — quick reference
+## Key entry points: quick reference
 
 | Purpose | File |
 |---|---|
