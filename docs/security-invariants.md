@@ -305,8 +305,10 @@ funds — the §1 non-custodial boundary for anything a USER owns is untouched.
 - **INV-9.6** Brakes: 40-claim campaign budget, max 10 claims per rolling hour (a full drain
   takes ≥ 4h of sustained abuse), payouts auto-halt when treasury spendable < reward.
 - **INV-9.7** Public surfaces (`/v1/faucet/*`, `/v1/ops/metrics`) never expose the treasury
-  address or anything about the key beyond the spendable balance. Both faucet endpoints sit in
-  the Lot S strict nginx rate-limit zone.
+  address or anything about the key beyond the spendable balance. `POST /v1/faucet/claim` sits in
+  the Lot S strict nginx rate-limit zone; `GET /v1/faucet/eligibility` was moved to the general
+  zone (2026-08-17 incident — it is a polled read surface and the strict zone starved it; the
+  money-moving claim POST stays strict).
 
 Review check (every faucet-path PR): grep the diff for `FAUCET_SECRET_KEY` and `Keypair` —
 confined to `faucet-payout.service.ts`; confirm no new transaction shapes; confirm the red

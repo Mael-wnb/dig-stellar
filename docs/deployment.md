@@ -60,6 +60,11 @@ web app can read the 429 cross-origin).
 | `api_actions` | `location /v1/actions/` | 30 r/min | 10 | builds cost RPC simulation; observed 29 POSTs/2 days |
 | `api_mutations` | POST/PATCH/DELETE under `/v1/` (via `$request_method` map → empty key exempts reads) | 2 r/s | 20 | mutations are click-driven |
 
+Faucet locations (added at Lot R go-live, adjusted in the 2026-08-17 incident):
+`POST /v1/faucet/claim` sits in the strict `api_actions` zone; `GET /v1/faucet/eligibility`
+sits in the general zone — it is polled by the promo/claim surfaces and the strict zone
+starved it. `/v1/actions/witness` is covered by the existing `location /v1/actions/`.
+
 If the web app ever grows a legitimately chattier page, re-measure before raising
 values — limits come from observed traffic, not guesses.
 

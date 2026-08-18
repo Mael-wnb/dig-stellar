@@ -14,8 +14,8 @@ clarity over optimism — this file improves decision quality, not morale.
 ## Overall project state
 
 Dig Stellar is past prototype stage. It has a live beta frontend on real Mainnet data, a dedicated
-backend API serving as the product façade, an indexer ingesting four protocols across Horizon and
-Soroban on a 15-minute cron, real wallet connection, grouped multi-wallet behavior, DB-backed wallet
+backend API serving as the product façade, an indexer ingesting five protocols across Horizon,
+Soroban and the DeFindex API on a 15-minute cron, real wallet connection, grouped multi-wallet behavior, DB-backed wallet
 balance refresh, and a non-custodial transaction builder with a **fully successful** SDEX swap proven
 on Testnet.
 
@@ -42,6 +42,13 @@ Three table families coexist in the same Postgres DB. This is the single most im
   Read by the `/v1/*` routes (`StellarController`).
 - **raw SQL v2 — wallet layer.** `user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions`
   (`stellar_v2_multiwallet.sql`). Read by `/v1/wallets/*` (`WalletsController`).
+- **raw SQL v3 — alerting.** `alert_rules`, `alert_rule_state`, `notifications`
+  (`stellar_v3_alerting.sql`; depends on v1 entities + v2 `user_wallets`). Written by the
+  `job:wallet-alert` OS-cron sweep; read by `/v1/alert-rules` + `/v1/notifications` (§7).
+- **raw SQL v4 — faucet (Lot R, money path).** `faucet_claims` (`stellar_v4_faucet.sql`; depends
+  on `action_witnesses` from `stellar_v1_action_witness.sql`, the Horizon-verified execution
+  ledger). Written/read only by `apps/api/src/modules/faucet/` — the ONLY module holding a
+  server-side key (`security-invariants.md` §9). See §8.
 - **Prisma models — legacy / parallel.** `Protocol`, `Venue`, `Snapshot`. Written by
   `run:blend` / `run:horizon` / `run:once`; read only by the prefix-less `/protocols`, `/venues`,
   `/venues/:key/snapshots` routes (`AppController`). Not part of the product pipeline. Elsewhere the
@@ -204,8 +211,25 @@ response adds `coverageSince` (first measurable event day) so the UI dates the w
 effect: Blend + amount-less pools hide the section; pools un-hide organically as measurable liquidity
 events arrive (§3).
 
-Partial / weak: health/operational endpoints incomplete; freshness not yet exposed systematically
-across routes. On `/v1/network/stats`: two fields (`activeWallets`, `dexVolume24hUsd`) come back `null`
+**Canonical network TVL (2026-08-17 founder ruling — `docs/decisions/2026-08-17-network-tvl-definition.md`).**
+The DefiLlama chain-TVL source is dropped entirely: `/v1/network/stats.stellarTvlUsd` is now copied
+(by indexer step 73) from the latest `network_tvl_snapshots` point — the same snapshot the hero and
+the chart read via `GET /v1/network/tvl-series`, so the two surfaces can never disagree. Definition:
+Σ over `pool_metrics_latest` for active tracked venues, lending counted GROSS (total supplied),
+DeFindex EXCLUDED (its vault funds sit inside Blend pools). Each point carries `tvlNetUsd`
+(supplied − borrowed); at implementation: gross **$230.06M** / net **$186.49M**. History is never
+rewritten — the definitional step-down (~$249M → ~$230M) is marked by `meta.methodologyChangeAt`
+(2026-08-17T18:02Z) and a dashed guide + footnote on the chart. Hero labels: "Total value tracked"
++ a "Net TVL (supplied − borrowed)" secondary line.
+
+**Execution witness + reward faucet (Lot R, 2026-08-17 — live in prod).**
+`POST /v1/actions/witness` verifies an executed tx hash server-side against Horizon (never
+trusting the client) and records it in `action_witnesses` — see §8. `/v1/faucet/eligibility` +
+`/v1/faucet/claim` (module `modules/faucet/`) implement the one-time 5 XLM reward — see §8.
+`/v1/ops/metrics` gained a `faucet` drain-visibility block (claim counts, remaining, treasury
+spendable — never the treasury address).
+
+Partial / weak: on `/v1/network/stats`: two fields (`activeWallets`, `dexVolume24hUsd`) come back `null`
 because the stellar.expert summary endpoint returns 404 — a pre-existing source issue (already null in
 the old live-fetch code), not a regression; minor debt.
 
@@ -224,11 +248,14 @@ two missing fields; (3) return a clean 400 instead of 500 when an action body is
 Working: Horizon + Soroban ingestion; protocol adapters in `lib/protocols/`; canonical refresh chain
 `job:refresh` → 72 → 71 → per-protocol steps; persistence of asset prices, pool/reserve snapshots,
 pool + protocol metrics (now including stellar-native in the protocol-level aggregation); wallet
-balance snapshot generation; runs on a 15-minute cron on the VPS. **G0 (Lot G)** appends one
-`network_tvl_snapshots` row at the tail of step 7 (`70-protocol-persist-metrics.ts`): `sum(
-protocol_metrics_latest.tvl_usd)` + protocol count, `as_of` truncated to the minute and upserted
-(idempotent per run) — one network-TVL history point per refresh cycle, read by `/v1/network/tvl-series`
-(§2). Additive raw-SQL migration `stellar_v1_network_tvl.sql`; Prisma untouched. **H4 (Lot H)**: the
+balance snapshot generation; runs on a 15-minute cron on the VPS. **G0 (Lot G, redefined
+2026-08-17)** appends one `network_tvl_snapshots` row at the tail of step 7
+(`70-protocol-persist-metrics.ts`), `as_of` truncated to the minute and upserted (idempotent per
+run) — one network-TVL history point per refresh cycle, read by `/v1/network/tvl-series` (§2).
+Since the 2026-08-17 canonical-TVL ruling the row is computed from `pool_metrics_latest` over
+active entities of tracked venues (lending GROSS, DeFindex excluded) and carries `tvl_net_usd`
+(supplied − borrowed); step 73 copies the same figure into `network_stats_latest` (DefiLlama
+dropped). Additive raw-SQL migration `stellar_v1_network_tvl.sql`; Prisma untouched. **H4 (Lot H)**: the
 Aquarius and Soroswap event normalizers now extract liquidity add/remove amounts into
 `normalized_events` — Aquarius `deposit_liquidity`/`withdraw_liquidity` (shape probe-verified against
 live mainnet events: `value = [amount0, amount1, lp_shares]`, single-sided deposits keep an honest 0
@@ -337,11 +364,15 @@ cross-check vs mainnet.blend.capital is matched — **T2-D1 is complete** (v2 sc
 
 | Protocol | Source | Pools | TVL (verified) | State |
 |---|---|---:|---|---|
-| Blend | Soroban RPC | 4 | ≈ $166M | operational (fixed, orbit, etherfuse, yieldblox; Forex excluded — frozen oracle) |
-| Aquarius | Soroban RPC | 21 | ≈ $41M | operational — **perimeter widened Aug 16 (Lot P)**, incl. 6 concentrated pools |
-| Stellar native DEX | Horizon | 9 | ≈ $6.2M | operational (now aggregated at protocol level) |
+| Blend | Soroban RPC | 4 | ≈ $181M gross / $138M net | operational (fixed, orbit, etherfuse, yieldblox; Forex excluded — frozen oracle) |
+| Aquarius | Soroban RPC | 21 | ≈ $42M | operational — **perimeter widened Aug 16 (Lot P)**, incl. 6 concentrated pools |
+| Stellar native DEX | Horizon | 60 | ≈ $5.4M | operational (now aggregated at protocol level) |
 | Soroswap | Soroban RPC | 4 active | ≈ $1.18M | operational — **+2 pairs Aug 16 (Lot P)**; native/EURC pair revived on-chain and re-enabled |
-| DeFindex | DeFindex API (SDK) | 3 vaults | ≈ $18.8M | operational — **live in prod since Aug 4** (T3-D1) |
+| DeFindex | DeFindex API (SDK) | 3 vaults | ≈ $19.3M | operational — **live in prod since Aug 4** (T3-D1); **excluded from the canonical network-TVL sum** (2026-08-17 ruling — vault funds sit inside Blend pools) |
+
+(TVL column refreshed 2026-08-17 from the canonical-TVL validation itemization —
+`docs/decisions/2026-08-17-network-tvl-definition.md`; network sum: gross $230.1M / net $186.5M
+over the 4 tracked venues.)
 | Wallet balances | Horizon + Stellar RPC | — | — | operational |
 
 **AMM perimeter widened (Aug 16, 2026 — Lot P, local validation done; VPS seed pending).** 19 pools
@@ -435,6 +466,17 @@ stream from the architecture doc:
 This matches the verbatim criterion (rules evaluated against the snapshot DB → in-app notifications).
 Deploy is done (schema + cron live on the VPS, real `alert_fired` rows in prod) and the delivery is
 captured in the ~5-min submission demo video — T2-D2 is complete.
+
+**Lot N (2026-08-16) — alerting expanded to 5 evaluated families** (supersedes the
+"one evaluated family" gating described above; beyond the submitted T2-D2 criteria — product
+deepening, not claim scope): wallet health-factor, **asset price** (above/below USD threshold on
+priced assets), **pool TVL-drop**, **pool supply/borrow APY** (lending pools only, per-target
+gated), plus an **automatic pool-status protection** — all as evaluator functions inside the
+UNCHANGED OS-cron sweep (82→81→83; no broker, in-app only). Honesty rules: the modal offers a
+family IFF its evaluator actually runs (still "soon": utilization, netflow, wallet
+balance/exposure, protocol-scope metrics); notification copy carries the observed value + its
+`as_of`; stale snapshots are skipped with a warning, never evaluated; the modal states the sweep
+cadence. Evidence: `docs/evidence/lot-n/`.
 
 ---
 
@@ -582,8 +624,43 @@ at status > 3, withdraw NEVER status-blocked); the card disables Supply with hon
 status badge on non-Active pools and auto-selects Withdraw; known Blend error codes map
 client-side to one-line messages (`lib/blendContractErrors.ts`, #1206 → governance copy), unmapped
 codes render "code #NNNN" with the raw diagnostics behind a collapsible details (the API payload
-keeps the raw error verbatim). Local-proven (api build + 42 tests, web build); **VPS deploy of the
-A5/A5b code pending.**
+keeps the raw error verbatim). Local-proven at the time (api build + 42 tests, web build); **the
+A5/A5b code reached prod with the Lot R deploy (2026-08-17)** — the full evidenced action stack
+is now the prod flow.
+
+**Execution witness (Lot R — R1, 2026-08-17, live in prod).** `POST /v1/actions/witness
+{txHash, network?, userId?}` verifies an executed tx entirely against Horizon: tx successful, the
+source is a tracked wallet, a qualifying op sourced by that wallet (path payment / manage_buy_offer
+→ `sdex-swap`; SAC transfer wallet → registry Blend pool → `blend-deposit`; pool → wallet →
+`blend-withdraw`), a **mandatory link to a recorded Dig build** (`action_events` within
+[-60, +5] min of close time — an executed tx with no recorded build did not come through Dig), and
+an XLM-equivalent min-notional at verification-time prices (threshold stored on the row).
+Successful verifications land in **`action_witnesses`** (tx-hash PK, idempotent; failures never
+stored) — **the automatic T3-D2 executed-tx KPI ledger, replacing the manual hash list**.
+Blend-withdraws are witnessed for the ledger but are never faucet-qualifying. The web widgets
+fire-and-forget the hash after submit (never blocking the action flow). `action_events` gained a
+`metadata jsonb` column populated at build time (historical rows stay NULL — no backfill).
+Evidence: `docs/evidence/lot-r/r1-witness.md`.
+
+**Reward faucet (Lot R — R2–R4, 2026-08-17, LIVE on mainnet — a money path).** One-time 5 XLM
+reward per wallet AND per user (ever, DB-enforced, global across networks) after a verified
+qualifying action ≥ 1 XLM notional. `GET /v1/faucet/eligibility` (advisory; wallet-less form =
+the campaign poll) + `POST /v1/faucet/claim` (re-runs the FULL check server-side, strictly serial,
+never auto-retries a failed payout). The treasury secret is the FIRST and ONLY server-side key —
+isolated in `faucet-payout.service.ts`, which can express exactly ONE tx shape (single native
+payment, memo `dig-reward`); see `security-invariants.md` §9. Brakes: 40-claim budget, 10/h
+velocity, auto-halt when treasury spendable < reward; drain visibility via the `faucet` block on
+`/v1/ops/metrics`. Deploys dark (`FAUCET_ENABLED` unset). Full loop proven on live testnet (real
+payout `8cb9a86b…`, red tests on-chain — `docs/evidence/lot-r/r4-testnet-e2e.md`). Promo surfaces
+(R3/R3b): campaign card with Swap/Supply CTAs opening the real ActionModal, live `remaining/max`
+progress, server-enforced countdown (`FAUCET_ENDS_AT` → `campaign-ended`). **Campaign live:
+started 2026-08-17 ~16:45 UTC, 48h; 15/40 claims paid (75 XLM) in the first ~12h; 17 witnessed
+mainnet txs by 16 wallets as of 2026-08-18 09:15 UTC.** KPI framing rule: these figures
+accumulated under an incentive campaign — say so in any claim. Post-deploy prod incident
+(2026-08-17, fixed same day): a missing `action_events.metadata` column (aborted pull) silently
+killed build inserts → witnesses honestly failed `no-matching-build`; and a Vue `v-else` chain
+break (promo note inserted mid-chain) hid the Blend supply form whenever a campaign was live —
+`docs/evidence/lot-r/incident-2026-08-17-prod.md`.
 
 ---
 
@@ -594,11 +671,28 @@ A5/A5b code pending.**
 (`stellar-api.getdig.ai`, `/health` ok), `apps/indexer` on a 15-min cron with `flock` guarding against
 overlap. Local dev works (`docker compose` → Postgres 16 + Redis 7).
 
-Incomplete: deployment is still manual (git pull + build + PM2 restart on the VPS; Vercel auto-deploys
-the front); no CI/CD; mature observability (RPC latency/error metrics) not in place; no exposed
-deployed-commit SHA to prove VPS/Vercel version alignment. Runbooks are maintained.
+**Edge / security posture (Lot S, 2026-08-17 — deployed).** The S0 recon found the API listening
+publicly on `*:3000` with ufw inactive (any nginx-layer control was bypassable). Now: the API
+binds **`127.0.0.1:3000`** (nginx is the only public path), ufw default-deny incoming (allow
+22/80/443), IP-direct probes hit a `return 444` vhost. **Measured** nginx `limit_req` zones —
+values from observed traffic, not guesses (general 10 r/s burst 60; `POST /v1/actions/*` 30 r/min
+burst 10; mutations 2 r/s burst 20), JSON 429 + `Retry-After`; post-incident exception: the polled
+`GET /v1/faucet/eligibility` sits in the general zone while `POST /v1/faucet/claim` stays strict.
+Security headers (HSTS, nosniff, X-Frame-Options DENY, no-referrer), `server_tokens off`, 100k
+body cap. The API is **pm2-supervised with boot persistence** (`pm2-root` systemd unit enabled +
+fresh `pm2 save` dump; reboot simulated via `pm2 kill && pm2 resurrect` — API back healthy). The
+beta userId-as-bearer access model is documented honestly in `security-invariants.md` §7 —
+rate-limited, not solved; real auth is post-beta. Config reproducible from `docs/deployment.md`;
+evidence: `docs/evidence/lot-s/`.
 
-Near-term: this shape is fine for the beta and the Tranche 2 claim. CI/CD and observability are T3.
+Incomplete: deployment is still manual (git pull + build + PM2 restart on the VPS; Vercel
+auto-deploys the front); no CI/CD pipeline on the VPS path — the 2026-08-17 incident (an aborted
+pull skipped a SQL file, silently killing build-event inserts until re-applied) is exactly the
+failure mode manual deploys invite. The deployed commit SHA is now exposed (`/health` `version`,
+GIT_SHA — Lot E). Runbooks are maintained.
+
+Near-term: this shape is fine for the beta. CI/CD hardening of the deploy path is the remaining
+T3-D3 ops item.
 
 ---
 
@@ -619,9 +713,9 @@ Near-term: this shape is fine for the beta and the Tranche 2 claim. CI/CD and ob
 2. Deployment maturity / CI-CD (T3) — *narrowed 2026-08-13 by Lot E E4: proven fresh-clone
    quickstart (`docs/reference-deployment.md`), `.env.example` per app, committed core-registry
    bootstrap, minimal CI workflow; VPS deploy discipline remains manual (documented)*
-3. Transaction builder: mainnet execution is now evidenced end-to-end (swaps + Blend
-   supply/withdraw, `docs/evidence/t3-d2-mainnet-actions.md`) — remaining fragility is
-   deployment, not capability: the A5/A5b code is local-proven, VPS deploy pending
+3. T3-D2 KPI gap: 17 witnessed executed txs vs the 200 target (2026-08-18) — the witness ledger
+   counts automatically and the incentive campaign drives real executions, but post-campaign
+   organic adoption is unproven (the action stack itself is deployed and evidenced end-to-end)
 
 ## 12. Closest tranche-relevant wins
 1. SCF Tranche 3 (30%) submission — the T2 group (portfolio/active-signer, live alerting, live bridge)
@@ -632,8 +726,10 @@ Near-term: this shape is fine for the beta and the Tranche 2 claim. CI/CD and ob
 ---
 
 ## 13. Current execution priorities (updated 2026-08-04 — internal T3 target: Aug 15)
-1. **T3-D2 KPI push** — mainnet swaps are live; 50+ wallets / 200+ txs accumulate only while the
-   window is open. Distribution (Stellar/SCF channels, communities) is scheduled work.
+1. **T3-D2 KPI push** — the 5 XLM witness-gated reward campaign is LIVE (started 2026-08-17
+   ~16:45 UTC, 48h): 15/40 claims paid + 17 witnessed executed txs in the first ~12h.
+   `action_witnesses` accumulates the 200-tx evidence automatically; distribution must continue
+   after the campaign, and every claim states the incentive context.
 2. ~~Lot A2 — Blend deposit on Mainnet~~ **DONE and exceeded (Aug 14)**: multi-pool mainnet
    supplies + the withdraw closing the loop, all Horizon-verified
    (`docs/evidence/t3-d2-mainnet-actions.md`); VPS deploy of the A5/A5b code pending

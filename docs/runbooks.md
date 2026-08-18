@@ -529,7 +529,10 @@ The faucet pays 5 XLM from a DIG-owned hot wallet after a verified qualifying ac
    optional `FAUCET_REWARD_XLM` / `FAUCET_MAX_CLAIMS` / `FAUCET_HOURLY_CLAIM_CAP` /
    `FAUCET_MIN_NOTIONAL_XLM`. Leave `FAUCET_ENABLED` unset until go-live.
 4. Apply `stellar_v1_action_witness.sql` + `stellar_v4_faucet.sql` (see "Apply raw SQL schemas").
-5. nginx: add `/v1/actions/witness` and `/v1/faucet/` to the Lot S strict rate-limit zone.
+5. nginx: `/v1/actions/witness` is already covered by the strict `location /v1/actions/` zone;
+   put `POST /v1/faucet/claim` in the strict zone but keep `GET /v1/faucet/eligibility` in the
+   general zone — it is polled by the promo surfaces and the strict zone starves it (learned in
+   the 2026-08-17 incident; see `docs/deployment.md` zones).
 
 ### Go-live sequence (mainnet)
 

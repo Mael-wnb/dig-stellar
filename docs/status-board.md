@@ -53,8 +53,9 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   feed (≈½ market price; predated Lot P) — ruled + fixed same day (manual rule $0.069, vetted vs
   pool-implied + Aqua oracle, confidence: low; robust Aquarius-derived fix on the fast-follow
   list). Evidence: `docs/evidence/lot-p/`.
-- Closest tranche-critical targets: T3-D2 KPIs (adoption — distribution push starts now; the
-  execution evidence itself is now complete), T3-D3 (**Lot C design-handoff port DONE** —
+- Closest tranche-critical targets: T3-D2 KPIs (adoption — the 5 XLM witness-gated reward
+  campaign is LIVE since Aug 17 and `action_witnesses` counts executions automatically; the
+  execution evidence itself is complete), T3-D3 (**Lot C design-handoff port DONE** —
   shell + 5 views + modals on real data, `/v1/pools/:slug/flows` + `/series` added; observability +
   reference packaging still open).
 - Biggest current risk: **the T3-D2 KPIs** — they cannot be built, only accumulated; every day of
@@ -226,7 +227,78 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   2026-08-13. Separate PRE-EXISTING discrepancy flagged, not fixed: YieldBlox is +63.8% vs the
   Blend SDK (exotic-asset pricing in `asset_prices`, not dead reserves) — its own lot. Evidence:
   `docs/evidence/dead-reserves-2026-08-14.md`.
-- Last updated: 2026-08-14
+- T2-D2 addendum (2026-08-16, Lot N): **alerting expanded to 5 evaluated families** — wallet
+  health-factor (the submitted T2-D2 family), asset price, pool TVL-drop, pool supply/borrow APY,
+  plus an automatic pool-status protection — all inside the UNCHANGED OS-cron sweep (82→81→83,
+  no broker, in-app only). Honesty rules held: the modal only offers families whose evaluator
+  actually runs, notification copy carries the observed value + its `as_of`, stale snapshots are
+  skipped with a warning instead of evaluated. Beyond the already-submitted T2-D2 criteria —
+  product deepening, not claim scope. Evidence: `docs/evidence/lot-n/`.
+- T3-D3 note (2026-08-16, Lot Q): visual-polish pass — Q1 circular asset logos vs square app
+  tiles (`BrandLogo` `variant` prop, swept call sites), Q2 residual "native"→XLM naming purge,
+  Q3 single-frame venue tiles, Q4 protocol cards Type + assets line, Q5 the pools-table
+  "24h swaps" column fixed (pre-existing gap — the API never returned `swaps24h`; now a grouped
+  `normalized_events` scan + the stellar-native Horizon-derived count). Evidence:
+  `docs/evidence/lot-q/`.
+- Ops note (2026-08-17, Lot S): **API edge hardened — DEPLOYED live on the VPS.** S0 recon found
+  the critical gap: Nest listened on `*:3000` with ufw inactive (nginx bypassable). Now: API binds
+  **`127.0.0.1:3000`**, ufw default-deny (allow 22/80/443), IP-direct probes get `return 444`.
+  **Measured** nginx `limit_req` zones (from observed traffic, not guesses): general 10 r/s
+  burst 60, `POST /v1/actions/*` 30 r/min burst 10, mutations 2 r/s burst 20 — JSON 429 +
+  `Retry-After`, proven by curl bursts while normal app navigation stays clean. Security headers
+  (HSTS, nosniff, DENY, no-referrer), `server_tokens off`, 100k body cap. Follow-up same day:
+  **pm2 boot persistence** — the "unsupervised nohup" diagnosis was WRONG (pm2 supervised the API
+  since Jun 19); the real gaps were no `pm2-root` systemd unit + a stale Jun-19 dump, both closed
+  (reboot simulated via `pm2 kill && pm2 resurrect`, API back healthy). The beta userId-as-bearer
+  model is documented honestly in `security-invariants.md` §7 (rate-limited, not solved — post-beta).
+  Config is reproducible from `docs/deployment.md`; evidence: `docs/evidence/lot-s/`.
+- T3-D2 note (2026-08-17, Lot R): **on-chain execution witness + 5 XLM reward faucet — LIVE on
+  mainnet.** R1: `POST /v1/actions/witness` verifies executed txs against Horizon (known wallet,
+  qualifying op, mandatory link to a recorded Dig build within [-60,+5] min, ≥1 XLM notional at
+  verification-time prices) into `action_witnesses` — **the automatic T3-D2 executed-tx KPI
+  ledger, replacing the manual hash list** (blend-withdraws witnessed too, never
+  faucet-qualifying). R2: claims backend (`faucet_claims`, money path per
+  `security-invariants.md` §9 — the ONLY server-side key, isolated in `faucet-payout.service.ts`,
+  one tx shape; one claim per wallet AND per user ever, DB-enforced; 40-claim budget, 10/h
+  velocity, auto-halt below reward; dark by default). R3/R3b: campaign card with Swap/Supply CTAs,
+  live `remaining/max` progress + server-enforced countdown (`FAUCET_ENDS_AT`). R4: full loop
+  proven on live testnet (real payout `8cb9a86b…`, memo `dig-reward`, red tests on-chain).
+  **Campaign started 2026-08-17 ~16:45 UTC, 48h (ends 2026-08-19 16:45 UTC): 15 claims paid in
+  the first ~12h.** Evidence: `docs/evidence/lot-r/`.
+- Data note (2026-08-17): **canonical network-TVL definition (founder ruling,
+  `docs/decisions/2026-08-17-network-tvl-definition.md`).** Network TVL = our data only — Σ over
+  `pool_metrics_latest` for active tracked venues, lending counted GROSS (total supplied),
+  **DeFindex excluded** (its vault funds sit inside Blend pools — double-count); the DefiLlama
+  chain-TVL source is dropped entirely (`/v1/network/stats` now copies the same snapshot). Hero
+  reads the latest `network_tvl_snapshots` point = the chart's last point (can never disagree),
+  labeled **"Total value tracked"** with an honest **"Net TVL (supplied − borrowed)"** secondary
+  line. At implementation: gross **$230.06M** / net **$186.49M**. History NOT rewritten — the
+  definitional step-down (~$249M → ~$230M) is marked by `meta.methodologyChangeAt`
+  (2026-08-17T18:02Z) + a dashed guide/footnote on the chart.
+- Incident (2026-08-17, prod — diagnosed and fixed same day): after the Lot R deploy, (1) the
+  `action_events.metadata` column was missing (an aborted pull skipped that SQL file) → every
+  build insert failed silently → witnesses honestly returned `no-matching-build`; founder
+  re-applied `stellar_v1_ops_metrics.sql`. One founder swap is permanently unwitnessable (its
+  build event was lost) — redone fresh, no backfill invention. (2) A Vue `v-else` chain break:
+  the R3 promo note inserted between the Blend card's `v-if`/`v-else-if` made the whole supply
+  form unreachable whenever a campaign was live — fixed (R3c: promo moved inside the form's
+  branch; claim-panel instances moved inside their state blocks), plus claim-panel honesty
+  (witness reasons surfaced, `no-store` on the polled eligibility, 429 backoff). Ops side:
+  `GET /v1/faucet/eligibility` moved to the general nginx zone (claim POST stays strict).
+  Incident note: `docs/evidence/lot-r/incident-2026-08-17-prod.md`.
+- **KPI position (2026-08-18 ~09:15 UTC — real prod numbers, from `action_witnesses` +
+  `faucet_claims` + `/v1/ops/adoption`).** Executed-tx ledger: **17 witnessed mainnet txs** (all
+  sdex-swap, all ≥ 1 XLM notional; 16 distinct wallets, 15 distinct users; first witness
+  2026-08-17 16:40 UTC), plus the 6 manually evidenced Aug-14 txs — **vs the 200-tx target this
+  is ~a tenth, honestly far**. Faucet: 15/40 claims paid (75 XLM out), 0 failed, treasury
+  ~125.5 XLM spendable. Adoption: **65 tracked wallets** (43 signers / 22 watch-only), 48
+  distinct users, 35 distinct acting addresses; 276 builds total (last 24h: 103 mainnet
+  swap-builds + 108 quotes) — builds ≠ executions. The 50-wallet KPI is arguably met on tracked
+  wallets (65) but only 16 wallets have a witnessed execution. **Context stated explicitly:
+  these numbers accumulated during the 5 XLM incentive campaign** (one claim per wallet/user,
+  1 XLM min notional, 40-claim budget, 10/h velocity cap) — the grant narrative must say so
+  (see the KPI-integrity note in `docs/evidence/lot-r/r4-testnet-e2e.md`).
+- Last updated: 2026-08-18
 
 ---
 
@@ -261,7 +333,7 @@ T1-D3 criteria.
 | Deliverable | Status | Completion | Confidence | Current evidence | Main remaining gap | Next action |
 |---|---|---:|---|---|---|---|
 | D1 — Mainnet Deployment & Freshness Tracking | Done in prod | 95% | High | **Both criteria met, deployed to prod Aug 4 (Lot B).** (1) All 5 named protocols live on real Mainnet data — **DeFindex integrated into the v1 pipeline** (venue + 3 vaults enumerated from `GET /vault/discover`: Meru ≈$18.1M, Beans USDC ≈$507k, Beans EURC ≈$200k; ≈$18.8M aggregate, avg APY ≈7.1%; `protocolCount = 5`; yield-vault detail variant in the UI). (2) Freshness first-class: `isStale` + `staleAfterSeconds` on every `/v1/*` payload (read-time, threshold 45 min = 3× cron), FreshnessChip + stale badges in the UI, standardized exponential-backoff retries on every refresh step. Evidence in `docs/evidence/lot-b/`. Full prod `job:refresh` clean in ~3 min | **Demo capture** for the claim (only non-build item) | Capture the T3-D1 demo (5 protocols + stale drill) |
-| D2 — Non-Custodial Mainnet Actions | Substantially done — swaps + lending evidenced on mainnet | 80% | Medium | **Both action families executed and Horizon-verified on Pubnet.** Swaps LIVE from the dashboard (ungated Aug 2; both directions incl. `eeeae199…`; Aug 14: 50 XLM→7.97 USDC + 10 XLM→1.38 EURC). **Blend lending: multi-pool supplies (5 XLM→Fixed, 5 XLM + 5 USDC→YieldBlox) AND the withdraw closing the supply↔withdraw loop (`537a2303…`, the exact supplied position back)** — six txs, all XDR-decoded, congestion-fee bid confirmed against reality (10,000-stroop inclusion bid, ~46–59% of ceiling charged). Honest refusal path proven: frozen Orbit supply dies at SIMULATION (#1206, nothing signed). Security regime verified in prod: kill-switch (403 default), 100 XLM cap, issuer-verified 5-pair whitelist, client-side pre-sign XDR validation (fail closed), in-wallet signing only. Evidence: `docs/evidence/t3-d2-mainnet-actions.md` + `mainnet-ungating-2026-08-02.md` + `pair-vetting-2026-08-01.md` + `lot-a5-blend-multipool.md` | **KPIs** (50+ wallets / 200+ txs — window open, needs distribution; the only open criterion) + VPS deploy of the A5/A5b code | KPI push now; deploy A5/A5b to the VPS |
+| D2 — Non-Custodial Mainnet Actions | Substantially done — swaps + lending evidenced on mainnet | 80% | Medium | **Both action families executed and Horizon-verified on Pubnet.** Swaps LIVE from the dashboard (ungated Aug 2; both directions incl. `eeeae199…`; Aug 14: 50 XLM→7.97 USDC + 10 XLM→1.38 EURC). **Blend lending: multi-pool supplies (5 XLM→Fixed, 5 XLM + 5 USDC→YieldBlox) AND the withdraw closing the supply↔withdraw loop (`537a2303…`, the exact supplied position back)** — six txs, all XDR-decoded, congestion-fee bid confirmed against reality (10,000-stroop inclusion bid, ~46–59% of ceiling charged). Honest refusal path proven: frozen Orbit supply dies at SIMULATION (#1206, nothing signed). Security regime verified in prod: kill-switch (403 default), 100 XLM cap, issuer-verified 5-pair whitelist, client-side pre-sign XDR validation (fail closed), in-wallet signing only. Evidence: `docs/evidence/t3-d2-mainnet-actions.md` + `mainnet-ungating-2026-08-02.md` + `pair-vetting-2026-08-01.md` + `lot-a5-blend-multipool.md`. **Since Aug 17 (Lot R): the full action stack is deployed to prod, `action_witnesses` is the automatic executed-tx KPI ledger, and the 5 XLM reward campaign is live** (48h, ends Aug 19 16:45 UTC) | **KPIs** (50+ wallets / 200+ txs) — the only open criterion. Real position 2026-08-18: 17 witnessed txs / 16 wallets with executions (65 tracked wallets, 48 users) — accumulated under the incentive campaign; the 200-tx bar is honestly far | Ride the campaign window; keep distribution going after it ends; state the incentive context in the claim |
 | D3 — Observability, UI/UX Polish & Reference Handoff | In progress | 45% | Medium | **UI/UX-polish component substantially landed** across Lots C/F/G/H (design-handoff port → shell + 5 views + modals; advisor-feedback F1–F5; founder-review G0–G4: TVL history + chain logos + clickable tx hashes + adaptive pools table + hero dedupe/compact actions + network-TVL hero chart; founder-review-2 H0–H4: modal teleport fix, dashboard "Your positions" panel, Uniswap-standard swap reskin, measurable flows coverage + Aquarius/Soroswap liquidity-amount extraction — **H deploy pending**) — all green (web build + 49 tests + api build), captures in `docs/evidence/lot-{c,f,g,h}/`. Plus `docker-compose.yml` local-dev stack, `/health` liveness, modular architecture, grown docs corpus | Real RPC latency/error metrics + CI/CD (still manual VPS deploy); packaged SDF reference implementation; final report w/ adoption metrics (depends on T3-D2 KPIs) | Deploy Lot H (build + PM2 restart + Aquarius event backfill), then observability (RPC latency/error metrics) + CI/CD, then reference packaging |
 
 ---
@@ -276,16 +348,20 @@ T1-D3 criteria.
 7. Evidence discipline: `docs/security-invariants.md` + `docs/evidence/` corpus, claim-ready
 
 ## Weakest areas right now
-1. **T3-D2 KPIs** — adoption can't be built, only accumulated; distribution push not yet started
-2. Observability beyond freshness (RPC latency/error metrics) + CI/CD (still manual VPS deploy) — T3-D3
-3. A5/A5b (multi-pool actions + pool-status/friendly-errors) local-proven but not yet deployed to the VPS
-4. UI polish debt: sidebar redesign pending; responsive + loading/error consistency partial
+1. **T3-D2 KPIs** — 17 witnessed txs vs the 200 target (2026-08-18); the incentive campaign
+   drives real executions but the gap stays large, and post-campaign organic adoption is unproven
+2. CI/CD: VPS deploy is still manual — the 2026-08-17 incident (aborted pull skipping a SQL file)
+   is exactly the failure mode this invites
+3. Observability boundary: `/v1/ops/adoption`'s boundary copy still cites the manual hash list as
+   the executed-tx evidence — superseded by `action_witnesses` (minor string fix at next deploy)
+4. UI polish debt: responsive + loading/error consistency partial
 
 ## Best near-term tranche wins
 1. T3-D1 demo capture → claim-ready (everything else already live in prod)
-2. KPI distribution push — swaps AND lending are live+evidenced; every announcement day counts toward 50/200
-3. Deploy A5/A5b to the VPS → the whole evidenced T3-D2 flow becomes the prod flow
-4. Sidebar redesign + metrics endpoints → T3-D3 momentum before the final report
+2. KPI accumulation — the witness ledger now counts executions automatically; every campaign
+   claim and post-campaign organic action lands in `action_witnesses`
+3. Final report assembly: adoption metrics (with the incentive-campaign context stated) +
+   reference packaging are the remaining T3-D3 items
 
 ---
 
