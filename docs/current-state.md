@@ -662,6 +662,23 @@ killed build inserts → witnesses honestly failed `no-matching-build`; and a Vu
 break (promo note inserted mid-chain) hid the Blend supply form whenever a campaign was live —
 `docs/evidence/lot-r/incident-2026-08-17-prod.md`.
 
+**Reward campaign 2 (Lot R2, 2026-08-18 — built + testnet-proven, deploy/activation pending).**
+One change vs campaign 1: rewards are **per action family** — first verified swap AND first
+verified Blend supply each earn 5 XLM, max 2 claims per wallet, 60-claim budget. Schema
+`stellar_v5_faucet_campaign2.sql` adds `campaign` + `action_family` to `faucet_claims`
+(campaign-1 rows preserved and relabeled from their witness kinds) and moves uniqueness to
+(wallet|user, family, campaign); the per-witness unique index is unchanged, so every claim
+still consumes a distinct executed tx. New env `FAUCET_STARTS_AT` (fail-closed — unset =
+`campaign-not-started`, nothing promises or pays): only witnesses whose tx **executed**
+(`ledger_closed_at`) inside the window qualify, so a campaign-1 wallet claims again only via a
+new on-chain execution. Eligibility is per-family end-to-end (`wallet.families.{swap,blend-supply}`
+in `GET /v1/faucet/eligibility`; `POST /v1/faucet/claim` takes `family`); promo card advertises
+"up to 10 XLM"; claim panel is family-scoped with a cross-family hint. `/v1/ops/metrics` faucet
+block is campaign-scoped with an `allTime` sub-block. All Lot R brakes and §9 isolation
+untouched. Full testnet loop proven (per-family double claim on one wallet, same-family
+re-claims refused, campaign-1-wallet both directions, velocity + auto-halt live, fail-closed
+misconfig): `docs/evidence/lot-r2/testnet-e2e.md`.
+
 ---
 
 ## 9. Deployment / operations

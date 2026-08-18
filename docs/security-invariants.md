@@ -286,9 +286,10 @@ This is the FIRST time a funded secret key lives server-side. It changes nothing
 funds — the §1 non-custodial boundary for anything a USER owns is untouched.
 
 - **INV-9.1** The treasury is **DIG's own money, never the user's**. A dedicated fresh keypair,
-  funded manually with **200 XLM — the hard exposure cap**. Worst case if everything fails, the
-  hot wallet drains: bounded, accepted, and the only reason this is beta-shippable. Never fund
-  beyond the cap; refills are manual and deliberate.
+  funded manually with **the campaign budget and no more — the hard exposure cap** (200 XLM in
+  campaign 1; 302 XLM for campaign 2's 60 × 5 XLM + fees, Lot R2). Worst case if everything
+  fails, the hot wallet drains: bounded, accepted, and the only reason this is beta-shippable.
+  Never fund beyond the current campaign's cap; refills are manual and deliberate.
 - **INV-9.2** `FAUCET_SECRET_KEY` exists ONLY in the VPS env — never committed, never logged,
   never in an error message or API payload, never in chat. The keypair is generated locally by
   the founder.
@@ -301,9 +302,16 @@ funds — the §1 non-custodial boundary for anything a USER owns is untouched.
   founder flips it. While dark, the treasury is never queried and no key state is observable.
 - **INV-9.5** Payment discipline: payouts are strictly serial; **a failed payout is NEVER
   auto-retried** (an ambiguous failure may still have paid) — the claim row blocks the
-  wallet/user until founder review. One claim per wallet AND per user, ever, DB-enforced.
-- **INV-9.6** Brakes: 40-claim campaign budget, max 10 claims per rolling hour (a full drain
-  takes ≥ 4h of sustained abuse), payouts auto-halt when treasury spendable < reward.
+  wallet/user until founder review. Claim uniqueness is DB-enforced per
+  **(wallet, action family, campaign)** AND per **(user, action family, campaign)** — since
+  campaign 2 (Lot R2, `stellar_v5_faucet_campaign2.sql`) a wallet can earn at most one reward
+  per family per campaign (campaign 1 was one per wallet ever). Every claim additionally
+  consumes a DISTINCT witnessed tx (unique per witness hash), and only witnesses whose tx
+  executed inside the campaign window (`FAUCET_STARTS_AT`, fail-closed when unset) qualify —
+  a past campaign's action can never be replayed for a new reward.
+- **INV-9.6** Brakes: campaign claim budget (`FAUCET_MAX_CLAIMS` — 40 in campaign 1, 60 in
+  campaign 2), max 10 claims per rolling hour (a full drain takes hours of sustained abuse),
+  payouts auto-halt when treasury spendable < reward.
 - **INV-9.7** Public surfaces (`/v1/faucet/*`, `/v1/ops/metrics`) never expose the treasury
   address or anything about the key beyond the spendable balance. `POST /v1/faucet/claim` sits in
   the Lot S strict nginx rate-limit zone; `GET /v1/faucet/eligibility` was moved to the general

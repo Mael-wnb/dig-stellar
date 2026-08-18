@@ -298,6 +298,23 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   these numbers accumulated during the 5 XLM incentive campaign** (one claim per wallet/user,
   1 XLM min notional, 40-claim budget, 10/h velocity cap) — the grant narrative must say so
   (see the KPI-integrity note in `docs/evidence/lot-r/r4-testnet-e2e.md`).
+- T3-D2 note (2026-08-18, Lot R2): **reward campaign 2 built + testnet-proven — per-FAMILY
+  first-action rewards.** One change vs campaign 1: first verified swap AND first verified Blend
+  supply each earn 5 XLM (max 2 claims/wallet), 60-claim budget (302 XLM founder top-up).
+  Everything else preserved (witness-gating, 10/h velocity, auto-halt, §9 isolation, dark
+  deploy). Schema `stellar_v5_faucet_campaign2.sql`: `campaign` + `action_family` on
+  `faucet_claims` (campaign-1 rows preserved as evidence), uniqueness now per
+  (wallet|user, family, campaign). New fail-closed `FAUCET_STARTS_AT`: only witnesses whose tx
+  EXECUTED inside the campaign window qualify — a campaign-1 wallet claims again only via a new
+  on-chain execution (both directions live-proven on testnet, incl. brakes + fail-closed
+  misconfig). Eligibility/claim are per-family end-to-end (API + promo card "up to 10 XLM" +
+  claim panel with cross-family hint); `/v1/ops/metrics` faucet block campaign-scoped with
+  `allTime` carry. Hitchhikers in the same change: `/v1/ops/adoption` boundary now cites the
+  `action_witnesses` ledger (manual-hash-list sentence was stale), and the dead stellar.expert
+  `network-activity/summary` call (upstream 404 — THE systematic 1-per-run `price-sources`
+  error) removed from step 73. api 125/125 tests, web build green. Evidence:
+  `docs/evidence/lot-r2/testnet-e2e.md`. **VPS deploy + activation founder-side (v5 SQL before
+  restart; set FAUCET_MAX_CLAIMS=60 + FAUCET_STARTS_AT + FAUCET_ENDS_AT at go-live).**
 - T3-D3 note (2026-08-18, Lot Z): **SDF Reference Implementation packaging DONE — the
   "functional Docker compose" criterion is met and proven from a clean clone.**
   `docker compose --profile app up -d --build` now runs the full stack: postgres (the ten

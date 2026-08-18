@@ -171,6 +171,7 @@ psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stella
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_ops_metrics.sql   # E2 (Lot E — T3-D3): rpc_metrics_runs + refresh_step_runs — written at end of each job:refresh; R1 adds action_events.metadata (re-run once)
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_action_witness.sql # R1 (Lot R — T3-D2): action_witnesses — verified execution witnesses (apply BEFORE deploying the R1 api)
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v4_faucet.sql   # R2 (Lot R — T3-D2): faucet_claims — money path, depends on action_witnesses; deploys dark (FAUCET_ENABLED unset)
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v5_faucet_campaign2.sql # Lot R2: campaign 2 — campaign/action_family columns + per-family uniqueness (apply BEFORE the campaign-2 api build)
 ```
 Manually-applied schemas (local AND VPS): `stellar_v1.sql`, `stellar_v1_metrics.sql`,
 `stellar_v1_bridge.sql` (Allbridge bridge flows — T2-D3), `stellar_v2_multiwallet.sql`,
@@ -534,10 +535,27 @@ The faucet pays 5 XLM from a DIG-owned hot wallet after a verified qualifying ac
    general zone — it is polled by the promo surfaces and the strict zone starves it (learned in
    the 2026-08-17 incident; see `docs/deployment.md` zones).
 
+### Campaign 2 (Lot R2) — per-family rewards
+
+Campaign 2 pays per action FAMILY: first verified swap AND first verified Blend supply each
+earn 5 XLM (max 2 claims per wallet), budget 60 claims. Evidence:
+`docs/evidence/lot-r2/testnet-e2e.md`.
+
+1. Apply `stellar_v5_faucet_campaign2.sql` BEFORE deploying/restarting the campaign-2 api
+   build (it relabels campaign-1 rows and swaps the unique indexes to per-(wallet, family,
+   campaign); idempotent).
+2. Fund the treasury with the campaign budget (302 XLM for 60 × 5 + fees) — founder-side.
+3. Activation env, all three together: `FAUCET_MAX_CLAIMS=60`, `FAUCET_STARTS_AT=<ISO now>`,
+   `FAUCET_ENDS_AT=<ISO now+48h>`, then `FAUCET_ENABLED=true` + pm2 restart.
+   `FAUCET_STARTS_AT` is REQUIRED and fail-closed: without it the campaign stays inactive
+   (`campaign-not-started`) — only witnesses whose tx executed at/after it qualify, so
+   campaign-1 actions can never be replayed for a campaign-2 reward.
+
 ### Go-live sequence (mainnet)
 
-1. **Clear testnet E2E claim rows first** — the one-claim-per-wallet/user unique indexes are
-   GLOBAL across networks: `delete from faucet_claims where network = 'testnet';`
+1. **Clear testnet E2E claim rows first** — the unique indexes (per wallet/user + family +
+   campaign since v5) are GLOBAL across networks:
+   `delete from faucet_claims where network = 'testnet';`
 2. Set `FAUCET_NETWORK=mainnet`, `FAUCET_ENABLED=true`, restart the api (pm2).
 3. Founder executes ONE real qualifying action + claim as the go-live proof; verify the payout
    hash and the `/v1/ops/metrics` faucet block.
