@@ -11,7 +11,12 @@
 // construction. 429s from the edge rate limiter back off with honest
 // "retrying" copy. Never blocks or delays the action flow it sits under.
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { claimFaucetReward, fetchFaucetEligibility } from "../api/faucet";
+import {
+  claimFaucetReward,
+  fetchFaucetEligibility,
+  type FaucetActionFamily,
+  type FaucetFamilyStatus,
+} from "../api/faucet";
 import { submitActionWitness } from "../api/actions";
 import { ApiError } from "../api/client";
 import { useAppUser } from "../composables/useAppUser";
@@ -23,7 +28,17 @@ const props = defineProps<{
   network: "testnet" | "mainnet";
   /** The executed tx — re-witnessed idempotently to verify eligibility. */
   txHash: string;
+  /**
+   * Campaign 2 (Lot R2): which reward family this panel claims for — the
+   * mounting widget knows (swap widget -> 'swap', Blend deposit -> 'blend-supply').
+   */
+  family: FaucetActionFamily;
 }>();
+
+const FAMILY_LABEL: Record<FaucetActionFamily, string> = {
+  swap: "swap",
+  "blend-supply": "Blend supply",
+};
 
 const { campaign, campaignLiveFor, refreshCampaign } = useFaucet();
 const { userId } = useAppUser();
@@ -43,6 +58,22 @@ const payoutTxHash = ref("");
 /** True while a 429 backoff is in progress — drives the honest retry copy. */
 const rateLimited = ref(false);
 const rewardXlm = computed(() => campaign.value?.rewardXlm ?? 5);
+/** Last-known per-family statuses — feeds the cross-family hint (Lot R2). */
+const familyStatuses = ref<Partial<Record<FaucetActionFamily, FaucetFamilyStatus>> | null>(null);
+
+/**
+ * "You can still earn 5 XLM with your first Blend supply" — shown after this
+ * family resolves (paid or already-claimed) while the OTHER family remains
+ * earnable (eligible now, or simply not acted yet).
+ */
+const otherFamilyHint = computed(() => {
+  const other: FaucetActionFamily = props.family === "swap" ? "blend-supply" : "swap";
+  const s = familyStatuses.value?.[other];
+  if (!s) return "";
+  const earnable = s.eligible || s.reason === "no-qualifying-witness";
+  if (!earnable) return "";
+  return `You can still earn ${rewardXlm.value} XLM with your first ${FAMILY_LABEL[other]}.`;
+});
 
 const explorerNetwork = computed(() => (props.network === "mainnet" ? "public" : "testnet"));
 
@@ -71,10 +102,11 @@ const WITNESS_REASON_COPY: Record<string, string> = {
 
 const ELIGIBILITY_REASON_COPY: Record<string, string> = {
   "below-min-notional": "", // filled at render (needs the live min)
-  "already-claimed": "Reward already claimed — one per wallet, ever.",
+  "already-claimed": "", // filled at render (names the family)
   "claim-failed-pending-review":
     "A previous claim needs manual review — no action needed on your side.",
   "temporarily-paused": "Rewards are temporarily paused (hourly limit) — try again within the hour.",
+  "campaign-not-started": "The reward campaign hasn't started yet.",
   "campaign-ended": "The reward campaign has ended.",
   "campaign-exhausted": "All rewards have been claimed — the campaign is over.",
   "treasury-drained": "Rewards are paused while the reward pool refills.",
@@ -88,6 +120,10 @@ const reasonCopy = computed(() => {
   if (!reason.value) return "";
   if (reason.value === "below-min-notional") {
     return `This action was below the ${campaign.value?.minNotionalXlm ?? 1} XLM minimum — a larger swap or supply qualifies.`;
+  }
+  if (reason.value === "already-claimed") {
+    const label = props.family === "swap" ? "Swap" : "Blend supply";
+    return `${label} reward already claimed — one reward per action type this campaign.`;
   }
   return (
     WITNESS_REASON_COPY[reason.value] ??
@@ -162,22 +198,23 @@ async function checkEligibility(elapsed: number): Promise<void> {
     const res = await fetchFaucetEligibility(props.wallet);
     if (disposed) return;
     campaign.value = res.campaign;
-    const w = res.wallet;
-    if (!w) return;
-    if (w.eligible) {
+    familyStatuses.value = res.wallet?.families ?? null;
+    const f = res.wallet?.families?.[props.family];
+    if (!f) return;
+    if (f.eligible) {
       state.value = "eligible";
       return;
     }
-    if (w.reason === "already-claimed" && w.claim?.status === "paid" && w.claim.payoutTxHash) {
-      payoutTxHash.value = w.claim.payoutTxHash;
+    if (f.reason === "already-claimed" && f.claim?.status === "paid" && f.claim.payoutTxHash) {
+      payoutTxHash.value = f.claim.payoutTxHash;
       state.value = "paid";
       return;
     }
-    if (w.reason === "faucet-disabled") {
+    if (f.reason === "faucet-disabled") {
       state.value = "hidden";
       return;
     }
-    reason.value = w.reason ?? null;
+    reason.value = f.reason ?? null;
     state.value = "ineligible";
   } catch (err) {
     if (disposed) return;
@@ -212,12 +249,19 @@ async function onClaim(): Promise<void> {
   // safe), with honest copy while waiting.
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const res = await claimFaucetReward(props.wallet);
+      const res = await claimFaucetReward(props.wallet, props.family);
       if (disposed) return;
       rateLimited.value = false;
       if (res.claimed) {
         payoutTxHash.value = res.payoutTxHash;
         state.value = "paid";
+        // Refresh the per-family statuses so the cross-family hint under the
+        // paid state reflects THIS claim (fire-and-forget, render-only).
+        void fetchFaucetEligibility(props.wallet)
+          .then((r) => {
+            if (!disposed) familyStatuses.value = r.wallet?.families ?? null;
+          })
+          .catch(() => {});
       } else {
         reason.value = res.reason;
         state.value = "ineligible";
@@ -310,10 +354,15 @@ onBeforeUnmount(() => {
       >
         View payout on stellar.expert ↗
       </a>
+      <span v-if="otherFamilyHint" style="color: var(--dig-faint)">{{ otherFamilyHint }}</span>
     </template>
 
     <template v-else>
       <span style="color: var(--dig-faint)">{{ reasonCopy }}</span>
+      <span
+        v-if="reason === 'already-claimed' && otherFamilyHint"
+        style="color: var(--dig-faint)"
+      >{{ otherFamilyHint }}</span>
     </template>
   </div>
 </template>

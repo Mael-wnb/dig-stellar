@@ -621,6 +621,7 @@ function reset() {
           :wallet="connectedAddress"
           :network="network"
           :tx-hash="txHash"
+          family="swap"
         />
       </div>
 

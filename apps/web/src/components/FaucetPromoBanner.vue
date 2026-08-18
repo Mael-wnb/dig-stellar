@@ -62,7 +62,15 @@ watch(
   { immediate: true }
 );
 
-// --- Claims-left progress ("34/40 left"), live from the server values.
+// --- Campaign 2 (Lot R2): per-family rewards — the headline advertises the
+// wallet's MAX take (families.length × rewardXlm), the body names both firsts.
+const maxEarnXlm = computed(() => {
+  const c = campaign.value;
+  if (!c) return 0;
+  return c.rewardXlm * (c.families?.length ?? 1);
+});
+
+// --- Claims-left progress ("54/60 left"), live from the server values.
 const progressPct = computed(() => {
   const c = campaign.value;
   if (!c || c.maxClaims <= 0) return 0;
@@ -118,11 +126,12 @@ onBeforeUnmount(() => {
           >Testnet</span>
         </div>
         <div class="text-[20px] font-bold tracking-[-0.02em]" style="color: var(--dig-text)">
-          Earn {{ campaign.rewardXlm }} XLM
+          Earn up to {{ maxEarnXlm }} XLM
         </div>
         <div class="text-[12px]" style="color: var(--dig-faint)">
-          Your first swap or Blend supply (≥ {{ campaign.minNotionalXlm }} XLM) earns
-          {{ campaign.rewardXlm }} XLM — first-come, one reward per wallet.
+          Your first swap AND your first Blend supply (each ≥
+          {{ campaign.minNotionalXlm }} XLM) each earn {{ campaign.rewardXlm }} XLM —
+          first-come, up to {{ campaign.families?.length ?? 2 }} rewards per wallet.
         </div>
       </div>
     </div>

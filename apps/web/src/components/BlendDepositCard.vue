@@ -1030,6 +1030,7 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
           :wallet="connectedAddress"
           :network="network"
           :tx-hash="txHash"
+          family="blend-supply"
         />
       </div>
 
@@ -1068,6 +1069,7 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
           :wallet="connectedAddress"
           :network="network"
           :tx-hash="txHash"
+          family="blend-supply"
         />
       </div>
 

@@ -1,16 +1,25 @@
 // src/api/faucet.ts
 //
-// R3 (Lot R — T3-D2): client for the reward-faucet endpoints. Read-only
-// campaign/eligibility + the one claim POST. The server re-checks everything —
-// these responses are advisory for rendering, never trusted for money logic.
+// R3 (Lot R — T3-D2) / campaign 2 (Lot R2): client for the reward-faucet
+// endpoints. Read-only campaign/eligibility + the one claim POST. Campaign 2
+// is PER FAMILY: first verified swap AND first verified Blend supply each
+// earn the reward, so eligibility and claims name the family. The server
+// re-checks everything — these responses are advisory for rendering, never
+// trusted for money logic.
 import { apiFetch } from "./client";
 
+export type FaucetActionFamily = "swap" | "blend-supply";
+
 export type FaucetCampaign = {
+  /** Which campaign the server is running (2 = per-family rewards). */
+  campaign: number;
   active: boolean;
   remainingClaims: number;
-  /** Campaign budget — for the "34/40 left" progress (R3b). */
+  /** Campaign budget — for the "54/60 left" progress (R3b). */
   maxClaims: number;
   rewardXlm: number;
+  /** Rewardable families — "up to families.length × rewardXlm" per wallet. */
+  families: FaucetActionFamily[];
   network: "testnet" | "mainnet";
   minNotionalXlm: number;
   /** ISO deadline or null (R3b). Server-enforced; countdown-only client-side. */
@@ -19,6 +28,7 @@ export type FaucetCampaign = {
 
 export type FaucetIneligibleReason =
   | "faucet-disabled"
+  | "campaign-not-started"
   | "campaign-ended"
   | "campaign-exhausted"
   | "temporarily-paused"
@@ -29,13 +39,17 @@ export type FaucetIneligibleReason =
   | "treasury-unavailable"
   | "treasury-drained";
 
+export type FaucetFamilyStatus = {
+  eligible: boolean;
+  reason?: FaucetIneligibleReason;
+  claim?: { status: string; payoutTxHash: string | null };
+};
+
 export type FaucetEligibility = {
   campaign: FaucetCampaign;
   wallet?: {
     address: string;
-    eligible: boolean;
-    reason?: FaucetIneligibleReason;
-    claim?: { status: string; payoutTxHash: string | null };
+    families: Record<FaucetActionFamily, FaucetFamilyStatus>;
   };
 };
 
@@ -55,10 +69,11 @@ export async function fetchFaucetEligibility(
 }
 
 export async function claimFaucetReward(
-  wallet: string
+  wallet: string,
+  family: FaucetActionFamily
 ): Promise<FaucetClaimResult> {
   return apiFetch<FaucetClaimResult>("/faucet/claim", {
     method: "POST",
-    body: JSON.stringify({ wallet }),
+    body: JSON.stringify({ wallet, family }),
   });
 }
