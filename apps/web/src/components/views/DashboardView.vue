@@ -70,7 +70,17 @@ const { notifications, unreadCount, load: loadNotifications } = useNotifications
 onMounted(() => void loadNotifications())
 
 // ── network hero + stat strip ────────────────────────────────────────────────
-const heroTvl = computed(() => formatUsd(netRaw.value.stellarTvlUsd))
+// Hero TVL (2026-08-17 ruling): read from the SAME tvl-series response the chart
+// draws — latest point of network_tvl_snapshots. One writer, one table: the hero
+// and the chart's last point can never disagree. Gross headline ("Total value
+// tracked") + honest secondary line ("Net TVL (supplied − borrowed)").
+const heroPoint = computed(() =>
+  tvlSeries.value.length ? tvlSeries.value[tvlSeries.value.length - 1] : null,
+)
+const heroTvl = computed(() => (heroPoint.value ? formatUsd(heroPoint.value.tvlUsd) : '—'))
+const heroNetTvl = computed(() =>
+  heroPoint.value?.tvlNetUsd != null ? formatUsd(heroPoint.value.tvlNetUsd) : null,
+)
 const xlmChange = computed(() => formatPct(netRaw.value.xlmPriceChange24hPct))
 const xlmChangeColor = computed(() =>
   (netRaw.value.xlmPriceChange24hPct ?? 0) >= 0 ? 'var(--dig-green)' : 'var(--dig-red)',
@@ -140,7 +150,10 @@ const {
         </div>
         <div class="flex items-end gap-[14px] mt-[8px]">
           <div class="text-[42px] font-bold tracking-[-0.03em] tabular-nums">{{ heroTvl }}</div>
-          <div class="text-[13px] mb-[10px]" style="color: var(--dig-faint)">total TVL</div>
+          <div class="text-[13px] mb-[10px]" style="color: var(--dig-faint)">total value tracked</div>
+        </div>
+        <div v-if="heroNetTvl" class="text-[13px] mt-[2px]" style="color: var(--dig-faint)">
+          Net TVL (supplied − borrowed): <span class="font-semibold tabular-nums" style="color: var(--dig-text)">{{ heroNetTvl }}</span>
         </div>
 
         <!-- G2: the inline Testnet/Mainnet actions section was removed; a swap is

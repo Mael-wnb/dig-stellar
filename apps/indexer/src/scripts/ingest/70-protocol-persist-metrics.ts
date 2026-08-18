@@ -110,9 +110,19 @@ async function persistProtocol(
 
 // G0 (Lot G / T3-D3): leave one network-TVL point behind on every refresh cycle.
 // History accumulates — it cannot be reconstructed later without historized
-// prices — so this runs at the tail of step 7, once protocol_metrics_latest is
-// fully rewritten. The row is the sum over protocol_metrics_latest.tvl_usd (the
-// exact figure the dashboard hero shows) plus the count of protocols folded in.
+// prices — so this runs at the tail of step 7, once pool_metrics_latest is
+// fully rewritten. Definition (founder ruling, 2026-08-17 — see
+// docs/decisions/2026-08-17-network-tvl-definition.md):
+//   tvl_usd     = Σ pool_metrics_latest.tvl_usd over active entities of tracked
+//                 venues, EXCLUDING defindex (its vault funds sit inside Blend
+//                 pools — summing both double-counts; the DeFindex protocol card
+//                 keeps its own figure). Lending pools contribute GROSS (total
+//                 supplied); DEX pools contribute pool liquidity. This is the
+//                 exact "Total value tracked" figure the hero and chart show —
+//                 both read this table, so they can never disagree.
+//   tvl_net_usd = tvl_usd − Σ total_borrowed_usd over the same rows
+//                 ("Net TVL (supplied − borrowed)", the hero's secondary line).
+//   protocol_count = venues folded into the sum.
 // Idempotent per run: as_of is truncated to the minute and upserted, so a
 // re-run of the same cycle overwrites its point rather than duplicating it.
 async function persistNetworkTvlSnapshot(
@@ -120,27 +130,33 @@ async function persistNetworkTvlSnapshot(
 ) {
   const res = await client.query(
     `
-    insert into network_tvl_snapshots (as_of, tvl_usd, protocol_count)
+    insert into network_tvl_snapshots (as_of, tvl_usd, tvl_net_usd, protocol_count)
     select
       date_trunc('minute', now()),
       coalesce(sum(pm.tvl_usd), 0),
-      count(*)
-    from protocol_metrics_latest pm
+      coalesce(sum(pm.tvl_usd), 0) - coalesce(sum(pm.total_borrowed_usd), 0),
+      count(distinct pm.venue_id)
+    from pool_metrics_latest pm
+    join venues v on v.id = pm.venue_id
+    join entities e on e.id = pm.entity_id
+    where e.is_active = true and v.slug <> 'defindex'
     on conflict (as_of) do update set
       tvl_usd = excluded.tvl_usd,
+      tvl_net_usd = excluded.tvl_net_usd,
       protocol_count = excluded.protocol_count
-    returning as_of, tvl_usd, protocol_count
+    returning as_of, tvl_usd, tvl_net_usd, protocol_count
     `
   );
 
   const row = res.rows[0] as
-    | { as_of: Date; tvl_usd: string; protocol_count: number }
+    | { as_of: Date; tvl_usd: string; tvl_net_usd: string; protocol_count: number }
     | undefined;
 
   console.log({
     networkTvlSnapshot: true,
     asOf: row?.as_of,
     tvlUsd: row ? Number(row.tvl_usd) : null,
+    tvlNetUsd: row ? Number(row.tvl_net_usd) : null,
     protocolCount: row?.protocol_count ?? null,
   });
 }

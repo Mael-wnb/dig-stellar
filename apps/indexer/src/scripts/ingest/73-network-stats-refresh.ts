@@ -1,8 +1,10 @@
 // apps/indexer/src/scripts/ingest/73-network-stats-refresh.ts
 //
-// Fetches network-wide Stellar stats from external providers and upserts them
+// Fetches network-wide Stellar stats from external providers (XLM price,
+// stablecoin mcap, wallets/DEX volume, USDC supply, tx fees) and upserts them
 // into network_stats_latest (single row, scope='global'). Read by the API at
-// GET /v1/network/stats.
+// GET /v1/network/stats. Exception: stellar_tvl_usd is NOT external — it is
+// our canonical network sum, read from network_tvl_snapshots (step 70).
 //
 // NOTE: the safeGet* fetchers below are intentionally COPIED from the previous
 // apps/api NetworkService (not shared) — api and indexer are separate apps by
@@ -23,11 +25,6 @@ type CoinGeckoPriceResponse = {
     usd?: number;
     usd_24h_change?: number;
   };
-};
-
-type DefiLlamaChainRow = {
-  name: string;
-  tvl: number;
 };
 
 type StablecoinChainRow = {
@@ -108,20 +105,6 @@ async function safeGetXlmPrice(): Promise<{
       priceUsd: null,
       change24hPct: null,
     };
-  }
-}
-
-async function safeGetStellarTvl(): Promise<number | null> {
-  try {
-    const data = await fetchJsonWithTimeout<DefiLlamaChainRow[]>(
-      'https://api.llama.fi/v2/chains'
-    );
-
-    const stellar = data.find((row) => row.name === 'Stellar');
-    return toFiniteNumber(stellar?.tvl);
-  } catch (error) {
-    console.warn(`safeGetStellarTvl failed: ${getErrorMessage(error)}`);
-    return null;
   }
 }
 
@@ -224,14 +207,12 @@ async function safeGetAvgTxFee(): Promise<number | null> {
 async function main(): Promise<void> {
   const [
     xlmPrice,
-    stellarTvl,
     stableMcap,
     stellarExpertSummary,
     usdcSupply,
     avgTxFeeXlm,
   ] = await Promise.all([
     safeGetXlmPrice(),
-    safeGetStellarTvl(),
     safeGetStableMcap(),
     safeGetStellarExpertSummary(),
     safeGetUsdcSupply(),
@@ -251,6 +232,16 @@ async function main(): Promise<void> {
       `select count(*)::int as n from protocol_metrics_latest`
     );
     const protocolCount = (protocolCountRes.rows[0]?.n as number) ?? 0;
+
+    // TVL source (founder ruling, 2026-08-17): OUR canonical network sum from
+    // network_tvl_snapshots (written by step 70 earlier in this same cycle) —
+    // the DefiLlama chain-TVL fetch is gone. This keeps stats consistent with
+    // the hero/chart figure ("Total value tracked", DeFindex excluded).
+    const tvlRes = await client.query(
+      `select tvl_usd from network_tvl_snapshots order by as_of desc limit 1`
+    );
+    const stellarTvl =
+      tvlRes.rows.length > 0 ? toFiniteNumber(String(tvlRes.rows[0].tvl_usd)) : null;
 
     await client.query(
       `

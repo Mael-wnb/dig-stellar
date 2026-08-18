@@ -22,9 +22,12 @@ export async function fetchNetworkStats(): Promise<NetworkStatsResponse> {
 }
 
 // G4 (Lot G): network TVL 7-day series from network_tvl_snapshots (G0).
+// Single TVL source for BOTH the hero (latest point) and the chart (series)
+// since the 2026-08-17 ruling — "Total value tracked", DeFindex excluded.
 export type NetworkTvlPoint = {
   t: string // hour bucket, ISO
-  tvlUsd: number
+  tvlUsd: number // gross — "Total value tracked"
+  tvlNetUsd: number | null // supplied − borrowed; null on pre-2026-08-17 points
   protocolCount: number
 }
 
@@ -37,6 +40,9 @@ export type NetworkTvlSeriesResponse = {
     firstSnapshotAt: string | null
     partial: boolean
     bucket: 'hour'
+    // First point under the 2026-08-17 definition when older points exist —
+    // marks the definitional step-down for the chart footnote.
+    methodologyChangeAt: string | null
   }
 }
 

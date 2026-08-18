@@ -6,6 +6,8 @@ import { computeFreshness, staleAfterSeconds } from '../../common/freshness';
 export type NetworkStatsResponse = {
   xlmPriceUsd: number | null;
   xlmPriceChange24hPct: number | null;
+  // Since 2026-08-17: our canonical tracked-network sum (latest
+  // network_tvl_snapshots point, copied in by the indexer) — not DefiLlama.
   stellarTvlUsd: number | null;
   activeWallets: number | null;
   stableMcapUsd: number | null;
@@ -36,9 +38,15 @@ type NetworkStatsRow = {
 };
 
 // G4 (Lot G / T3-D3): network TVL history read from network_tvl_snapshots (G0).
+// Since the 2026-08-17 ruling this is the single TVL source for BOTH the hero
+// (latest point) and the chart (series) — "Total value tracked", gross, with
+// DeFindex excluded from the sum. See stellar_v1_network_tvl.sql.
 export type NetworkTvlPoint = {
   t: string; // hour bucket, ISO
-  tvlUsd: number;
+  tvlUsd: number; // gross — "Total value tracked"
+  // Net TVL (supplied − borrowed), same snapshot. null on points written before
+  // the 2026-08-17 methodology change — history is never rewritten.
+  tvlNetUsd: number | null;
   protocolCount: number;
 };
 
@@ -54,12 +62,18 @@ export type NetworkTvlSeriesResponse = {
     // true while history is younger than the window (curve still filling in).
     partial: boolean;
     bucket: 'hour';
+    // First snapshot written under the 2026-08-17 definition (gross tracked sum,
+    // DeFindex excluded). Non-null only when older pre-change points also exist —
+    // it marks the definitional step-down in the curve so the chart can footnote
+    // it honestly instead of rewriting history.
+    methodologyChangeAt: string | null;
   };
 };
 
 type TvlBucketRow = {
   bucket: unknown;
   tvl_usd: unknown;
+  tvl_net_usd: unknown;
   protocol_count: unknown;
 };
 
@@ -141,6 +155,7 @@ export class NetworkService {
       select distinct on (date_trunc('hour', as_of))
         date_trunc('hour', as_of) as bucket,
         tvl_usd,
+        tvl_net_usd,
         protocol_count
       from network_tvl_snapshots
       where as_of >= $1::timestamptz
@@ -157,19 +172,36 @@ export class NetworkService {
       series.push({
         t,
         tvlUsd,
+        tvlNetUsd: this.toFiniteNumber(row.tvl_net_usd),
         protocolCount: this.toFiniteNumber(row.protocol_count) ?? 0,
       });
     }
 
+    // first = earliest snapshot ever; first_v2 = earliest snapshot carrying the
+    // 2026-08-17 definition (tvl_net_usd non-null). A changeover exists only
+    // when pre-change rows precede it.
     const firstRows = (await this.prisma.$queryRawUnsafe(
-      `select min(as_of) as first from network_tvl_snapshots`,
-    )) as Array<{ first: unknown }>;
+      `
+      select
+        min(as_of) as first,
+        min(as_of) filter (where tvl_net_usd is not null) as first_v2
+      from network_tvl_snapshots
+      `,
+    )) as Array<{ first: unknown; first_v2: unknown }>;
     const firstSnapshotAt = this.toIsoString(firstRows[0]?.first ?? null);
+    const firstV2At = this.toIsoString(firstRows[0]?.first_v2 ?? null);
+    const methodologyChangeAt =
+      firstSnapshotAt !== null &&
+      firstV2At !== null &&
+      new Date(firstSnapshotAt).getTime() < new Date(firstV2At).getTime()
+        ? firstV2At
+        : null;
 
     // Partial while history began after the window opened (or there is none yet)
     // — i.e. the 7-day curve isn't fully backed by data. Drives the honest note.
     const partial =
-      firstSnapshotAt === null || new Date(firstSnapshotAt).getTime() > from.getTime();
+      firstSnapshotAt === null ||
+      new Date(firstSnapshotAt).getTime() > from.getTime();
 
     return {
       series,
@@ -180,6 +212,7 @@ export class NetworkService {
         firstSnapshotAt,
         partial,
         bucket: 'hour',
+        methodologyChangeAt,
       },
     };
   }
@@ -210,7 +243,10 @@ export class NetworkService {
     // Prisma.Decimal objects (not number/string), so unwrap them via
     // toNumber()/toString() — same approach as stellar.service.ts.
     if (typeof value === 'object') {
-      if ('toNumber' in value && typeof (value as { toNumber: unknown }).toNumber === 'function') {
+      if (
+        'toNumber' in value &&
+        typeof (value as { toNumber: unknown }).toNumber === 'function'
+      ) {
         try {
           const n = (value as { toNumber: () => number }).toNumber();
           return Number.isFinite(n) ? n : null;
@@ -219,7 +255,10 @@ export class NetworkService {
         }
       }
 
-      if ('toString' in value && typeof (value as { toString: unknown }).toString === 'function') {
+      if (
+        'toString' in value &&
+        typeof (value as { toString: unknown }).toString === 'function'
+      ) {
         const n = Number((value as { toString: () => string }).toString());
         return Number.isFinite(n) ? n : null;
       }

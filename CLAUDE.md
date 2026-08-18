@@ -136,7 +136,7 @@ pnpm -C packages/db prisma:studio   # prisma studio
 pnpm -C apps/indexer run:once       # seed / run-once
 pnpm -C apps/indexer run:blend
 pnpm -C apps/indexer run:horizon
-pnpm -C apps/indexer run:defindex   # scaffolded, not validated — see note below
+pnpm -C apps/indexer run:defindex   # standalone defindex run — see scope note below
 pnpm -C apps/indexer job:refresh    # global refresh orchestration
                                     #   -> src/scripts/ingest/72-run-refresh-job.ts
 pnpm -C apps/indexer job:wallet-alert  # alerting sweep (OS-cron): 82 -> 81 health -> api 83-evaluate-alerts
@@ -157,7 +157,8 @@ pnpm -C apps/web preview
 Per-protocol ingestion: logic lives in `apps/indexer/src/lib/protocols/<protocol>/`. The live
 entry points are the per-protocol `run-*-refresh.ts` called by `71-refresh-all-metrics.ts`
 (Blend `run-blend-pool-refresh.ts`, Soroswap `run-soroswap-pair-refresh.ts`, Aquarius
-`run-aquarius-pool-refresh.ts`, native `run-stellar-native-refresh.ts`). `src/scripts/ingest/`
+`run-aquarius-pool-refresh.ts`, native `run-stellar-native-refresh.ts`, DeFindex
+`run-defindex-refresh.ts`). `src/scripts/ingest/`
 **also contains superseded legacy** (numbered `*-v1.ts`, `*-insert-*.ts`, and duplicate
 `run-*-refresh.ts`) — confirm a file is on the live `job:refresh` path before relying on or editing it.
 
@@ -222,10 +223,12 @@ implementation — treat it as first-class, not "later."
 
 ### Scope notes (so you don't over- or under-claim)
 
-- **DeFindex** is **out of scope for T1-D1.** A `run:defindex` script and `@defindex/sdk` exist, but
-  the adapter is not validated. Do not treat it as part of the T1-D1 evidence, and do not "finish"
-  it unless explicitly asked — T1-D1 coverage is Blend, Soroswap, Aquarius (Soroban) + Stellar-native
-  DEX (Horizon).
+- **DeFindex** is live on the `job:refresh` path (vault discovery + `run-defindex-refresh.ts` in
+  `71-refresh-all-metrics.ts`, protocol metrics persisted by step 70) and has its own protocol card.
+  It remains outside the **T1-D1 evidence** (that coverage is Blend, Soroswap, Aquarius + Stellar-native
+  DEX) and is **excluded from the canonical network-TVL sum** (`network_tvl_snapshots`) — its vault
+  funds sit inside Blend pools, so counting both would double-count (founder ruling 2026-08-17,
+  `docs/decisions/2026-08-17-network-tvl-definition.md`).
 - **Tests / CI** are **largely deferred (likely T3).** The one exception: the T2-D2 alerting evaluator
   has unit specs (`modules/alerts/evaluate.spec.ts`, `alerts.ownership.spec.ts`). Beyond those there
   are no broad suites and no CI pipeline. Do not add a test/CI build-out as a side effect of an

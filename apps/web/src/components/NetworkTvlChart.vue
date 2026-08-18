@@ -9,8 +9,8 @@
 import { computed, ref } from 'vue'
 import { formatUsd } from '../utils/format'
 
-interface TvlPoint { t: string; tvlUsd: number; protocolCount: number }
-interface Meta { from: string; to: string; firstSnapshotAt: string | null; partial: boolean }
+interface TvlPoint { t: string; tvlUsd: number; tvlNetUsd: number | null; protocolCount: number }
+interface Meta { from: string; to: string; firstSnapshotAt: string | null; partial: boolean; methodologyChangeAt: string | null }
 const props = defineProps<{
   series: TvlPoint[]
   meta: Meta | null
@@ -66,7 +66,7 @@ const yDomain = computed(() => {
   return { lo: min - pad, hi: max + pad }
 })
 
-interface Pt { x: number; y: number; nx: number; t: string; tvl: number }
+interface Pt { x: number; y: number; nx: number; t: string; tvl: number; tvlNet: number | null }
 const pts = computed<Pt[]>(() => {
   const { fromMs, toMs } = bounds.value
   const { lo, hi } = yDomain.value
@@ -81,6 +81,7 @@ const pts = computed<Pt[]>(() => {
       nx,
       t: p.t,
       tvl: p.tvlUsd,
+      tvlNet: p.tvlNetUsd,
     }
   })
 })
@@ -145,12 +146,27 @@ const tip = computed(() => {
     flip: p.nx > 0.6,
     date: fmtBucket(p.t),
     tvl: formatUsd(p.tvl),
+    tvlNet: p.tvlNet != null ? formatUsd(p.tvlNet) : null,
   }
 })
 
 const sinceLabel = computed(() =>
   props.meta?.partial ? fmtDate(props.meta.firstSnapshotAt) : '',
 )
+
+// 2026-08-17 methodology change (founder ruling): the series stepped down when
+// the sum moved to tracked-venues-only (DeFindex excluded — double-count with
+// Blend). History is never rewritten; instead the changeover is marked with a
+// dashed guide on the date (when inside the window) and an honest footnote.
+const changeAt = computed(() => props.meta?.methodologyChangeAt ?? null)
+const changeX = computed<number | null>(() => {
+  if (!changeAt.value) return null
+  const { fromMs, toMs } = bounds.value
+  const tMs = new Date(changeAt.value).getTime()
+  if (!Number.isFinite(tMs) || tMs <= fromMs || tMs >= toMs) return null
+  return ((tMs - fromMs) / (toMs - fromMs)) * W
+})
+const changeLabel = computed(() => (changeAt.value ? fmtDate(changeAt.value) : ''))
 </script>
 
 <template>
@@ -183,6 +199,8 @@ const sinceLabel = computed(() =>
           <path v-for="(seg, i) in segments" :key="'l' + i" :d="linePath(seg)" fill="none" stroke="#B8E640" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
           <circle v-for="(d, i) in dots" :key="'d' + i" :cx="d.x" :cy="d.y" r="2.5" fill="#B8E640" />
           <circle v-if="lastPt" :cx="lastPt.x" :cy="lastPt.y" r="3" fill="#B8E640" />
+          <!-- methodology-change marker (2026-08-17): dashed guide on the changeover date -->
+          <line v-if="changeX !== null" :x1="changeX" y1="0" :x2="changeX" :y2="H" stroke="#5E5F5D" stroke-width="1" stroke-dasharray="3 3" />
         </svg>
 
         <!-- hover guide + tooltip -->
@@ -193,8 +211,13 @@ const sinceLabel = computed(() =>
             <p class="text-[11px] font-semibold" style="color: var(--dig-faint)">{{ tip.date }}</p>
             <div class="flex items-center gap-1.5 text-[12px] mt-1">
               <span class="w-2 h-2 rounded-[2px]" style="background:#B8E640;" />
-              <span style="color: var(--dig-faint)">TVL</span>
+              <span style="color: var(--dig-faint)">Tracked</span>
               <span class="ml-auto font-bold tabular-nums" style="color: var(--dig-text)">{{ tip.tvl }}</span>
+            </div>
+            <div v-if="tip.tvlNet" class="flex items-center gap-1.5 text-[12px] mt-0.5">
+              <span class="w-2 h-2 rounded-[2px]" style="background:transparent;" />
+              <span style="color: var(--dig-faint)">Net</span>
+              <span class="ml-auto font-semibold tabular-nums" style="color: var(--dig-faint)">{{ tip.tvlNet }}</span>
             </div>
           </div>
         </div>
@@ -203,6 +226,12 @@ const sinceLabel = computed(() =>
       <!-- honest "building history" note while the window isn't fully covered -->
       <p v-if="sinceLabel" class="text-[11px] mt-[8px]" style="color: var(--dig-faint)">
         Building history since {{ sinceLabel }} — the curve fills toward 7 days as snapshots accrue.
+      </p>
+
+      <!-- honest methodology-change footnote: the step-down is definitional, not a market move -->
+      <p v-if="changeLabel" class="text-[11px] mt-[6px]" style="color: var(--dig-faint)">
+        Methodology change on {{ changeLabel }}: total value tracked is now the sum of tracked venues only
+        (DeFindex excluded — its funds sit inside Blend). Earlier points keep the old definition.
       </p>
     </template>
   </div>
