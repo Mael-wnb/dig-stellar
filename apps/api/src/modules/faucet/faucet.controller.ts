@@ -22,11 +22,14 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { FaucetService } from './faucet.service';
+import { FAUCET_FAMILIES, type ActionFamily } from './faucet-eligibility';
 
 const STELLAR_PUBKEY_RE = /^G[A-Z2-7]{55}$/;
 
 interface ClaimBody {
   wallet: string;
+  /** Campaign 2 (Lot R2): which family this claim is for. */
+  family: string;
 }
 
 @Controller('v1/faucet')
@@ -57,6 +60,16 @@ export class FaucetController {
     if (!wallet || typeof wallet !== 'string' || !STELLAR_PUBKEY_RE.test(wallet)) {
       throw new BadRequestException('wallet must be a Stellar public key (G…)');
     }
-    return this.faucetService.claim(wallet);
+    const family = body?.family;
+    if (
+      !family ||
+      typeof family !== 'string' ||
+      !(FAUCET_FAMILIES as readonly string[]).includes(family)
+    ) {
+      throw new BadRequestException(
+        `family must be one of: ${FAUCET_FAMILIES.join(', ')}`,
+      );
+    }
+    return this.faucetService.claim(wallet, family as ActionFamily);
   }
 }

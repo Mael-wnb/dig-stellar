@@ -23,6 +23,14 @@ const PASSPHRASES: Record<FaucetNetwork, string> = {
   mainnet: Networks.PUBLIC,
 };
 
+/**
+ * The campaign this build counts claims against (faucet_claims.campaign).
+ * A CODE constant, not an env: this code version IS campaign 2 (per-family
+ * rewards) — an env would only add a mislabeling foot-gun. Campaign 3 will be
+ * a code change anyway.
+ */
+export const FAUCET_CAMPAIGN = 2;
+
 /** FAUCET_ENABLED kill-switch. Default OFF — everything deploys dark. */
 export function isFaucetEnabled(): boolean {
   return process.env.FAUCET_ENABLED === 'true';
@@ -78,6 +86,21 @@ export function faucetMinNotionalXlm(): number {
  */
 export function faucetEndsAt(): Date | null {
   const raw = process.env.FAUCET_ENDS_AT?.trim();
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+/**
+ * Campaign start (FAUCET_STARTS_AT, ISO date) — REQUIRED for campaign 2 to be
+ * active. Only witnesses whose tx executed (ledger_closed_at) at or after this
+ * instant qualify: a campaign-1 action can never be replayed for a campaign-2
+ * reward. FAIL-CLOSED: unset/unparseable = campaign not started — a
+ * misconfigured activation shows no promise and pays nothing, never the
+ * opposite. The founder sets it (with FAUCET_ENDS_AT) at activation.
+ */
+export function faucetStartsAt(): Date | null {
+  const raw = process.env.FAUCET_STARTS_AT?.trim();
   if (!raw) return null;
   const parsed = new Date(raw);
   return Number.isFinite(parsed.getTime()) ? parsed : null;

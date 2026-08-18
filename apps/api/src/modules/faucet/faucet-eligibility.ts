@@ -6,6 +6,21 @@
 // gathers the facts (DB + Horizon) and both the eligibility endpoint AND the
 // claim path run THIS function — there is exactly one decision procedure.
 
+/**
+ * Campaign 2 (Lot R2): the reward unit. One reward per (wallet, family,
+ * campaign) — first verified swap AND first verified Blend supply each pay.
+ * The mapping from witness kinds is EXPLICIT and closed: withdraws never
+ * qualify (supply is the funded action).
+ */
+export type ActionFamily = 'swap' | 'blend-supply';
+
+export const FAUCET_FAMILIES: readonly ActionFamily[] = ['swap', 'blend-supply'];
+
+export const FAMILY_BY_WITNESS_KIND: Record<string, ActionFamily> = {
+  'sdex-swap': 'swap',
+  'blend-deposit': 'blend-supply',
+};
+
 export type PriorClaim = {
   status: 'pending' | 'paid' | 'failed';
   payoutTxHash: string | null;
@@ -22,6 +37,7 @@ export type WitnessState = 'none' | 'below-min' | 'ok';
 
 export type IneligibleReason =
   | 'faucet-disabled'
+  | 'campaign-not-started'
   | 'campaign-ended'
   | 'campaign-exhausted'
   | 'temporarily-paused'
@@ -46,6 +62,13 @@ export interface CampaignFacts {
   claimsLastHour: number;
   hourlyCap: number;
   /**
+   * Campaign start in epoch ms — REQUIRED (Lot R2 fail-closed rule): null
+   * (unset env) or a future instant means the campaign has NOT started, no
+   * promo renders, nothing pays. Also the witness window floor: the service
+   * only surfaces witnesses whose tx executed at/after this instant.
+   */
+  startsAtMs: number | null;
+  /**
    * Campaign deadline in epoch ms, or null = no deadline (R3b). A past
    * deadline closes the campaign server-side — never merely decorative.
    */
@@ -64,6 +87,13 @@ export function campaignEnded(f: Pick<CampaignFacts, 'endsAtMs' | 'nowMs'>): boo
   return f.endsAtMs != null && f.nowMs >= f.endsAtMs;
 }
 
+/** True iff the campaign start is unset (fail-closed) or still in the future. */
+export function campaignNotStarted(
+  f: Pick<CampaignFacts, 'startsAtMs' | 'nowMs'>,
+): boolean {
+  return f.startsAtMs == null || f.nowMs < f.startsAtMs;
+}
+
 /**
  * Campaign state for the promo surface (R3): active while the flag is on,
  * budget remains, and the deadline (if any) has not passed. A velocity pause
@@ -73,11 +103,16 @@ export function campaignEnded(f: Pick<CampaignFacts, 'endsAtMs' | 'nowMs'>): boo
 export function campaignState(f: CampaignFacts): CampaignState {
   const remainingClaims = Math.max(0, f.maxClaims - f.countedClaims);
   return {
-    active: f.enabled && remainingClaims > 0 && !campaignEnded(f),
+    active: f.enabled && remainingClaims > 0 && !campaignNotStarted(f) && !campaignEnded(f),
     remainingClaims,
   };
 }
 
+/**
+ * Campaign 2: the wallet facts are PER FAMILY — the service resolves the
+ * witness and prior claim for one (wallet, family, campaign) and calls this
+ * once per family. The rules themselves stay family-agnostic.
+ */
 export interface WalletFacts extends CampaignFacts {
   witnessState: WitnessState;
   priorClaim: PriorClaim;
@@ -99,6 +134,7 @@ export function walletEligibility(f: WalletFacts): WalletEligibility {
   const no = (reason: IneligibleReason): WalletEligibility => ({ eligible: false, reason });
 
   if (!f.enabled) return no('faucet-disabled');
+  if (campaignNotStarted(f)) return no('campaign-not-started');
   if (campaignEnded(f)) return no('campaign-ended');
   if (campaignState(f).remainingClaims <= 0) return no('campaign-exhausted');
   if (f.claimsLastHour >= f.hourlyCap) return no('temporarily-paused');

@@ -10,13 +10,18 @@ import {
 const NOW = 1_700_000_000_000;
 const HOUR = 3_600_000;
 
-/** A fully-eligible baseline; each test flips exactly one fact. */
+/**
+ * A fully-eligible baseline; each test flips exactly one fact. Campaign 2
+ * (Lot R2): the facts are per-family (the service resolves witness + prior
+ * claim per family) and startsAtMs is REQUIRED — fail-closed.
+ */
 const eligibleFacts = (): WalletFacts => ({
   enabled: true,
-  maxClaims: 40,
+  maxClaims: 60,
   countedClaims: 5,
   claimsLastHour: 2,
   hourlyCap: 10,
+  startsAtMs: NOW - 12 * HOUR,
   endsAtMs: null,
   nowMs: NOW,
   witnessState: 'ok',
@@ -27,19 +32,24 @@ const eligibleFacts = (): WalletFacts => ({
 
 describe('campaignState', () => {
   it('is active with the flag on and budget remaining', () => {
-    expect(campaignState(eligibleFacts())).toEqual({ active: true, remainingClaims: 35 });
+    expect(campaignState(eligibleFacts())).toEqual({ active: true, remainingClaims: 55 });
+  });
+
+  it('R2 fail-closed: unset or future startsAt keeps the campaign inactive', () => {
+    expect(campaignState({ ...eligibleFacts(), startsAtMs: null }).active).toBe(false);
+    expect(campaignState({ ...eligibleFacts(), startsAtMs: NOW + HOUR }).active).toBe(false);
   });
 
   it('deactivates when the flag is off (dark deploy) or the budget is spent', () => {
     expect(campaignState({ ...eligibleFacts(), enabled: false }).active).toBe(false);
-    expect(campaignState({ ...eligibleFacts(), countedClaims: 40 })).toEqual({
+    expect(campaignState({ ...eligibleFacts(), countedClaims: 60 })).toEqual({
       active: false,
       remainingClaims: 0,
     });
   });
 
   it('never reports negative remaining claims', () => {
-    expect(campaignState({ ...eligibleFacts(), countedClaims: 45 }).remainingClaims).toBe(0);
+    expect(campaignState({ ...eligibleFacts(), countedClaims: 65 }).remainingClaims).toBe(0);
   });
 
   it('stays active under a velocity pause (temporary, wallet-level only)', () => {
@@ -60,13 +70,18 @@ describe('walletEligibility', () => {
 
   const cases: Array<[string, Partial<WalletFacts>, string]> = [
     ['disabled flag', { enabled: false }, 'faucet-disabled'],
+    ['unset startsAt (R2 fail-closed)', { startsAtMs: null }, 'campaign-not-started'],
+    ['future startsAt', { startsAtMs: NOW + HOUR }, 'campaign-not-started'],
     ['expired deadline (server-enforced, R3b)', { endsAtMs: NOW - 1 }, 'campaign-ended'],
-    ['exhausted budget', { countedClaims: 40 }, 'campaign-exhausted'],
+    ['exhausted budget', { countedClaims: 60 }, 'campaign-exhausted'],
     ['velocity brake at the cap', { claimsLastHour: 10 }, 'temporarily-paused'],
     ['no witness', { witnessState: 'none' }, 'no-qualifying-witness'],
     ['below min notional', { witnessState: 'below-min' }, 'below-min-notional'],
     [
-      'prior paid claim (double claim)',
+      // Campaign 2: the facts are per-family, so this locks "second claim for
+      // the SAME family rejected" — the other family arrives with its own
+      // priorClaim: null facts and stays eligible.
+      'prior paid claim for this family (double claim)',
       { priorClaim: { status: 'paid', payoutTxHash: 'abc' } },
       'already-claimed',
     ],
