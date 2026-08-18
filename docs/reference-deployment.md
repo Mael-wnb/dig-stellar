@@ -57,10 +57,14 @@ Expected outcome (first refresh takes ~3–6 min after `up`):
 
 ```bash
 docker compose --profile app ps               # postgres + api healthy, indexer running
-docker compose logs -f indexer                # bootstrap, then a green refresh summary
+docker compose logs -f indexer                # bootstrap, then the per-step refresh summary
 curl -s localhost:3000/health                 # status ok, version = GIT_SHA, freshness
 curl -s localhost:3000/v1/protocols           # 5 protocols with real mainnet data
 ```
+
+Without `DEFINDEX_API_KEY` the summary shows 9/10 steps SUCCESS and `defindex` FAILED —
+the documented expected degradation (non-fatal, recorded in `refresh_step_runs`; the
+defindex card simply has no data until a key is provided).
 
 Proof from a clean clone: `docs/evidence/lot-z/z1-compose-fresh-clone.md`.
 

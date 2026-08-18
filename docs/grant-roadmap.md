@@ -451,21 +451,27 @@ How to measure completion:
 Estimated date: August 31, 2026 — Budget: $6,140
 
 ### Internal interpretation & status (living)
-Owner: all apps. Status: ~25%.
+Owner: all apps. Status: ~85% — two of three criteria met; the final report remains.
 
-**Partial groundwork.** A `docker-compose.yml` exists (Postgres + Redis) — partial evidence toward the
-"functional Docker compose" criterion, though it is currently the local-dev stack, not a packaged
-reference implementation. A `/health` endpoint exists (liveness only). Documentation is strong and
-growing (status-board, current-state, grant-roadmap, runbooks, repo-structure, data-model, plus the
-T3 additions: `security-invariants.md` and the `docs/evidence/` corpus — vetting, ungating, Lot B
-captures) and the architecture is modular. UI-polish scope for this cycle includes the **sidebar
-navigation redesign** (user-directed, maps to the "Final UI polish" criterion).
+**Criterion 1 (observability) — met (Lot E, 2026-08-13).** Enriched `/health` (per-venue
+freshness + GIT_SHA version), `GET /v1/ops/metrics` (per-run RPC latency p50/p95/p99 + error
+rates from actual samples), `GET /v1/ops/adoption`. Evidence: `docs/evidence/lot-e/`.
 
-**Remaining gap:** real metrics endpoints (RPC latency p50/p95/p99, error rates), packaging as an SDF
-reference implementation with docs, and the final report with adoption metrics (which depends on the
-T3-D2 KPIs). Note: testing/CI dependencies are installed but no suites/pipelines exist yet — if any
-testing evidence is wanted for handoff, it is built here, and must not be cited as already existing
-before then.
+**Criterion 2 (Reference Implementation, functional Docker compose) — met (Lot Z, 2026-08-18).**
+The application is packaged: `docker compose --profile app up -d --build` from a fresh clone
+runs postgres (schema auto-applied from the raw SQL files in dependency order), redis, the
+containerized API and the containerized indexer (bootstrap + 15-min refresh loop replacing
+the cron), on real mainnet data with no secrets. Proven end-to-end from a clean clone —
+first refresh 10/10 steps green, `/v1/protocols` serving live TVL, `down && up` idempotent
+(`docs/evidence/lot-z/z1-compose-fresh-clone.md`). `apps/web` deliberately stays outside the
+stack (static Vite build on Vercel — documented choice). Internal documentation:
+`docs/reference-deployment.md` (+ runbooks/deployment/architecture corpus). UI-polish scope
+for this cycle (sidebar redesign + Lots C/F/G/H/Q) landed earlier.
+
+**Remaining gap:** the final report to the SDF (modular architecture + initial adoption
+metrics — depends on the T3-D2 KPI window). Note: no broad test suites/CI pipeline exist
+(a minimal GitHub Actions build workflow is a bonus, not evidence) — do not cite testing
+beyond the alerting specs.
 
 ---
 

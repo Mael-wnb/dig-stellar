@@ -671,6 +671,19 @@ break (promo note inserted mid-chain) hid the Blend supply form whenever a campa
 (`stellar-api.getdig.ai`, `/health` ok), `apps/indexer` on a 15-min cron with `flock` guarding against
 overlap. Local dev works (`docker compose` → Postgres 16 + Redis 7).
 
+**Reference Implementation packaging (Lot Z, 2026-08-18 — done, proven).** The T3-D3
+"functional Docker compose" criterion is met: `docker compose --profile app up -d --build`
+from a fresh clone runs postgres (schema auto-applied — the ten raw SQL files mounted into
+initdb with explicit numbering in dependency order), redis, the containerized API and the
+containerized indexer (bootstrap + immediate refresh + 15-min sequential loop replacing
+cron+flock, self-excluding by construction). Proven from a clean clone: 10/10 refresh steps
+green, `/v1/protocols` live mainnet TVL, `down && up` idempotent
+(`docs/evidence/lot-z/z1-compose-fresh-clone.md`; path doc: `docs/reference-deployment.md`).
+The default `docker compose up` still runs infra only — the dev workflow is unchanged, and
+the VPS keeps its PM2/cron setup (this lot deploys nothing). `apps/web` stays outside the
+stack (static Vite build on Vercel — a documented choice), and the faucet stays dark (no
+server-side key plumbed into compose).
+
 **Edge / security posture (Lot S, 2026-08-17 — deployed).** The S0 recon found the API listening
 publicly on `*:3000` with ufw inactive (any nginx-layer control was bypassable). Now: the API
 binds **`127.0.0.1:3000`** (nginx is the only public path), ufw default-deny incoming (allow

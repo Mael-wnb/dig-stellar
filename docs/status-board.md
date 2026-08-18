@@ -56,8 +56,8 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
 - Closest tranche-critical targets: T3-D2 KPIs (adoption — the 5 XLM witness-gated reward
   campaign is LIVE since Aug 17 and `action_witnesses` counts executions automatically; the
   execution evidence itself is complete), T3-D3 (**Lot C design-handoff port DONE** —
-  shell + 5 views + modals on real data, `/v1/pools/:slug/flows` + `/series` added; observability +
-  reference packaging still open).
+  shell + 5 views + modals on real data, `/v1/pools/:slug/flows` + `/series` added; observability
+  DONE Lot E Aug 13; **reference packaging DONE Lot Z Aug 18** — remaining: final report + demo).
 - Biggest current risk: **the T3-D2 KPIs** — they cannot be built, only accumulated; every day of
   the open window counts.
 - Main execution goal: KPI push + A2 + T3-D3, converging on the Aug 15 internal target.
@@ -298,6 +298,21 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   these numbers accumulated during the 5 XLM incentive campaign** (one claim per wallet/user,
   1 XLM min notional, 40-claim budget, 10/h velocity cap) — the grant narrative must say so
   (see the KPI-integrity note in `docs/evidence/lot-r/r4-testnet-e2e.md`).
+- T3-D3 note (2026-08-18, Lot Z): **SDF Reference Implementation packaging DONE — the
+  "functional Docker compose" criterion is met and proven from a clean clone.**
+  `docker compose --profile app up -d --build` now runs the full stack: postgres (the ten
+  `stellar_v*.sql` files auto-applied via numbered init mounts in dependency order — the
+  exact failure mode of the 2026-08-17 incident, made structural), redis, containerized
+  API (carries the indexer package because the wallet on-demand refresh spawns `pnpm tsx`
+  there) and containerized indexer (bootstrap:core + immediate refresh + 15-min sequential
+  loop replacing cron+flock). Default `docker compose up` unchanged (infra only — dev
+  workflow intact); `apps/web` deliberately outside the stack (Vercel); faucet stays dark
+  (no server-side key plumbed). Clean-clone proof: 10/10 refresh steps green on public RPC,
+  `/health` version = GIT_SHA, `/v1/protocols` live TVL, `down && up` idempotent; one
+  deviation found and fixed (root-owned `apps/indexer/tmp` broke non-root writes).
+  Evidence: `docs/evidence/lot-z/z1-compose-fresh-clone.md`. Zero product-logic changes.
+  **Remaining T3-D3: the final SDF report (+ demo)** — observability (Lot E) and packaging
+  (Lot Z) are both done.
 - Last updated: 2026-08-18
 
 ---
