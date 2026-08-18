@@ -231,7 +231,7 @@ const changeLabel = computed(() => (changeAt.value ? fmtDate(changeAt.value) : '
       <!-- honest methodology-change footnote: the step-down is definitional, not a market move -->
       <p v-if="changeLabel" class="text-[11px] mt-[6px]" style="color: var(--dig-faint)">
         Methodology change on {{ changeLabel }}: total value tracked is now the sum of tracked venues only
-        (DeFindex excluded — its funds sit inside Blend). Earlier points keep the old definition.
+        (DeFindex excluded — its funds sit inside Blend).
       </p>
     </template>
   </div>
