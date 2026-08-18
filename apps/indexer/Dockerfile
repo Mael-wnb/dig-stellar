@@ -37,6 +37,12 @@ RUN pnpm -C packages/db run prisma:generate
 
 COPY apps/indexer apps/indexer
 
+# The refresh writes runtime artifacts under apps/indexer/tmp/ (ops-metrics
+# sample flushes, discovery saveJson snapshots) — the only path the non-root
+# user needs to write. Found by the Lot Z fresh-clone proof: without this,
+# soroswap/allbridge fail with EACCES and ops samples are dropped.
+RUN mkdir -p apps/indexer/tmp && chown -R node:node apps/indexer/tmp
+
 ENV REFRESH_INTERVAL_SECONDS=900
 USER node
 CMD ["sh", "apps/indexer/docker-entrypoint.sh"]
