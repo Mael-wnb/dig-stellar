@@ -183,7 +183,7 @@ const networkLabel = 'Stellar mainnet'
       </div>
       <div class="flex gap-[8px] mt-[12px]">
         <a
-          href="https://x.com/getdig_ai"
+          href="https://x.com/Dig_Agentic"
           target="_blank"
           rel="noopener"
           title="Follow on X"
@@ -194,7 +194,7 @@ const networkLabel = 'Stellar mainnet'
           X
         </a>
         <a
-          href="https://discord.gg/getdig"
+          href="https://discord.gg/sDpqGfmDgF"
           target="_blank"
           rel="noopener"
           title="Join Discord"
