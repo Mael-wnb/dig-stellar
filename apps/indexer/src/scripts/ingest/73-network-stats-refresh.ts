@@ -34,11 +34,6 @@ type StablecoinChainRow = {
   };
 };
 
-type StellarExpertSummaryResponse = {
-  accounts?: number;
-  dex_volume?: number;
-};
-
 type HorizonFeeStatsResponse = {
   fee_charged?: {
     mode?: string;
@@ -122,27 +117,16 @@ async function safeGetStableMcap(): Promise<number | null> {
   }
 }
 
-async function safeGetStellarExpertSummary(): Promise<{
-  activeWallets: number | null;
-  dexVolume24hUsd: number | null;
-}> {
-  try {
-    const data = await fetchJsonWithTimeout<StellarExpertSummaryResponse>(
-      'https://api.stellar.expert/explorer/public/network-activity/summary'
-    );
-
-    return {
-      activeWallets: toFiniteNumber(data?.accounts),
-      dexVolume24hUsd: toFiniteNumber(data?.dex_volume),
-    };
-  } catch (error) {
-    console.warn(`safeGetStellarExpertSummary failed: ${getErrorMessage(error)}`);
-    return {
-      activeWallets: null,
-      dexVolume24hUsd: null,
-    };
-  }
-}
+// Active wallets / DEX volume: the stellar.expert network-activity summary
+// endpoint was REMOVED upstream (404 on every call — it was the systematic
+// 1-per-run error on the price-sources rpc metric; verified dead 2026-08-18,
+// no replacement endpoint found). The fields were already null in prod since
+// the endpoint died; keep them null honestly instead of burning a doomed call
+// each run. Revisit only if stellar.expert publishes a successor endpoint.
+const STELLAR_EXPERT_SUMMARY = {
+  activeWallets: null as number | null,
+  dexVolume24hUsd: null as number | null,
+};
 
 async function safeGetUsdcSupply(): Promise<number | null> {
   const controller = new AbortController();
@@ -205,19 +189,13 @@ async function safeGetAvgTxFee(): Promise<number | null> {
 }
 
 async function main(): Promise<void> {
-  const [
-    xlmPrice,
-    stableMcap,
-    stellarExpertSummary,
-    usdcSupply,
-    avgTxFeeXlm,
-  ] = await Promise.all([
+  const [xlmPrice, stableMcap, usdcSupply, avgTxFeeXlm] = await Promise.all([
     safeGetXlmPrice(),
     safeGetStableMcap(),
-    safeGetStellarExpertSummary(),
     safeGetUsdcSupply(),
     safeGetAvgTxFee(),
   ]);
+  const stellarExpertSummary = STELLAR_EXPERT_SUMMARY;
 
   const asOf = nowIso();
   const client = createPgClient();
