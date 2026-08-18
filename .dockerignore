@@ -1,0 +1,21 @@
+# Build context filter for the reference-implementation images (Lot Z — T3-D3).
+# Both Dockerfiles (apps/api, apps/indexer) build from the REPO ROOT context.
+
+.git
+**/node_modules
+**/dist
+
+# NEVER ship env files into an image — apps/api/.env may hold FAUCET_SECRET_KEY
+# on an operator machine. Containers get their config from compose `environment`.
+# (`**/.env` matches only files named exactly `.env`; the committed
+# `.env.example` files are not affected.)
+**/.env
+**/.env.local
+**/.env.production
+
+# Not needed to build or run the images.
+docs
+design
+tools
+apps/web/src
+apps/web/public

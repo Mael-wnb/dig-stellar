@@ -1,13 +1,29 @@
-# Dig Stellar — reference infrastructure stack (E4, Lot E — T3-D3).
+# Dig Stellar — reference-implementation stack (Lot Z — T3-D3).
 #
-# Runs the two infrastructure services (Postgres 16 + Redis 7). The application
-# processes run as documented pnpm services on the host — the deliberate
-# simplest-that-works choice for the reference deployment:
-#   api   -> pnpm -C apps/api start:dev        (NestJS, :3000)
-#   web   -> pnpm -C apps/web dev              (Vite, :5173)
-#   indexer -> one-shot cron-style commands (pnpm -C apps/indexer job:refresh),
-#              NOT a daemon.
-# Full quickstart (clone -> rendering dashboard): docs/reference-deployment.md.
+# Two ways to run it:
+#
+#   1. Local dev (unchanged): `docker compose up -d` runs ONLY the two
+#      infrastructure services (Postgres 16 + Redis 7); the applications run as
+#      documented pnpm services on the host (docs/reference-deployment.md).
+#        api     -> pnpm -C apps/api start:dev        (NestJS, :3000)
+#        web     -> pnpm -C apps/web dev              (Vite, :5173)
+#        indexer -> one-shot cron-style commands (pnpm -C apps/indexer job:refresh)
+#
+#   2. Reference deployment (SDF reviewers): the `app` profile adds the
+#      containerized api + indexer on top:
+#        docker compose --profile app up -d --build
+#      Full path (fresh clone -> mainnet data): docs/reference-deployment.md.
+#      apps/web is deliberately NOT in the stack — it is a static Vite build
+#      deployed on Vercel; point any static host at it (documented choice).
+#
+# Schema bootstrap: the raw SQL files are mounted into the postgres image's
+# /docker-entrypoint-initdb.d/ with EXPLICIT numeric prefixes in dependency
+# order (v1 base incl. pgcrypto -> v1 satellites -> v2 multiwallet -> v3
+# alerting (needs v1 entities + v2 user_wallets) -> v4 faucet (needs
+# action_witnesses)). Do not rely on lexical order of the source filenames —
+# the numbering below IS the ordering contract. initdb runs ONLY on an empty
+# data volume; the files are idempotent, and `job:refresh` on an existing dev
+# volume is unaffected.
 #
 # Host ports and container-name prefix are overridable so a second stack (e.g. a
 # fresh-clone verification) can run next to this one. CRITICAL: also set a distinct
@@ -15,7 +31,8 @@
 # directory name), and a second checkout with the same project name REPLACES your
 # running containers and mounts your existing data volumes:
 #   COMPOSE_PROJECT_NAME=dig_ref DIG_CONTAINER_PREFIX=dig_ref \
-#   POSTGRES_PORT=15432 REDIS_PORT=16379 docker compose up -d
+#   POSTGRES_PORT=15432 REDIS_PORT=16379 API_PORT=13000 \
+#   docker compose --profile app up -d --build
 services:
   postgres:
     image: postgres:16
@@ -27,8 +44,28 @@ services:
       POSTGRES_DB: dig_stellar
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
+    # -h 127.0.0.1 forces TCP: during initdb the temporary server only listens
+    # on the unix socket, so a socket-based pg_isready would report healthy
+    # BEFORE the init SQL below has run.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U dig -d dig_stellar"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
     volumes:
       - dig_stellar_pgdata:/var/lib/postgresql/data
+      # Dependency-ordered schema bootstrap (see header). Same files the manual
+      # `psql -f` path applies (docs/runbooks.md "Apply raw SQL schemas").
+      - ./apps/api/src/db/stellar_v1.sql:/docker-entrypoint-initdb.d/10-stellar_v1.sql:ro
+      - ./apps/api/src/db/stellar_v1_metrics.sql:/docker-entrypoint-initdb.d/11-stellar_v1_metrics.sql:ro
+      - ./apps/api/src/db/stellar_v1_logos.sql:/docker-entrypoint-initdb.d/12-stellar_v1_logos.sql:ro
+      - ./apps/api/src/db/stellar_v1_network_tvl.sql:/docker-entrypoint-initdb.d/13-stellar_v1_network_tvl.sql:ro
+      - ./apps/api/src/db/stellar_v1_ops_metrics.sql:/docker-entrypoint-initdb.d/14-stellar_v1_ops_metrics.sql:ro
+      - ./apps/api/src/db/stellar_v1_bridge.sql:/docker-entrypoint-initdb.d/15-stellar_v1_bridge.sql:ro
+      - ./apps/api/src/db/stellar_v1_action_witness.sql:/docker-entrypoint-initdb.d/16-stellar_v1_action_witness.sql:ro
+      - ./apps/api/src/db/stellar_v2_multiwallet.sql:/docker-entrypoint-initdb.d/20-stellar_v2_multiwallet.sql:ro
+      - ./apps/api/src/db/stellar_v3_alerting.sql:/docker-entrypoint-initdb.d/30-stellar_v3_alerting.sql:ro
+      - ./apps/api/src/db/stellar_v4_faucet.sql:/docker-entrypoint-initdb.d/40-stellar_v4_faucet.sql:ro
 
   redis:
     image: redis:7
@@ -38,6 +75,71 @@ services:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
       - dig_stellar_redisdata:/data
+
+  # ---- `app` profile: the containerized reference deployment ----------------
+  # Config comes from compose `environment` (no .env files inside images —
+  # see .dockerignore). Optional knobs (GIT_SHA, STELLAR_RPC_URL,
+  # DEFINDEX_API_KEY) substitute from the shell or a root `.env`
+  # (see .env.example) and have safe public defaults.
+  # The faucet stays DARK: FAUCET_ENABLED / FAUCET_SECRET_KEY are deliberately
+  # not plumbed here — the reference deployment must never require or suggest
+  # a server-side key (docs/security-invariants.md §9).
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      args:
+        # Surfaced as `version` by GET /health ('unknown' when unset):
+        #   GIT_SHA=$(git rev-parse --short HEAD) docker compose --profile app up -d --build
+        GIT_SHA: ${GIT_SHA:-}
+    container_name: ${DIG_CONTAINER_PREFIX:-dig_stellar}_api
+    profiles: ["app"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://dig:dig@postgres:5432/dig_stellar?schema=public
+      HOST: 0.0.0.0
+      PORT: 3000
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      # Wallet on-demand refresh spawns indexer scripts; the RPC vars make the
+      # spawned scripts use the same endpoint as the indexer service.
+      STELLAR_RPC_URL: ${STELLAR_RPC_URL:-}
+      HORIZON_URL: ${HORIZON_URL:-https://horizon.stellar.org}
+    ports:
+      - "${API_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:3000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  indexer:
+    build:
+      context: .
+      dockerfile: apps/indexer/Dockerfile
+    container_name: ${DIG_CONTAINER_PREFIX:-dig_stellar}_indexer
+    profiles: ["app"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://dig:dig@postgres:5432/dig_stellar?schema=public
+      # Unset -> the public SDF Soroban RPC (rate-limited; fine for a first
+      # run — use an operator endpoint for a permanent deployment).
+      STELLAR_RPC_URL: ${STELLAR_RPC_URL:-}
+      HORIZON_URL: ${HORIZON_URL:-https://horizon.stellar.org}
+      # Optional; without it the defindex step fails NON-fatally per refresh
+      # (recorded in refresh_step_runs; other protocols unaffected).
+      DEFINDEX_API_KEY: ${DEFINDEX_API_KEY:-}
+      # Read-only tx source for contract simulations (aquarius step). Any
+      # funded mainnet account works; it never signs anything.
+      STELLAR_SOURCE_ACCOUNT: ${STELLAR_SOURCE_ACCOUNT:-GDCRZPZYBZ24RHRO3WBPJGFDL7NDFKUQBS3ZDB6YGBJB3TGKMFYBQ3LD}
+      REFRESH_INTERVAL_SECONDS: ${REFRESH_INTERVAL_SECONDS:-900}
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   dig_stellar_pgdata:
