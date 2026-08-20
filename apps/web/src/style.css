@@ -105,4 +105,13 @@ body {
 /* ALERTS (T2-D2) — entrance animations used by AlertsView + AlertRuleModal */
 @keyframes digFade    { from { opacity: 0; transform: translateY(8px); }              to { opacity: 1; transform: translateY(0); } }
 @keyframes digSheet   { from { opacity: 0; transform: translateY(24px) scale(.98); }  to { opacity: 1; transform: translateY(0) scale(1); } }
+
+/* AA1 (Lot AA) — mobile nav drawer. Slide-in for the off-canvas sidebar, and
+   the ≥44px touch-target bump for the interactive rows it contains (the drawer
+   reuses AppSidebar as-is; the desktop sidebar keeps its original density). */
+@keyframes digDrawer  { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+.dig-drawer .dig-nav,
+.dig-drawer .dig-navon,
+.dig-drawer .dig-chip,
+.dig-drawer .dig-social { min-height: 44px; }
 @keyframes digOverlay { from { opacity: 0; }                                          to { opacity: 1; } }
