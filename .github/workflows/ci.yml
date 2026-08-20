@@ -3,9 +3,11 @@
 # (manual VPS deploy, documented in docs/deployment.md + docs/runbooks.md).
 name: ci
 
+# feat/** and fix/** included per the Lot AA §1 workflow rules: all work now
+# lands on branches, and the merge gate requires CI green on the pushed branch.
 on:
   push:
-    branches: [main, alpha]
+    branches: [main, alpha, 'feat/**', 'fix/**']
   pull_request:
 
 jobs:
@@ -33,3 +35,4 @@ jobs:
 
       # vue-tsc typecheck runs inside the web build.
       - run: pnpm -C apps/web build
+      - run: pnpm -C apps/web test

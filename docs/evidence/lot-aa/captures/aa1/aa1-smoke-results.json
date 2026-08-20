@@ -1,0 +1,432 @@
+[
+  {
+    "name": "390x844/dashboard burger visible",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/dashboard static sidebar hidden",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/dashboard no h-overflow",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/dashboard main h-pan (info)",
+    "ok": true,
+    "detail": "30px"
+  },
+  {
+    "name": "390x844/dashboard drawer opens",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/dashboard no h-overflow with drawer",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844 drawer rows >=44px",
+    "ok": true,
+    "detail": "[44,44,44,44,44,44,44]"
+  },
+  {
+    "name": "390x844/dashboard backdrop closes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/protocols burger visible",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/protocols static sidebar hidden",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/protocols no h-overflow",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/protocols drawer opens",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/protocols no h-overflow with drawer",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/protocols backdrop closes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/pool burger visible",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/pool static sidebar hidden",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/pool no h-overflow",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/pool drawer opens",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/pool no h-overflow with drawer",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/pool backdrop closes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/portfolio burger visible",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/portfolio static sidebar hidden",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/portfolio no h-overflow",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/portfolio drawer opens",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/portfolio no h-overflow with drawer",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/portfolio backdrop closes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/alerts burger visible",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/alerts static sidebar hidden",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/alerts no h-overflow",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/alerts drawer opens",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/alerts no h-overflow with drawer",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844/alerts backdrop closes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844 main scroll-locked while open",
+    "ok": true,
+    "detail": "hidden"
+  },
+  {
+    "name": "390x844 Esc closes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "390x844 main scroll restored",
+    "ok": true,
+    "detail": "auto"
+  },
+  {
+    "name": "390x844 nav click closes + navigates",
+    "ok": true,
+    "detail": "#protocols"
+  },
+  {
+    "name": "768x1024/dashboard burger visible",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/dashboard static sidebar hidden",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/dashboard no h-overflow",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/dashboard drawer opens",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/dashboard no h-overflow with drawer",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024 drawer rows >=44px",
+    "ok": true,
+    "detail": "[44,44,44,44,44,44,44]"
+  },
+  {
+    "name": "768x1024/dashboard backdrop closes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/protocols burger visible",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/protocols static sidebar hidden",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/protocols no h-overflow",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/protocols drawer opens",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/protocols no h-overflow with drawer",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/protocols backdrop closes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/pool burger visible",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/pool static sidebar hidden",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/pool no h-overflow",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/pool drawer opens",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/pool no h-overflow with drawer",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/pool backdrop closes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/portfolio burger visible",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/portfolio static sidebar hidden",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/portfolio no h-overflow",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/portfolio drawer opens",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/portfolio no h-overflow with drawer",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/portfolio backdrop closes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/alerts burger visible",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/alerts static sidebar hidden",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/alerts no h-overflow",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/alerts drawer opens",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/alerts no h-overflow with drawer",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024/alerts backdrop closes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024 main scroll-locked while open",
+    "ok": true,
+    "detail": "hidden"
+  },
+  {
+    "name": "768x1024 Esc closes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768x1024 main scroll restored",
+    "ok": true,
+    "detail": "auto"
+  },
+  {
+    "name": "768x1024 nav click closes + navigates",
+    "ok": true,
+    "detail": "#protocols"
+  },
+  {
+    "name": "1440x900/dashboard burger hidden",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1440x900/dashboard static sidebar visible",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1440x900/dashboard no h-overflow",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1440x900/protocols burger hidden",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1440x900/protocols static sidebar visible",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1440x900/protocols no h-overflow",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1440x900/pool burger hidden",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1440x900/pool static sidebar visible",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1440x900/pool no h-overflow",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1440x900/portfolio burger hidden",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1440x900/portfolio static sidebar visible",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1440x900/portfolio no h-overflow",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1440x900/alerts burger hidden",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1440x900/alerts static sidebar visible",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1440x900/alerts no h-overflow",
+    "ok": true,
+    "detail": ""
+  }
+]
