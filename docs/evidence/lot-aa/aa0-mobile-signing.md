@@ -83,6 +83,37 @@ on popup flows that are unproven on real iOS Safari. Treat the lot as
    Major-version bump touching the signing path ⇒ its own lot, never during a
    live campaign.
 
+## Appendix (2026-08-20) — real-device results (founder, iPhone Safari, Vercel Preview)
+
+The AA1 preview validation doubled as the AA0-a real-device test. Results:
+
+- **xBull**: the connect popup reports "looks like you don't have used xBull
+  before" and redirects to wallet.xbull.app — the `xbull-wallet-connect` bridge
+  only talks to a wallet configured in the xBull **web** wallet, not the native
+  iOS app. Possible workaround (untested): import the wallet at
+  wallet.xbull.app in Safari first, then connect from Dig.
+- **Albedo**: the popup opens a blank blue page with the Albedo logo; the flow
+  never completes.
+- **Verdict CONFIRMED: consultation-first.** No out-of-the-box mobile signing
+  today; the two "offered" wallets both fail on a real device.
+
+**New finding (founder) — verified in code:** adding a watch-only wallet
+requires a connected signer first, so a mobile visitor currently has **no entry
+path at all** (can't sign, can't track). Two layers enforce it:
+
+1. `ConnectModal.vue` `onTrack()`: without a session `userId` it errors
+   "Connect a signer wallet first, then add watch-only addresses."
+2. The backend can't support the fix as-is: watch-only add is
+   `POST /v1/wallets` → `WalletsService.createWallet` →
+   `normalizeUserId()`, and that helper's ABSENT-userId behavior is the W1
+   **standing debt**: it silently falls back to the shared demo account
+   `00000000-…-0001` (several read routes depend on that default). Unblocking
+   watch-only-first means minting a real user on first track — the pattern
+   already exists in `connectWallet`'s recovery path
+   (`normalizeOptionalUserId` → create user, return `userId`), so the change
+   is contained but it IS a `wallets.service.ts` change, **not ConnectModal
+   UX only** → flagged to the founder for AA3 re-scoping per instruction.
+
 ## Consequences for the AA sub-lots
 
 - AA1 (shell) proceeds unchanged — highest value regardless of verdict.
