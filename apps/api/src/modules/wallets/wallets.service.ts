@@ -651,16 +651,44 @@ export class WalletsService {
     };
   }
 
+  // Lot AB (watch-only-first): an ABSENT userId no longer falls back to the
+  // shared demo account (that silent default was the W1 standing debt on this
+  // path) — it MINTS a real user, the same pattern as connectWallet's no-session
+  // recovery fork, and returns its userId so the client can adopt the session.
+  // This is what gives a mobile visitor an entry path: track first, sign never
+  // (the row is NOT promoted to signer — a watch-only address can't sign).
+  // Present userId → prior behavior, unchanged. Read routes keep the demo
+  // default (they depend on it; out of AB's scope).
   async createWallet(params: {
     userId?: string;
     chain?: string;
     address?: string;
     label?: string | null;
   }) {
-    const userId = this.normalizeUserId(params.userId);
+    const sessionUserId = this.normalizeOptionalUserId(params.userId);
     const chain = this.normalizeChain(params.chain);
     const address = this.normalizeAddress(params.address);
     const label = this.normalizeLabel(params.label);
+
+    if (!sessionUserId) {
+      const newUserId = randomUUID();
+
+      const inserted = await this.createWalletForUser({
+        userId: newUserId,
+        chain,
+        address,
+        label,
+      });
+
+      return {
+        created: true,
+        createdUser: true,
+        userId: newUserId,
+        wallet: this.mapWallet(inserted),
+      };
+    }
+
+    const userId = sessionUserId;
 
     const existing = (await this.prisma.$queryRawUnsafe(
       `
@@ -715,6 +743,8 @@ export class WalletsService {
 
       return {
         created: false,
+        createdUser: false,
+        userId,
         wallet: this.mapWallet(updated[0]),
       };
     }
@@ -728,6 +758,8 @@ export class WalletsService {
 
     return {
       created: true,
+      createdUser: false,
+      userId,
       wallet: this.mapWallet(inserted),
     };
   }
