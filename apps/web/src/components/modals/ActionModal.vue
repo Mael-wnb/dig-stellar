@@ -33,13 +33,15 @@ const activeTab = ref('primary')
   <!-- Teleported to <body> so a transformed/animated ancestor can never become
        the containing block for the fixed overlay (H1). -->
   <Teleport to="body">
+  <!-- AA3: bottom sheet below sm (100dvh cap, inner scroll). Wrapper-only —
+       the embedded widgets stay byte-identical (Lot AA invariant). -->
   <div
-    class="fixed inset-0 z-[50] flex items-center justify-center p-[24px]"
+    class="fixed inset-0 z-[50] flex items-center justify-center p-[24px] max-sm:items-end max-sm:p-0"
     style="background: rgba(38,36,32,0.34); backdrop-filter: blur(3px); animation: digOverlay .2s ease"
     @click.self="emit('close')"
   >
     <div
-      class="w-[520px] max-w-full rounded-[20px] max-h-[92vh] overflow-hidden flex flex-col"
+      class="w-[520px] max-w-full rounded-[20px] max-h-[92vh] overflow-hidden flex flex-col max-sm:w-full max-sm:rounded-b-none max-sm:max-h-[100dvh]"
       style="background: var(--dig-surface); box-shadow: 0 30px 80px -30px rgba(38,36,32,0.5); animation: digSheet .3s cubic-bezier(.2,.8,.2,1) both"
     >
       <!-- header -->

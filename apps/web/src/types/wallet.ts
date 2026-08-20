@@ -104,7 +104,9 @@ export interface WalletBalancesResponse {
 }
 
 export interface CreateWalletRequest {
-  userId: string;
+  // Lot AB: absent on the FIRST watch-only track — the backend mints a real
+  // user and returns its id (never the shared demo account).
+  userId?: string;
   chain: string;
   address: string;
   label: string;
@@ -113,6 +115,9 @@ export interface CreateWalletRequest {
 
 export interface CreateWalletResponse {
   created?: boolean;
+  // Lot AB: the owning user — the minted one when createdUser is true.
+  createdUser?: boolean;
+  userId?: string;
   wallet: WalletItem;
 }
 

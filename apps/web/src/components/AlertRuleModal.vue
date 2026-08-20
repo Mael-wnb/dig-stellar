@@ -186,12 +186,12 @@ function submit() {
        of the viewport. -->
   <Teleport to="body">
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center p-6"
+    class="fixed inset-0 z-50 flex items-center justify-center p-6 max-sm:items-end max-sm:p-0"
     style="background:rgba(38,36,32,.34); backdrop-filter:blur(3px); animation:digOverlay .2s ease;"
     @click.self="emit('close')"
   >
     <div
-      class="bg-[#1E1E1E] rounded-[20px] flex flex-col max-h-[90vh] overflow-hidden w-full max-w-[560px] text-[#E2E6E1]"
+      class="bg-[#1E1E1E] rounded-[20px] flex flex-col max-h-[90vh] overflow-hidden w-full max-w-[560px] text-[#E2E6E1] max-sm:max-w-full max-sm:rounded-b-none max-sm:max-h-[100dvh]"
       style="box-shadow:0 30px 80px -30px rgba(38,36,32,.5); animation:digSheet .3s cubic-bezier(.2,.8,.2,1) both;"
     >
       <div class="dig-scroll px-[26px] pt-6 pb-[26px] overflow-y-auto">
@@ -208,7 +208,8 @@ function submit() {
 
         <!-- 1 · What to watch -->
         <p class="text-xs font-semibold text-[#5E5F5D] mb-[9px]">1. What to watch</p>
-        <div class="grid grid-cols-4 gap-[9px] mb-5">
+        <!-- AA3: 2×2 below sm — four-across clipped the last card at 390. -->
+        <div class="grid grid-cols-4 gap-[9px] mb-5 max-sm:grid-cols-2">
           <button
             v-for="sc in SCOPES"
             :key="sc.key"
@@ -234,7 +235,9 @@ function submit() {
             ? 'No priced assets available right now. The tracked-asset list comes from the data pipeline.'
             : 'No eligible targets available right now. The list comes from the data pipeline.' }}
         </p>
-        <div v-else class="grid grid-cols-2 gap-2 mb-5 max-h-[150px] overflow-y-auto">
+        <!-- AA3: themed scrollbar + a max-height that cuts mid-row below sm, so
+             a longer wallet list visibly continues instead of looking clipped. -->
+        <div v-else class="dig-scroll grid grid-cols-2 gap-2 mb-5 max-h-[150px] overflow-y-auto max-sm:max-h-[176px]">
           <button
             v-for="t in targets"
             :key="t.id"

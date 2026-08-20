@@ -14,6 +14,7 @@ import {
 } from "../api/wallets";
 import type { WalletDefiSummary, WalletItem } from "../types/wallet";
 import { useActiveSigner } from "./useActiveSigner";
+import { useAppUser } from "./useAppUser";
 
 const EMPTY_DEFI: WalletDefiSummary = {
   totalSuppliedUsd: 0,
@@ -158,15 +159,19 @@ export function useWallets(userIdRef: { value: string | null }) {
     }
   }
 
+  // Lot AB (AA3): a session userId is no longer required — on the FIRST
+  // watch-only track the backend mints a real user and returns its id, which
+  // we adopt as the session (the mobile entry path). With a session present,
+  // behavior is unchanged.
   async function addWallet(params: {
     address: string;
     label?: string;
   }): Promise<WalletItem> {
-    const userId = requireUserId();
+    const sessionUserId = userIdRef.value?.trim() || undefined;
     error.value = "";
 
     const response = await createWallet({
-      userId,
+      userId: sessionUserId,
       chain: "stellar",
       address: params.address,
       label: params.label?.trim() || "",
@@ -174,6 +179,15 @@ export function useWallets(userIdRef: { value: string | null }) {
     });
 
     const createdWallet = response.wallet ?? response;
+
+    const userId = sessionUserId ?? response.userId;
+    if (!userId) {
+      throw new Error("Backend did not return a userId for the new wallet.");
+    }
+    if (!sessionUserId) {
+      // Adopt the minted account (also triggers the shared overview watcher).
+      useAppUser().setUserId(userId);
+    }
 
     await refreshWallet(createdWallet.id, userId);
     await loadOverview();
