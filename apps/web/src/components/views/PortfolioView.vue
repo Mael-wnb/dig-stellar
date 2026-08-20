@@ -320,36 +320,38 @@ const assetsView = computed(() => {
     <EmptyPortfolioState v-if="!userId || (!hasWallets && !overviewLoading)" @connect="openConnect" />
 
     <template v-else>
-      <!-- Summary: liquid kept distinct from DeFi supplied/borrowed -->
-      <div class="grid gap-[16px]" style="grid-template-columns: repeat(4, 1fr)">
-        <div class="rounded-[16px] px-[20px] py-[18px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
+      <!-- Summary: liquid kept distinct from DeFi supplied/borrowed.
+           AA2 (arbitration 2): peek-strip below sm in its own scroll container. -->
+      <div class="gap-[16px] sm:grid sm:grid-cols-4 max-sm:flex max-sm:overflow-x-auto max-sm:pb-[4px] dig-scroll">
+        <div class="rounded-[16px] px-[20px] py-[18px] max-sm:w-[170px] max-sm:flex-shrink-0" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
           <div class="text-[12px] font-medium" style="color: var(--dig-faint)">Liquid balances</div>
           <div class="text-[24px] font-bold tracking-[-0.02em] mt-[6px] tabular-nums">{{ formatUsd(totalPortfolioUsd) }}</div>
           <div class="text-[12px] mt-[4px]" style="color: var(--dig-faint)">{{ wallets.length }} wallets on Mainnet</div>
         </div>
-        <div class="rounded-[16px] px-[20px] py-[18px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
+        <div class="rounded-[16px] px-[20px] py-[18px] max-sm:w-[170px] max-sm:flex-shrink-0" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
           <div class="text-[12px] font-medium" style="color: var(--dig-faint)">DeFi supplied</div>
           <div class="text-[24px] font-bold tracking-[-0.02em] mt-[6px] tabular-nums" style="color: var(--dig-green)">{{ formatUsd(defi.totalSuppliedUsd) }}</div>
           <div class="text-[12px] mt-[4px]" style="color: var(--dig-faint)">Blend</div>
         </div>
-        <div class="rounded-[16px] px-[20px] py-[18px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
+        <div class="rounded-[16px] px-[20px] py-[18px] max-sm:w-[170px] max-sm:flex-shrink-0" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
           <div class="text-[12px] font-medium" style="color: var(--dig-faint)">DeFi borrowed</div>
           <div class="text-[24px] font-bold tracking-[-0.02em] mt-[6px] tabular-nums" style="color: var(--dig-amber)">{{ formatUsd(defi.totalBorrowedUsd) }}</div>
           <div class="text-[12px] mt-[4px]" style="color: var(--dig-faint)">Blend</div>
         </div>
-        <div class="rounded-[16px] px-[20px] py-[18px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
+        <div class="rounded-[16px] px-[20px] py-[18px] max-sm:w-[170px] max-sm:flex-shrink-0" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
           <div class="text-[12px] font-medium" style="color: var(--dig-faint)">Net DeFi</div>
           <div class="text-[24px] font-bold tracking-[-0.02em] mt-[6px] tabular-nums">{{ formatUsd(defi.netDefiUsd) }}</div>
           <div class="text-[12px] mt-[4px]" style="color: var(--dig-faint)">supplied − borrowed</div>
         </div>
       </div>
 
-      <!-- Wallet cards -->
-      <div class="dig-scroll flex gap-[16px] overflow-x-auto pb-[4px]">
+      <!-- Wallet cards. AA2 (arbitration 2): single column below sm — unlike the
+           stat tiles, wallet cards are management surfaces, not a glanceable strip. -->
+      <div class="dig-scroll flex gap-[16px] overflow-x-auto pb-[4px] max-sm:flex-col max-sm:overflow-x-visible">
         <div
           v-for="(w, i) in wallets"
           :key="w.id"
-          class="relative flex-shrink-0 w-[240px] rounded-[16px] p-[18px] cursor-pointer"
+          class="relative flex-shrink-0 w-[240px] max-sm:w-full rounded-[16px] p-[18px] cursor-pointer"
           :style="{ background: 'var(--dig-surface)', border: `1.5px solid ${scope === w.id ? 'var(--dig-accent)' : 'var(--dig-line)'}` }"
           @click="toggleScope(w.id); selectWallet(w)"
         >
@@ -420,7 +422,7 @@ const assetsView = computed(() => {
         </div>
         <button
           type="button"
-          class="dig-card-h flex-shrink-0 w-[150px] rounded-[16px] flex flex-col items-center justify-center gap-[8px] cursor-pointer"
+          class="dig-card-h flex-shrink-0 w-[150px] max-sm:w-full max-sm:flex-row max-sm:py-[13px] rounded-[16px] flex flex-col items-center justify-center gap-[8px] cursor-pointer"
           style="border: 1.5px dashed #34342E; color: var(--dig-faint)"
           @click="openConnect"
         >

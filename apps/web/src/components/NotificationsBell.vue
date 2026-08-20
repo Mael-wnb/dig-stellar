@@ -52,7 +52,7 @@ function goAlerts() {
     <button
       type="button"
       aria-label="Notifications"
-      class="dig-ghost relative w-[38px] h-[38px] rounded-[11px] flex items-center justify-center transition-colors"
+      class="dig-ghost relative w-[38px] h-[38px] max-sm:w-[44px] max-sm:h-[44px] rounded-[11px] flex items-center justify-center transition-colors"
       style="background: var(--dig-surface); border: 1px solid var(--dig-line); color: var(--dig-faint)"
       @click="toggle"
     >
@@ -73,7 +73,7 @@ function goAlerts() {
     <!-- Activity feed dropdown -->
     <div
       v-if="open"
-      class="absolute right-0 mt-[10px] w-[380px] max-h-[520px] overflow-y-auto z-[50] dig-scroll"
+      class="absolute right-0 mt-[10px] w-[380px] max-sm:fixed max-sm:inset-x-[12px] max-sm:top-[64px] max-sm:mt-0 max-sm:w-auto max-h-[520px] overflow-y-auto z-[50] dig-scroll"
       style="background: var(--dig-surface); border: 1px solid var(--dig-line); border-radius: 16px; box-shadow: 0 16px 48px rgba(0,0,0,0.5)"
     >
       <!-- header -->

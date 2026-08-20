@@ -114,4 +114,14 @@ body {
 .dig-drawer .dig-navon,
 .dig-drawer .dig-chip,
 .dig-drawer .dig-social { min-height: 44px; }
+
+/* AA2 (arbitration decision 4) — shared touch-target floor on phones: one pass
+   over the shared control classes instead of per-view tweaks. Covers filter and
+   action chips, modal close buttons (.dig-chip), primary/ghost buttons (connect,
+   CTAs, bell) and nav rows. min-width only on chips so icon-only closers become
+   tappable squares without stretching full-width buttons. */
+@media (max-width: 639px) {
+  .dig-chip, .dig-btn, .dig-ghost, .dig-nav, .dig-navon { min-height: 44px; }
+  .dig-chip { min-width: 44px; }
+}
 @keyframes digOverlay { from { opacity: 0; }                                          to { opacity: 1; } }

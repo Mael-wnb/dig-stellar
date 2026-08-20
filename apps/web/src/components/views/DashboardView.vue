@@ -141,8 +141,9 @@ const {
 
 <template>
   <div class="max-w-[1180px] mx-auto px-[26px] py-[26px] flex flex-col gap-[16px]" style="animation: digFade .35s ease both">
-    <!-- Hero + alerts summary -->
-    <div class="grid gap-[16px]" style="grid-template-columns: 1.5fr 1fr">
+    <!-- Hero + alerts summary. AA2: stacks below sm (the side-by-side row was
+         the source of the 390px horizontal pan — catalog correction). -->
+    <div class="grid gap-[16px] grid-cols-1 sm:grid-cols-[1.5fr_1fr]">
       <div class="rounded-[18px] p-[24px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
         <div class="flex items-center justify-between gap-[14px]">
           <div class="text-[13px] font-medium" style="color: var(--dig-faint)">Stellar DeFi network</div>
@@ -214,9 +215,10 @@ const {
          Self-hiding when the campaign is dark or the budget is spent. -->
     <FaucetPromoBanner />
 
-    <!-- Stat strip -->
-    <div class="grid gap-[16px]" style="grid-template-columns: repeat(4, 1fr)">
-      <div v-for="s in statTiles" :key="s.label" class="rounded-[16px] px-[20px] py-[18px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
+    <!-- Stat strip. AA2 (arbitration 2): peek-strip below sm in its OWN scroll
+         container (main itself must never h-pan), 4-up grid from sm up. -->
+    <div class="gap-[16px] sm:grid sm:grid-cols-4 max-sm:flex max-sm:overflow-x-auto max-sm:pb-[4px] dig-scroll">
+      <div v-for="s in statTiles" :key="s.label" class="rounded-[16px] px-[20px] py-[18px] max-sm:w-[150px] max-sm:flex-shrink-0" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
         <div class="text-[12px] font-medium" style="color: var(--dig-faint)">{{ s.label }}</div>
         <div class="text-[24px] font-bold tracking-[-0.02em] mt-[6px] tabular-nums">{{ s.value }}</div>
         <div class="text-[12px] font-semibold mt-[4px]" :style="{ color: s.color }">{{ s.delta }}</div>

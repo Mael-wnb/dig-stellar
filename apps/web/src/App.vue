@@ -32,8 +32,10 @@ const { drawerOpen } = useDrawer()
     <div class="flex-1 h-full flex flex-col min-w-0">
       <AppTopbar />
 
+      <!-- overflow-x-hidden (AA2): main must never pan horizontally — wide
+           content scrolls inside its own overflow-x container, never the view. -->
       <main
-        class="dig-scroll flex-1 overflow-y-auto"
+        class="dig-scroll flex-1 overflow-y-auto overflow-x-hidden"
         :style="{
           background: `var(--dig-bg) url('${bgUrl}') center top / cover no-repeat`,
           overflow: drawerOpen ? 'hidden' : undefined,

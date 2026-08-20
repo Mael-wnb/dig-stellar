@@ -199,6 +199,25 @@ const changeLabel = computed(() => (changeAt.value ? fmtDate(changeAt.value) : '
           <path v-for="(seg, i) in segments" :key="'l' + i" :d="linePath(seg)" fill="none" stroke="#B8E640" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
           <circle v-for="(d, i) in dots" :key="'d' + i" :cx="d.x" :cy="d.y" r="2.5" fill="#B8E640" />
           <circle v-if="lastPt" :cx="lastPt.x" :cy="lastPt.y" r="3" fill="#B8E640" />
+          <!-- AA2 (arbitration 5): phone-only tick marks. The non-uniform viewBox
+               scale squashes the r=2.5 dots to ~1px-wide slivers below sm, so
+               isolated snapshots get a device-pixel tick there (display gated in
+               <style>; never shown at sm+, and never interpolating across gaps). -->
+          <line
+            v-for="(d, i) in dots"
+            :key="'m' + i"
+            class="tvl-mark"
+            :x1="d.x" :y1="d.y - 5" :x2="d.x" :y2="d.y + 5"
+            stroke="#B8E640" stroke-width="3" stroke-linecap="round"
+            vector-effect="non-scaling-stroke"
+          />
+          <line
+            v-if="lastPt"
+            class="tvl-mark"
+            :x1="lastPt.x" :y1="lastPt.y - 5" :x2="lastPt.x" :y2="lastPt.y + 5"
+            stroke="#B8E640" stroke-width="3" stroke-linecap="round"
+            vector-effect="non-scaling-stroke"
+          />
           <!-- methodology-change marker (2026-08-17): dashed guide on the changeover date -->
           <line v-if="changeX !== null" :x1="changeX" y1="0" :x2="changeX" :y2="H" stroke="#5E5F5D" stroke-width="1" stroke-dasharray="3 3" />
         </svg>
@@ -235,3 +254,15 @@ const changeLabel = computed(() => (changeAt.value ? fmtDate(changeAt.value) : '
     </template>
   </div>
 </template>
+
+<style scoped>
+/* AA2: the tick marks exist only below sm — desktop rendering is unchanged. */
+.tvl-mark {
+  display: none;
+}
+@media (max-width: 639px) {
+  .tvl-mark {
+    display: block;
+  }
+}
+</style>

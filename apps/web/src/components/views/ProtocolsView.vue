@@ -5,6 +5,7 @@
 // and a per-protocol stale dot (restyled, not removed). Rows open the pool view.
 import { computed, ref, watch } from 'vue'
 import { useProtocol } from '../../composables/useProtocol'
+import { useMediaQuery } from '../../composables/useMediaQuery'
 import { useView } from '../../composables/useView'
 import { venueTheme } from '../../data/venueTheme'
 import { displayPoolName, displaySymbol, formatUsd, formatCount } from '../../utils/format'
@@ -274,7 +275,37 @@ const rows = computed(() => {
 type ColType = 'value' | 'protocol' | 'key'
 interface Col { key: SortKey | null; label: string; field?: string; align: 'left' | 'right'; type: ColType }
 
+// AA2 (arbitration 1): below sm the table shows Pool + TVL + ONE type metric and
+// must FIT the viewport — no horizontal scroll, no card refactor. On "All" the
+// PROTOCOL column is the one dropped (identity stays visible via row icon +
+// filter chips). Presentation-only: rows/sort/data logic untouched.
+const isNarrow = useMediaQuery('(max-width: 639px)')
+
 const columns = computed<Col[]>(() => {
+  if (isNarrow.value) {
+    switch (selectedKind.value) {
+      case 'lending':
+        return [
+          { key: 'tvl', label: 'TVL', field: 'tvl', align: 'right', type: 'value' },
+          { key: 'apy', label: 'Supply APY', field: 'apy', align: 'right', type: 'value' },
+        ]
+      case 'amm':
+        return [
+          { key: 'tvl', label: 'TVL', field: 'tvl', align: 'right', type: 'value' },
+          { key: 'vol', label: '24h vol', field: 'vol', align: 'right', type: 'value' },
+        ]
+      case 'vault':
+        return [
+          { key: 'tvl', label: 'TVL', field: 'tvl', align: 'right', type: 'value' },
+          { key: 'apy', label: 'APY', field: 'apy', align: 'right', type: 'value' },
+        ]
+      default:
+        return [
+          { key: 'tvl', label: 'TVL', field: 'tvl', align: 'right', type: 'value' },
+          { key: 'key', label: 'Key metric', align: 'right', type: 'key' },
+        ]
+    }
+  }
   switch (selectedKind.value) {
     case 'lending':
       return [
@@ -305,13 +336,23 @@ const columns = computed<Col[]>(() => {
 })
 
 // Grid track sizing: Pool (wide) · each column · chevron. Protocol/Key metric get
-// a touch more room than a plain numeric column.
+// a touch more room than a plain numeric column. Narrow: tighter pool column and
+// a slimmer chevron so three columns genuinely fit 390px.
 const gridTemplate = computed(
   () =>
-    `2fr ${columns.value
+    `${isNarrow.value ? '1.6fr' : '2fr'} ${columns.value
       .map((c) => (c.type === 'key' ? '1.4fr' : c.type === 'protocol' ? '1.2fr' : '1fr'))
-      .join(' ')} 40px`,
+      .join(' ')} ${isNarrow.value ? '20px' : '40px'}`,
 )
+
+// A sort key whose column is hidden at narrow still sorts correctly but shows no
+// header feedback — snap back to TVL (always visible) when the set shrinks.
+watch(isNarrow, (narrow) => {
+  if (narrow && !columns.value.some((c) => c.key === sortKey.value)) {
+    sortKey.value = 'tvl'
+    sortDir.value = 'desc'
+  }
+})
 
 function arrow(k: SortKey | null): string {
   if (k === null || sortKey.value !== k) return ''
@@ -335,7 +376,7 @@ function arrow(k: SortKey | null): string {
         <div
           v-for="c in protocolCards"
           :key="c.id"
-          class="flex-shrink-0 w-[300px] rounded-[18px] p-[22px] cursor-pointer dig-card-h"
+          class="flex-shrink-0 w-[300px] rounded-[18px] p-[22px] max-sm:w-[236px] max-sm:p-[15px] cursor-pointer dig-card-h"
           style="background: var(--dig-surface); border: 1px solid var(--dig-line)"
           @click="openPool(c.topPool)"
         >
@@ -359,14 +400,14 @@ function arrow(k: SortKey | null): string {
               >+{{ c.moreAssets }}</span>
             </div>
           </div>
-          <div class="grid grid-cols-3 gap-[14px] mt-[20px]">
+          <div class="grid grid-cols-3 gap-[14px] mt-[20px] max-sm:gap-[10px] max-sm:mt-[12px]">
             <div class="min-w-0">
-              <div class="text-[12px] truncate" style="color: var(--dig-faint)">TVL</div>
-              <div class="text-[18px] font-bold mt-[2px] tabular-nums truncate">{{ formatUsd(c.tvl) }}</div>
+              <div class="text-[12px] max-sm:text-[11px] truncate" style="color: var(--dig-faint)">TVL</div>
+              <div class="text-[18px] max-sm:text-[14px] font-bold mt-[2px] tabular-nums truncate">{{ formatUsd(c.tvl) }}</div>
             </div>
             <div v-for="m in c.metrics" :key="m.label" class="min-w-0">
-              <div class="text-[12px] truncate" style="color: var(--dig-faint)">{{ m.label }}</div>
-              <div class="text-[18px] font-bold mt-[2px] tabular-nums truncate" :style="{ color: m.color }">{{ m.value }}</div>
+              <div class="text-[12px] max-sm:text-[11px] truncate" style="color: var(--dig-faint)">{{ m.label }}</div>
+              <div class="text-[18px] max-sm:text-[14px] font-bold mt-[2px] tabular-nums truncate" :style="{ color: m.color }">{{ m.value }}</div>
             </div>
           </div>
         </div>
@@ -394,9 +435,11 @@ function arrow(k: SortKey | null): string {
           <span class="ml-auto text-[12px]" style="color: var(--dig-faint)">{{ rows.length }} pools</span>
         </div>
 
+        <!-- AA2: below sm the reduced column set fits the viewport — no min
+             width, no horizontal scroll (arbitration 1). -->
         <div class="overflow-x-auto">
-          <div class="min-w-[720px]">
-            <div class="grid items-center px-[20px] py-[11px] text-[11px] font-semibold uppercase tracking-[0.04em]" :style="{ gridTemplateColumns: gridTemplate, color: 'var(--dig-faint)', borderBottom: '1px solid var(--dig-line-soft)' }">
+          <div class="sm:min-w-[720px]">
+            <div class="grid items-center px-[20px] max-sm:px-[12px] py-[11px] text-[11px] font-semibold uppercase tracking-[0.04em]" :style="{ gridTemplateColumns: gridTemplate, color: 'var(--dig-faint)', borderBottom: '1px solid var(--dig-line-soft)' }">
               <div>Pool</div>
               <template v-for="col in columns" :key="col.label">
                 <button v-if="col.key" type="button" class="cursor-pointer select-none uppercase bg-transparent" :style="{ textAlign: col.align, color: sortKey === col.key ? 'var(--dig-text)' : 'var(--dig-faint)' }" @click="toggleSort(col.key)">{{ col.label }}{{ arrow(col.key) }}</button>
@@ -407,7 +450,7 @@ function arrow(k: SortKey | null): string {
             <div
               v-for="r in rows"
               :key="r.id"
-              class="dig-row grid items-center px-[20px] py-[13px] cursor-pointer"
+              class="dig-row grid items-center px-[20px] max-sm:px-[12px] py-[13px] cursor-pointer"
               :style="{ gridTemplateColumns: gridTemplate, borderBottom: '1px solid var(--dig-line-soft)' }"
               @click="openPool(r.id)"
             >

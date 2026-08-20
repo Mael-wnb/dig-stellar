@@ -89,9 +89,11 @@ const iconFor = (n: { metric?: any; category?: string }) => ICONS[metricIconKey(
 
       <!-- ── LEFT: Activity feed ─────────────────────────────────────────── -->
       <section class="bg-[#1E1E1E] border border-[#2F2F2C] rounded-[18px] overflow-hidden">
-        <header class="flex items-center px-5 py-4 border-b border-[#2C2C29]">
+        <!-- AA2 (arbitration 3): below sm the header stacks — title row, chips
+             row, full-width "New rule" button (the one-row layout clipped). -->
+        <header class="flex items-center px-5 py-4 border-b border-[#2C2C29] max-sm:flex-wrap max-sm:gap-y-[10px]">
           <h2 class="text-sm font-semibold">Activity feed</h2>
-          <div class="flex gap-1.5 ml-3.5">
+          <div class="flex gap-1.5 ml-3.5 max-sm:order-2 max-sm:ml-0 max-sm:w-full max-sm:flex-wrap">
             <button
               v-for="[key, label] in FILTERS"
               :key="key"
@@ -108,7 +110,7 @@ const iconFor = (n: { metric?: any; category?: string }) => ICONS[metricIconKey(
             @click="markAllAsRead"
           >Mark all read</button>
           <button
-            class="h-[34px] px-3.5 rounded-[10px] bg-[#D5FF2F] text-[#252525] font-bold text-[12.5px] cursor-pointer hover:brightness-105"
+            class="h-[34px] px-3.5 rounded-[10px] bg-[#D5FF2F] text-[#252525] font-bold text-[12.5px] cursor-pointer hover:brightness-105 max-sm:order-3 max-sm:ml-0 max-sm:w-full max-sm:h-[44px]"
             :class="unreadCount > 0 ? 'ml-2.5' : 'ml-auto'"
             @click="modalOpen = true"
           >+ New rule</button>
