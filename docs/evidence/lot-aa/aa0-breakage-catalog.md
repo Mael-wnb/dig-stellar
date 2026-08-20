@@ -103,8 +103,16 @@ Founder arbitration items are marked **[AA2-ARB]**.
   its trigger is 38px (touch-target pass, §4).
 
 **Dashboard** (`shellsim/390x844/connected-dashboard{,-bottom}.png`)
-- H2 two-panel stack holds at 390; positions row, Assets/Position breakdown all
-  legible. Campaign card fits with countdown + progress + both CTAs.
+- ~~H2 two-panel stack holds at 390~~ **Correction (2026-08-20, found during
+  AA1 smoke):** the hero + Alerts panel row does NOT stack at 390 — it stays
+  side-by-side and pans horizontally inside `main` (the whole view scrolls
+  sideways; the Alerts panel and the 4th stat tile hang past the viewport).
+  The AA0 probe excused it because `main` itself computes `overflow-x:auto`.
+  Pre-existing (visible in the shellsim captures), unchanged by AA1. This makes
+  the AA2 dashboard item concrete: stack the H2 panel row at `<sm`, and give
+  the stat-tile strip its own nested scroll container so `main` never h-pans.
+  Positions row, Assets/Position breakdown legible. Campaign card fits with
+  countdown + progress + both CTAs.
 - Hero TVL curve renders very sparse at 390 — partly the short history (13
   snapshots), partly bar sizing; axis labels + methodology footnote wrap fine.
   Cosmetic/legibility pass in AA2.
