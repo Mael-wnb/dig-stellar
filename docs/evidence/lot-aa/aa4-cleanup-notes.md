@@ -6,7 +6,13 @@ Running list of temporary state to undo when Lot AA closes (checked off in AA4).
   `https://dig-stellar-web-git-feat-responsive-dig-7a565626.vercel.app` was
   added to `CORS_ORIGINS` on the VPS for AA1 real-device validation
   (founder, 2026-08-20). Remove it from the VPS env when the lot closes —
-  the preview URL dies with the branch.
+  the preview URL dies with the branch (branch deleted 2026-08-20; founder
+  runs the CORS removal on the VPS).
+- [x] **Lot AB VPS deploy**: DONE — founder deployed `3618c03` to the VPS
+  BEFORE giving the AA3 go (health verified: `version: 3618c03`, db ok, all
+  venues fresh except `allbridge` — expected-dormant, see
+  `docs/runbooks.md` /health note: Allbridge Core paused since the
+  2026-07-20 exploit). Watch-only-first is live in prod end-to-end.
 - [x] Docs sync per the brief's AA4: `current-state.md`, `status-board.md`
   (responsive debt line), §1 Workflow Rules → `delivery-playbook.md`
   (done 2026-08-20, AA4 close-out commit).

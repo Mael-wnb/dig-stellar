@@ -222,6 +222,12 @@ internal URLs (targets/steps are fixed internal labels; `version` is the short G
   the product reads), `lastRefreshAt` (max `as_of` in `network_tvl_snapshots`). Always HTTP 200
   with a readable `status`: `degraded` when the DB errors or any venue is stale; HTTP 503 only
   when the DB itself is unreachable.
+  **Known expected-dormant venue: `allbridge` (`asOf: null` / stale is NOT an indexer bug).**
+  Allbridge Core has been paused since the 2026-07-20 Solana flash-loan exploit (~$1.65M, their
+  second since 2023; LPs urged to withdraw; no relaunch announced as of 2026-08-20) — there are
+  simply no bridge events to ingest. The dashboard bridge card frames this honestly as an
+  upstream pause (self-clearing banner). If Allbridge relaunches, this note is the trigger to
+  re-enable freshness expectations for the venue.
 - `GET /v1/ops/metrics`: refresh-pipeline RPC latency + error rates over a 24h window, from
   `rpc_metrics_runs` / `refresh_step_runs` (written by 71 at end of each `job:refresh`).
   Error rate is aggregated (`sum(errors)/sum(calls)`, sound to aggregate); latency percentiles

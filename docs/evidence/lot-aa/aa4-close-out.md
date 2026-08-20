@@ -50,7 +50,8 @@ tests → CI on the pushed branch → smoke → Vercel Preview → founder real-
 ## Remaining outside this repo (founder / VPS)
 
 - [ ] Remove the branch-preview origin from VPS `CORS_ORIGINS`
-  (`aa4-cleanup-notes.md`) — the branch dies after the final merge.
-- [ ] VPS API deploy of Lot AB (`3618c03`) if not already done — required for
-  watch-only-first to work in prod (frontend fails safe with an honest error
-  until then, but the entry path stays closed).
+  (`aa4-cleanup-notes.md`) — the branch is deleted; founder runs this on the VPS.
+- [x] VPS API deploy of Lot AB (`3618c03`) — DONE by the founder BEFORE the AA3
+  go (health verified: version `3618c03`, db ok; `allbridge` freshness null is
+  expected-dormant — see the /health note in `docs/runbooks.md`). The §1
+  deploy-order rule was respected; watch-only-first is live in prod.
