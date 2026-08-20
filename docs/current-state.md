@@ -171,8 +171,17 @@ APY, Borrow APY — Volume/Daily Reward removed as structurally empty for lendin
 The SDEX swap widget now quotes the price live (via `/v1/actions/sdex/quote`) and derives min-receive
 with auto-slippage instead of a manual field.
 
-Partial / weak: loading/error/stale states are not yet consistent; responsive behavior needs a real
-pass; some zones still mix real features and "coming soon" placeholders.
+Partial / weak: loading/error/stale states are not yet consistent; some zones still mix real
+features and "coming soon" placeholders.
+
+Responsive (Lot AA, closed 2026-08-20): below `lg` the sidebar is an off-canvas drawer with a
+topbar burger; views adapt per founder arbitration (pools-table column swap at `<sm`, wallet cards
+single-column, peek-strips for card rows, ≥44px touch targets); the three modals render as bottom
+sheets below `sm`. On touch-mobile the connect modal is honest about the signing reality (AA0-a:
+consultation-first — desktop-extension wallets don't run in mobile browsers, xBull/Albedo bridges
+unreliable) and presents watch-only tracking as the primary entry: the first tracked address mints
+a real user server-side (Lot AB) — never the shared demo account. Evidence: `docs/evidence/lot-aa/`
+and `docs/evidence/lot-ab/`.
 
 Network selection: the wallet network follows the Mainnet/Testnet toggle (`useNetwork`) as the single
 source of truth — the Wallets Kit follows it via `kit.setNetwork`, signing uses the current network,
@@ -184,8 +193,8 @@ vetted pair lists; testnet unchanged. The Blend deposit card stays testnet-only 
 Direction: a pure UI + composables/state + internal-API-consumer layer. Core network stats are already
 served by the API from the DB (see §2).
 
-Priorities: (1) responsive pass; (2) standardize loading/error/stale; (3) clarify real vs deferred
-sections. (These are polish, not T1 criteria.)
+Priorities: (1) standardize loading/error/stale; (2) clarify real vs deferred sections.
+(These are polish, not T1 criteria. The responsive pass shipped as Lot AA.)
 
 ---
 

@@ -1,0 +1,925 @@
+[
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "disconnected-dashboard",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 11,
+      "sample": [
+        {
+          "sel": "div.max-w-[1180px].mx-auto > section.bg-[#2A2A2A].border > div.flex.items-start > a.ml-auto.flex-shrink-0",
+          "w": 75,
+          "h": 17,
+          "text": "Learn more ↗"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "24H"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 33,
+          "h": 25,
+          "text": "7D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "30D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 63,
+          "h": 30,
+          "text": "Routes"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 96,
+          "h": 30,
+          "text": "Recent flows"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 88,
+          "h": 17,
+          "text": "Route"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 33,
+          "text": "Inflow ↓"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 44,
+          "h": 17,
+          "text": "Outflow"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 17,
+          "text": "Net"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 32,
+          "h": 17,
+          "text": "Share"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "disconnected-protocols",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 2,
+      "sample": [
+        {
+          "sel": "div.overflow-x-auto > div.sm:min-w-[720px] > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 73,
+          "h": 17,
+          "text": "TVL ↓"
+        },
+        {
+          "sel": "div.overflow-x-auto > div.sm:min-w-[720px] > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 102,
+          "h": 17,
+          "text": "Key metric"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "disconnected-pool",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 1,
+      "sample": [
+        {
+          "sel": "div.rounded-[18px].p-[22px] > div.flex.items-center > span.text-[12.5px].font-semibold > a.no-underline.hover:opacity-80",
+          "w": 83,
+          "h": 17,
+          "text": "CAJJZS…BXBD"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "disconnected-portfolio",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 0,
+      "sample": []
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "disconnected-alerts",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 4,
+      "sample": [
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 37,
+          "h": 24,
+          "text": "All"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 62,
+          "h": 24,
+          "text": "Critical"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 64,
+          "h": 24,
+          "text": "Activity"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.grid-cols-1 > section.bg-[#1E1E1E].border > button.w-full.mt-3.5",
+          "w": 292,
+          "h": 40,
+          "text": "+ Create rule"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "connected-dashboard",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 11,
+      "sample": [
+        {
+          "sel": "div.max-w-[1180px].mx-auto > section.bg-[#2A2A2A].border > div.flex.items-start > a.ml-auto.flex-shrink-0",
+          "w": 75,
+          "h": 17,
+          "text": "Learn more ↗"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "24H"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 33,
+          "h": 25,
+          "text": "7D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "30D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 63,
+          "h": 30,
+          "text": "Routes"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 96,
+          "h": 30,
+          "text": "Recent flows"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 88,
+          "h": 17,
+          "text": "Route"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 33,
+          "text": "Inflow ↓"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 44,
+          "h": 17,
+          "text": "Outflow"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 17,
+          "text": "Net"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 32,
+          "h": 17,
+          "text": "Share"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "connected-protocols",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 2,
+      "sample": [
+        {
+          "sel": "div.overflow-x-auto > div.sm:min-w-[720px] > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 73,
+          "h": 17,
+          "text": "TVL ↓"
+        },
+        {
+          "sel": "div.overflow-x-auto > div.sm:min-w-[720px] > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 102,
+          "h": 17,
+          "text": "Key metric"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "connected-pool",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 1,
+      "sample": [
+        {
+          "sel": "div.rounded-[18px].p-[22px] > div.flex.items-center > span.text-[12.5px].font-semibold > a.no-underline.hover:opacity-80",
+          "w": 83,
+          "h": 17,
+          "text": "CAJJZS…BXBD"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "connected-portfolio",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 10,
+      "sample": [
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.text-[11px].font-semibold",
+          "w": 58,
+          "h": 25,
+          "text": "Refresh"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.w-[26px].h-[24px]",
+          "w": 26,
+          "h": 24,
+          "text": "⋯"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.text-[11px].font-semibold",
+          "w": 58,
+          "h": 25,
+          "text": "Refresh"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.w-[26px].h-[24px]",
+          "w": 26,
+          "h": 24,
+          "text": "⋯"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.text-[11px].font-semibold",
+          "w": 58,
+          "h": 25,
+          "text": "Refresh"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.w-[26px].h-[24px]",
+          "w": 26,
+          "h": 24,
+          "text": "⋯"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.text-[11px].font-semibold",
+          "w": 58,
+          "h": 25,
+          "text": "Refresh"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.w-[26px].h-[24px]",
+          "w": 26,
+          "h": 24,
+          "text": "⋯"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.ml-auto.flex > button.text-[12.5px].font-semibold",
+          "w": 89,
+          "h": 31,
+          "text": "By position"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.ml-auto.flex > button.text-[12.5px].font-semibold",
+          "w": 79,
+          "h": 31,
+          "text": "By wallet"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "connected-alerts",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 4,
+      "sample": [
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 37,
+          "h": 24,
+          "text": "All"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 62,
+          "h": 24,
+          "text": "Critical"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 64,
+          "h": 24,
+          "text": "Activity"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.grid-cols-1 > section.bg-[#1E1E1E].border > button.w-full.mt-3.5",
+          "w": 292,
+          "h": 40,
+          "text": "+ Create rule"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "action-swap-ended",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 13,
+      "sample": [
+        {
+          "sel": "div.max-w-[1180px].mx-auto > section.bg-[#2A2A2A].border > div.flex.items-start > a.ml-auto.flex-shrink-0",
+          "w": 75,
+          "h": 17,
+          "text": "Learn more ↗"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "24H"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 33,
+          "h": 25,
+          "text": "7D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "30D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 63,
+          "h": 30,
+          "text": "Routes"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 96,
+          "h": 30,
+          "text": "Recent flows"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 88,
+          "h": 17,
+          "text": "Route"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 33,
+          "text": "Inflow ↓"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 44,
+          "h": 17,
+          "text": "Outflow"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 17,
+          "text": "Net"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 32,
+          "h": 17,
+          "text": "Share"
+        },
+        {
+          "sel": "div.px-[26px].py-[18px] > div.flex.items-center > div.flex.items-center > button.px-3.py-[5px]",
+          "w": 69,
+          "h": 29,
+          "text": "Mainnet"
+        },
+        {
+          "sel": "div.px-[26px].py-[18px] > div.flex.items-center > div.flex.items-center > button.px-3.py-[5px]",
+          "w": 64,
+          "h": 27,
+          "text": "Testnet"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "action-blend-ended",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 21,
+      "sample": [
+        {
+          "sel": "div.max-w-[1180px].mx-auto > section.bg-[#2A2A2A].border > div.flex.items-start > a.ml-auto.flex-shrink-0",
+          "w": 75,
+          "h": 17,
+          "text": "Learn more ↗"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "24H"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 33,
+          "h": 25,
+          "text": "7D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "30D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 63,
+          "h": 30,
+          "text": "Routes"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 96,
+          "h": 30,
+          "text": "Recent flows"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 88,
+          "h": 17,
+          "text": "Route"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 33,
+          "text": "Inflow ↓"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 44,
+          "h": 17,
+          "text": "Outflow"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 17,
+          "text": "Net"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 32,
+          "h": 17,
+          "text": "Share"
+        },
+        {
+          "sel": "div.px-[26px].py-[18px] > div.flex.items-center > div.flex.items-center > button.px-3.py-[5px]",
+          "w": 69,
+          "h": 29,
+          "text": "Mainnet"
+        },
+        {
+          "sel": "div.px-[26px].py-[18px] > div.flex.items-center > div.flex.items-center > button.px-3.py-[5px]",
+          "w": 64,
+          "h": 27,
+          "text": "Testnet"
+        },
+        {
+          "sel": "div.px-[26px].py-[18px] > div.bg-[#2A2A2A].border > div.flex.gap-2 > button.flex-1.px-3",
+          "w": 148,
+          "h": 34,
+          "text": "supply"
+        },
+        {
+          "sel": "div.px-[26px].py-[18px] > div.bg-[#2A2A2A].border > div.flex.gap-2 > button.flex-1.px-3",
+          "w": 148,
+          "h": 34,
+          "text": "withdraw"
+        },
+        {
+          "sel": "div.bg-[#2A2A2A].border > div.bg-[#202020].border > span.text-[#9a9b99] > a.text-[#d5ff2f].hover:underline",
+          "w": 64,
+          "h": 14,
+          "text": "blend.capital"
+        },
+        {
+          "sel": "div.px-[26px].py-[18px] > div.bg-[#2A2A2A].border > div.text-[11px].text-[#9a9b99] > a.font-mono.hover:text-[#d5ff2f]",
+          "w": 73,
+          "h": 17,
+          "text": "CAJJZS…BXBD"
+        },
+        {
+          "sel": "div.px-[26px].py-[18px] > div.bg-[#2A2A2A].border > div.flex.gap-2 > button.flex-1.px-3",
+          "w": 148,
+          "h": 34,
+          "text": "XLM  Recommended"
+        },
+        {
+          "sel": "div.px-[26px].py-[18px] > div.bg-[#2A2A2A].border > div.flex.gap-2 > button.flex-1.px-3",
+          "w": 148,
+          "h": 34,
+          "text": "USDC"
+        },
+        {
+          "sel": "div.px-[26px].py-[18px] > div.bg-[#2A2A2A].border > label.flex.flex-col > input.bg-[#202020].border",
+          "w": 304,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.w-[520px].max-w-full > div.px-[26px].py-[18px] > div.bg-[#2A2A2A].border > button.w-full.px-4",
+          "w": 304,
+          "h": 34,
+          "text": "Deposit XLM to Blend"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "disconnected-dashboard",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "disconnected-protocols",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "disconnected-pool",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "disconnected-portfolio",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "disconnected-alerts",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "connected-dashboard",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "connected-protocols",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "connected-pool",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "connected-portfolio",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "connected-alerts",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "action-swap-ended",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "action-blend-ended",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "disconnected-dashboard",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "disconnected-protocols",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "disconnected-pool",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "disconnected-portfolio",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "disconnected-alerts",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "connected-dashboard",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "connected-protocols",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "connected-pool",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "connected-portfolio",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "connected-alerts",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "action-swap-ended",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "action-blend-ended",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  }
+]
