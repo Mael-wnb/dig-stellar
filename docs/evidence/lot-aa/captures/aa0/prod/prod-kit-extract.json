@@ -1,0 +1,78 @@
+{
+  "kitOpened": true,
+  "kit": {
+    "found": true,
+    "kitOpened": true,
+    "fullText": "Learn more What is a wallet? Wallets are used to send, receive, and store the keys you use to sign blockchain transactions. What is Stellar? Stellar is a decentralized, public blockchain that gives developers the tools to create experiences that are more like cash than crypto Connect a Wallet Albedo xBull Freighter Not available Rabet Not available LOBSTR Not available Hana Wallet Not available",
+    "rows": [
+      {
+        "cls": "help__whats_a_wallet",
+        "text": "What is a wallet? Wallets are used to send, receive, and sto"
+      },
+      {
+        "cls": "dialog-modal-body__wallets",
+        "text": "Connect a Wallet Albedo xBull Freighter Not available Rabet "
+      },
+      {
+        "cls": "wallets-container",
+        "text": "Connect a Wallet Albedo xBull Freighter Not available Rabet "
+      },
+      {
+        "cls": "wallets-header",
+        "text": "Connect a Wallet"
+      },
+      {
+        "cls": "wallets-header__modal-title dialog-text-solid",
+        "text": "Connect a Wallet"
+      },
+      {
+        "cls": "wallets-header__button",
+        "text": ""
+      },
+      {
+        "cls": "wallets-body",
+        "text": "Albedo xBull Freighter Not available Rabet Not available LOB"
+      },
+      {
+        "cls": " wallets-body__item  ",
+        "text": "Albedo"
+      },
+      {
+        "cls": " wallets-body__item  ",
+        "text": "xBull"
+      },
+      {
+        "cls": " wallets-body__item not-available ",
+        "text": "Freighter Not available"
+      },
+      {
+        "cls": "not-available",
+        "text": "Not available"
+      },
+      {
+        "cls": " wallets-body__item not-available ",
+        "text": "Rabet Not available"
+      },
+      {
+        "cls": "not-available",
+        "text": "Not available"
+      },
+      {
+        "cls": " wallets-body__item not-available ",
+        "text": "LOBSTR Not available"
+      },
+      {
+        "cls": "not-available",
+        "text": "Not available"
+      },
+      {
+        "cls": " wallets-body__item not-available mb-0",
+        "text": "Hana Wallet Not available"
+      },
+      {
+        "cls": "not-available",
+        "text": "Not available"
+      }
+    ]
+  }
+}

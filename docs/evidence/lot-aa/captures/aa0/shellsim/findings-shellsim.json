@@ -1,0 +1,1558 @@
+[
+  {
+    "tag": "shellsim",
+    "viewport": "390x844",
+    "name": "disconnected-dashboard",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 22,
+      "sample": [
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 120,
+          "h": 38,
+          "text": "Connect wallet"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-btn.h-[38px]",
+          "w": 88,
+          "h": 38,
+          "text": "Swap"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-ghost.h-[38px]",
+          "w": 102,
+          "h": 38,
+          "text": "Deposit"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 43,
+          "h": 60,
+          "text": "View all →"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > button.dig-ghost.mt-auto",
+          "w": 83,
+          "h": 40,
+          "text": "+ New alert rule"
+        },
+        {
+          "sel": "div.rounded-[18px].px-[22px] > div.flex.items-center > div.flex.items-center > button.dig-btn.h-[40px]",
+          "w": 99,
+          "h": 40,
+          "text": "Swap now"
+        },
+        {
+          "sel": "div.rounded-[18px].px-[22px] > div.flex.items-center > div.flex.items-center > button.dig-ghost.h-[40px]",
+          "w": 132,
+          "h": 40,
+          "text": "Supply on Blend"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[20px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 78,
+          "h": 24,
+          "text": "All pools →"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[20px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 108,
+          "h": 24,
+          "text": "View portfolio →"
+        },
+        {
+          "sel": "div.rounded-[18px].p-[20px] > div.flex-1.flex > div.flex.flex-col > button.dig-btn.rounded-[12px]",
+          "w": 128,
+          "h": 38,
+          "text": "Connect wallet"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > section.bg-[#2A2A2A].border > div.flex.items-start > a.ml-auto.flex-shrink-0",
+          "w": 75,
+          "h": 17,
+          "text": "Learn more ↗"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "24H"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 33,
+          "h": 25,
+          "text": "7D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "30D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 63,
+          "h": 30,
+          "text": "Routes"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 96,
+          "h": 30,
+          "text": "Recent flows"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 88,
+          "h": 17,
+          "text": "Route"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 33,
+          "text": "Inflow ↓"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 44,
+          "h": 17,
+          "text": "Outflow"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 17,
+          "text": "Net"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 32,
+          "h": 17,
+          "text": "Share"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "shellsim",
+    "viewport": "390x844",
+    "name": "disconnected-protocols",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 10,
+      "sample": [
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 122,
+          "h": 38,
+          "text": "Connect wallet"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 39,
+          "h": 28,
+          "text": "All"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 56,
+          "h": 28,
+          "text": "Blend"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 74,
+          "h": 28,
+          "text": "Aquarius"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 77,
+          "h": 28,
+          "text": "DeFindex"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 126,
+          "h": 28,
+          "text": "Stellar Native DEX"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 79,
+          "h": 28,
+          "text": "Soroswap"
+        },
+        {
+          "sel": "div.overflow-x-auto > div.min-w-[720px] > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 114,
+          "h": 17,
+          "text": "TVL ↓"
+        },
+        {
+          "sel": "div.overflow-x-auto > div.min-w-[720px] > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 160,
+          "h": 17,
+          "text": "Key metric"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "shellsim",
+    "viewport": "390x844",
+    "name": "disconnected-pool",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 7,
+      "sample": [
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 119,
+          "h": 38,
+          "text": "Connect wallet"
+        },
+        {
+          "sel": "div.flex-1.h-full > main.flex-1.overflow-y-auto > div.max-w-[1180px].mx-auto > button.dig-chip.inline-flex",
+          "w": 111,
+          "h": 28,
+          "text": "← Back to pools"
+        },
+        {
+          "sel": "div.rounded-[18px].p-[24px] > div.flex.items-center > div.ml-auto.flex > button.dig-ghost.h-[40px]",
+          "w": 84,
+          "h": 40,
+          "text": "Alert"
+        },
+        {
+          "sel": "div.rounded-[18px].p-[24px] > div.flex.items-center > div.ml-auto.flex > button.dig-btn.h-[40px]",
+          "w": 151,
+          "h": 40,
+          "text": "Supply / Withdraw"
+        },
+        {
+          "sel": "div.flex.flex-col > div.rounded-[18px].p-[22px] > div.flex.items-center > a.dig-chip.text-[12px]",
+          "w": 73,
+          "h": 24,
+          "text": "Explore →"
+        },
+        {
+          "sel": "div.rounded-[18px].p-[22px] > div.flex.items-center > span.text-[12.5px].font-semibold > a.no-underline.hover:opacity-80",
+          "w": 83,
+          "h": 17,
+          "text": "CAJJZS…BXBD"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "shellsim",
+    "viewport": "390x844",
+    "name": "disconnected-portfolio",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 2,
+      "sample": [
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 122,
+          "h": 38,
+          "text": "Connect wallet"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "shellsim",
+    "viewport": "390x844",
+    "name": "disconnected-alerts",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 7,
+      "sample": [
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 122,
+          "h": 38,
+          "text": "Connect wallet"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 37,
+          "h": 24,
+          "text": "All"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 62,
+          "h": 24,
+          "text": "Critical"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 64,
+          "h": 24,
+          "text": "Activity"
+        },
+        {
+          "sel": "div.grid.grid-cols-1 > section.bg-[#1E1E1E].border > header.flex.items-center > button.h-[34px].px-3.5",
+          "w": 57,
+          "h": 34,
+          "text": "+ New rule"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.grid-cols-1 > section.bg-[#1E1E1E].border > button.w-full.mt-3.5",
+          "w": 292,
+          "h": 40,
+          "text": "+ Create rule"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "shellsim",
+    "viewport": "390x844",
+    "name": "connected-dashboard",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 21,
+      "sample": [
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 122,
+          "h": 38,
+          "text": "GCLSPN…CF2O"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-btn.h-[38px]",
+          "w": 88,
+          "h": 38,
+          "text": "Swap"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-ghost.h-[38px]",
+          "w": 102,
+          "h": 38,
+          "text": "Deposit"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 43,
+          "h": 60,
+          "text": "View all →"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > button.dig-ghost.mt-auto",
+          "w": 83,
+          "h": 40,
+          "text": "+ New alert rule"
+        },
+        {
+          "sel": "div.rounded-[18px].px-[22px] > div.flex.items-center > div.flex.items-center > button.dig-btn.h-[40px]",
+          "w": 99,
+          "h": 40,
+          "text": "Swap now"
+        },
+        {
+          "sel": "div.rounded-[18px].px-[22px] > div.flex.items-center > div.flex.items-center > button.dig-ghost.h-[40px]",
+          "w": 132,
+          "h": 40,
+          "text": "Supply on Blend"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[20px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 78,
+          "h": 24,
+          "text": "All pools →"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[20px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 108,
+          "h": 24,
+          "text": "View portfolio →"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > section.bg-[#2A2A2A].border > div.flex.items-start > a.ml-auto.flex-shrink-0",
+          "w": 75,
+          "h": 17,
+          "text": "Learn more ↗"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "24H"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 33,
+          "h": 25,
+          "text": "7D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "30D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 63,
+          "h": 30,
+          "text": "Routes"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 96,
+          "h": 30,
+          "text": "Recent flows"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 88,
+          "h": 17,
+          "text": "Route"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 33,
+          "text": "Inflow ↓"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 44,
+          "h": 17,
+          "text": "Outflow"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 17,
+          "text": "Net"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 32,
+          "h": 17,
+          "text": "Share"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "shellsim",
+    "viewport": "390x844",
+    "name": "connected-protocols",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 10,
+      "sample": [
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 126,
+          "h": 38,
+          "text": "GCLSPN…CF2O"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 39,
+          "h": 28,
+          "text": "All"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 56,
+          "h": 28,
+          "text": "Blend"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 74,
+          "h": 28,
+          "text": "Aquarius"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 77,
+          "h": 28,
+          "text": "DeFindex"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 126,
+          "h": 28,
+          "text": "Stellar Native DEX"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 79,
+          "h": 28,
+          "text": "Soroswap"
+        },
+        {
+          "sel": "div.overflow-x-auto > div.min-w-[720px] > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 114,
+          "h": 17,
+          "text": "TVL ↓"
+        },
+        {
+          "sel": "div.overflow-x-auto > div.min-w-[720px] > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 160,
+          "h": 17,
+          "text": "Key metric"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "shellsim",
+    "viewport": "390x844",
+    "name": "connected-pool",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 9,
+      "sample": [
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 121,
+          "h": 38,
+          "text": "GCLSPN…CF2O"
+        },
+        {
+          "sel": "div.flex-1.h-full > main.flex-1.overflow-y-auto > div.max-w-[1180px].mx-auto > button.dig-chip.inline-flex",
+          "w": 111,
+          "h": 28,
+          "text": "← Back to pools"
+        },
+        {
+          "sel": "div.rounded-[18px].p-[24px] > div.flex.items-center > div.ml-auto.flex > button.dig-ghost.h-[40px]",
+          "w": 84,
+          "h": 40,
+          "text": "Alert"
+        },
+        {
+          "sel": "div.rounded-[18px].p-[24px] > div.flex.items-center > div.ml-auto.flex > button.dig-btn.h-[40px]",
+          "w": 151,
+          "h": 40,
+          "text": "Supply / Withdraw"
+        },
+        {
+          "sel": "div.flex.flex-col > div.rounded-[18px].p-[22px] > div.flex.items-center > a.dig-chip.text-[12px]",
+          "w": 73,
+          "h": 24,
+          "text": "Explore →"
+        },
+        {
+          "sel": "div.rounded-[18px].p-[22px] > div.flex.items-center > span.text-[12.5px].font-semibold > a.no-underline.hover:opacity-80",
+          "w": 83,
+          "h": 17,
+          "text": "CAJJZS…BXBD"
+        },
+        {
+          "sel": "div.flex.flex-col > div.rounded-[18px].p-[22px] > div.flex.gap-[9px] > button.dig-btn.flex-1",
+          "w": 141,
+          "h": 40,
+          "text": "Supply"
+        },
+        {
+          "sel": "div.flex.flex-col > div.rounded-[18px].p-[22px] > div.flex.gap-[9px] > button.dig-ghost.flex-1",
+          "w": 143,
+          "h": 40,
+          "text": "Withdraw"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "shellsim",
+    "viewport": "390x844",
+    "name": "connected-portfolio",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 13,
+      "sample": [
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 126,
+          "h": 38,
+          "text": "GCLSPN…CF2O"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.text-[11px].font-semibold",
+          "w": 58,
+          "h": 25,
+          "text": "Refresh"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.w-[26px].h-[24px]",
+          "w": 26,
+          "h": 24,
+          "text": "⋯"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.text-[11px].font-semibold",
+          "w": 58,
+          "h": 25,
+          "text": "Refresh"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.w-[26px].h-[24px]",
+          "w": 26,
+          "h": 24,
+          "text": "⋯"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.text-[11px].font-semibold",
+          "w": 58,
+          "h": 25,
+          "text": "Refresh"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.w-[26px].h-[24px]",
+          "w": 26,
+          "h": 24,
+          "text": "⋯"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.text-[11px].font-semibold",
+          "w": 58,
+          "h": 25,
+          "text": "Refresh"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.w-[26px].h-[24px]",
+          "w": 26,
+          "h": 24,
+          "text": "⋯"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.ml-auto.flex > button.text-[12.5px].font-semibold",
+          "w": 89,
+          "h": 31,
+          "text": "By position"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.ml-auto.flex > button.text-[12.5px].font-semibold",
+          "w": 79,
+          "h": 31,
+          "text": "By wallet"
+        },
+        {
+          "sel": "div.dig-row.px-[20px] > div.grid.items-center > div.text-right > button.dig-chip.text-[12px]",
+          "w": 63,
+          "h": 28,
+          "text": "Manage"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "shellsim",
+    "viewport": "390x844",
+    "name": "connected-alerts",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 7,
+      "sample": [
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 124,
+          "h": 38,
+          "text": "GCLSPN…CF2O"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 37,
+          "h": 24,
+          "text": "All"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 62,
+          "h": 24,
+          "text": "Critical"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 64,
+          "h": 24,
+          "text": "Activity"
+        },
+        {
+          "sel": "div.grid.grid-cols-1 > section.bg-[#1E1E1E].border > header.flex.items-center > button.h-[34px].px-3.5",
+          "w": 57,
+          "h": 34,
+          "text": "+ New rule"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.grid-cols-1 > section.bg-[#1E1E1E].border > button.w-full.mt-3.5",
+          "w": 292,
+          "h": 40,
+          "text": "+ Create rule"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "shellsim",
+    "viewport": "390x844",
+    "name": "modal-connect",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 24,
+      "sample": [
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 120,
+          "h": 38,
+          "text": "Connect wallet"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-btn.h-[38px]",
+          "w": 88,
+          "h": 38,
+          "text": "Swap"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-ghost.h-[38px]",
+          "w": 102,
+          "h": 38,
+          "text": "Deposit"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 43,
+          "h": 60,
+          "text": "View all →"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > button.dig-ghost.mt-auto",
+          "w": 83,
+          "h": 40,
+          "text": "+ New alert rule"
+        },
+        {
+          "sel": "div.rounded-[18px].px-[22px] > div.flex.items-center > div.flex.items-center > button.dig-btn.h-[40px]",
+          "w": 99,
+          "h": 40,
+          "text": "Swap now"
+        },
+        {
+          "sel": "div.rounded-[18px].px-[22px] > div.flex.items-center > div.flex.items-center > button.dig-ghost.h-[40px]",
+          "w": 132,
+          "h": 40,
+          "text": "Supply on Blend"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[20px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 78,
+          "h": 24,
+          "text": "All pools →"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[20px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 108,
+          "h": 24,
+          "text": "View portfolio →"
+        },
+        {
+          "sel": "div.rounded-[18px].p-[20px] > div.flex-1.flex > div.flex.flex-col > button.dig-btn.rounded-[12px]",
+          "w": 128,
+          "h": 38,
+          "text": "Connect wallet"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > section.bg-[#2A2A2A].border > div.flex.items-start > a.ml-auto.flex-shrink-0",
+          "w": 75,
+          "h": 17,
+          "text": "Learn more ↗"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "24H"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 33,
+          "h": 25,
+          "text": "7D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "30D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 63,
+          "h": 30,
+          "text": "Routes"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 96,
+          "h": 30,
+          "text": "Recent flows"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 88,
+          "h": 17,
+          "text": "Route"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 33,
+          "text": "Inflow ↓"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 44,
+          "h": 17,
+          "text": "Outflow"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 17,
+          "text": "Net"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 32,
+          "h": 17,
+          "text": "Share"
+        },
+        {
+          "sel": "div.w-[420px].rounded-[20px] > div.overflow-y-auto > div.flex.items-center > button.dig-chip.cursor-pointer",
+          "w": 30,
+          "h": 30,
+          "text": "×"
+        },
+        {
+          "sel": "div.fixed.inset-0 > div.w-[420px].rounded-[20px] > div.overflow-y-auto > input.w-full.h-[40px]",
+          "w": 290,
+          "h": 40,
+          "text": ""
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "shellsim",
+    "viewport": "390x844",
+    "name": "modal-walletskit",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 24,
+      "sample": [
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 111,
+          "h": 38,
+          "text": "Connecting…"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-btn.h-[38px]",
+          "w": 88,
+          "h": 38,
+          "text": "Swap"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-ghost.h-[38px]",
+          "w": 102,
+          "h": 38,
+          "text": "Deposit"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 43,
+          "h": 60,
+          "text": "View all →"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > button.dig-ghost.mt-auto",
+          "w": 83,
+          "h": 40,
+          "text": "+ New alert rule"
+        },
+        {
+          "sel": "div.rounded-[18px].px-[22px] > div.flex.items-center > div.flex.items-center > button.dig-btn.h-[40px]",
+          "w": 99,
+          "h": 40,
+          "text": "Swap now"
+        },
+        {
+          "sel": "div.rounded-[18px].px-[22px] > div.flex.items-center > div.flex.items-center > button.dig-ghost.h-[40px]",
+          "w": 132,
+          "h": 40,
+          "text": "Supply on Blend"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[20px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 78,
+          "h": 24,
+          "text": "All pools →"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[20px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 108,
+          "h": 24,
+          "text": "View portfolio →"
+        },
+        {
+          "sel": "div.rounded-[18px].p-[20px] > div.flex-1.flex > div.flex.flex-col > button.dig-btn.rounded-[12px]",
+          "w": 128,
+          "h": 38,
+          "text": "Connect wallet"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > section.bg-[#2A2A2A].border > div.flex.items-start > a.ml-auto.flex-shrink-0",
+          "w": 75,
+          "h": 17,
+          "text": "Learn more ↗"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "24H"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 33,
+          "h": 25,
+          "text": "7D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "30D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 63,
+          "h": 30,
+          "text": "Routes"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 96,
+          "h": 30,
+          "text": "Recent flows"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 88,
+          "h": 17,
+          "text": "Route"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 33,
+          "text": "Inflow ↓"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 44,
+          "h": 17,
+          "text": "Outflow"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 17,
+          "text": "Net"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 32,
+          "h": 17,
+          "text": "Share"
+        },
+        {
+          "sel": "div.w-[420px].rounded-[20px] > div.overflow-y-auto > div.flex.items-center > button.dig-chip.cursor-pointer",
+          "w": 30,
+          "h": 30,
+          "text": "×"
+        },
+        {
+          "sel": "div.fixed.inset-0 > div.w-[420px].rounded-[20px] > div.overflow-y-auto > input.w-full.h-[40px]",
+          "w": 290,
+          "h": 40,
+          "text": ""
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "shellsim",
+    "viewport": "390x844",
+    "name": "walletskit-content",
+    "kitInfo": {
+      "text": "Learn more What is a wallet? Wallets are used to send, receive, and store the keys you use to sign blockchain transactions. What is Stellar? Stellar is a decentralized, public blockchain that gives developers the tools to create experiences that are more like cash than crypto Connect a Wallet Albedo xBull Freighter Not available Rabet Not available LOBSTR Not available Hana Wallet Not available",
+      "rect": "found-container"
+    }
+  },
+  {
+    "tag": "shellsim",
+    "viewport": "390x844",
+    "name": "modal-alertrule",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 15,
+      "sample": [
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 124,
+          "h": 38,
+          "text": "GCLSPN…CF2O"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 37,
+          "h": 24,
+          "text": "All"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 62,
+          "h": 24,
+          "text": "Critical"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 64,
+          "h": 24,
+          "text": "Activity"
+        },
+        {
+          "sel": "div.grid.grid-cols-1 > section.bg-[#1E1E1E].border > header.flex.items-center > button.h-[34px].px-3.5",
+          "w": 57,
+          "h": 34,
+          "text": "+ New rule"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.grid-cols-1 > section.bg-[#1E1E1E].border > button.w-full.mt-3.5",
+          "w": 292,
+          "h": 40,
+          "text": "+ Create rule"
+        },
+        {
+          "sel": "div.bg-[#1E1E1E].rounded-[20px] > div.px-[26px].pt-6 > div.flex.items-center > button.cursor-pointer.text-[#5E5F5D]",
+          "w": 30,
+          "h": 30,
+          "text": "×"
+        },
+        {
+          "sel": "div.bg-[#1E1E1E].rounded-[20px] > div.px-[26px].pt-6 > div.flex.gap-1.5 > button.relative.text-[12.5px]",
+          "w": 154,
+          "h": 35,
+          "text": "Balance change soon"
+        },
+        {
+          "sel": "div.bg-[#1E1E1E].rounded-[20px] > div.px-[26px].pt-6 > div.flex.gap-1.5 > button.relative.text-[12.5px]",
+          "w": 140,
+          "h": 35,
+          "text": "Net exposure soon"
+        },
+        {
+          "sel": "div.bg-[#1E1E1E].rounded-[20px] > div.px-[26px].pt-6 > div.flex.gap-1.5 > button.relative.text-[12.5px]",
+          "w": 104,
+          "h": 35,
+          "text": "Health factor"
+        },
+        {
+          "sel": "div.bg-[#1E1E1E].rounded-[20px] > div.px-[26px].pt-6 > div.flex.gap-1.5 > button.relative.text-[12.5px]",
+          "w": 144,
+          "h": 35,
+          "text": "Position value soon"
+        },
+        {
+          "sel": "div.px-[26px].pt-6 > div.flex.items-center > span.flex.gap-1.5 > button.text-[12.5px].font-semibold",
+          "w": 85,
+          "h": 31,
+          "text": "falls below"
+        },
+        {
+          "sel": "div.px-[26px].pt-6 > div.flex.items-center > span.flex.gap-1.5 > button.text-[12.5px].font-semibold",
+          "w": 88,
+          "h": 31,
+          "text": "rises above"
+        },
+        {
+          "sel": "div.bg-[#1E1E1E].rounded-[20px] > div.px-[26px].pt-6 > div.flex.items-center > input.w-24.h-9",
+          "w": 96,
+          "h": 36,
+          "text": ""
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "shellsim",
+    "viewport": "390x844",
+    "name": "action-swap-shellsim",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 24,
+      "sample": [
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 122,
+          "h": 38,
+          "text": "GCLSPN…CF2O"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-btn.h-[38px]",
+          "w": 88,
+          "h": 38,
+          "text": "Swap"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-ghost.h-[38px]",
+          "w": 102,
+          "h": 38,
+          "text": "Deposit"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 43,
+          "h": 60,
+          "text": "View all →"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > button.dig-ghost.mt-auto",
+          "w": 83,
+          "h": 40,
+          "text": "+ New alert rule"
+        },
+        {
+          "sel": "div.rounded-[18px].px-[22px] > div.flex.items-center > div.flex.items-center > button.dig-btn.h-[40px]",
+          "w": 99,
+          "h": 40,
+          "text": "Swap now"
+        },
+        {
+          "sel": "div.rounded-[18px].px-[22px] > div.flex.items-center > div.flex.items-center > button.dig-ghost.h-[40px]",
+          "w": 132,
+          "h": 40,
+          "text": "Supply on Blend"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[20px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 78,
+          "h": 24,
+          "text": "All pools →"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[20px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 108,
+          "h": 24,
+          "text": "View portfolio →"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > section.bg-[#2A2A2A].border > div.flex.items-start > a.ml-auto.flex-shrink-0",
+          "w": 75,
+          "h": 17,
+          "text": "Learn more ↗"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "24H"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 33,
+          "h": 25,
+          "text": "7D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "30D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 63,
+          "h": 30,
+          "text": "Routes"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 96,
+          "h": 30,
+          "text": "Recent flows"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 88,
+          "h": 17,
+          "text": "Route"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 33,
+          "text": "Inflow ↓"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 44,
+          "h": 17,
+          "text": "Outflow"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 17,
+          "text": "Net"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 32,
+          "h": 17,
+          "text": "Share"
+        },
+        {
+          "sel": "div.w-[520px].max-w-full > div.px-[26px].pt-[22px] > div.flex.items-center > button.dig-chip.cursor-pointer",
+          "w": 30,
+          "h": 30,
+          "text": "×"
+        },
+        {
+          "sel": "div.px-[26px].py-[18px] > div.flex.items-center > div.flex.items-center > button.px-3.py-[5px]",
+          "w": 69,
+          "h": 29,
+          "text": "Mainnet"
+        },
+        {
+          "sel": "div.px-[26px].py-[18px] > div.flex.items-center > div.flex.items-center > button.px-3.py-[5px]",
+          "w": 64,
+          "h": 27,
+          "text": "Testnet"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "shellsim",
+    "viewport": "390x844",
+    "name": "action-blend-shellsim",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": {
+      "count": 32,
+      "sample": [
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 122,
+          "h": 38,
+          "text": "GCLSPN…CF2O"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-btn.h-[38px]",
+          "w": 88,
+          "h": 38,
+          "text": "Swap"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-ghost.h-[38px]",
+          "w": 102,
+          "h": 38,
+          "text": "Deposit"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 43,
+          "h": 60,
+          "text": "View all →"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > button.dig-ghost.mt-auto",
+          "w": 83,
+          "h": 40,
+          "text": "+ New alert rule"
+        },
+        {
+          "sel": "div.rounded-[18px].px-[22px] > div.flex.items-center > div.flex.items-center > button.dig-btn.h-[40px]",
+          "w": 99,
+          "h": 40,
+          "text": "Swap now"
+        },
+        {
+          "sel": "div.rounded-[18px].px-[22px] > div.flex.items-center > div.flex.items-center > button.dig-ghost.h-[40px]",
+          "w": 132,
+          "h": 40,
+          "text": "Supply on Blend"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[20px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 78,
+          "h": 24,
+          "text": "All pools →"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[20px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 108,
+          "h": 24,
+          "text": "View portfolio →"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > section.bg-[#2A2A2A].border > div.flex.items-start > a.ml-auto.flex-shrink-0",
+          "w": 75,
+          "h": 17,
+          "text": "Learn more ↗"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "24H"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 33,
+          "h": 25,
+          "text": "7D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "30D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 63,
+          "h": 30,
+          "text": "Routes"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-center > div.flex.gap-1 > button.text-[12px].font-semibold",
+          "w": 96,
+          "h": 30,
+          "text": "Recent flows"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 88,
+          "h": 17,
+          "text": "Route"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 33,
+          "text": "Inflow ↓"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 44,
+          "h": 17,
+          "text": "Outflow"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 40,
+          "h": 17,
+          "text": "Net"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 32,
+          "h": 17,
+          "text": "Share"
+        },
+        {
+          "sel": "div.w-[520px].max-w-full > div.px-[26px].pt-[22px] > div.flex.items-center > button.dig-chip.cursor-pointer",
+          "w": 30,
+          "h": 30,
+          "text": "×"
+        },
+        {
+          "sel": "div.px-[26px].py-[18px] > div.flex.items-center > div.flex.items-center > button.px-3.py-[5px]",
+          "w": 69,
+          "h": 29,
+          "text": "Mainnet"
+        },
+        {
+          "sel": "div.px-[26px].py-[18px] > div.flex.items-center > div.flex.items-center > button.px-3.py-[5px]",
+          "w": 64,
+          "h": 27,
+          "text": "Testnet"
+        },
+        {
+          "sel": "div.px-[26px].py-[18px] > div.bg-[#2A2A2A].border > div.flex.gap-2 > button.flex-1.px-3",
+          "w": 124,
+          "h": 34,
+          "text": "supply"
+        }
+      ]
+    },
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ]
+  }
+]

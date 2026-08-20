@@ -1,0 +1,1922 @@
+[
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "disconnected-dashboard",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [
+      {
+        "sel": "div.flex.h-screen > div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex",
+        "left": 362,
+        "right": 492,
+        "width": 130,
+        "text": "Connect wallet"
+      }
+    ],
+    "offenderTotal": 1,
+    "touch": {
+      "count": 23,
+      "sample": [
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-navon.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Dashboard"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Protocols"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Portfolio"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Alerts"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-chip.flex",
+          "w": 207,
+          "h": 36,
+          "text": "+ Add wallet"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "X"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "Discord"
+        },
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 82,
+          "h": 38,
+          "text": "Connect wallet"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-btn.h-[38px]",
+          "w": 88,
+          "h": 38,
+          "text": "Swap"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-ghost.h-[38px]",
+          "w": 102,
+          "h": 38,
+          "text": "Deposit"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 43,
+          "h": 60,
+          "text": "View all →"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > button.dig-ghost.mt-auto",
+          "w": 83,
+          "h": 40,
+          "text": "+ New alert rule"
+        },
+        {
+          "sel": "div.rounded-[18px].p-[20px] > div.flex-1.flex > div.flex.flex-col > button.dig-btn.rounded-[12px]",
+          "w": 86,
+          "h": 38,
+          "text": "Connect wallet"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > section.bg-[#2A2A2A].border > div.flex.items-start > a.ml-auto.flex-shrink-0",
+          "w": 75,
+          "h": 17,
+          "text": "Learn more ↗"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "24H"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 33,
+          "h": 25,
+          "text": "7D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "30D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 32,
+          "h": 17,
+          "text": "Route"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 36,
+          "h": 33,
+          "text": "Inflow ↓"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 44,
+          "h": 17,
+          "text": "Outflow"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 19,
+          "h": 17,
+          "text": "Net"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 32,
+          "h": 17,
+          "text": "Share"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "disconnected-protocols",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [
+      {
+        "sel": "div.flex.h-screen > div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex",
+        "left": 350,
+        "right": 480,
+        "width": 130,
+        "text": "Connect wallet"
+      }
+    ],
+    "offenderTotal": 1,
+    "touch": {
+      "count": 16,
+      "sample": [
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Dashboard"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-navon.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Protocols"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Portfolio"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Alerts"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-chip.flex",
+          "w": 207,
+          "h": 36,
+          "text": "+ Add wallet"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "X"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "Discord"
+        },
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 82,
+          "h": 38,
+          "text": "Connect wallet"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 39,
+          "h": 28,
+          "text": "All"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 56,
+          "h": 28,
+          "text": "Blend"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 74,
+          "h": 28,
+          "text": "Aquarius"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 77,
+          "h": 28,
+          "text": "DeFindex"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 79,
+          "h": 28,
+          "text": "Soroswap"
+        },
+        {
+          "sel": "div.overflow-x-auto > div.min-w-[720px] > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 114,
+          "h": 17,
+          "text": "TVL ↓"
+        },
+        {
+          "sel": "div.overflow-x-auto > div.min-w-[720px] > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 160,
+          "h": 17,
+          "text": "Key metric"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "disconnected-pool",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [
+      {
+        "sel": "div.flex.h-screen > div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex",
+        "left": 322,
+        "right": 452,
+        "width": 130,
+        "text": "Connect wallet"
+      }
+    ],
+    "offenderTotal": 1,
+    "touch": {
+      "count": 13,
+      "sample": [
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Dashboard"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-navon.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Protocols"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Portfolio"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Alerts"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-chip.flex",
+          "w": 207,
+          "h": 36,
+          "text": "+ Add wallet"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "X"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "Discord"
+        },
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 82,
+          "h": 38,
+          "text": "Connect wallet"
+        },
+        {
+          "sel": "div.rounded-[18px].p-[24px] > div.flex.items-center > div.ml-auto.flex > button.dig-ghost.h-[40px]",
+          "w": 84,
+          "h": 40,
+          "text": "Alert"
+        },
+        {
+          "sel": "div.rounded-[18px].p-[24px] > div.flex.items-center > div.ml-auto.flex > button.dig-btn.h-[40px]",
+          "w": 96,
+          "h": 40,
+          "text": "Supply / Withdraw"
+        },
+        {
+          "sel": "div.flex.flex-col > div.rounded-[18px].p-[22px] > div.flex.items-center > a.dig-chip.text-[12px]",
+          "w": 59,
+          "h": 42,
+          "text": "Explore →"
+        },
+        {
+          "sel": "div.rounded-[18px].p-[22px] > div.flex.items-center > span.text-[12.5px].font-semibold > a.no-underline.hover:opacity-80",
+          "w": 53,
+          "h": 36,
+          "text": "CAJJZS…BXBD"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "disconnected-portfolio",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [
+      {
+        "sel": "div.flex.h-screen > div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex",
+        "left": 344,
+        "right": 474,
+        "width": 130,
+        "text": "Connect wallet"
+      }
+    ],
+    "offenderTotal": 1,
+    "touch": {
+      "count": 9,
+      "sample": [
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Dashboard"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Protocols"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-navon.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Portfolio"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Alerts"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-chip.flex",
+          "w": 207,
+          "h": 36,
+          "text": "+ Add wallet"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "X"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "Discord"
+        },
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 82,
+          "h": 38,
+          "text": "Connect wallet"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "disconnected-alerts",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [
+      {
+        "sel": "div.flex.h-screen > div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex",
+        "left": 336,
+        "right": 465,
+        "width": 130,
+        "text": "Connect wallet"
+      }
+    ],
+    "offenderTotal": 1,
+    "touch": {
+      "count": 14,
+      "sample": [
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Dashboard"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Protocols"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Portfolio"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-navon.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Alerts"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-chip.flex",
+          "w": 207,
+          "h": 36,
+          "text": "+ Add wallet"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "X"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "Discord"
+        },
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 82,
+          "h": 38,
+          "text": "Connect wallet"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 37,
+          "h": 24,
+          "text": "All"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 62,
+          "h": 24,
+          "text": "Critical"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 64,
+          "h": 24,
+          "text": "Activity"
+        },
+        {
+          "sel": "div.grid.grid-cols-1 > section.bg-[#1E1E1E].border > header.flex.items-center > button.h-[34px].px-3.5",
+          "w": 55,
+          "h": 34,
+          "text": "+ New rule"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.grid-cols-1 > section.bg-[#1E1E1E].border > button.w-full.mt-3.5",
+          "w": 56,
+          "h": 40,
+          "text": "+ Create rule"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "connected-dashboard",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [
+      {
+        "sel": "div.flex.h-screen > div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex",
+        "left": 362,
+        "right": 503,
+        "width": 141,
+        "text": "GCLSPN…CF2O"
+      }
+    ],
+    "offenderTotal": 1,
+    "touch": {
+      "count": 26,
+      "sample": [
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-navon.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Dashboard"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Protocols"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Portfolio"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Alerts"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Real walletGCL…F2O"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Wallet 3 FreighterGDX…OSB"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Hana walletGDX…N3L"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Wallet 2GA7…SZZ"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-chip.flex",
+          "w": 207,
+          "h": 36,
+          "text": "+ Add wallet"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "X"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "Discord"
+        },
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 93,
+          "h": 38,
+          "text": "GCLSPN…CF2O"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-btn.h-[38px]",
+          "w": 88,
+          "h": 38,
+          "text": "Swap"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-ghost.h-[38px]",
+          "w": 102,
+          "h": 38,
+          "text": "Deposit"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 43,
+          "h": 60,
+          "text": "View all →"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > button.dig-ghost.mt-auto",
+          "w": 83,
+          "h": 40,
+          "text": "+ New alert rule"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > section.bg-[#2A2A2A].border > div.flex.items-start > a.ml-auto.flex-shrink-0",
+          "w": 75,
+          "h": 17,
+          "text": "Learn more ↗"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "24H"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 33,
+          "h": 25,
+          "text": "7D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "30D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 32,
+          "h": 17,
+          "text": "Route"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 36,
+          "h": 33,
+          "text": "Inflow ↓"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 44,
+          "h": 17,
+          "text": "Outflow"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 19,
+          "h": 17,
+          "text": "Net"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "connected-protocols",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [
+      {
+        "sel": "div.flex.h-screen > div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex",
+        "left": 350,
+        "right": 491,
+        "width": 141,
+        "text": "GCLSPN…CF2O"
+      }
+    ],
+    "offenderTotal": 1,
+    "touch": {
+      "count": 20,
+      "sample": [
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Dashboard"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-navon.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Protocols"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Portfolio"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Alerts"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Real walletGCL…F2O"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Wallet 3 FreighterGDX…OSB"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Hana walletGDX…N3L"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Wallet 2GA7…SZZ"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-chip.flex",
+          "w": 207,
+          "h": 36,
+          "text": "+ Add wallet"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "X"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "Discord"
+        },
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 93,
+          "h": 38,
+          "text": "GCLSPN…CF2O"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 39,
+          "h": 28,
+          "text": "All"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 56,
+          "h": 28,
+          "text": "Blend"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 74,
+          "h": 28,
+          "text": "Aquarius"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 77,
+          "h": 28,
+          "text": "DeFindex"
+        },
+        {
+          "sel": "div.rounded-[18px].overflow-hidden > div.flex.items-center > div.flex.gap-[6px] > button.dig-chip.text-[12px]",
+          "w": 79,
+          "h": 28,
+          "text": "Soroswap"
+        },
+        {
+          "sel": "div.overflow-x-auto > div.min-w-[720px] > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 114,
+          "h": 17,
+          "text": "TVL ↓"
+        },
+        {
+          "sel": "div.overflow-x-auto > div.min-w-[720px] > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 160,
+          "h": 17,
+          "text": "Key metric"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "connected-pool",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [
+      {
+        "sel": "div.flex.h-screen > div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex",
+        "left": 322,
+        "right": 463,
+        "width": 141,
+        "text": "GCLSPN…CF2O"
+      }
+    ],
+    "offenderTotal": 1,
+    "touch": {
+      "count": 19,
+      "sample": [
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Dashboard"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-navon.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Protocols"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Portfolio"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Alerts"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Real walletGCL…F2O"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Wallet 3 FreighterGDX…OSB"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Hana walletGDX…N3L"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Wallet 2GA7…SZZ"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-chip.flex",
+          "w": 207,
+          "h": 36,
+          "text": "+ Add wallet"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "X"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "Discord"
+        },
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 93,
+          "h": 38,
+          "text": "GCLSPN…CF2O"
+        },
+        {
+          "sel": "div.rounded-[18px].p-[24px] > div.flex.items-center > div.ml-auto.flex > button.dig-ghost.h-[40px]",
+          "w": 84,
+          "h": 40,
+          "text": "Alert"
+        },
+        {
+          "sel": "div.rounded-[18px].p-[24px] > div.flex.items-center > div.ml-auto.flex > button.dig-btn.h-[40px]",
+          "w": 96,
+          "h": 40,
+          "text": "Supply / Withdraw"
+        },
+        {
+          "sel": "div.flex.flex-col > div.rounded-[18px].p-[22px] > div.flex.items-center > a.dig-chip.text-[12px]",
+          "w": 59,
+          "h": 42,
+          "text": "Explore →"
+        },
+        {
+          "sel": "div.rounded-[18px].p-[22px] > div.flex.items-center > span.text-[12.5px].font-semibold > a.no-underline.hover:opacity-80",
+          "w": 53,
+          "h": 36,
+          "text": "CAJJZS…BXBD"
+        },
+        {
+          "sel": "div.flex.flex-col > div.rounded-[18px].p-[22px] > div.flex.gap-[9px] > button.dig-btn.flex-1",
+          "w": 42,
+          "h": 40,
+          "text": "Supply"
+        },
+        {
+          "sel": "div.flex.flex-col > div.rounded-[18px].p-[22px] > div.flex.gap-[9px] > button.dig-ghost.flex-1",
+          "w": 61,
+          "h": 40,
+          "text": "Withdraw"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "connected-portfolio",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [
+      {
+        "sel": "div.flex.h-screen > div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex",
+        "left": 344,
+        "right": 485,
+        "width": 141,
+        "text": "GCLSPN…CF2O"
+      }
+    ],
+    "offenderTotal": 1,
+    "touch": {
+      "count": 22,
+      "sample": [
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Dashboard"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Protocols"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-navon.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Portfolio"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Alerts"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Real walletGCL…F2O"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Wallet 3 FreighterGDX…OSB"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Hana walletGDX…N3L"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Wallet 2GA7…SZZ"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-chip.flex",
+          "w": 207,
+          "h": 36,
+          "text": "+ Add wallet"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "X"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "Discord"
+        },
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 93,
+          "h": 38,
+          "text": "GCLSPN…CF2O"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.text-[11px].font-semibold",
+          "w": 58,
+          "h": 25,
+          "text": "Refresh"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.w-[26px].h-[24px]",
+          "w": 26,
+          "h": 24,
+          "text": "⋯"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.text-[11px].font-semibold",
+          "w": 58,
+          "h": 25,
+          "text": "Refresh"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.w-[26px].h-[24px]",
+          "w": 26,
+          "h": 24,
+          "text": "⋯"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.text-[11px].font-semibold",
+          "w": 58,
+          "h": 25,
+          "text": "Refresh"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.w-[26px].h-[24px]",
+          "w": 26,
+          "h": 24,
+          "text": "⋯"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.text-[11px].font-semibold",
+          "w": 58,
+          "h": 25,
+          "text": "Refresh"
+        },
+        {
+          "sel": "div.relative.flex-shrink-0 > div.flex.items-center > div.ml-auto.flex > button.w-[26px].h-[24px]",
+          "w": 26,
+          "h": 24,
+          "text": "⋯"
+        },
+        {
+          "sel": "div.dig-row.px-[20px] > div.grid.items-center > div.text-right > button.dig-chip.text-[12px]",
+          "w": 63,
+          "h": 28,
+          "text": "Manage"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "connected-alerts",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [
+      {
+        "sel": "div.flex.h-screen > div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex",
+        "left": 336,
+        "right": 477,
+        "width": 141,
+        "text": "GCLSPN…CF2O"
+      }
+    ],
+    "offenderTotal": 1,
+    "touch": {
+      "count": 18,
+      "sample": [
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Dashboard"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Protocols"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Portfolio"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-navon.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Alerts"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Real walletGCL…F2O"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Wallet 3 FreighterGDX…OSB"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Hana walletGDX…N3L"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Wallet 2GA7…SZZ"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-chip.flex",
+          "w": 207,
+          "h": 36,
+          "text": "+ Add wallet"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "X"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "Discord"
+        },
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 93,
+          "h": 38,
+          "text": "GCLSPN…CF2O"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 37,
+          "h": 24,
+          "text": "All"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 62,
+          "h": 24,
+          "text": "Critical"
+        },
+        {
+          "sel": "section.bg-[#1E1E1E].border > header.flex.items-center > div.flex.gap-1.5 > button.text-xs.font-semibold",
+          "w": 64,
+          "h": 24,
+          "text": "Activity"
+        },
+        {
+          "sel": "div.grid.grid-cols-1 > section.bg-[#1E1E1E].border > header.flex.items-center > button.h-[34px].px-3.5",
+          "w": 55,
+          "h": 34,
+          "text": "+ New rule"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.grid-cols-1 > section.bg-[#1E1E1E].border > button.w-full.mt-3.5",
+          "w": 56,
+          "h": 40,
+          "text": "+ Create rule"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "action-swap-ended",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [
+      {
+        "sel": "div.flex.h-screen > div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex",
+        "left": 362,
+        "right": 503,
+        "width": 141,
+        "text": "GCLSPN…CF2O"
+      }
+    ],
+    "offenderTotal": 1,
+    "touch": {
+      "count": 29,
+      "sample": [
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-navon.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Dashboard"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Protocols"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Portfolio"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Alerts"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Real walletGCL…F2O"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Wallet 3 FreighterGDX…OSB"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Hana walletGDX…N3L"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Wallet 2GA7…SZZ"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-chip.flex",
+          "w": 207,
+          "h": 36,
+          "text": "+ Add wallet"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "X"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "Discord"
+        },
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 93,
+          "h": 38,
+          "text": "GCLSPN…CF2O"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-btn.h-[38px]",
+          "w": 88,
+          "h": 38,
+          "text": "Swap"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-ghost.h-[38px]",
+          "w": 102,
+          "h": 38,
+          "text": "Deposit"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 43,
+          "h": 60,
+          "text": "View all →"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > button.dig-ghost.mt-auto",
+          "w": 83,
+          "h": 40,
+          "text": "+ New alert rule"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > section.bg-[#2A2A2A].border > div.flex.items-start > a.ml-auto.flex-shrink-0",
+          "w": 75,
+          "h": 17,
+          "text": "Learn more ↗"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "24H"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 33,
+          "h": 25,
+          "text": "7D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "30D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 32,
+          "h": 17,
+          "text": "Route"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 36,
+          "h": 33,
+          "text": "Inflow ↓"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 44,
+          "h": 17,
+          "text": "Outflow"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 19,
+          "h": 17,
+          "text": "Net"
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "390x844",
+    "name": "action-blend-ended",
+    "viewportW": 390,
+    "docScrollW": 390,
+    "offenders": [
+      {
+        "sel": "div.flex.h-screen > div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex",
+        "left": 362,
+        "right": 503,
+        "width": 141,
+        "text": "GCLSPN…CF2O"
+      }
+    ],
+    "offenderTotal": 1,
+    "touch": {
+      "count": 37,
+      "sample": [
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-navon.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Dashboard"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Protocols"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Portfolio"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 38,
+          "text": "Alerts"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Real walletGCL…F2O"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Wallet 3 FreighterGDX…OSB"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Hana walletGDX…N3L"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-nav.flex",
+          "w": 207,
+          "h": 36,
+          "text": "Wallet 2GA7…SZZ"
+        },
+        {
+          "sel": "div > div.flex.h-screen > aside.w-[236px].flex-shrink-0 > button.dig-chip.flex",
+          "w": 207,
+          "h": 36,
+          "text": "+ Add wallet"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "X"
+        },
+        {
+          "sel": "aside.w-[236px].flex-shrink-0 > div.mt-auto.px-[10px] > div.flex.gap-[8px] > a.dig-social.flex-1",
+          "w": 90,
+          "h": 34,
+          "text": "Discord"
+        },
+        {
+          "sel": "header.h-[64px].flex-shrink-0 > div.ml-auto.flex > div.relative > button.dig-ghost.relative",
+          "w": 38,
+          "h": 38,
+          "text": ""
+        },
+        {
+          "sel": "div.flex-1.h-full > header.h-[64px].flex-shrink-0 > div.ml-auto.flex > button.dig-btn.h-[38px]",
+          "w": 93,
+          "h": 38,
+          "text": "GCLSPN…CF2O"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-btn.h-[38px]",
+          "w": 88,
+          "h": 38,
+          "text": "Swap"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[24px] > div.flex.items-center > button.dig-ghost.h-[38px]",
+          "w": 102,
+          "h": 38,
+          "text": "Deposit"
+        },
+        {
+          "sel": "div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > div.flex.items-center > button.dig-chip.text-[12px]",
+          "w": 43,
+          "h": 60,
+          "text": "View all →"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > div.grid.gap-[16px] > div.rounded-[18px].p-[22px] > button.dig-ghost.mt-auto",
+          "w": 83,
+          "h": 40,
+          "text": "+ New alert rule"
+        },
+        {
+          "sel": "div.max-w-[1180px].mx-auto > section.bg-[#2A2A2A].border > div.flex.items-start > a.ml-auto.flex-shrink-0",
+          "w": 75,
+          "h": 17,
+          "text": "Learn more ↗"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "24H"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 33,
+          "h": 25,
+          "text": "7D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div.flex.items-start > div.flex.gap-1.5 > button.text-[11.5px].font-semibold",
+          "w": 40,
+          "h": 25,
+          "text": "30D"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 32,
+          "h": 17,
+          "text": "Route"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 36,
+          "h": 33,
+          "text": "Inflow ↓"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 44,
+          "h": 17,
+          "text": "Outflow"
+        },
+        {
+          "sel": "section.bg-[#2A2A2A].border > div > div.grid.items-center > button.cursor-pointer.select-none",
+          "w": 19,
+          "h": 17,
+          "text": "Net"
+        }
+      ]
+    },
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ]
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "disconnected-dashboard",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "disconnected-protocols",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "disconnected-pool",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "disconnected-portfolio",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "disconnected-alerts",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "connected-dashboard",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "connected-protocols",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "connected-pool",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "connected-portfolio",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "connected-alerts",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "action-swap-ended",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "768x1024",
+    "name": "action-blend-ended",
+    "viewportW": 768,
+    "docScrollW": 768,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ]
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "disconnected-dashboard",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "disconnected-protocols",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "disconnected-pool",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "disconnected-portfolio",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "disconnected-alerts",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "connected-dashboard",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "connected-protocols",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "connected-pool",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "connected-portfolio",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "connected-alerts",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "action-swap-ended",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": []
+  },
+  {
+    "tag": "ended",
+    "viewport": "1024x768",
+    "name": "action-blend-ended",
+    "viewportW": 1024,
+    "docScrollW": 1024,
+    "offenders": [],
+    "offenderTotal": 0,
+    "touch": null,
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ]
+  }
+]
