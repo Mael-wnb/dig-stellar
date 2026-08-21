@@ -74,7 +74,7 @@ The remaining sections document the **host-pnpm path** (the dev workflow).
 
 ## 0. Prerequisites
 
-- **Node 20+** (`.nvmrc` at the repo root pins 20; `nvm use`). Vite 8 fails on Node 18.
+- **Node 24** (`.nvmrc` at the repo root pins 24; `nvm use`). Vite 8 fails on Node 18.
 - **pnpm 10** (`corepack enable` or `npm i -g pnpm`)
 - **Docker** (compose v2)
 

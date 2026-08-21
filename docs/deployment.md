@@ -84,7 +84,7 @@ simulation) brings the API back healthy on `127.0.0.1:3000`.
 
 Deploy / restart procedure:
 ```bash
-export PATH=/root/.nvm/versions/node/v20.19.4/bin:$PATH   # non-interactive PATH has node 18
+export PATH=/root/.nvm/versions/node/v24.19.0/bin:$PATH   # non-interactive PATH has an old node
 cd /root/dig-stellar && git pull
 pnpm --dir apps/api build
 cd apps/api

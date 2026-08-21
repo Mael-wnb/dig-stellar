@@ -7,16 +7,18 @@ This document captures practical procedures used regularly during development an
 
 ## Node version (read first)
 
-The frontend build (`apps/web`) uses Vite 8, which requires **Node 20+** (Node 18 fails with
-`CustomEvent is not defined`). A `.nvmrc` pinned to `20` lives at the repo root. Default is set via
-`nvm alias default 20`. Before any build/dev command, ensure Node 20 is active:
+The repo runs on **Node 24** (active LTS; Lot AC migration, 2026-08-21 — Node 20 hit upstream
+EOL on 2026-04-30). A `.nvmrc` pinned to `24` lives at the repo root; `engines` floors every
+workspace at `>=24` (web pins `24.x` for Vercel). Default is set via `nvm alias default 24`.
+Before any build/dev command, ensure Node 24 is active:
 
 ```bash
 export NVM_DIR="$HOME/.nvm" && \. "$NVM_DIR/nvm.sh" && nvm use
 ```
 
-If a fresh `pnpm install` is needed under Node 20 (e.g. to fetch native bindings like
-`@rolldown/binding-darwin-arm64` that were skipped under Node 18): `pnpm install`.
+After switching Node majors, always re-run a fresh `pnpm install`: native bindings
+(`bufferutil`, `secp256k1`, `@rolldown/binding-*`, …) are compiled per Node ABI and must be
+rebuilt for the active major.
 
 ---
 
@@ -26,7 +28,7 @@ If a fresh `pnpm install` is needed under Node 20 (e.g. to fetch native bindings
 ```bash
 export NVM_DIR="$HOME/.nvm" && \. "$NVM_DIR/nvm.sh" && nvm use
 pnpm -C apps/web dev      # Vite dev server, http://localhost:5173
-pnpm -C apps/web build    # vue-tsc typecheck + vite build (must be on Node 20)
+pnpm -C apps/web build    # vue-tsc typecheck + vite build (must be on Node 24)
 ```
 
 Frontend env (`apps/web/.env`):
@@ -144,8 +146,11 @@ Example crontab (VPS): every 15 min, offset from `job:refresh` so they don't col
 End-to-end alert latency ≈ this interval + the web's notification poll (~30-60s):
 ```cron
 # m         h  dom mon dow  command
-  7,22,37,52 *  *   *   *    cd /srv/dig-stellar && pnpm -C apps/indexer job:wallet-alert >> /var/log/dig/wallet-alert.log 2>&1
+  7,22,37,52 *  *   *   *    export PATH=/root/.nvm/versions/node/v24.19.0/bin:$PATH && cd /root/dig-stellar && pnpm -C apps/indexer job:wallet-alert >> /var/log/dig/wallet-alert.log 2>&1
 ```
+(Matches the real VPS crontab — repo at `/root/dig-stellar`, Node 24 tree exported because the
+non-interactive cron PATH has an old node. An earlier version of this example showed
+`/srv/dig-stellar`, which never matched the VPS.)
 Prereq: `stellar_v3_alerting.sql` applied. A non-zero exit from the health refresh (81) aborts the
 evaluator (83) for that run and logs; stale/half-written health rows are never evaluated.
 
@@ -509,7 +514,7 @@ curl -s -X POST $API/v1/actions/blend/position -H "Content-Type: application/jso
 
 ## Common debug situations
 
-- **Frontend build fails with `CustomEvent is not defined`** → you're on Node 18; `nvm use` (Node 20).
+- **Frontend build fails with `CustomEvent is not defined`** → you're on an old Node (18); `nvm use` (Node 24).
 - **`/v1/...` returns 404 from the widget** → the frontend is hitting the wrong API base; check
   `apps/web/.env` `VITE_API_BASE` points at the running API (local = `http://localhost:3000`).
 - **API returns all-`null` numeric fields from a raw-SQL read** → Postgres `numeric` columns come back
