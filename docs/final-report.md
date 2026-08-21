@@ -116,7 +116,7 @@ Production runs on a hardened setup: the API is reachable only through the rever
 
 Honest remaining debt, stated rather than hidden: deployments are manual by runbook (a CI/CD pipeline is the next operational investment), and parts of the internal linting configuration predate the current codebase. Neither affects the delivered criteria.
 
-DIG continues past this grant: the team is pursuing an SCF integration-track submission to deepen protocol coverage, and the witness ledger, freshness pipeline, and reference implementation delivered here are the foundation that work builds on.
+DIG continues past this grant: the team is pursuing an SCF Round 45 (integration track) submission to deepen protocol coverage, and the witness ledger, freshness pipeline, and reference implementation delivered here are the foundation that work builds on.
 
 ---
 

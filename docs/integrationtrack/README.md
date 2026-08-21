@@ -1,6 +1,7 @@
 # Dig: Stellar DeFi Intelligence & Position Management Layer
 
-> Accelerator scope. An extension of Dig's existing Stellar work (SCF 43), built in the same
+> SCF Round 45 (integration track) submission. An extension of Dig's existing Stellar work
+> (SCF 43), built in the same
 > monorepo on top of the already-delivered indexing, analytics, transaction-builder, and
 > multi-wallet infrastructure.
 
@@ -29,7 +30,7 @@ integration, CCTP capital import, and external notification delivery** built on 
 ## Documents
 
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md): technical architecture and Stellar integration plan (with a reviewer FAQ)
-- [`milestones.md`](./milestones.md): deliverables by tranche
+- [`milestones.md`](./milestones.md): 8 deliverables across 3 tranches (3 + 3 + 2), Sept 22 → Dec 19, 2026, $75,000 total (T1 $24,200 / T2 $27,900 / T3 $22,900)
 
 ## Core principle
 

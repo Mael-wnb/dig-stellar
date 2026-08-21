@@ -1,6 +1,6 @@
 # Dig: Stellar DeFi Intelligence & Position Management Layer (Technical Architecture)
 
-This document is the technical architecture for Dig's accelerator-scope product: a DeFi intelligence and position management layer for Stellar. It is self-contained, Stellar-specific throughout, and focuses on the new capabilities built on top of the existing indexing and analytics infrastructure. For the full reference implementation of the underlying pipeline, already built and deployed, see the repository's main `docs/TECHNICAL_ARCHITECTURE.md`.
+This document is the technical architecture for Dig's SCF Round 45 (integration track) scope: a DeFi intelligence and position management layer for Stellar. It is self-contained, Stellar-specific throughout, and focuses on the new capabilities built on top of the existing indexing and analytics infrastructure. For the full reference implementation of the underlying pipeline, already built and deployed, see the repository's main `docs/TECHNICAL_ARCHITECTURE.md`.
 
 ---
 
@@ -129,7 +129,7 @@ flowchart TB
 
 ## 5. Stellar Building Blocks: Deep Integration Plan
 
-This is the heart of the architecture. For each integrated protocol, the table below shows what the existing foundation already reads (grant scope) and what this accelerator scope adds in terms of execution and position management.
+This is the heart of the architecture. For each integrated protocol, the table below shows what the existing foundation already reads (SCF 43 scope) and what this SCF 45 integration-track scope adds in terms of execution and position management.
 
 ### 5.1 Blend V2: From Analytics to Full Position Management
 
@@ -140,7 +140,7 @@ This is the heart of the architecture. For each integrated protocol, the table b
 - Derived: utilization, APY curves, health factor (computed from positions + Reflector prices using per-asset `c_factor` and `l_factor`)
 - Basic execution: `submit()` with a single deposit or withdraw Request
 
-**New (accelerator scope):**
+**New (SCF 45 integration-track scope):**
 
 | Capability | Contract surface | Detail |
 |---|---|---|
@@ -160,7 +160,7 @@ This is the heart of the architecture. For each integrated protocol, the table b
 - AQUA emissions per pool from `liquidity_pool_reward_gauge`
 - Derived: TVL, volume, effective APR including emissions
 
-**New (accelerator scope):**
+**New (SCF 45 integration-track scope):**
 
 | Capability | Contract surface | Detail |
 |---|---|---|
@@ -178,7 +178,7 @@ This is the heart of the architecture. For each integrated protocol, the table b
 - Factory enumeration, pair reserves, swap events, Router quote generation
 - Swap execution via Router `swap_exact_tokens_for_tokens()`
 
-**New (accelerator scope):**
+**New (SCF 45 integration-track scope):**
 
 | Capability | Contract surface | Detail |
 |---|---|---|
@@ -194,7 +194,7 @@ This is the heart of the architecture. For each integrated protocol, the table b
 - Strategy reads: underlying exposure decomposition
 - Derived: share-to-asset ratio over time, vault APY
 
-**New (accelerator scope):**
+**New (SCF 45 integration-track scope):**
 
 | Capability | Contract surface | Detail |
 |---|---|---|
@@ -240,7 +240,7 @@ All issued by `GCRYUGD5NVARGXT56XEZI5CIFCQETYHAPQQTHO2O3IQZTHDH4LATMYWC` (Etherf
 - Trade history via `/trades`
 - Swap execution via `PathPaymentStrictSend` / `PathPaymentStrictReceive`
 
-**New (accelerator scope):**
+**New (SCF 45 integration-track scope):**
 
 | Capability | Operation | Detail |
 |---|---|---|
