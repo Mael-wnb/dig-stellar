@@ -146,10 +146,13 @@ Example crontab (VPS): every 15 min, offset from `job:refresh` so they don't col
 End-to-end alert latency ≈ this interval + the web's notification poll (~30-60s):
 ```cron
 # m         h  dom mon dow  command
-  7,22,37,52 *  *   *   *    export PATH=/root/.nvm/versions/node/v24.19.0/bin:$PATH && cd /root/dig-stellar && pnpm -C apps/indexer job:wallet-alert >> /var/log/dig/wallet-alert.log 2>&1
+7,22,37,52 * * * * cd /root/dig-stellar && /usr/bin/flock -n /tmp/dig-stellar-alert.lock bash -lc 'export PATH=/root/.nvm/versions/node/v24.19.0/bin:$PATH && pnpm --dir apps/indexer job:wallet-alert' >> /var/log/dig-stellar-alert.log 2>&1
 ```
-(Matches the real VPS crontab — repo at `/root/dig-stellar`, Node 24 tree exported because the
-non-interactive cron PATH has an old node. An earlier version of this example showed
+(The real VPS crontab line, verified in the Lot AC migration — see
+`docs/evidence/lot-ac/ac2-execution.md` step 0: repo at `/root/dig-stellar`, `flock` guard
+against overlapping runs, Node 24 tree exported because the non-interactive cron PATH has an
+old node, log at `/var/log/dig-stellar-alert.log`. The `job:refresh` cron line follows the
+same pattern (`*/15`, its own lock and log). An earlier version of this example showed
 `/srv/dig-stellar`, which never matched the VPS.)
 Prereq: `stellar_v3_alerting.sql` applied. A non-zero exit from the health refresh (81) aborts the
 evaluator (83) for that run and logs; stale/half-written health rows are never evaluated.
