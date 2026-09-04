@@ -38,6 +38,48 @@ const WINDOW_MS: Record<BridgeWindow, number> = {
 }
 const seriesDaysFor = (w: BridgeWindow): number => (w === '30d' ? 30 : 7)
 
+// ── Upstream-paused rule (single source of truth) ───────────────────────────
+// One definition for "the underlying bridge (Allbridge) looks paused": no flow
+// for more than BRIDGE_UPSTREAM_STALE_DAYS. Used by the BridgeSection staleness
+// banner AND the status page's Allbridge row suffix (Lot ST) — never duplicate
+// the threshold or the day arithmetic elsewhere.
+export const BRIDGE_UPSTREAM_STALE_DAYS = 3
+
+export function daysSinceLastFlowOf(flows: Array<{ occurredAt: string }>): number | null {
+  let latest = 0
+  for (const f of flows) {
+    const ts = new Date(f.occurredAt).getTime()
+    if (Number.isFinite(ts) && ts > latest) latest = ts
+  }
+  if (!latest) return null
+  return Math.floor((Date.now() - latest) / 86_400_000)
+}
+
+export function isBridgeUpstreamPaused(daysSinceLastFlow: number | null): boolean {
+  return daysSinceLastFlow != null && daysSinceLastFlow > BRIDGE_UPSTREAM_STALE_DAYS
+}
+
+// Lot ST: lightweight module-scoped probe of the SAME condition for views that
+// only need the boolean (status page row suffix) — one flows fetch (limit 1,
+// the freshest flow decides), shared across consumers, lazy on first use.
+const upstreamPausedRef = ref<boolean | null>(null)
+let upstreamPausedLoaded = false
+
+export function useBridgeUpstreamPaused() {
+  if (!upstreamPausedLoaded) {
+    upstreamPausedLoaded = true
+    fetchBridgeFlows({ limit: 1 })
+      .then((res) => {
+        upstreamPausedRef.value = isBridgeUpstreamPaused(daysSinceLastFlowOf(res.flows))
+      })
+      .catch(() => {
+        // Unknown stays null — the suffix simply doesn't render.
+        upstreamPausedRef.value = null
+      })
+  }
+  return { upstreamPaused: upstreamPausedRef }
+}
+
 // ── chain identity ───────────────────────────────────────────────────────────
 // Real Allbridge source chains (not Paul's mock ETH/BNB/ARB). tint/color are
 // per-chain accents with a neutral fallback; `logo` is a bundled brand mark
@@ -296,15 +338,9 @@ export function useBridge() {
   // Days since the freshest bridge flow, from the window-independent recent feed
   // (not summary.lastFlowAt, which is null once flows fall outside the active
   // window). Drives the staleness banner. null = no flows at all -> banner hidden.
-  const daysSinceLastFlow = computed<number | null>(() => {
-    let latest = 0
-    for (const f of rawFlows.value) {
-      const ts = new Date(f.occurredAt).getTime()
-      if (Number.isFinite(ts) && ts > latest) latest = ts
-    }
-    if (!latest) return null
-    return Math.floor((Date.now() - latest) / 86_400_000)
-  })
+  const daysSinceLastFlow = computed<number | null>(() =>
+    daysSinceLastFlowOf(rawFlows.value),
+  )
 
   const routes = computed<BridgeRouteRow[]>(() => {
     const s = summary.value

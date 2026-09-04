@@ -9,6 +9,7 @@ import BridgeChart from './BridgeChart.vue'
 import BridgeRoutesTable from './BridgeRoutesTable.vue'
 import BridgeFlowsFeed from './BridgeFlowsFeed.vue'
 import { bridgeAnnotations } from '../../config/bridgeAnnotations'
+import { isBridgeUpstreamPaused } from '../../composables/useBridge'
 
 type Win = '24h' | '7d' | '30d'
 interface Bucket { inflow: number; outflow: number; net: number; centerTs: number }
@@ -71,12 +72,13 @@ const stats = computed(() =>
       ]
 )
 
-// Staleness banner: shown only when the freshest flow is older than the threshold.
-// Self-clearing (flows resume -> daysSinceLastFlow drops) and null-safe (no flows ->
-// no banner). "Learn more" reuses the most recent annotation's url, never hardcoded.
-const STALE_THRESHOLD_DAYS = 3
-const showStaleBanner = computed(
-  () => props.daysSinceLastFlow != null && props.daysSinceLastFlow > STALE_THRESHOLD_DAYS
+// Staleness banner: shown only when the freshest flow is older than the shared
+// upstream-paused threshold (useBridge, also drives the status page's Allbridge
+// suffix — Lot ST). Self-clearing (flows resume -> daysSinceLastFlow drops) and
+// null-safe (no flows -> no banner). "Learn more" reuses the most recent
+// annotation's url, never hardcoded.
+const showStaleBanner = computed(() =>
+  isBridgeUpstreamPaused(props.daysSinceLastFlow ?? null)
 )
 const staleLink = computed(() => {
   const latest = [...bridgeAnnotations].sort((a, b) => (a.date < b.date ? 1 : -1))[0]

@@ -170,8 +170,25 @@ const networkLabel = 'Stellar mainnet'
       <span class="text-[15px] leading-none">+</span> Add wallet
     </button>
 
+    <!-- System status (Lot ST): plain link at the bottom of the nav, outside
+         the product views. No live dot for the beta — a dot would mean polling
+         the full status payload from every view. -->
+    <button
+      type="button"
+      class="dig-nav mt-auto flex items-center gap-[8px] px-[10px] py-[7px] rounded-[10px] cursor-pointer text-[12.5px] w-full text-left transition-colors"
+      :style="{
+        fontWeight: view === 'status' ? 600 : 500,
+        color: view === 'status' ? 'var(--dig-text)' : 'var(--dig-faint)',
+        background: view === 'status' ? '#2A2A27' : 'transparent',
+      }"
+      title="View system status"
+      @click="setView('status')"
+    >
+      System status
+    </button>
+
     <!-- Footer -->
-    <div class="mt-auto px-[10px] pt-[14px] pb-[4px]" style="border-top: 1px solid #2C2C29">
+    <div class="px-[10px] pt-[14px] pb-[4px]" style="border-top: 1px solid #2C2C29">
       <div class="flex items-center gap-[8px]">
         <div
           class="w-[8px] h-[8px] rounded-full flex-shrink-0"

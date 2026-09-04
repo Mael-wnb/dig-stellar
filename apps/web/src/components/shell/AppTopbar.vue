@@ -35,6 +35,7 @@ const TITLES: Record<string, [string, string]> = {
   pool: ['Pool detail', 'On-chain metrics and activity'],
   portfolio: ['Portfolio', 'Balances and positions'],
   alerts: ['Alerts', 'Monitoring rules and activity'],
+  status: ['System status', 'Refresh pipeline health, last 24h'],
 }
 
 const title = computed(() => (TITLES[view.value] ?? TITLES.dashboard)[0])

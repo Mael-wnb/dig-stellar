@@ -17,8 +17,10 @@ export type AppView =
   | 'pool'
   | 'portfolio'
   | 'alerts'
+  // Lot ST: public status page (#status) — sits outside the product nav.
+  | 'status'
 
-const VIEWS: AppView[] = ['dashboard', 'protocols', 'pool', 'portfolio', 'alerts']
+const VIEWS: AppView[] = ['dashboard', 'protocols', 'pool', 'portfolio', 'alerts', 'status']
 
 // Lightweight hash sync (NOT a router): the URL hash mirrors the active view so
 // a refresh keeps you where you were, and a view is shareable/deep-linkable
