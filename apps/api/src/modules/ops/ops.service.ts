@@ -14,6 +14,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../db/prisma.service';
 import { FaucetService } from '../faucet/faucet.service';
+import { staleAfterSeconds } from '../../common/freshness';
+import {
+  computeOpsStatus,
+  type OpsStatusPayload,
+  type RpcRunRow as StatusRpcRow,
+  type StepRunRow as StatusStepRow,
+} from './status';
 
 const WINDOW = '24h';
 const WINDOW_INTERVAL = '24 hours';
@@ -126,6 +133,10 @@ export class OpsService {
       };
     });
 
+    // Lot ST fix: the outer query now windows like the rpc one — before, it
+    // returned the latest row EVER per step, so `window: "24h"` was untrue for
+    // steps[].last* (recon 00-recon-2026-09-03 §A.2). A step with no run in
+    // the window now simply drops out of `steps`.
     const stepRows = (await this.prisma.$queryRawUnsafe(
       `
       select distinct on (step)
@@ -142,6 +153,7 @@ export class OpsService {
             and f.run_at > now() - interval '${WINDOW_INTERVAL}'
         ) as failures_24h
       from refresh_step_runs r
+      where run_at >= now() - interval '${WINDOW_INTERVAL}'
       order by step asc, run_at desc
       `,
     )) as StepSummaryRow[];
@@ -166,6 +178,77 @@ export class OpsService {
       // treasury SPENDABLE balance (no address, no key state beyond balance).
       faucet: await this.faucetService.getOpsSnapshot(),
     };
+  }
+
+  // Lot ST (T3-D3 follow-up): GET /v1/ops/status — the status-page payload.
+  // All logic lives in the pure computeOpsStatus() (see status.ts, incl. the
+  // thresholds object and the honest boundary); this method only fetches the
+  // windowed rows and the all-time history floor.
+  async getStatus(): Promise<OpsStatusPayload> {
+    const stepRows = (await this.prisma.$queryRawUnsafe(
+      `
+      select run_at, step, status, duration_ms, message
+      from refresh_step_runs
+      where run_at >= now() - interval '${WINDOW_INTERVAL}'
+      order by run_at asc
+      `,
+    )) as Array<{
+      run_at: unknown;
+      step: string;
+      status: string;
+      duration_ms: number;
+      message: string | null;
+    }>;
+
+    const rpcRows = (await this.prisma.$queryRawUnsafe(
+      `
+      select run_at, target, calls, errors, p50_ms, p95_ms, p99_ms
+      from rpc_metrics_runs
+      where run_at >= now() - interval '${WINDOW_INTERVAL}'
+      order by run_at asc
+      `,
+    )) as RpcRunRow[];
+
+    // least() ignores nulls in Postgres, so one empty table doesn't hide the
+    // other's history. Both empty -> null -> historySince: null (honest).
+    const historyRows = (await this.prisma.$queryRawUnsafe(
+      `
+      select least(
+        (select min(run_at) from refresh_step_runs),
+        (select min(run_at) from rpc_metrics_runs)
+      ) as history_since
+      `,
+    )) as Array<{ history_since: unknown }>;
+    const historySinceRaw = historyRows[0]?.history_since ?? null;
+
+    const statusStepRows: StatusStepRow[] = stepRows.map((row) => ({
+      runAt: new Date(row.run_at as string | Date),
+      step: row.step,
+      status: row.status,
+      durationMs: toInt(row.duration_ms),
+      message: row.message ?? null,
+    }));
+
+    const statusRpcRows: StatusRpcRow[] = rpcRows.map((row) => ({
+      runAt: new Date(row.run_at as string | Date),
+      target: row.target,
+      calls: toInt(row.calls),
+      errors: toInt(row.errors),
+      p50Ms: toInt(row.p50_ms),
+      p95Ms: toInt(row.p95_ms),
+      p99Ms: toInt(row.p99_ms),
+    }));
+
+    return computeOpsStatus({
+      now: new Date(),
+      staleAfterSeconds: staleAfterSeconds(),
+      historySince:
+        historySinceRaw == null
+          ? null
+          : new Date(historySinceRaw as string | Date),
+      stepRows: statusStepRows,
+      rpcRows: statusRpcRows,
+    });
   }
 
   // E3: fire-and-forget adoption event. A logging failure must NEVER fail the
