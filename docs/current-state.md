@@ -13,21 +13,19 @@ clarity over optimism — this file improves decision quality, not morale.
 
 ## Overall project state
 
-Dig Stellar is past prototype stage. It has a live beta frontend on real Mainnet data, a dedicated
-backend API serving as the product façade, an indexer ingesting five protocols across Horizon,
-Soroban and the DeFindex API on a 15-minute cron, real wallet connection, grouped multi-wallet behavior, DB-backed wallet
-balance refresh, and a non-custodial transaction builder with a **fully successful** SDEX swap proven
-on Testnet.
+Dig Stellar is a live production beta: a frontend on real Mainnet data (`stellar.getdig.ai`), a
+dedicated backend API façade, an indexer ingesting five protocols across Horizon, Soroban and the
+DeFindex API on a 15-minute cron, grouped multi-wallet portfolio with the active-signer model,
+in-app alerting, bridge-flow monitoring, and a non-custodial transaction builder with swaps and
+Blend supply/withdraw executed and Horizon-verified on Mainnet.
 
-The three MVP deliverables (internally "T1") meet their SCF criteria and have been **submitted** for
-the **Tranche 2 (20%) disbursement** — claim-ready and now **awaiting SCF validation** (not yet
-validated, approved, or paid). The **T2 deliverable group is complete and live in prod**, and its
-**Tranche 3 (30%) disbursement submission is filed** — **Submitted for disbursement review — awaiting
-SCF validation** (submission ≠ acceptance): T2-D1 portfolio/active-signer (**done** — the visual HF
-cross-check vs mainnet.blend.capital was performed and matched), T2-D2 in-app alerting (**live in prod
-on the VPS** — schema + cron running, real `alert_fired` notifications in prod), T2-D3 bridge
-monitoring (**live in prod** — schema applied + Allbridge bootstrap run, `bridge_flows` populated).
-The ~5-min prod demo video is recorded; T2 build, deploy, and evidence are complete.
+**SCF #43 is COMPLETE — all four tranches validated and paid.** Tranche 2 (20%, MVP): late July
+2026 · Tranche 3 (30%): early August 2026 · Tranche 4 (40%): around 20 August 2026, including
+acceptance of the final SDF report. The team rushed to finish before 15 August to apply to
+SCF 45; SCF 45 reviewers redirected the application to SCF 46 (8 November 2026) because SCF 43's
+final validation had not landed at their review time. Everything since — Lots AA/AB (responsive
+shell + watch-only-first), AC (Node 24), AD (CI/CD, in progress), ST (status page) — is
+**post-grant product hardening** while preparing the SCF 46 application.
 
 ---
 
@@ -766,34 +764,22 @@ T3-D3 ops item.
    counts automatically and the incentive campaign drives real executions, but post-campaign
    organic adoption is unproven (the action stack itself is deployed and evidenced end-to-end)
 
-## 12. Closest tranche-relevant wins
-1. SCF Tranche 3 (30%) submission — the T2 group (portfolio/active-signer, live alerting, live bridge)
-   is **filed for disbursement review**, awaiting SCF validation
-2. ~5-min prod demo video — recorded and attached (T2 deliverables + T1 MVP walkthrough)
-3. (Next group) begin the T3 group — mainnet actions (T3-D2) + freshness/observability (T3-D1/D3)
+## 12. Closest post-grant wins
+1. Lot AD — CI/CD deploy pipeline (in progress): removes the manual-VPS-deploy failure mode
+2. Lot ST — status page deploy (API → verify → Vercel, `docs/deployment.md` "Lot ST deploy sequence")
+3. SCF 46 application prep (deadline 8 November 2026)
 
 ---
 
-## 13. Current execution priorities (updated 2026-08-04 — internal T3 target: Aug 15)
-1. **T3-D2 KPI push** — the 5 XLM witness-gated reward campaign is LIVE (started 2026-08-17
-   ~16:45 UTC, 48h): 15/40 claims paid + 17 witnessed executed txs in the first ~12h.
-   `action_witnesses` accumulates the 200-tx evidence automatically; distribution must continue
-   after the campaign, and every claim states the incentive context.
-2. ~~Lot A2 — Blend deposit on Mainnet~~ **DONE and exceeded (Aug 14)**: multi-pool mainnet
-   supplies + the withdraw closing the loop, all Horizon-verified
-   (`docs/evidence/t3-d2-mainnet-actions.md`); VPS deploy of the A5/A5b code pending
-3. **T3-D3** — sidebar UX redesign, RPC latency/error metrics, SDF reference packaging
-4. **T3-D1 demo capture** (the only remaining T3-D1 item — everything else is live in prod)
-5. Keep `grant-roadmap.md` and `status-board.md` aligned with this reality
-   (T1 + T2 submissions both filed, awaiting SCF validation — nothing pending on our side)
-
-(Done this session: data cleanup — stellar-native protocol aggregation, dynamic `protocolCount`=4,
-dead Soroswap pair hidden + TVL corrected, "native"→"XLM" display, Blend panel trimmed; cron moved to
-15 min; Validation Cloud `joinUrl` fix resolving a cascading refresh failure; T1-D3 SDEX swap proven
-**fully successful** on Testnet via a live-quote + auto-slippage flow.)
+## 13. Current execution priorities (updated 2026-09-05 — post-grant)
+1. **Lot AD — CI/CD deploy pipeline** (in progress): automated VPS deploy replacing the manual
+   sequence (the 2026-08-17 aborted-pull incident class is the failure mode it removes)
+2. **Lot ST — status page deploy**: founder runs the ordered sequence in `docs/deployment.md`
+   (API build + pm2 restart → three curl verifications → Vercel push → `#status` + 390px check)
+3. **SCF 46 application prep** (deadline 8 November 2026)
 
 What should not dominate now: over-engineering auth/session, premature abstraction layers, broad
-refactors not tied to a tranche need, or polishing low-value UI before the Tranche 2 submission is out.
+refactors not tied to a product need, or polishing low-value UI ahead of the SCF 46 application.
 
 ---
 

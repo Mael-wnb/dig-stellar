@@ -22,24 +22,28 @@ Keep it short, practical, and frequently updated. Keep it aligned with `docs/gra
 
 ## Tranche numbering (SCF #43 — 4 disbursements)
 
-SCF #43 pays in four tranches: 10% / 20% / 30% / 40%.
+SCF #43 paid in four tranches: 10% / 20% / 30% / 40%. **All four are received.**
 - **Tranche 1 (10%)** — upfront, received on approval. No deliverables to prove.
-- **Tranche 2 (20%)** — **current submission target.** Unlocked by review of the MVP
-  deliverables below (internally tracked as "T1 — MVP": D1 indexing, D2 dashboard,
-  D3 builder).
-- **Tranche 3 (30%)** — testnet review (internal "T2" work).
-- **Tranche 4 (40%)** — mainnet launch (internal "T3" work).
+- **Tranche 2 (20%)** — MVP group ("T1": D1 indexing, D2 dashboard, D3 builder) —
+  **validated and paid late July 2026**.
+- **Tranche 3 (30%)** — testnet review (internal "T2" work) — **validated and paid early
+  August 2026**.
+- **Tranche 4 (40%)** — mainnet launch (internal "T3" work) — **validated and paid around
+  20 August 2026, including acceptance of the final SDF report**.
 
 The internal "T1/T2/T3" labels below are the *deliverable groups* the project was approved
-with; the MVP group (T1) is what the 20% disbursement is reviewed against.
+with; the tables and notes below are kept as the historical record of how each closed.
 
 ---
 
 ## Global status
 
-- Current phase: **T3 execution sprint** (internal target: Aug 15). T1 (MVP) and T2 submissions are
-  both **filed and awaiting SCF validation** (neither validated nor paid yet — nothing pending on
-  our side).
+- Current phase: **post-grant. SCF #43 is COMPLETE — all four tranches validated and paid**
+  (Tranche 2, 20%, MVP: late July 2026 · Tranche 3, 30%: early August 2026 · Tranche 4, 40%:
+  around 20 August 2026, including acceptance of the final SDF report). Everything since is
+  post-grant product hardening/upgrades (Lots AA, AB, AC, AD in progress, ST) while preparing
+  the **SCF 46 application (8 November 2026)** — SCF 45 reviewers redirected the application
+  to SCF 46 because SCF 43's final validation had not landed at their review time.
 - T3 headline: **T3-D1 is DONE in prod** (Aug 4 — DeFindex live as the 5th protocol ≈$18.8M,
   first-class freshness + standardized backoff retries; demo capture remaining) and **T3-D2 mainnet
   actions are LIVE and evidenced end-to-end** (swaps ungated Aug 2 behind kill-switch + 100 XLM cap
@@ -330,7 +334,14 @@ with; the MVP group (T1) is what the 20% disbursement is reviewed against.
   Evidence: `docs/evidence/lot-z/z1-compose-fresh-clone.md`. Zero product-logic changes.
   **Remaining T3-D3: the final SDF report (+ demo)** — observability (Lot E) and packaging
   (Lot Z) are both done.
-- Last updated: 2026-08-18
+- Post-grant note (2026-09-05, Lot ST): **status page live at `#status`** — the visible face
+  of the Lot E observability: `GET /v1/ops/status?window=24h` (public, no-store; gap +
+  availability math incl. trailing/leading gaps; `overall.state` = current state) + the
+  StatusView/StatusBar web view, FreshnessChip click-through, sidebar link. Steps-query 24h
+  fix on `/v1/ops/metrics`; ops module's first tests (api suite 129 → 147). VPS + Vercel
+  push founder-side (`docs/deployment.md` "Lot ST deploy sequence"). Evidence:
+  `docs/evidence/status-page/`. No SCF criterion involved.
+- Last updated: 2026-09-05
 
 ---
 
@@ -364,9 +375,9 @@ T1-D3 criteria.
 
 | Deliverable | Status | Completion | Confidence | Current evidence | Main remaining gap | Next action |
 |---|---|---:|---|---|---|---|
-| D1 — Mainnet Deployment & Freshness Tracking | Done in prod | 95% | High | **Both criteria met, deployed to prod Aug 4 (Lot B).** (1) All 5 named protocols live on real Mainnet data — **DeFindex integrated into the v1 pipeline** (venue + 3 vaults enumerated from `GET /vault/discover`: Meru ≈$18.1M, Beans USDC ≈$507k, Beans EURC ≈$200k; ≈$18.8M aggregate, avg APY ≈7.1%; `protocolCount = 5`; yield-vault detail variant in the UI). (2) Freshness first-class: `isStale` + `staleAfterSeconds` on every `/v1/*` payload (read-time, threshold 45 min = 3× cron), FreshnessChip + stale badges in the UI, standardized exponential-backoff retries on every refresh step. Evidence in `docs/evidence/lot-b/`. Full prod `job:refresh` clean in ~3 min | **Demo capture** for the claim (only non-build item) | Capture the T3-D1 demo (5 protocols + stale drill) |
-| D2 — Non-Custodial Mainnet Actions | Substantially done — swaps + lending evidenced on mainnet | 80% | Medium | **Both action families executed and Horizon-verified on Pubnet.** Swaps LIVE from the dashboard (ungated Aug 2; both directions incl. `eeeae199…`; Aug 14: 50 XLM→7.97 USDC + 10 XLM→1.38 EURC). **Blend lending: multi-pool supplies (5 XLM→Fixed, 5 XLM + 5 USDC→YieldBlox) AND the withdraw closing the supply↔withdraw loop (`537a2303…`, the exact supplied position back)** — six txs, all XDR-decoded, congestion-fee bid confirmed against reality (10,000-stroop inclusion bid, ~46–59% of ceiling charged). Honest refusal path proven: frozen Orbit supply dies at SIMULATION (#1206, nothing signed). Security regime verified in prod: kill-switch (403 default), 100 XLM cap, issuer-verified 5-pair whitelist, client-side pre-sign XDR validation (fail closed), in-wallet signing only. Evidence: `docs/evidence/t3-d2-mainnet-actions.md` + `mainnet-ungating-2026-08-02.md` + `pair-vetting-2026-08-01.md` + `lot-a5-blend-multipool.md`. **Since Aug 17 (Lot R): the full action stack is deployed to prod, `action_witnesses` is the automatic executed-tx KPI ledger, and the 5 XLM reward campaign is live** (48h, ends Aug 19 16:45 UTC) | **KPIs** (50+ wallets / 200+ txs) — the only open criterion. Real position 2026-08-18: 17 witnessed txs / 16 wallets with executions (65 tracked wallets, 48 users) — accumulated under the incentive campaign; the 200-tx bar is honestly far | Ride the campaign window; keep distribution going after it ends; state the incentive context in the claim |
-| D3 — Observability, UI/UX Polish & Reference Handoff | In progress | 45% | Medium | **UI/UX-polish component substantially landed** across Lots C/F/G/H (design-handoff port → shell + 5 views + modals; advisor-feedback F1–F5; founder-review G0–G4: TVL history + chain logos + clickable tx hashes + adaptive pools table + hero dedupe/compact actions + network-TVL hero chart; founder-review-2 H0–H4: modal teleport fix, dashboard "Your positions" panel, Uniswap-standard swap reskin, measurable flows coverage + Aquarius/Soroswap liquidity-amount extraction — **H deploy pending**) — all green (web build + 49 tests + api build), captures in `docs/evidence/lot-{c,f,g,h}/`. Plus `docker-compose.yml` local-dev stack, `/health` liveness, modular architecture, grown docs corpus | Real RPC latency/error metrics + CI/CD (still manual VPS deploy); packaged SDF reference implementation; final report w/ adoption metrics (depends on T3-D2 KPIs) | Deploy Lot H (build + PM2 restart + Aquarius event backfill), then observability (RPC latency/error metrics) + CI/CD, then reference packaging |
+| D1 — Mainnet Deployment & Freshness Tracking | Done | 100% | High | **Both criteria met, deployed to prod Aug 4 (Lot B).** (1) All 5 named protocols live on real Mainnet data — **DeFindex integrated into the v1 pipeline** (venue + 3 vaults enumerated from `GET /vault/discover`: Meru ≈$18.1M, Beans USDC ≈$507k, Beans EURC ≈$200k; ≈$18.8M aggregate, avg APY ≈7.1%; `protocolCount = 5`; yield-vault detail variant in the UI). (2) Freshness first-class: `isStale` + `staleAfterSeconds` on every `/v1/*` payload (read-time, threshold 45 min = 3× cron), FreshnessChip + stale badges in the UI, standardized exponential-backoff retries on every refresh step. Evidence in `docs/evidence/lot-b/`. Full prod `job:refresh` clean in ~3 min | — (validated by SCF) | — |
+| D2 — Non-Custodial Mainnet Actions | Done | 100% | High | **Both action families executed and Horizon-verified on Pubnet.** Swaps LIVE from the dashboard (ungated Aug 2; both directions incl. `eeeae199…`; Aug 14: 50 XLM→7.97 USDC + 10 XLM→1.38 EURC). **Blend lending: multi-pool supplies (5 XLM→Fixed, 5 XLM + 5 USDC→YieldBlox) AND the withdraw closing the supply↔withdraw loop (`537a2303…`, the exact supplied position back)** — six txs, all XDR-decoded, congestion-fee bid confirmed against reality (10,000-stroop inclusion bid, ~46–59% of ceiling charged). Honest refusal path proven: frozen Orbit supply dies at SIMULATION (#1206, nothing signed). Security regime verified in prod: kill-switch (403 default), 100 XLM cap, issuer-verified 5-pair whitelist, client-side pre-sign XDR validation (fail closed), in-wallet signing only. Evidence: `docs/evidence/t3-d2-mainnet-actions.md` + `mainnet-ungating-2026-08-02.md` + `pair-vetting-2026-08-01.md` + `lot-a5-blend-multipool.md`. **Since Aug 17 (Lot R): the full action stack is deployed to prod, `action_witnesses` is the automatic executed-tx KPI ledger, and the 5 XLM reward campaign is live** (48h, ends Aug 19 16:45 UTC) | — (validated by SCF — the deliverable was accepted with the incentive-campaign context disclosed alongside the KPI adoption evidence; the numbers are not restated here as "met") | — |
+| D3 — Observability, UI/UX Polish & Reference Handoff | Done | 100% | High | **UI/UX-polish component substantially landed** across Lots C/F/G/H (design-handoff port → shell + 5 views + modals; advisor-feedback F1–F5; founder-review G0–G4: TVL history + chain logos + clickable tx hashes + adaptive pools table + hero dedupe/compact actions + network-TVL hero chart; founder-review-2 H0–H4: modal teleport fix, dashboard "Your positions" panel, Uniswap-standard swap reskin, measurable flows coverage + Aquarius/Soroswap liquidity-amount extraction — **H deploy pending**) — all green (web build + 49 tests + api build), captures in `docs/evidence/lot-{c,f,g,h}/`. Plus `docker-compose.yml` local-dev stack, `/health` liveness, modular architecture, grown docs corpus | — (validated by SCF) | — |
 
 ---
 
@@ -392,12 +403,12 @@ T1-D3 criteria.
    entry via Lot AB. Final sweep: 81 capture records at 390/768/1024, zero horizontal
    overflow, zero console errors — `docs/evidence/lot-aa/`.)
 
-## Best near-term tranche wins
-1. T3-D1 demo capture → claim-ready (everything else already live in prod)
-2. KPI accumulation — the witness ledger now counts executions automatically; every campaign
-   claim and post-campaign organic action lands in `action_witnesses`
-3. Final report assembly: adoption metrics (with the incentive-campaign context stated) +
-   reference packaging are the remaining T3-D3 items
+## Best near-term wins (post-grant)
+1. **Lot AD — CI/CD deploy pipeline** (in progress): removes the manual-VPS-deploy failure
+   mode (the 2026-08-17 aborted-pull incident class)
+2. **Lot ST — status page deploy**: API → verify → Vercel per the Lot ST sequence in
+   `docs/deployment.md` (built, staged, tests 147 green)
+3. **SCF 46 application prep** (deadline 8 November 2026)
 
 ---
 

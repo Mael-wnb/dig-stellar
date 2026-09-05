@@ -411,7 +411,7 @@ KPI:
 Estimated date: August 24, 2026 — Budget: $8,610
 
 ### Internal interpretation & status (living)
-Owner: `apps/web` + `apps/api`. Status: **~60%, mainnet swaps LIVE in prod** (ungated 2026-08-02).
+Owner: `apps/web` + `apps/api`. Status: **Done — validated and paid (Tranche 4, around 20 August 2026)**.
 
 **Criterion 1: half met (swaps ✅, vault/lending pending).** The SDEX swap runs on Mainnet from
 the dashboard: first real executions succeeded in **both directions** (1 XLM → USDC, and USDC →
@@ -431,9 +431,11 @@ exclusively in-wallet. Contract: `docs/security-invariants.md`; evidence:
 **Criterion 3: met** for the swap (pending/success/failure states, network-aware
 stellar.expert link); the deposit inherits the same surface in A2.
 
-**Remaining:** Lot A2 (Blend deposit mainnet) and the **hard KPIs** (50+ unique mainnet wallets,
-200+ mainnet transactions), adoption metrics whose window opened with the ungating; distribution
-is scheduled work, not an afterthought.
+**Close-out (post-grant, 2026-09-05):** SCF's Tranche 4 validation (around 20 August 2026)
+closed this deliverable — accepted with the KPI adoption evidence presented under the disclosed
+incentive-campaign context (the numbers are not restated here as "met"). The interpretation
+paragraphs above are kept as the historical record; Lot A2 and the mainnet supply↔withdraw loop
+had landed before validation (`docs/evidence/t3-d2-mainnet-actions.md`).
 
 ---
 
@@ -451,7 +453,7 @@ How to measure completion:
 Estimated date: August 31, 2026 — Budget: $6,140
 
 ### Internal interpretation & status (living)
-Owner: all apps. Status: ~85%, two of three criteria met; the final report remains.
+Owner: all apps. Status: **Done — validated and paid (Tranche 4, around 20 August 2026)**.
 
 **Criterion 1 (observability): met (Lot E, 2026-08-13).** Enriched `/health` (per-venue
 freshness + GIT_SHA version), `GET /v1/ops/metrics` (per-run RPC latency p50/p95/p99 + error
@@ -468,10 +470,9 @@ stack (static Vite build on Vercel, a documented choice). Internal documentation
 `docs/reference-deployment.md` (+ runbooks/deployment/architecture corpus). UI-polish scope
 for this cycle (sidebar redesign + Lots C/F/G/H/Q) landed earlier.
 
-**Remaining gap:** the final report to the SDF (modular architecture + initial adoption
-metrics; depends on the T3-D2 KPI window). Note: no broad test suites/CI pipeline exist
-(a minimal GitHub Actions build workflow is a bonus, not evidence); do not cite testing
-beyond the alerting specs.
+**Close-out (post-grant, 2026-09-05):** the final SDF report (modular architecture + adoption
+metrics) was submitted and accepted as part of the Tranche 4 validation (around 20 August
+2026), closing the last criterion.
 
 ---
 
