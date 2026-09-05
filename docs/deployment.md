@@ -165,9 +165,13 @@ git push origin main && git push public-origin main
 
 **(b) VPS — API, immediately after:**
 
+Remote naming: the VPS clone's only remote is **`origin`**
+(`git@github.com:Mael-wnb/dig-stellar.git`); **`public-origin`** is the local dev clone's
+name for that same repository — it does not exist on the VPS.
+
 ```bash
 cd /root/dig-stellar
-git pull public-origin main
+git pull origin main
 pnpm install
 pnpm -C apps/api build
 GIT_SHA=$(git -C /root/dig-stellar rev-parse --short HEAD) pm2 restart dig-stellar-api --update-env
