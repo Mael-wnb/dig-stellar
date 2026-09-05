@@ -23,7 +23,8 @@ export class OpsController {
     return this.opsService.getMetrics();
   }
 
-  // Lot ST (T3-D3 follow-up): the status-page payload. Refresh-pipeline
+  // Lot ST — post-grant upgrade (Sept 2026), builds on Lot E: the status-page
+  // payload. Refresh-pipeline
   // visibility (our own runs), NOT an external uptime probe. no-store like the
   // faucet eligibility read: the payload embeds `now`, caching it lies.
   @Get('status')

@@ -442,8 +442,18 @@ Exists: refresh jobs on a 15-min cron; persisted timestamps across snapshots/met
   `runTsxWithRetry` (`scripts/shared/retry.ts`): 3 attempts, 5s→20s + jitter, per-step logging;
   non-fatal steps keep catch-and-log as the last resort.
 
-Still incomplete (later T3): ingestion health endpoint / observability (RPC latency + error-rate
-metrics are T3-D3).
+**Landed (T3-D3 Lot E, Aug 13):** enriched `/health` (per-venue freshness + GIT_SHA),
+`GET /v1/ops/metrics` (per-run RPC latency p50/p95/p99 + error rates), `GET /v1/ops/adoption`.
+
+**Landed (post-grant Lot ST, Sept 2026):** a public **status page** at `#status` — the visible
+face of the Lot E observability. `GET /v1/ops/status?window=24h` aggregates
+`refresh_step_runs` + `rpc_metrics_runs` server-side into a Statuspage-style payload (one row
+per pipeline step and per RPC target, one tile per 15-min run, gap/availability math incl.
+trailing/leading gaps); the web renders dumbly (`StatusView` + `StatusBar`), the
+`FreshnessChip` click-through lands there, and a "System status" link sits at the bottom of
+the sidebar nav. What it does **not** do (honest boundary, stated on the page): it is not an
+external uptime probe of the API or dashboard (it reflects the indexer's own refresh runs);
+retries are invisible (final SUCCESS/FAILED only); window is 24h only for the beta.
 
 ---
 

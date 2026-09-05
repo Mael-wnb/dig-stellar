@@ -146,3 +146,52 @@ Later, this doc should include:
 - cron schedule details
 - deployment commands
 - rollback notes
+
+---
+
+## Lot ST deploy sequence (status page, Sept 2026) — ORDER MATTERS
+
+The VPS pulls from `public-origin`, and the same push triggers Vercel — so the push comes
+first, and the VPS deploy follows IMMEDIATELY: the web goes live ~2 min before the API, during
+which `#status` shows its error state (acceptable — the page is new and unlinked from any user
+flow). **No SQL to apply — Lot ST has no schema change** (it only reads `rpc_metrics_runs` +
+`refresh_step_runs` as they are).
+
+**(a) Push (one push; Vercel starts building the web immediately):**
+
+```bash
+git push origin main && git push public-origin main
+```
+
+**(b) VPS — API, immediately after:**
+
+```bash
+cd /root/dig-stellar
+git pull public-origin main
+pnpm install
+pnpm -C apps/api build
+GIT_SHA=$(git -C /root/dig-stellar rev-parse --short HEAD) pm2 restart dig-stellar-api --update-env
+pm2 save
+```
+
+**(c) Verify (all three):**
+
+```bash
+# 1. New endpoint up, 200 + no-store:
+curl -sI https://stellar-api.getdig.ai/v1/ops/status | egrep '^(HTTP|Cache-Control)'
+#    -> HTTP/… 200 · Cache-Control: no-store
+
+# 2. Payload sane (~96 runs at the 15-min cadence, operational, no gaps):
+curl -s 'https://stellar-api.getdig.ai/v1/ops/status?window=24h' \
+  | jq '{overall, n: (.runs|length), gaps, historySince}'
+
+# 3. The /v1/ops/metrics steps fix (window filter): one recent timestamp, not Aug history:
+curl -s https://stellar-api.getdig.ai/v1/ops/metrics | jq '[.steps[].lastRunAt] | unique'
+```
+
+**(d) Web checks:** `https://stellar.getdig.ai/#status` renders the live bars, a
+`FreshnessChip` click (dashboard or pool detail) lands on `#status`, and a 390 px check on a
+phone: the bar scrolls inside its own container, the body never pans horizontally.
+
+Strict variant (only worth it when a web change would break on the old API): push
+`<api-commit>:main` first, deploy the VPS from it, then push the rest and pull again.

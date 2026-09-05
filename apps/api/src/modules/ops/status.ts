@@ -1,6 +1,7 @@
 // apps/api/src/modules/ops/status.ts
 //
-// Lot ST (T3-D3 follow-up): pure aggregation for GET /v1/ops/status.
+// Lot ST — post-grant upgrade (Sept 2026), builds on Lot E: pure aggregation
+// for GET /v1/ops/status.
 // Turns raw `refresh_step_runs` + `rpc_metrics_runs` rows (24h window) into the
 // Statuspage-style payload the web renders dumbly. No I/O here — the service
 // fetches rows and calls computeOpsStatus(); everything below is unit-testable

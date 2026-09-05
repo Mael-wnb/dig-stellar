@@ -180,7 +180,8 @@ export class OpsService {
     };
   }
 
-  // Lot ST (T3-D3 follow-up): GET /v1/ops/status — the status-page payload.
+  // Lot ST — post-grant upgrade (Sept 2026), builds on Lot E:
+  // GET /v1/ops/status — the status-page payload.
   // All logic lives in the pure computeOpsStatus() (see status.ts, incl. the
   // thresholds object and the honest boundary); this method only fetches the
   // windowed rows and the all-time history floor.

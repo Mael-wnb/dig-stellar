@@ -247,12 +247,96 @@ internal URLs (targets/steps are fixed internal labels; `version` is the short G
   Honest boundary (stated in the payload): counts server-side BUILDS; on-chain submission is
   client-side (non-custodial), so executed-tx evidence stays the manual hash list. No backfill:
   counters start at deploy.
+- `GET /v1/ops/status?window=24h` (Lot ST, post-grant Sept 2026 — feeds the `#status` page):
+  the Statuspage-style aggregation of the same two tables. Public read-only, `Cache-Control:
+  no-store`, only `window=24h` accepted (anything else → 400 listing supported values).
+  Rules — all in ONE exported object, `OPS_STATUS_RULES` in `apps/api/src/modules/ops/status.ts`:
+  - step segment: `SUCCESS` → ok (green) · `FAILED` → failed (red). Retries are invisible in
+    the DB, so no amber is derived for steps.
+  - rpc segment: 0 errors → ok · error rate < 0.25 → degraded (amber) · ≥ 0.25 → failed.
+  - gaps: the window is a TIME axis — spans between consecutive events in
+    `[windowStart, run₁…runₙ, now]` over 1.75 × the 15-min cadence are missed cycles,
+    including the open-ended TRAILING span (`before: null`, refresh overdue) and the leading
+    span when history predates the window (else `noDataBefore`, not a gap).
+  - `availability24h` = 1 − (failed + missed) / (observed + missed); degraded does NOT reduce it.
+  - `overall.state` is the CURRENT state (latest run + trailing age only), never a 24h
+    aggregate; `staleAfterSeconds` comes from `common/freshness.ts` (same 45-min rule).
+  Boundary: this reflects the indexer's refresh pipeline and its outbound calls — it is not an
+  external uptime probe of the API or the dashboard.
 
 ```bash
 # Incident history, one query instead of grepping cron logs (E2):
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" \
   -c "select run_at, step, status, duration_ms, left(message, 80) from refresh_step_runs where status = 'FAILED' order by run_at desc limit 20;"
 ```
+
+### Status-page fixture drill (local — Lot ST)
+
+To exercise the `#status` view against a full 24h of shapes (failure, degradation, gap) on a
+local DB that only holds a couple of real runs: seed 96 synthetic runs whose `run_at` seconds
+are exactly `:33` (the fixture marker — real writer rows carry sub-second precision, e.g.
+`…:33.854`, so the cleanup predicate can never touch them). Never run against prod; never
+commit the rows.
+
+```sql
+-- Seed (96 runs over the last 24h into BOTH tables; one FAILED aquarius step at ≈−5h,
+-- a 3-cycle gap at ≈−11h, price-sources at 10% errors for ≈2h):
+with runs as (
+  select
+    date_trunc('minute', now()) - interval '2 minutes'
+      + interval '33 seconds'
+      - (n * interval '15 minutes') as run_at,
+    n
+  from generate_series(0, 95) n
+  where n not in (44, 45, 46)
+)
+insert into refresh_step_runs (run_at, step, status, duration_ms, message)
+select
+  r.run_at,
+  s.step,
+  case when s.step = 'aquarius' and r.n = 20 then 'FAILED' else 'SUCCESS' end,
+  1500 + (r.n % 7) * 210,
+  case when s.step = 'aquarius' and r.n = 20
+       then 'fixture: simulated pool refresh failure' else null end
+from runs r
+cross join (values
+  ('prices:reference'), ('prices:soroswap-derived'), ('blend'), ('soroswap'),
+  ('aquarius'), ('stellar-native'), ('defindex'), ('protocol-metrics'),
+  ('allbridge'), ('network-stats')
+) s(step)
+on conflict (run_at, step) do nothing;
+
+with runs as (
+  select
+    date_trunc('minute', now()) - interval '2 minutes'
+      + interval '33 seconds'
+      - (n * interval '15 minutes') as run_at,
+    n
+  from generate_series(0, 95) n
+  where n not in (44, 45, 46)
+)
+insert into rpc_metrics_runs (run_at, target, calls, errors, p50_ms, p95_ms, p99_ms)
+select
+  r.run_at,
+  t.target,
+  100,
+  case when t.target = 'price-sources' and r.n between 4 and 11 then 10 else 0 end,
+  90 + (r.n % 5) * 12,
+  260 + (r.n % 5) * 30,
+  420 + (r.n % 5) * 45
+from runs r
+cross join (values
+  ('soroban-rpc'), ('horizon'), ('defindex-api'), ('price-sources')
+) t(target)
+on conflict (run_at, target) do nothing;
+
+-- Cleanup (the :33.000 marker is exact; real rows have fractional seconds):
+delete from refresh_step_runs where extract(second from run_at) = 33;
+delete from rpc_metrics_runs  where extract(second from run_at) = 33;
+```
+
+Observed counts in the 2026-09-04 drill: steps 120 → 1050 → 120, rpc 48 → 420 → 48; the real
+rows' `max(run_at)` unchanged after cleanup.
 
 ---
 

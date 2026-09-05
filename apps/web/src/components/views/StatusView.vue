@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// StatusView — Lot ST (T3-D3 follow-up): the visible face of the Lot E
+// StatusView — Lot ST, post-grant upgrade (Sept 2026): the visible face of the Lot E
 // observability. One row per pipeline step and per RPC target, one tile per
 // 15-min refresh run over 24h. ALL states/percentages come from
 // GET /v1/ops/status — this view renders, it never re-derives a rule.
@@ -53,7 +53,7 @@ const bannerText = computed(() => {
     case 'operational':
       return 'All pipeline systems operational'
     case 'degraded':
-      return `Pipeline degraded — ${failedStepsLatestRun.value} step(s) failed on the latest run`
+      return `Pipeline degraded — ${plural(failedStepsLatestRun.value, 'failed step')} on the latest run`
     case 'outage':
       return `Pipeline stalled — last refresh ${ageLabel(lastRunAgeSeconds.value)} ago`
     default:
