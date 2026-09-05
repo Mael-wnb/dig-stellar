@@ -37,15 +37,23 @@ function rpcRow(i: number, target: string, calls: number, errors: number): RpcRu
 }
 
 // `now` defaults to one cadence after the last grid run so the trailing age is
-// fresh (no stale/outage) unless a test wants otherwise.
+// fresh (no stale/outage) unless a test wants otherwise. `historySince`
+// defaults to the EARLIEST fixture run (fresh-deploy semantics): the span
+// before the first run is then "no data", never a leading gap, so fixtures
+// exercise only what they construct — leading-gap tests opt in with an
+// explicit pre-window historySince.
 function compute(
   partial: Partial<OpsStatusInput> & { lastRunIndex?: number },
 ): ReturnType<typeof computeOpsStatus> {
   const { lastRunIndex, ...rest } = partial;
+  const rows = [...(rest.stepRows ?? []), ...(rest.rpcRows ?? [])];
+  const earliest = rows.length
+    ? new Date(Math.min(...rows.map((r) => r.runAt.getTime())))
+    : null;
   return computeOpsStatus({
     now: new Date(runAt(lastRunIndex ?? 0).getTime() + CADENCE_MS),
     staleAfterSeconds: STALE_AFTER_SECONDS,
-    historySince: new Date('2026-08-13T08:00:00.000Z'),
+    historySince: earliest,
     stepRows: [],
     rpcRows: [],
     ...rest,
@@ -269,6 +277,69 @@ describe('computeOpsStatus', () => {
     expect(result.runs).toEqual([]);
     expect(result.components).toEqual([]);
     expect(result.historySince).toBeNull();
+    expect(result.noDataBefore).toBeNull();
+  });
+
+  it('stalled pipeline (one run 23h28m ago, old history) → outage, open-ended trailing gap, ~1% availability', () => {
+    // 2b bug fixture: one run, then silence. Before the fix this read as
+    // "0 missed cycles, 100% availability" — a dead pipeline must not read 100%.
+    const only = runAt(0);
+    const now = new Date(only.getTime() + (23 * 60 + 28) * 60_000); // +23h28m
+    const result = compute({
+      stepRows: [stepRow(0, 'blend')],
+      rpcRows: [rpcRow(0, 'horizon', 10, 0)],
+      historySince: new Date(only.getTime() - 10 * 86_400_000), // history >> window
+      now,
+    });
+
+    // Trailing span 1408min → floor(1408/15) = 93 missed cycles, open-ended.
+    expect(result.gaps).toContainEqual({
+      after: only.toISOString(),
+      before: null,
+      missedCycles: 93,
+    });
+    // Leading span (windowStart → run) = 32min → 1 more missed cycle.
+    expect(result.overall.missedCycles24h).toBe(94);
+    expect(result.overall.state).toBe('outage');
+    expect(result.noDataBefore).toBeNull();
+    for (const comp of result.components) {
+      // 1 observed + 94 missed, 0 failed → 1 − 94/95 ≈ 0.0105.
+      expect(comp.availability24h).toBe(Number((1 / 95).toFixed(4)));
+      expect(comp.state).toBe('stale');
+    }
+  });
+
+  it('fresh deploy (history starts 2h ago, 8 runs) → no leading gap, noDataBefore set, availability 1', () => {
+    const indices = Array.from({ length: 8 }, (_, i) => i);
+    const result = compute({
+      stepRows: indices.map((i) => stepRow(i, 'blend')),
+      historySince: runAt(0), // history begins INSIDE the window
+      lastRunIndex: 7,
+    });
+
+    expect(result.gaps).toEqual([]);
+    expect(result.overall.missedCycles24h).toBe(0);
+    expect(result.overall.state).toBe('operational');
+    expect(result.noDataBefore).toBe(runAt(0).toISOString());
+    const blend = result.components.find((c) => c.id === 'step:blend')!;
+    expect(blend.availability24h).toBe(1);
+  });
+
+  it('a late-but-not-stale pipeline (35m since last run) → trailing gap of 2, overall still operational', () => {
+    const result = compute({
+      stepRows: [stepRow(0, 'blend'), stepRow(1, 'blend')],
+      // 35min after the last run: > 1.75×cadence (26.25m) but < 45m stale.
+      now: new Date(runAt(1).getTime() + 35 * 60_000),
+    });
+
+    expect(result.gaps).toEqual([
+      { after: runAt(1).toISOString(), before: null, missedCycles: 2 },
+    ]);
+    expect(result.overall.missedCycles24h).toBe(2);
+    expect(result.overall.state).toBe('operational'); // current state: latest run green
+    const blend = result.components.find((c) => c.id === 'step:blend')!;
+    // 2 observed + 2 missed → 1 − 2/4.
+    expect(blend.availability24h).toBe(0.5);
   });
 });
 

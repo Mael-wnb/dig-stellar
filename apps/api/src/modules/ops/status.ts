@@ -132,7 +132,14 @@ export type OpsStatusComponent = {
   segments: Array<StepSegment | RpcSegment>;
 };
 
-export type OpsStatusGap = { after: string; before: string; missedCycles: number };
+// `before: null` = the open-ended TRAILING gap (last run → now): the next run
+// is overdue. The leading entry (window start → first run) uses the window
+// start as `after`; it exists only when history predates the window.
+export type OpsStatusGap = {
+  after: string;
+  before: string | null;
+  missedCycles: number;
+};
 
 export type OpsStatusPayload = {
   window: string;
@@ -140,6 +147,9 @@ export type OpsStatusPayload = {
   cadenceMinutes: number;
   staleAfterSeconds: number;
   historySince: string | null;
+  // Set when history starts INSIDE the window (fresh deploy): the span before
+  // it is "no data", not missed cycles — the UI draws it as empty slots.
+  noDataBefore: string | null;
   runs: Array<{ runAt: string }>;
   gaps: OpsStatusGap[];
   overall: {
@@ -206,10 +216,34 @@ export function computeOpsStatus(input: OpsStatusInput): OpsStatusPayload {
   const axis = Array.from(axisSet).sort((a, b) => a - b);
 
   // ── Gaps (jitter-tolerant; see OPS_STATUS_RULES.gapFactor) ────────────────
+  // The window is a TIME axis (now − 24h … now), not just the observed runs:
+  // gap candidates are the spans between consecutive events in
+  // [windowStart, run₁ … runₙ, now]. Without the boundary spans, a pipeline
+  // dead for 23h read as "0 missed cycles, 100% availability" (2b bug).
+  const windowStartMs = now.getTime() - 24 * 3_600_000;
+  const gapThresholdMs = OPS_STATUS_RULES.gapFactor * cadenceMs;
   const gaps: OpsStatusGap[] = [];
+  let noDataBefore: string | null = null;
+
+  // Leading span (windowStart → first run): real missed cycles ONLY when
+  // history predates the window — runs were expected. A historySince inside
+  // the window is a fresh deploy: "no data", not a gap (no fake grey history).
+  if (historySince && historySince.getTime() > windowStartMs) {
+    noDataBefore = historySince.toISOString();
+  } else if (axis.length && historySince) {
+    const leadingSpanMs = axis[0] - windowStartMs;
+    if (leadingSpanMs > gapThresholdMs) {
+      gaps.push({
+        after: new Date(windowStartMs).toISOString(),
+        before: new Date(axis[0]).toISOString(),
+        missedCycles: Math.round(leadingSpanMs / cadenceMs) - 1,
+      });
+    }
+  }
+
   for (let i = 1; i < axis.length; i += 1) {
     const gapMs = axis[i] - axis[i - 1];
-    if (gapMs > OPS_STATUS_RULES.gapFactor * cadenceMs) {
+    if (gapMs > gapThresholdMs) {
       gaps.push({
         after: new Date(axis[i - 1]).toISOString(),
         before: new Date(axis[i]).toISOString(),
@@ -217,6 +251,22 @@ export function computeOpsStatus(input: OpsStatusInput): OpsStatusPayload {
       });
     }
   }
+
+  // Trailing span (last run → now): ALWAYS a real gap once the next run is
+  // overdue by the gap factor. Open-ended (`before: null`). missedCycles is
+  // floor(span/cadence) — the next run is simply late, so the first cycle
+  // counts as soon as it is overdue (not round − 1 like a closed span).
+  if (axis.length) {
+    const trailingSpanMs = now.getTime() - axis[axis.length - 1];
+    if (trailingSpanMs > gapThresholdMs) {
+      gaps.push({
+        after: new Date(axis[axis.length - 1]).toISOString(),
+        before: null,
+        missedCycles: Math.floor(trailingSpanMs / cadenceMs),
+      });
+    }
+  }
+
   const missedCycles24h = gaps.reduce((sum, g) => sum + g.missedCycles, 0);
 
   // ── Step components ───────────────────────────────────────────────────────
@@ -326,6 +376,7 @@ export function computeOpsStatus(input: OpsStatusInput): OpsStatusPayload {
     cadenceMinutes: OPS_STATUS_RULES.cadenceMinutes,
     staleAfterSeconds,
     historySince: historySince ? historySince.toISOString() : null,
+    noDataBefore,
     runs: axis.map((ms) => ({ runAt: new Date(ms).toISOString() })),
     gaps,
     overall: {

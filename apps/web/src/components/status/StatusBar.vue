@@ -1,13 +1,16 @@
 <script setup lang="ts">
 // StatusBar — Lot ST. The Statuspage-style segmented bar: one tile per refresh
-// run on the shared `runs` axis, plus one grey hatched tile PER missed cycle
-// (so the bar's width stays proportional to time) and a transparent outlined
-// slot when this component has no row for a run on the axis (never a
-// synthesized state). Dumb by design: every state/colour decision was made by
-// the API; this maps states to tiles.
+// run, one grey hatched tile PER missed cycle — including the open-ended
+// TRAILING gap (before: null — refresh overdue since the last run) and the
+// real leading gap (window start → first run) — plus empty "no data" slots for
+// the pre-history span (noDataBefore, fresh deploy) and for a run this
+// component has no row for. Tile position ≈ time position along the 24h axis;
+// a stalled pipeline reads 1 green + ~93 hatched, never "1 green + nothing"
+// (2b fix). Dumb by design: every state/count decision was made by the API.
 //
 // Beta tooltip = native `title` + `aria-label`, tiles keyboard-focusable
-// (tabindex=0) — no custom tooltip component yet.
+// (tabindex=0). The 24h-ago/12h/now axis labels are rendered ONCE per group by
+// StatusView, not here.
 import { computed } from 'vue'
 import { SEVERITY_STYLE } from '../../composables/useAlerts'
 import type {
@@ -22,6 +25,9 @@ const props = defineProps<{
   runs: Array<{ runAt: string }>
   segments: OpsStatusSegment[]
   gaps: OpsStatusGap[]
+  noDataBefore: string | null
+  generatedAt: string
+  cadenceMinutes: number
 }>()
 
 // Segment colours come from the SAME palette the alert severities use — the
@@ -60,11 +66,44 @@ function segmentDetails(s: OpsStatusSegment): string {
 }
 
 const tiles = computed<Tile[]>(() => {
+  const cadenceMs = props.cadenceMinutes * 60_000
+  const windowStartMs = new Date(props.generatedAt).getTime() - 24 * 3_600_000
+  const runsSet = new Set(props.runs.map((r) => r.runAt))
   const byRunAt = new Map(props.segments.map((s) => [s.runAt, s]))
-  const gapAfter = new Map(props.gaps.map((g) => [g.after, g]))
+  // Between-run gaps key on the run they follow; the leading gap's `after` is
+  // the window start (not a run); the trailing gap has `before: null`.
+  const gapAfterRun = new Map(
+    props.gaps.filter((g) => g.before !== null && runsSet.has(g.after)).map((g) => [g.after, g]),
+  )
+  const leadingGap = props.gaps.find((g) => g.before !== null && !runsSet.has(g.after)) ?? null
+  const trailingGap = props.gaps.find((g) => g.before === null) ?? null
   const out: Tile[] = []
 
-  props.runs.forEach((run, i) => {
+  // Pre-history "no data" slots (fresh deploy): window start → first run.
+  if (props.noDataBefore && props.runs.length) {
+    const firstMs = new Date(props.runs[0].runAt).getTime()
+    const slots = Math.max(0, Math.floor((firstMs - windowStartMs) / cadenceMs))
+    for (let m = 0; m < slots; m += 1) {
+      out.push({
+        kind: 'empty',
+        key: `nd-${m}`,
+        label: `No data — history starts ${timeLabel(props.noDataBefore)}`,
+      })
+    }
+  }
+
+  // Leading REAL gap (history predates the window; runs were expected).
+  if (leadingGap) {
+    for (let m = 0; m < leadingGap.missedCycles; m += 1) {
+      out.push({
+        kind: 'gap',
+        key: `lg-${m}`,
+        label: `Missed cycle (no refresh between ${timeLabel(leadingGap.after)} and ${timeLabel(leadingGap.before!)})`,
+      })
+    }
+  }
+
+  props.runs.forEach((run) => {
     const segment = byRunAt.get(run.runAt)
     if (segment) {
       out.push({
@@ -81,18 +120,28 @@ const tiles = computed<Tile[]>(() => {
       })
     }
 
-    // Gap tiles sit between this run and the next: one per missed cycle.
-    const gap = gapAfter.get(run.runAt)
-    if (gap && i < props.runs.length - 1) {
+    const gap = gapAfterRun.get(run.runAt)
+    if (gap) {
       for (let m = 0; m < gap.missedCycles; m += 1) {
         out.push({
           kind: 'gap',
           key: `g-${run.runAt}-${m}`,
-          label: `Missed cycle (no refresh between ${timeLabel(gap.after)} and ${timeLabel(gap.before)})`,
+          label: `Missed cycle (no refresh between ${timeLabel(gap.after)} and ${timeLabel(gap.before!)})`,
         })
       }
     }
   })
+
+  // Open-ended trailing gap: the refresh is overdue RIGHT NOW.
+  if (trailingGap) {
+    for (let m = 0; m < trailingGap.missedCycles; m += 1) {
+      out.push({
+        kind: 'gap',
+        key: `tg-${m}`,
+        label: `Missed cycle — refresh overdue (last run ${timeLabel(trailingGap.after)})`,
+      })
+    }
+  }
 
   return out
 })
@@ -106,7 +155,7 @@ const trackMinWidth = computed(() => `${tiles.value.length * 6}px`)
   <!-- The scroll container: the BAR scrolls, the body never does (Lot AA). -->
   <div class="overflow-x-auto dig-scroll">
     <div
-      class="flex items-stretch gap-[2px] h-[26px]"
+      class="flex items-stretch gap-[2px] h-[18px]"
       :style="{ minWidth: trackMinWidth }"
       role="img"
       :aria-label="`${runs.length} refresh runs over the last 24 hours`"
@@ -129,16 +178,6 @@ const trackMinWidth = computed(() => `${tiles.value.length * 6}px`)
         :aria-label="tile.label"
       />
     </div>
-
-    <!-- Axis labels: static window markers (the axis is the 24h window). -->
-    <div
-      class="flex justify-between mt-[5px] text-[10.5px]"
-      :style="{ minWidth: trackMinWidth, color: 'var(--dig-faint)' }"
-    >
-      <span>24h ago</span>
-      <span>12h</span>
-      <span>now</span>
-    </div>
   </div>
 </template>
 
@@ -154,7 +193,7 @@ const trackMinWidth = computed(() => `${tiles.value.length * 6}px`)
   );
 }
 
-/* Run on the axis but no row for THIS component: transparent outline only. */
+/* No data: pre-history slot, or a run this component has no row for. */
 .dig-status-tile-empty {
   background: transparent;
   border: 1px solid var(--dig-line);

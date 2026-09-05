@@ -38,7 +38,8 @@ export type OpsStatusComponent = {
   segments: OpsStatusSegment[]
 }
 
-export type OpsStatusGap = { after: string; before: string; missedCycles: number }
+// `before: null` = open-ended trailing gap (last run → now, refresh overdue).
+export type OpsStatusGap = { after: string; before: string | null; missedCycles: number }
 
 export type OpsStatusResponse = {
   window: string
@@ -46,6 +47,9 @@ export type OpsStatusResponse = {
   cadenceMinutes: number
   staleAfterSeconds: number
   historySince: string | null
+  // Set when history starts inside the window (fresh deploy): the span before
+  // it is "no data" (empty slots), not missed cycles.
+  noDataBefore: string | null
   runs: Array<{ runAt: string }>
   gaps: OpsStatusGap[]
   overall: {

@@ -18,6 +18,10 @@ const { data, state, error, lastRunAgeSeconds, reload } = useOpsStatus()
 // (useBridge single source) — UI copy only, the API stays neutral.
 const { upstreamPaused } = useBridgeUpstreamPaused()
 
+function plural(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? '' : 's'}`
+}
+
 function ageLabel(seconds: number | null): string {
   if (seconds === null) return '—'
   if (seconds < 60) return `${seconds}s`
@@ -123,13 +127,11 @@ const LEGEND = [
 
 <template>
   <div class="max-w-[1180px] mx-auto px-[26px] py-[26px] max-md:px-[14px]" style="color: var(--dig-text)">
-    <!-- Header -->
-    <div class="mb-[18px]">
-      <h1 class="text-[19px] font-bold">System status</h1>
-      <p class="text-[12.5px] mt-[3px]" style="color: var(--dig-faint)">
-        Refresh pipeline and upstream targets, last 24 hours
-      </p>
-    </div>
+    <!-- No in-page h1: like every other view, the topbar owns the title.
+         Only the subtitle line stays. -->
+    <p class="mb-[14px] text-[12.5px]" style="color: var(--dig-faint)">
+      Refresh pipeline and upstream targets, last 24 hours
+    </p>
 
     <!-- Loading (F4) -->
     <div v-if="state === 'loading'" class="flex flex-col gap-[12px]">
@@ -191,7 +193,7 @@ const LEGEND = [
               color: data.overall.missedCycles24h > 0 ? 'var(--dig-muted)' : 'var(--dig-faint)',
             }"
           >
-            {{ data.overall.missedCycles24h }} missed cycle(s) · 24h
+            {{ plural(data.overall.missedCycles24h, 'missed cycle') }} · 24h
           </span>
           <span
             class="px-[9px] py-[3px] rounded-full"
@@ -200,7 +202,7 @@ const LEGEND = [
               color: data.overall.failedSteps24h > 0 ? 'var(--dig-muted)' : 'var(--dig-faint)',
             }"
           >
-            {{ data.overall.failedSteps24h }} failed step(s) · 24h
+            {{ plural(data.overall.failedSteps24h, 'failed step') }} · 24h
           </span>
         </span>
       </div>
@@ -236,10 +238,10 @@ const LEGEND = [
           <div
             v-for="c in group.comps"
             :key="c.id"
-            class="px-[16px] py-[12px]"
+            class="px-[16px] py-[8px]"
             style="border-color: var(--dig-line-soft)"
           >
-            <div class="flex items-center gap-[10px] mb-[8px] flex-wrap">
+            <div class="flex items-center gap-[10px] mb-[5px] flex-wrap">
               <span class="text-[13px] font-semibold min-w-[150px]">{{ rowLabel(c) }}</span>
               <span
                 class="text-[10.5px] font-semibold uppercase tracking-[.04em] px-[7px] py-px rounded-full"
@@ -251,7 +253,24 @@ const LEGEND = [
                 {{ availabilityLabel(c.availability24h) }}
               </span>
             </div>
-            <StatusBar :runs="data.runs" :segments="c.segments" :gaps="data.gaps" />
+            <StatusBar
+              :runs="data.runs"
+              :segments="c.segments"
+              :gaps="data.gaps"
+              :no-data-before="data.noDataBefore"
+              :generated-at="data.generatedAt"
+              :cadence-minutes="data.cadenceMinutes"
+            />
+          </div>
+
+          <!-- Axis rendered ONCE per group (2b density), not per row. -->
+          <div
+            class="flex justify-between px-[16px] py-[6px] text-[10.5px]"
+            style="color: var(--dig-faint); border-color: var(--dig-line-soft)"
+          >
+            <span>24h ago</span>
+            <span>12h</span>
+            <span>now</span>
           </div>
         </div>
       </section>
