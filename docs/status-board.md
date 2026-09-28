@@ -341,7 +341,15 @@ with; the tables and notes below are kept as the historical record of how each c
   fix on `/v1/ops/metrics`; ops module's first tests (api suite 129 → 147). VPS + Vercel
   push founder-side (`docs/deployment.md` "Lot ST deploy sequence"). Evidence:
   `docs/evidence/status-page/`. No SCF criterion involved.
-- Last updated: 2026-09-05
+- Post-grant note (2026-09-28, hotfix): **lending "supplied" side read from the wrong column** —
+  the pool TVL series (`/v1/pools/:slug/series`) and the Protocols-card top assets
+  (`/v1/protocols`) summed `d_supply_scaled` (borrowed) instead of `b_supply_scaled` (supplied)
+  for Blend, since Lot C / Lot Q. API-only fix on `hotfix/lending-supplied-side` + regression spec
+  (api suite 147 → 149); charts change retroactively (Fixed pool ≈ $35M → ≈ $190M, the numbers
+  becoming true, as with the 2026-08-14 dead-reserves fix). VPS deploy founder-side; prod
+  "after" capture pending. Evidence: `docs/evidence/hotfix-lending-supplied-side/`. No SCF
+  criterion involved. Surfaced by the Lot LM L0 recon.
+- Last updated: 2026-09-28
 
 ---
 

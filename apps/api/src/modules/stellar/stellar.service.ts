@@ -247,7 +247,10 @@ export class StellarService {
         select
           v.slug as venue_slug,
           rs.asset_id,
-          sum(coalesce(rs.d_supply_scaled, 0)) as amount
+          sum(coalesce(
+            case when v.venue_type = 'lending' then rs.b_supply_scaled else rs.d_supply_scaled end,
+            0
+          )) as amount
         from reserve_snapshots rs
         join latest l
           on l.entity_id = rs.entity_id and l.snapshot_at = rs.snapshot_at
@@ -884,7 +887,8 @@ export class StellarService {
   // Blend-only, honest reconstruction. No stored USD time-series exists in the
   // DB (pool_metrics_latest is a single-row upsert), but Blend lending pools
   // retain per-asset reserve history in reserve_snapshots. We reconstruct TVL
-  // per snapshot as sum(d_supply_scaled × latest asset price) — a degraded,
+  // per snapshot as sum(supplied × latest asset price), where supplied is
+  // b_supply_scaled (indexer convention: b = supplied, d = borrowed) — a degraded,
   // irregular-cadence, latest-price approximation (asset_prices is only ~18 days
   // deep). AMM/native/vault pools have no usable reserve history → covered=false
   // so the UI keeps the honest "building history" note rather than a fake curve.
@@ -927,7 +931,7 @@ export class StellarService {
       select
         rs.snapshot_at,
         to_char(date_trunc('day', rs.snapshot_at at time zone 'UTC'), 'YYYY-MM-DD') as day,
-        sum(rs.d_supply_scaled * coalesce(p.price_usd, 0)) as tvl_usd
+        sum(coalesce(rs.b_supply_scaled, 0) * coalesce(p.price_usd, 0)) as tvl_usd
       from reserve_snapshots rs
       join lateral (
         select ap.price_usd from asset_prices ap
