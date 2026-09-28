@@ -113,18 +113,65 @@ latest price per asset):
 The fixed sum equals `pool_metrics_latest.total_supplied_usd` **to the cent** on every pool; the old
 sum equals `total_borrowed_usd` to the cent.
 
-## After — production (TODO, founder, post-deploy)
+## After — production, 2026-09-28 ~14:55 UTC, deployed version `18072ca`
 
-<!-- TODO(founder): run after VPS deploy, paste outputs here, same commands as the "Before" block -->
+Captured founder-side after the VPS deploy with these exact commands:
+
 ```
-date -u
+API=https://stellar-api.getdig.ai
+curl -s $API/health | jq -c '{status, version}'
 for s in blend-fixed-pool blend-orbit-pool blend-etherfuse-pool blend-yieldblox-pool; do
-  echo "$s series=$(curl -s https://stellar-api.getdig.ai/v1/pools/$s/series | jq -c '.points[-1]') totalSuppliedUsd=$(curl -s https://stellar-api.getdig.ai/v1/pools/$s | jq '.metrics.totalSuppliedUsd|round')"
+  echo "--- $s"
+  curl -s "$API/v1/pools/$s/series" | jq -c '.points[-1]'
+  curl -s "$API/v1/pools/$s" | jq -c '{supplied: .metrics.totalSuppliedUsd, borrowed: .metrics.totalBorrowedUsd}'
 done
-curl -s https://stellar-api.getdig.ai/v1/protocols | jq -c '.[]|select(.id=="blend")|{tvlUsd,assetCount,topAssets:[.topAssets[]|{symbol,tvlUsd:(.tvlUsd|round)}]}'
+curl -s $API/v1/protocols | jq -c '.[] | select(.id=="blend") | {tvlUsd, assetCount, topAssets: [.topAssets[] | {symbol, tvlUsd}]}'
+curl -s $API/v1/protocols | jq -c '.[] | select(.id=="aquarius" or .id=="soroswap") | {id, topAssets: [.topAssets[] | {symbol, tvlUsd}]}'
 ```
-Expected: each series last point ≈ that pool's `totalSuppliedUsd` (within price drift since the
-last refresh); Blend top asset order likely native / USDC / EURC.
+
+Output:
+
+```
+=== 1. Version
+{"status":"ok","version":"18072ca"}
+=== 2. Series last point vs pool supplied/borrowed
+--- blend-fixed-pool
+{"day":"2026-09-28","tvlUsd":198077243.15}
+{"supplied":198077243.1454882,"borrowed":35301903.2212206}
+--- blend-orbit-pool
+{"day":"2026-09-28","tvlUsd":190999.14}
+{"supplied":190999.13833371573,"borrowed":406.9865695}
+--- blend-etherfuse-pool
+{"day":"2026-09-28","tvlUsd":16305.5}
+{"supplied":16305.504839947745,"borrowed":1527.0713223662324}
+--- blend-yieldblox-pool
+{"day":"2026-09-28","tvlUsd":360528.22}
+{"supplied":360528.21522928757,"borrowed":42485.12471680124}
+=== 3. Blend top assets
+{"tvlUsd":198645076.00389114,"assetCount":10,"topAssets":[{"symbol":"native","tvlUsd":151529583.07836384},{"symbol":"USDC","tvlUsd":46676210.8844169},{"symbol":"EURC","tvlUsd":235826.678438796}]}
+=== 4. AMM (unchanged vs pre-deploy capture)
+{"id":"aquarius","topAssets":[{"symbol":"SolvBTC","tvlUsd":12097848.36900022},{"symbol":"USDC","tvlUsd":10968259.3120354},{"symbol":"native","tvlUsd":8420454.44889706}]}
+{"id":"soroswap","topAssets":[{"symbol":"EURC","tvlUsd":534076.723857416},{"symbol":"USDC","tvlUsd":389852.322147},{"symbol":"native","tvlUsd":306622.99711849436}]}
+```
+
+| Pool | Series last point (after) | Pool `totalSuppliedUsd` | Pool `totalBorrowedUsd` | Series before (13:00 UTC) |
+|---|---|---|---|---|
+| blend-fixed-pool | 198,077,243.15 | 198,077,243.15 | 35,301,903.22 | 35,311,430.74 |
+| blend-orbit-pool | 190,999.14 | 190,999.14 | 406.99 | 406.99 |
+| blend-etherfuse-pool | 16,305.50 | 16,305.50 | 1,527.07 | 1,563.00 |
+| blend-yieldblox-pool | 360,528.22 | 360,528.22 | 42,485.12 | 43,034.94 |
+
+**Verified in prod:** the series last point equals the pool's supplied figure to the cent on all
+four Blend pools (before the fix it equalled the borrowed figure). Blend top assets are now
+native / USDC / EURC (before: USDC / native / EURC, ranked by borrowed value). Aquarius and
+Soroswap top assets are unchanged versus the pre-deploy capture, as expected for AMM venues.
+
+**Deploy incident (input for Lot AD):** the first deploy attempt served the old code — the VPS
+had pulled `18072ca` but the API had not been rebuilt, so pm2 kept running the previous `dist`
+and `GET /health` still reported `version: "a5bedbf"`. Caught by the `/health` version check in
+the deploy procedure, fixed by `pnpm -C apps/api build` + `pm2 restart dig-stellar-api
+--update-env` with `GIT_SHA` set. A pull-without-rebuild is exactly the drift class the Lot AD
+CI/CD pipeline is meant to remove.
 
 ## Regression test + mutation check
 

@@ -346,9 +346,12 @@ with; the tables and notes below are kept as the historical record of how each c
   (`/v1/protocols`) summed `d_supply_scaled` (borrowed) instead of `b_supply_scaled` (supplied)
   for Blend, since Lot C / Lot Q. API-only fix on `hotfix/lending-supplied-side` + regression spec
   (api suite 147 → 149); charts change retroactively (Fixed pool ≈ $35M → ≈ $190M, the numbers
-  becoming true, as with the 2026-08-14 dead-reserves fix). VPS deploy founder-side; prod
-  "after" capture pending. Evidence: `docs/evidence/hotfix-lending-supplied-side/`. No SCF
-  criterion involved. Surfaced by the Lot LM L0 recon.
+  becoming true, as with the 2026-08-14 dead-reserves fix). **Deployed and verified in prod
+  2026-09-28 (`18072ca`):** series last point = pool supplied to the cent on all 4 Blend pools;
+  Blend top assets native / USDC / EURC; Aquarius/Soroswap unchanged. First deploy attempt
+  served old code (pulled, not rebuilt — caught by the `/health` version check; Lot AD input).
+  Evidence: `docs/evidence/hotfix-lending-supplied-side/`. No SCF criterion involved. Surfaced
+  by the Lot LM L0 recon.
 - Last updated: 2026-09-28
 
 ---
