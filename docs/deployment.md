@@ -204,3 +204,18 @@ phone: the bar scrolls inside its own container, the body never pans horizontall
 
 Strict variant (only worth it when a web change would break on the old API): push
 `<api-commit>:main` first, deploy the VPS from it, then push the rest and pull again.
+
+---
+
+## Package changes on the VPS (S1 lesson, 2026-09-29)
+
+`needrestart` on this Ubuntu auto-restarts services after an `apt` install (it restarted nginx,
+cron, ssh, redis-server and more when `docker-compose-v2` was installed). Any `apt` on the VPS
+runs with `NEEDRESTART_MODE=l` (list only) and never inside a maintenance window that holds the
+cron locks:
+```bash
+NEEDRESTART_MODE=l apt-get install -y <package>
+```
+The Postgres image's `pg_hba.conf` trusts `local`, `127.0.0.1` and `::1` **inside the
+container**; a `docker exec … psql -h 127.0.0.1` never tests a password. Password checks are
+made from the host through `127.0.0.1:5432` (docker-proxy → `scram-sha-256`).
