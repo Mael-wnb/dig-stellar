@@ -309,3 +309,88 @@ credential; capture above). Removal of the SSH key still present on the VPS is a
   connection alike → separate price hotfix with a fallback to the XLM price derived from
   Soroswap.
 - SSH key cleanup on the VPS (S2).
+
+---
+
+## Phase 7 — persistent, generalised DOCKER-USER rule (separate slot, 2026-09-29 ~17:29Z–17:33Z)
+
+Option A of the runbook, executed by the founder with a second SSH session kept open. IP masked.
+
+### 7.0 — state before (read-only)
+
+```
+$ ufw status verbose
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), deny (routed)
+22/tcp (OpenSSH) ALLOW IN Anywhere ; 80/tcp ALLOW IN Anywhere ; 443/tcp ALLOW IN Anywhere (+ v6 for 22 and 80)
+$ iptables -S DOCKER-USER
+-N DOCKER-USER
+-A DOCKER-USER -i eth1 -p tcp -m conntrack --ctorigdstport 5432 -j DROP
+-A DOCKER-USER -i eth0 -p tcp -m conntrack --ctorigdstport 5432 -j DROP
+$ tail -5 /etc/ufw/after.rules            # ends with "COMMIT"
+$ grep -c 'DOCKER-USER' /etc/ufw/after.rules
+0
+Interfaces: eth0 (public, <vps-ip>/19 + a private /16), eth1 (DigitalOcean VPC, private /20)
+```
+
+### 7.1 — persistent rule
+
+```
+$ cp -p /etc/ufw/after.rules /root/after.rules.pre-s1
+# appended to /etc/ufw/after.rules:
+# S1 (2026-09-29): Docker publishes ports around ufw. Drop every NEW inbound connection
+# from the public interfaces to any container. docs/security-invariants.md §10.
+*filter
+:DOCKER-USER - [0:0]
+-A DOCKER-USER -i eth0 -m conntrack --ctstate NEW -j DROP
+-A DOCKER-USER -i eth1 -m conntrack --ctstate NEW -j DROP
+-A DOCKER-USER -j RETURN
+COMMIT
+$ iptables -F DOCKER-USER ; ufw reload
+Firewall reloaded
+Chain DOCKER-USER (1 references)
+num pkts bytes target prot opt in   out source    destination
+1      0     0 DROP   all  --  eth0 *   0.0.0.0/0 0.0.0.0/0  ctstate NEW
+2      0     0 DROP   all  --  eth1 *   0.0.0.0/0 0.0.0.0/0  ctstate NEW
+3      0     0 RETURN all  --  *    *   0.0.0.0/0 0.0.0.0/0
+(the two temporary 5432 rules are gone)
+$ curl -s http://127.0.0.1:3000/health | head -c 120
+{"status":"ok","version":"fdd370b","uptimeSeconds":1184,"db":{"ok":true,...}
+$ ss -ltnp | grep ':5432 '
+LISTEN 0 4096 127.0.0.1:5432 0.0.0.0:* users:(("docker-proxy",pid=806876,fd=7))
+```
+
+### 7.2 — external tests (from outside the VPS)
+
+```
+$ nc -zv -G 5 <vps-ip> 5432
+nc: connectx to <vps-ip> port 5432 (tcp) failed: Operation timed out
+$ curl -sI https://stellar-api.getdig.ai/health | head -1
+HTTP/1.1 200 OK
+$ ssh -o ConnectTimeout=5 root@<vps-ip> 'echo ssh ok'
+ssh ok                                     # a NEW session is accepted (host services never traverse DOCKER-USER)
+```
+
+### 7.3 — structural proof: a container deliberately published on 0.0.0.0
+
+```
+$ docker run -d --rm --name s1-wall-probe -p 0.0.0.0:18080:8080 busybox httpd -f -p 8080
+$ ss -ltnp | grep ':18080 '
+LISTEN 0 4096 0.0.0.0:18080 0.0.0.0:* users:(("docker-proxy",pid=909273,fd=7))
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/
+404                                        # the container answers locally
+# from outside the VPS:
+$ nc -zv -G 5 <vps-ip> 18080
+nc: connectx to <vps-ip> port 18080 (tcp) failed: Operation timed out
+$ docker stop s1-wall-probe ; docker rmi busybox        # only dig_stellar_postgres remains
+```
+
+### Conclusion
+
+A port published by mistake on `0.0.0.0` is no longer reachable from the internet: the S1
+incident class is blocked structurally, independently of each service's binding. The rule is
+persistent (`/etc/ufw/after.rules`), so it survives a reboot: the pending kernel reboot is
+unblocked (to be scheduled in a dedicated slot; not done tonight). Rollback:
+`cp /root/after.rules.pre-s1 /etc/ufw/after.rules && ufw reload` (the backup stays on the VPS
+for a few days).

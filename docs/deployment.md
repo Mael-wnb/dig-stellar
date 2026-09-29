@@ -51,6 +51,16 @@ rebuild; recreate it from this section.** Evidence: `docs/evidence/lot-s/`.
   default-deny. Every binding in `docker-compose.yml` is now `127.0.0.1:` (Postgres, Redis, the
   Lot Z api service). Check after any container recreation: `ss -ltnp | grep -E ':(5432|6379) '`
   → `127.0.0.1` only. Invariant: `docs/security-invariants.md` §10.
+- **Persistent `DOCKER-USER` wall** (S1 phase 7, 2026-09-29): `/etc/ufw/after.rules` declares the
+  `DOCKER-USER` chain and drops every NEW inbound connection from `eth0` and `eth1` to any
+  container (`-m conntrack --ctstate NEW -j DROP`, then `RETURN`). A port published on
+  `0.0.0.0` by mistake is therefore unreachable from the internet whatever the compose file
+  says; container outbound traffic and host services (nginx, ssh) are unaffected. **This block is
+  ops state that must survive a VPS rebuild; recreate it from
+  `docs/evidence/lot-ad/s1-remediation-execution.md` §Phase 7.** Verify: `iptables -L DOCKER-USER -n -v
+  --line-numbers` → two `DROP … ctstate NEW` (eth0, eth1) + `RETURN`; from outside, `nc -zv -G 5
+  <vps-ip> 5432` times out while `curl -sI https://stellar-api.getdig.ai/health` is 200. Rollback:
+  `cp /root/after.rules.pre-s1 /etc/ufw/after.rules && ufw reload` (backup kept on the VPS).
 - The `default` vhost (`sites-available/default`) does `return 444;`: IP-direct
   scanner probes get a closed connection, not a file listing.
 

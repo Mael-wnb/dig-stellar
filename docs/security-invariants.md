@@ -334,7 +334,12 @@ see. Evidence: `docs/evidence/lot-ad/ad0-security-findings.md`.
   is a defect. Remote access to Postgres goes through an SSH tunnel. ufw is NOT a control for
   Docker-published ports — the binding is. Verification on the VPS after any container
   (re)creation: `ss -ltnp | grep -E ':(5432|6379|3000) '` shows only `127.0.0.1`, and
-  `docker port <container>` shows a `127.0.0.1:` prefix.
+  `docker port <container>` shows a `127.0.0.1:` prefix. Since S1 phase 7 (2026-09-29) the
+  invariant is also **enforced by a persistent ufw rule**, not only by binding discipline: the
+  `DOCKER-USER` chain in `/etc/ufw/after.rules` drops every NEW inbound connection from the
+  public interfaces to any container (proven with a container deliberately published on
+  `0.0.0.0`: unreachable from outside — `docs/evidence/lot-ad/s1-remediation-execution.md`
+  §Phase 7). The binding remains the first line; the rule is the wall behind it.
 - **INV-10.2** The DB role password is never the default (`dig`) on a shared host; it is
   generated on the VPS (`openssl rand -hex 24`), rotated in place (`ALTER USER`), and lives
   only in the VPS `.env` files (api, indexer, root compose). Never printed, never pasted, never
