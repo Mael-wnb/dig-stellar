@@ -321,3 +321,33 @@ funds; the §1 non-custodial boundary for anything a USER owns is untouched.
 Review check (every faucet-path PR): grep the diff for `FAUCET_SECRET_KEY` and `Keypair`,
 confined to `faucet-payout.service.ts`; confirm no new transaction shapes; confirm the red
 tests (double claim, disabled flag, below-notional, exhausted, velocity, drained) still pass.
+
+## 10. Host network posture (S1, 2026-09-29): Docker bypasses ufw; no CI credential on the VPS
+
+Found during the Lot AD audit: the Postgres container's published port (`5432:5432` in
+`docker-compose.yml`) was reachable from outside despite ufw default-deny. Docker programs
+its own iptables chains (`DOCKER`, `DOCKER-USER` in FORWARD), which ufw's INPUT rules never
+see. Evidence: `docs/evidence/lot-ad/ad0-security-findings.md`.
+
+- **INV-10.1** No service port is ever published on a public interface. Every `ports:` entry
+  in any compose file binds an explicit `127.0.0.1:` host address; a bare `HOST_PORT:PORT`
+  is a defect. Remote access to Postgres goes through an SSH tunnel. ufw is NOT a control for
+  Docker-published ports — the binding is. Verification on the VPS after any container
+  (re)creation: `ss -ltnp | grep -E ':(5432|6379|3000) '` shows only `127.0.0.1`, and
+  `docker port <container>` shows a `127.0.0.1:` prefix.
+- **INV-10.2** The DB role password is never the default (`dig`) on a shared host; it is
+  generated on the VPS (`openssl rand -hex 24`), rotated in place (`ALTER USER`), and lives
+  only in the VPS `.env` files (api, indexer, root compose). Never printed, never pasted, never
+  committed. `docker-compose.yml` has no default for it (`${POSTGRES_PASSWORD:?…}`): a stack
+  cannot come up on the default by accident.
+- **INV-10.3** No GitHub credential of any kind on the VPS (Lot S §S2 posture, restated for
+  Lot AD): the deploy path pulls a public repository and reads CI status through the
+  unauthenticated GitHub API. If a CI-held credential must ever reach the VPS (AD3 option a),
+  it is a dedicated non-root deploy user with a forced `command=` in `authorized_keys`, and
+  the faucet key host is treated as the blast radius — decided at the AD3 gate, not by default.
+- **INV-10.4** Known limit, stated as is: `log_connections` was off on the container, so the
+  absence of a successful external login before the fix cannot be proven from the logs.
+  Enabling `log_connections` is part of the S1 remediation, so the limit does not recur.
+
+Review check (any compose / deploy change): grep `ports:` blocks for entries without
+`127.0.0.1:`; grep the diff for `POSTGRES_PASSWORD` / `DATABASE_URL` literals.

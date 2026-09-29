@@ -20,15 +20,19 @@ production. Any static host (or `pnpm -C apps/web dev` locally) serves it agains
 
 ## Docker compose path (containerized reference)
 
-From a fresh clone to real mainnet data, no secrets required:
+From a fresh clone to real mainnet data, no secrets required beyond a local DB password
+of your choosing (S1, 2026-09-29: compose refuses to start without `POSTGRES_PASSWORD`;
+`.env.example` ships the dev value `dig`, which the host-pnpm `apps/*/.env.example` files
+also use):
 
 ```bash
 git clone <repo-url> dig-stellar && cd dig-stellar
+cp .env.example .env                       # POSTGRES_PASSWORD=dig for a local stack
 GIT_SHA=$(git rev-parse --short HEAD) docker compose --profile app up -d --build
 ```
 
-That is the whole procedure. Optional knobs (all have safe public defaults) substitute
-from the shell or a root `.env`; `cp .env.example .env` and uncomment what you need:
+That is the whole procedure. The other knobs (all have safe public defaults) are in the
+same root `.env`; uncomment what you need:
 `GIT_SHA` (the `version` reported by `/health`; 'unknown' when unset), `STELLAR_RPC_URL`
 (operator Soroban RPC; unset = public SDF endpoint, rate-limited but fine for a first
 run), `DEFINDEX_API_KEY` (without it the defindex step fails non-fatally each run).

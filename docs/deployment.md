@@ -46,6 +46,11 @@ rebuild; recreate it from this section.** Evidence: `docs/evidence/lot-s/`.
 - The API binds **`127.0.0.1:3000`** (`main.ts`; override with `HOST=0.0.0.0` only
   for environments that need it, e.g. Docker). nginx is the only public path.
 - ufw: default deny incoming; allow `22/tcp`, `80/tcp`, `443/tcp`.
+- **Docker-published ports bypass ufw** (S1, 2026-09-29): Docker's own iptables chains sit in
+  FORWARD, ufw filters INPUT, so a compose `ports: "5432:5432"` is public even under ufw
+  default-deny. Every binding in `docker-compose.yml` is now `127.0.0.1:` (Postgres, Redis, the
+  Lot Z api service). Check after any container recreation: `ss -ltnp | grep -E ':(5432|6379) '`
+  → `127.0.0.1` only. Invariant: `docs/security-invariants.md` §10.
 - The `default` vhost (`sites-available/default`) does `return 444;`: IP-direct
   scanner probes get a closed connection, not a file listing.
 

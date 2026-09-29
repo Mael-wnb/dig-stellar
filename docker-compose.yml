@@ -25,6 +25,15 @@
 # data volume; the files are idempotent, and `job:refresh` on an existing dev
 # volume is unaffected.
 #
+# POSTGRES_PASSWORD is REQUIRED (S1, 2026-09-29): `cp .env.example .env` and set it
+# (dev value `dig` documented there) — compose refuses to start without it.
+#
+# Host-port bindings are pinned to 127.0.0.1 (S1, 2026-09-29): Docker publishes ports
+# through its own iptables chains, which BYPASS ufw — a bare "5432:5432" is reachable
+# from the internet even with ufw default-deny. Nothing in this stack needs a public
+# port (nginx fronts the API on the host; reach Postgres remotely via an SSH tunnel).
+# See docs/security-invariants.md §10 and docs/evidence/lot-ad/ad0-security-findings.md.
+#
 # Host ports and container-name prefix are overridable so a second stack (e.g. a
 # fresh-clone verification) can run next to this one. CRITICAL: also set a distinct
 # COMPOSE_PROJECT_NAME — compose identifies a stack by project name (default = the
@@ -33,17 +42,29 @@
 #   COMPOSE_PROJECT_NAME=dig_ref DIG_CONTAINER_PREFIX=dig_ref \
 #   POSTGRES_PORT=15432 REDIS_PORT=16379 API_PORT=13000 \
 #   docker compose --profile app up -d --build
+# Container logs: the json-file driver has NO rotation by default — with
+# log_connections on (S1) the postgres log grows unbounded. Applied to every service.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
 services:
   postgres:
     image: postgres:16
     container_name: ${DIG_CONTAINER_PREFIX:-dig_stellar}_postgres
+    logging: *default-logging
     restart: unless-stopped
     environment:
       POSTGRES_USER: dig
-      POSTGRES_PASSWORD: dig
+      # REQUIRED (no default — INV-10.2). Read by initdb ONLY on an EMPTY volume; after a
+      # rotation (ALTER USER) set it in the root .env so a future volume re-init matches
+      # the DATABASE_URL the apps use (S1). Dev value documented in .env.example.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (root .env; dev value in .env.example)}
       POSTGRES_DB: dig_stellar
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     # -h 127.0.0.1 forces TCP: during initdb the temporary server only listens
     # on the unix socket, so a socket-based pg_isready would report healthy
     # BEFORE the init SQL below has run.
@@ -70,9 +91,10 @@ services:
   redis:
     image: redis:7
     container_name: ${DIG_CONTAINER_PREFIX:-dig_stellar}_redis
+    logging: *default-logging
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - dig_stellar_redisdata:/data
 
@@ -94,10 +116,11 @@ services:
         #   GIT_SHA=$(git rev-parse --short HEAD) docker compose --profile app up -d --build
         GIT_SHA: ${GIT_SHA:-}
     container_name: ${DIG_CONTAINER_PREFIX:-dig_stellar}_api
+    logging: *default-logging
     profiles: ["app"]
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://dig:dig@postgres:5432/dig_stellar?schema=public
+      DATABASE_URL: postgresql://dig:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (root .env; dev value in .env.example)}@postgres:5432/dig_stellar?schema=public
       HOST: 0.0.0.0
       PORT: 3000
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
@@ -106,7 +129,7 @@ services:
       STELLAR_RPC_URL: ${STELLAR_RPC_URL:-}
       HORIZON_URL: ${HORIZON_URL:-https://horizon.stellar.org}
     ports:
-      - "${API_PORT:-3000}:3000"
+      - "127.0.0.1:${API_PORT:-3000}:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -122,10 +145,11 @@ services:
       context: .
       dockerfile: apps/indexer/Dockerfile
     container_name: ${DIG_CONTAINER_PREFIX:-dig_stellar}_indexer
+    logging: *default-logging
     profiles: ["app"]
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://dig:dig@postgres:5432/dig_stellar?schema=public
+      DATABASE_URL: postgresql://dig:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (root .env; dev value in .env.example)}@postgres:5432/dig_stellar?schema=public
       # Unset -> the public SDF Soroban RPC (rate-limited; fine for a first
       # run — use an operator endpoint for a permanent deployment).
       STELLAR_RPC_URL: ${STELLAR_RPC_URL:-}
