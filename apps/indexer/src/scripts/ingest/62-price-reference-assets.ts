@@ -4,11 +4,15 @@ import '../../lib/ops-capture';
 
 import { nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
+import { getOptionalNumberEnv } from '../shared/env';
 import { inferStablePrice } from '../shared/pricing';
 import { PRICING_RULES_BY_SYMBOL, type PricingRule } from '../shared/pricing-config';
+import { resolveXlmPrice } from '../shared/xlm-price-db';
 
+// price === null means "no qualifying source" — the asset is then skipped (no row),
+// never priced with an invented constant (hotfix 2026-09-29).
 type PriceResolution = {
-  price: number;
+  price: number | null;
   source: string;
   metadata: Record<string, unknown>;
 };
@@ -27,8 +31,14 @@ type CoinGeckoSimplePriceResponse = Record<
   }
 >;
 
+// 5 s budget: keyless CoinGecko is blocked from datacenter IPs (CloudFront 403,
+// 2026-09-29); a slow/blocked provider must not stretch the refresh.
+const COINGECKO_TIMEOUT_MS = 5_000;
+
 async function fetchJson(url: string, headers?: Record<string, string>) {
-  const res = await fetch(url, { headers });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), COINGECKO_TIMEOUT_MS);
+  const res = await fetch(url, { headers, signal: controller.signal }).finally(() => clearTimeout(timeout));
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -36,14 +46,6 @@ async function fetchJson(url: string, headers?: Record<string, string>) {
   }
 
   return res.json();
-}
-
-function getOptionalNumberEnv(name: string): number | null {
-  const raw = process.env[name];
-  if (!raw) return null;
-
-  const value = Number(raw);
-  return Number.isFinite(value) ? value : null;
 }
 
 async function getLatestPriceBySource(
@@ -112,84 +114,54 @@ async function resolveCoinGeckoBasePrices(
 
   const requiredIds = Array.from(new Set(['stellar', 'bitcoin', ...configuredIds]));
 
+  // CoinGecko first (keyless, 5 s). A failure is logged once here and handled by
+  // the selection below — it is not an error for the step.
+  let coinGeckoPrices = new Map<string, number>();
+  let coinGeckoError: string | null = null;
   try {
-    const prices = await fetchCoinGeckoPrices(requiredIds);
-
-    const xlmPrice = prices.get('stellar');
-    if (xlmPrice === undefined) {
-      throw new Error('Missing stellar price in CoinGecko response');
-    }
-
-    const btcPrice = prices.get('bitcoin');
-    if (btcPrice === undefined) {
-      throw new Error('Missing bitcoin price in CoinGecko response');
-    }
-
-    return {
-      xlm: {
-        price: xlmPrice,
-        source: 'coingecko_xlm_usd',
-        metadata: {
-          confidence: 'high',
-          method: 'direct_native_price',
-        },
-      },
-      btc: {
-        price: btcPrice,
-        source: 'coingecko_btc_usd',
-        metadata: {
-          confidence: 'high',
-          method: 'direct_btc_price',
-        },
-      },
-      coinGeckoPrices: prices,
-    };
+    coinGeckoPrices = await fetchCoinGeckoPrices(requiredIds);
   } catch (error) {
-    const dbXlm = await getLatestPriceBySource(client, 'coingecko_xlm_usd');
-    const dbBtc = await getLatestPriceBySource(client, 'coingecko_btc_usd');
-
-    const xlmFallback =
-      dbXlm ??
-      getOptionalNumberEnv('MANUAL_XLM_USD') ??
-      getOptionalNumberEnv('XLM_USD_FALLBACK') ??
-      0.165416;
-
-    const btcFallback =
-      dbBtc ??
-      getOptionalNumberEnv('MANUAL_BTC_USD') ??
-      getOptionalNumberEnv('BTC_USD_FALLBACK') ??
-      69846;
-
-    return {
-      xlm: {
-        price: xlmFallback,
-        source: dbXlm !== null ? 'db_cached_xlm_usd' : 'manual_xlm_fallback',
-        metadata: {
-          confidence: dbXlm !== null ? 'medium' : 'low',
-          method:
-            dbXlm !== null
-              ? 'latest_db_fallback_after_api_failure'
-              : 'manual_fallback_after_api_failure',
-          fallbackFrom: 'coingecko_xlm_usd',
-          error: error instanceof Error ? error.message : String(error),
-        },
-      },
-      btc: {
-        price: btcFallback,
-        source: dbBtc !== null ? 'db_cached_btc_usd' : 'manual_btc_fallback',
-        metadata: {
-          confidence: dbBtc !== null ? 'medium' : 'low',
-          method:
-            dbBtc !== null
-              ? 'latest_db_fallback_after_api_failure'
-              : 'manual_fallback_after_api_failure',
-          fallbackFrom: 'coingecko_btc_usd',
-          error: error instanceof Error ? error.message : String(error),
-        },
-      },
-      coinGeckoPrices: new Map<string, number>(),
-    };
+    coinGeckoError = error instanceof Error ? error.message : String(error);
+    console.warn(`coingecko unavailable: ${coinGeckoError.split('\n')[0]}`);
   }
+
+  // XLM/USD: manual override > CoinGecko > deepest on-chain XLM/USDC pool within
+  // guards > null. Pure rule in shared/xlm-price.ts (unit-tested), DB reads in
+  // shared/xlm-price-db.ts. The proxy-XLM assets below follow the same price.
+  const selection = await resolveXlmPrice(client, coinGeckoPrices.get('stellar') ?? null, new Date());
+  const xlm: PriceResolution = {
+    price: selection.priceUsd,
+    source: selection.source,
+    metadata: {
+      ...selection.metadata,
+      kind: selection.kind,
+      ...(coinGeckoError ? { coingeckoError: coinGeckoError.split('\n')[0] } : {}),
+    },
+  };
+  if (xlm.price === null) {
+    console.warn(`xlm price: NO qualifying source (coingecko failed, on-chain guards: ${JSON.stringify(selection.metadata.rejected ?? [])}) — native and XLM proxies skipped this run`);
+  }
+
+  // BTC/USD (best effort, proxies only): CoinGecko, else the latest stored BTC-proxy
+  // row, else the manual env, else null — never the former hard-coded constant.
+  let btc: PriceResolution;
+  const btcDirect = coinGeckoPrices.get('bitcoin');
+  if (btcDirect !== undefined) {
+    btc = { price: btcDirect, source: 'coingecko_btc_usd', metadata: { confidence: 'high', method: 'direct_btc_price' } };
+  } else {
+    const dbBtc = await getLatestPriceBySource(client, 'coingecko_btc_proxy');
+    const envBtc = getOptionalNumberEnv('MANUAL_BTC_USD') ?? getOptionalNumberEnv('BTC_USD_FALLBACK');
+    if (dbBtc !== null) {
+      btc = { price: dbBtc, source: 'db_cached_btc_usd', metadata: { confidence: 'medium', method: 'latest_db_fallback_after_api_failure', fallbackFrom: 'coingecko_btc_usd', error: coinGeckoError } };
+    } else if (envBtc !== null) {
+      btc = { price: envBtc, source: 'manual_env', metadata: { confidence: 'medium', method: 'manual_override_env', envVar: 'MANUAL_BTC_USD|BTC_USD_FALLBACK' } };
+    } else {
+      btc = { price: null, source: 'none', metadata: { method: 'no_qualifying_source', error: coinGeckoError } };
+      console.warn('btc price: NO qualifying source — BTC proxies skipped this run');
+    }
+  }
+
+  return { xlm, btc, coinGeckoPrices };
 }
 
 function resolveStableFallback(symbol: string): {
@@ -299,11 +271,12 @@ function resolvePriceFromRule(params: {
     }
 
     if (rule.base === 'XLM') {
+      // Same price as native, whatever resolved it (CoinGecko or on-chain); null → skipped.
       return {
         priceUsd: xlm.price,
-        source: 'coingecko_xlm_proxy',
+        source: xlm.source === 'coingecko_direct' ? 'coingecko_xlm_proxy' : `xlm_proxy:${xlm.source}`,
         metadata: {
-          confidence: 'medium',
+          confidence: xlm.price === null ? 'none' : 'medium',
           method: 'pricing_config_proxy',
           proxy: 'XLM',
           upstreamSource: xlm.source,
@@ -314,6 +287,11 @@ function resolvePriceFromRule(params: {
   }
 
   if (rule.kind === 'coingecko') {
+    if (rule.id === 'stellar') {
+      // native: the shared XLM selection (CoinGecko > on-chain > null) — its
+      // fallbackEnvVar is honoured inside the selection as the manual override.
+      return { priceUsd: xlm.price, source: xlm.source, metadata: xlm.metadata };
+    }
     const direct = coinGeckoPrices.get(rule.id);
     if (direct !== undefined) {
       return {
@@ -414,6 +392,7 @@ async function main() {
       console.log(symbol || asset.contract_address, '=>', resolved.priceUsd, resolved.source);
     }
 
+    console.log(`xlm price source: ${xlm.metadata.kind} (${xlm.source}) => ${xlm.price ?? 'null'}`);
     console.log({
       completedAt: observedAt,
       inserted,

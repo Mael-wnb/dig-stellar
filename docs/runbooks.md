@@ -393,6 +393,35 @@ Known issue: `activeWallets` and `dexVolume24hUsd` come back `null`; the stellar
 endpoint returns 404 (pre-existing; needs a corrected endpoint). `updatedAt` is the row's `as_of`,
 not request time.
 
+### XLM/USD price sources (hotfix 2026-09-29)
+
+Keyless CoinGecko access is blocked from datacenter IPs (CloudFront 403), so the XLM/USD price
+is selected by one shared rule (`apps/indexer/src/scripts/shared/xlm-price.ts`, unit-tested with
+`pnpm -C apps/indexer test`), used by step 1 `prices:reference` (writes the `native` row and the
+XLM-proxy rows in `asset_prices`) and read back by step 9 `network-stats` (no second CoinGecko
+call in the same run):
+
+1. `MANUAL_XLM_USD` / `XLM_USD_FALLBACK` — explicit manual override, traced as `manual_env`;
+2. CoinGecko (keyless, 5 s timeout) — `coingecko_direct`;
+3. the deepest on-chain XLM/USDC constant-product pool already captured by the refresh (SDEX
+   `stellar-native-native-usdc-pool`, Aquarius `aquarius-native-usdc-pool`, Soroswap
+   `soroswap-native-usdc-pair`) that passes the guards: reserves ≤ 60 min old, ≥ 50 000 USDC,
+   and ≤ 10 % deviation from the last CoinGecko row when that row is < 6 h old —
+   `onchain_sdex_xlm_usdc` / `onchain_aquarius_xlm_usdc` / `onchain_soroswap_xlm_usdc`;
+4. nothing → `null` and an explicit `xlm price: NO qualifying source` log line. No constant.
+
+The price serves display and USD valuation only (plus the faucet witness's notional threshold,
+which reads `asset_prices` with its own 24 h max age); it never feeds a transaction build.
+Each run logs `xlm price source: <kind> (<source>) => <price>` in steps 1 and 9;
+`network_stats_latest.metadata.xlmPriceSource` carries the same. The `#status` "Price sources"
+tile keeps reporting the CoinGecko failure — it measures the upstream, not the published price.
+
+Verify after a refresh:
+```bash
+grep -n "xlm price source" /var/log/dig-stellar-refresh.log | tail -2
+psql "$DATABASE_URL" -Atc "select a.symbol, ap.source, ap.price_usd, ap.observed_at from asset_prices ap join assets a on a.id = ap.asset_id where a.symbol in ('native','yXLM') order by ap.observed_at desc limit 4"
+```
+
 ---
 
 ## Smart Transaction Builder (T1-D3, Testnet)

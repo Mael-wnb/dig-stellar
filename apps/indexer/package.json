@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
     "run:once": "tsx src/run-once.ts",
     "run:blend": "tsx src/run-blend.ts",
     "run:horizon": "tsx src/run-horizon.ts",

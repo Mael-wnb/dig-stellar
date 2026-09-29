@@ -17,8 +17,14 @@ import '../../lib/ops-capture';
 
 import { nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
+import { loadLatestNativePrice, loadNative24hChange } from '../shared/xlm-price-db';
 
-const REQUEST_TIMEOUT_MS = 6_000;
+// 5 s: a blocked provider (keyless CoinGecko, CloudFront 403 from datacenter IPs
+// since 2026-09-29) must not stretch the refresh.
+const REQUEST_TIMEOUT_MS = 5_000;
+// Step 1 (prices:reference) resolves XLM/USD earlier in the same run; its native
+// row is at most this old when we get here. Read it instead of calling CoinGecko again.
+const SAME_RUN_MAX_AGE_MS = 20 * 60 * 1000;
 
 type CoinGeckoPriceResponse = {
   stellar?: {
@@ -188,9 +194,48 @@ async function safeGetAvgTxFee(): Promise<number | null> {
   }
 }
 
+type XlmPriceResult = {
+  priceUsd: number | null;
+  change24hPct: number | null;
+  // 'coingecko' | 'onchain' | 'manual' | 'none' + the asset_prices.source detail
+  source: string;
+  sourceDetail: string | null;
+  changeMethod: 'coingecko' | 'stored_history' | null;
+  changeBasis: { priceUsd: number; observedAt: string; source: string } | null;
+};
+
+function kindOfSource(source: string): string {
+  if (source.startsWith('coingecko')) return 'coingecko';
+  if (source.startsWith('onchain_')) return 'onchain';
+  if (source.startsWith('manual')) return 'manual';
+  return 'none';
+}
+
+// XLM/USD for the headline: the native row step 1 wrote in this run (any source),
+// with the 24h change derived from stored history; only when no such row exists
+// (step 1 failed or found nothing) fall back to one CoinGecko call. Never a constant.
+async function resolveXlmForStats(client: ReturnType<typeof createPgClient>, now: Date): Promise<XlmPriceResult> {
+  const fromThisRun = await loadLatestNativePrice(client, SAME_RUN_MAX_AGE_MS, now);
+  if (fromThisRun) {
+    const change = await loadNative24hChange(client, fromThisRun, now);
+    return {
+      priceUsd: fromThisRun.priceUsd,
+      change24hPct: change.changePct,
+      source: kindOfSource(fromThisRun.source),
+      sourceDetail: fromThisRun.source,
+      changeMethod: change.changePct === null ? null : 'stored_history',
+      changeBasis: change.basis ? { priceUsd: change.basis.priceUsd, observedAt: change.basis.observedAt.toISOString(), source: change.basis.source } : null,
+    };
+  }
+  const cg = await safeGetXlmPrice();
+  if (cg.priceUsd !== null) {
+    return { priceUsd: cg.priceUsd, change24hPct: cg.change24hPct, source: 'coingecko', sourceDetail: 'coingecko_direct', changeMethod: cg.change24hPct === null ? null : 'coingecko', changeBasis: null };
+  }
+  return { priceUsd: null, change24hPct: null, source: 'none', sourceDetail: null, changeMethod: null, changeBasis: null };
+}
+
 async function main(): Promise<void> {
-  const [xlmPrice, stableMcap, usdcSupply, avgTxFeeXlm] = await Promise.all([
-    safeGetXlmPrice(),
+  const [stableMcap, usdcSupply, avgTxFeeXlm] = await Promise.all([
     safeGetStableMcap(),
     safeGetUsdcSupply(),
     safeGetAvgTxFee(),
@@ -202,6 +247,9 @@ async function main(): Promise<void> {
   await client.connect();
 
   try {
+    const xlmPrice = await resolveXlmForStats(client, new Date());
+    console.log(`xlm price source: ${xlmPrice.source} (${xlmPrice.sourceDetail ?? '-'}) => ${xlmPrice.priceUsd ?? 'null'}; 24h change via ${xlmPrice.changeMethod ?? 'none'}`);
+
     // "protocols with live aggregated metrics" — count the rows written by
     // step 70 (70-protocol-persist-metrics), which runs before this step in
     // 71-refresh-all-metrics. Dynamic so it stays correct as protocols are
@@ -264,7 +312,13 @@ async function main(): Promise<void> {
         usdcSupply,
         avgTxFeeXlm,
         protocolCount,
-        JSON.stringify({ source: '73-network-stats-refresh' }),
+        JSON.stringify({
+          source: '73-network-stats-refresh',
+          xlmPriceSource: xlmPrice.source,
+          xlmPriceSourceDetail: xlmPrice.sourceDetail,
+          xlmPriceChangeMethod: xlmPrice.changeMethod,
+          xlmPriceChangeBasis: xlmPrice.changeBasis,
+        }),
       ]
     );
 
@@ -273,6 +327,7 @@ async function main(): Promise<void> {
       asOf,
       xlmPriceUsd: xlmPrice.priceUsd,
       xlmPriceChange24hPct: xlmPrice.change24hPct,
+      xlmPriceSource: xlmPrice.source,
       stellarTvlUsd: stellarTvl,
       activeWallets: stellarExpertSummary.activeWallets,
       stableMcapUsd: stableMcap,
