@@ -1,4 +1,12 @@
 // apps/indexer/src/scripts/ingest/62-price-reference-assets.ts
+//
+// Step 1 of job:refresh — one asset_prices row per priced asset per run.
+// price-sources v2 (2026-09-29): CoinGecko is called ONLY when a key is configured
+// (keyless access is blocked from datacenter IPs); every other asset is priced by
+// the shared selection (shared/xlm-price.ts): manual env override > CoinGecko (if
+// called) > deepest on-chain constant-product pool vs USDC or vs XLM within guards >
+// null. No hard-coded price exists any more: no qualifying source → no row + a log.
+//
 // E2 (Lot E): install RPC latency/error capture BEFORE any HTTP-touching import.
 import '../../lib/ops-capture';
 
@@ -7,13 +15,13 @@ import { createPgClient } from '../shared/db';
 import { getOptionalNumberEnv } from '../shared/env';
 import { inferStablePrice } from '../shared/pricing';
 import { PRICING_RULES_BY_SYMBOL, type PricingRule } from '../shared/pricing-config';
-import { resolveXlmPrice } from '../shared/xlm-price-db';
+import { loadPoolReserveSets, resolveAssetPrice } from '../shared/xlm-price-db';
+import type { PoolReserveSet, XlmPriceSelection } from '../shared/xlm-price';
 
-// price === null means "no qualifying source" — the asset is then skipped (no row),
-// never priced with an invented constant (hotfix 2026-09-29).
-type PriceResolution = {
-  price: number | null;
+type Resolution = {
+  priceUsd: number | null;
   source: string;
+  kind: string;
   metadata: Record<string, unknown>;
 };
 
@@ -24,315 +32,121 @@ type AssetRow = {
   name: string | null;
 };
 
-type CoinGeckoSimplePriceResponse = Record<
-  string,
-  {
-    usd?: number;
-  }
->;
+type CoinGeckoSimplePriceResponse = Record<string, { usd?: number }>;
 
-// 5 s budget: keyless CoinGecko is blocked from datacenter IPs (CloudFront 403,
-// 2026-09-29); a slow/blocked provider must not stretch the refresh.
+// ── CoinGecko: only with a key ───────────────────────────────────────────────
+// Pro plan: pro-api.coingecko.com + x-cg-pro-api-key (docs.coingecko.com/reference/authentication).
+// The former Demo shape (api.coingecko.com + x-cg-demo-api-key, COINGECKO_API_KEY) is kept
+// for compatibility. No key → no call at all (a 5 s budget bounds a slow answer).
 const COINGECKO_TIMEOUT_MS = 5_000;
 
-async function fetchJson(url: string, headers?: Record<string, string>) {
+function coinGeckoConfig(): { baseUrl: string; headers: Record<string, string>; plan: 'pro' | 'demo' } | null {
+  const pro = process.env.COINGECKO_PRO_API_KEY?.trim();
+  if (pro) return { baseUrl: 'https://pro-api.coingecko.com/api/v3', headers: { 'x-cg-pro-api-key': pro }, plan: 'pro' };
+  const demo = process.env.COINGECKO_API_KEY?.trim();
+  if (demo) return { baseUrl: 'https://api.coingecko.com/api/v3', headers: { 'x-cg-demo-api-key': demo }, plan: 'demo' };
+  return null;
+}
+
+async function fetchJson(url: string, headers: Record<string, string>) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), COINGECKO_TIMEOUT_MS);
   const res = await fetch(url, { headers, signal: controller.signal }).finally(() => clearTimeout(timeout));
-
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`HTTP ${res.status} on ${url}${text ? `\n${text.slice(0, 500)}` : ''}`);
   }
-
   return res.json();
 }
 
-async function getLatestPriceBySource(
-  client: ReturnType<typeof createPgClient>,
-  source: string
-): Promise<number | null> {
-  const res = await client.query(
-    `
-    select ap.price_usd
-    from asset_prices ap
-    where ap.source = $1
-    order by ap.observed_at desc
-    limit 1
-    `,
-    [source]
-  );
-
-  if (!(res.rowCount ?? 0)) return null;
-
-  const value = Number(res.rows[0].price_usd);
-  return Number.isFinite(value) ? value : null;
-}
-
-async function fetchCoinGeckoPrices(ids: string[]): Promise<Map<string, number>> {
-  if (!ids.length) {
-    return new Map<string, number>();
+async function fetchCoinGeckoPrices(ids: string[]): Promise<{ prices: Map<string, number>; called: boolean; error: string | null }> {
+  const config = coinGeckoConfig();
+  if (!config || !ids.length) {
+    console.log('coingecko: no API key configured — not called (on-chain pricing only)');
+    return { prices: new Map(), called: false, error: null };
   }
-
-  const apiKey = process.env.COINGECKO_API_KEY;
-  const headers: Record<string, string> = {};
-
-  if (apiKey) {
-    headers['x-cg-demo-api-key'] = apiKey;
-  }
-
   const uniqueIds = Array.from(new Set(ids));
-  const query = encodeURIComponent(uniqueIds.join(','));
-
-  const data = (await fetchJson(
-    `https://api.coingecko.com/api/v3/simple/price?ids=${query}&vs_currencies=usd`,
-    headers
-  )) as CoinGeckoSimplePriceResponse;
-
-  const out = new Map<string, number>();
-
-  for (const id of uniqueIds) {
-    const price = data?.[id]?.usd;
-    if (typeof price === 'number' && Number.isFinite(price)) {
-      out.set(id, price);
-    }
-  }
-
-  return out;
-}
-
-async function resolveCoinGeckoBasePrices(
-  client: ReturnType<typeof createPgClient>
-): Promise<{
-  xlm: PriceResolution;
-  btc: PriceResolution;
-  coinGeckoPrices: Map<string, number>;
-}> {
-  const configuredIds = Object.values(PRICING_RULES_BY_SYMBOL)
-    .filter((rule): rule is Extract<PricingRule, { kind: 'coingecko' }> => rule.kind === 'coingecko')
-    .map((rule) => rule.id);
-
-  const requiredIds = Array.from(new Set(['stellar', 'bitcoin', ...configuredIds]));
-
-  // CoinGecko first (keyless, 5 s). A failure is logged once here and handled by
-  // the selection below — it is not an error for the step.
-  let coinGeckoPrices = new Map<string, number>();
-  let coinGeckoError: string | null = null;
   try {
-    coinGeckoPrices = await fetchCoinGeckoPrices(requiredIds);
-  } catch (error) {
-    coinGeckoError = error instanceof Error ? error.message : String(error);
-    console.warn(`coingecko unavailable: ${coinGeckoError.split('\n')[0]}`);
-  }
-
-  // XLM/USD: manual override > CoinGecko > deepest on-chain XLM/USDC pool within
-  // guards > null. Pure rule in shared/xlm-price.ts (unit-tested), DB reads in
-  // shared/xlm-price-db.ts. The proxy-XLM assets below follow the same price.
-  const selection = await resolveXlmPrice(client, coinGeckoPrices.get('stellar') ?? null, new Date());
-  const xlm: PriceResolution = {
-    price: selection.priceUsd,
-    source: selection.source,
-    metadata: {
-      ...selection.metadata,
-      kind: selection.kind,
-      ...(coinGeckoError ? { coingeckoError: coinGeckoError.split('\n')[0] } : {}),
-    },
-  };
-  if (xlm.price === null) {
-    console.warn(`xlm price: NO qualifying source (coingecko failed, on-chain guards: ${JSON.stringify(selection.metadata.rejected ?? [])}) — native and XLM proxies skipped this run`);
-  }
-
-  // BTC/USD (best effort, proxies only): CoinGecko, else the latest stored BTC-proxy
-  // row, else the manual env, else null — never the former hard-coded constant.
-  let btc: PriceResolution;
-  const btcDirect = coinGeckoPrices.get('bitcoin');
-  if (btcDirect !== undefined) {
-    btc = { price: btcDirect, source: 'coingecko_btc_usd', metadata: { confidence: 'high', method: 'direct_btc_price' } };
-  } else {
-    const dbBtc = await getLatestPriceBySource(client, 'coingecko_btc_proxy');
-    const envBtc = getOptionalNumberEnv('MANUAL_BTC_USD') ?? getOptionalNumberEnv('BTC_USD_FALLBACK');
-    if (dbBtc !== null) {
-      btc = { price: dbBtc, source: 'db_cached_btc_usd', metadata: { confidence: 'medium', method: 'latest_db_fallback_after_api_failure', fallbackFrom: 'coingecko_btc_usd', error: coinGeckoError } };
-    } else if (envBtc !== null) {
-      btc = { price: envBtc, source: 'manual_env', metadata: { confidence: 'medium', method: 'manual_override_env', envVar: 'MANUAL_BTC_USD|BTC_USD_FALLBACK' } };
-    } else {
-      btc = { price: null, source: 'none', metadata: { method: 'no_qualifying_source', error: coinGeckoError } };
-      console.warn('btc price: NO qualifying source — BTC proxies skipped this run');
+    const data = (await fetchJson(
+      `${config.baseUrl}/simple/price?ids=${encodeURIComponent(uniqueIds.join(','))}&vs_currencies=usd`,
+      config.headers
+    )) as CoinGeckoSimplePriceResponse;
+    const prices = new Map<string, number>();
+    for (const id of uniqueIds) {
+      const price = data?.[id]?.usd;
+      if (typeof price === 'number' && Number.isFinite(price)) prices.set(id, price);
     }
+    console.log(`coingecko (${config.plan} key): ${prices.size}/${uniqueIds.length} ids priced`);
+    return { prices, called: true, error: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`coingecko unavailable: ${message.split('\n')[0]}`);
+    return { prices: new Map(), called: true, error: message.split('\n')[0] };
   }
-
-  return { xlm, btc, coinGeckoPrices };
 }
 
-function resolveStableFallback(symbol: string): {
-  priceUsd: number | null;
-  source: string;
-  metadata: Record<string, unknown>;
-} {
-  const stable = inferStablePrice(symbol);
-
-  if (stable !== null) {
-    return {
-      priceUsd: stable,
-      source: 'manual_stable',
-      metadata: {
-        confidence: 'high',
-        method: 'hardcoded_stable_assumption',
-      },
-    };
-  }
-
-  return {
-    priceUsd: null,
-    source: 'unknown',
-    metadata: {},
-  };
+// ── Per-asset resolution ─────────────────────────────────────────────────────
+function fromSelection(selection: XlmPriceSelection, extra: Record<string, unknown> = {}): Resolution {
+  return { priceUsd: selection.priceUsd, source: selection.source, kind: selection.kind, metadata: { ...selection.metadata, ...extra } };
 }
 
-function resolvePriceFromRule(params: {
+async function resolveRule(params: {
+  client: ReturnType<typeof createPgClient>;
   symbol: string;
   rule: PricingRule | undefined;
-  xlm: PriceResolution;
-  btc: PriceResolution;
-  coinGeckoPrices: Map<string, number>;
-}): {
-  priceUsd: number | null;
-  source: string;
-  metadata: Record<string, unknown>;
-} {
-  const { symbol, rule, xlm, btc, coinGeckoPrices } = params;
+  coinGecko: Map<string, number>;
+  xlm: Resolution;
+  btcUsd: number | null;
+  sets: PoolReserveSet[];
+  now: Date;
+}): Promise<Resolution> {
+  const { client, symbol, rule, coinGecko, xlm, btcUsd, sets, now } = params;
+  const onchain = (coingecko: number | null, manualEnvVars: string[]) =>
+    resolveAssetPrice(client, { symbol, coingecko, manualEnvVars, xlmUsd: xlm.priceUsd, sets, now });
 
   if (!rule) {
-    return resolveStableFallback(symbol);
+    const stable = inferStablePrice(symbol);
+    if (stable !== null) {
+      return { priceUsd: stable, source: 'manual_stable', kind: 'stable', metadata: { confidence: 'high', method: 'hardcoded_stable_assumption' } };
+    }
+    return { priceUsd: null, source: 'none', kind: 'none', metadata: { method: 'no_pricing_rule' } };
   }
 
   if (rule.kind === 'stable') {
-    return {
-      priceUsd: rule.priceUsd,
-      source: 'manual_stable',
-      metadata: {
-        confidence: 'high',
-        method: 'pricing_config_stable',
-      },
-    };
+    return { priceUsd: rule.priceUsd, source: 'manual_stable', kind: 'stable', metadata: { confidence: 'high', method: 'pricing_config_stable' } };
   }
 
   if (rule.kind === 'manual') {
-    const envPrice = getOptionalNumberEnv(rule.envVar);
-    const confidence = rule.confidence ?? 'medium';
-    const note = rule.note ? { note: rule.note } : {};
-
-    if (envPrice !== null) {
-      return {
-        priceUsd: envPrice,
-        source: 'manual_env',
-        metadata: {
-          confidence,
-          method: 'pricing_config_manual_env',
-          envVar: rule.envVar,
-          ...note,
-        },
-      };
-    }
-
-    if (rule.fallbackPriceUsd !== undefined) {
-      return {
-        priceUsd: rule.fallbackPriceUsd,
-        source: 'manual_fallback',
-        metadata: {
-          confidence,
-          method: 'pricing_config_manual_fallback',
-          envVar: rule.envVar,
-          ...note,
-        },
-      };
-    }
-
-    return {
-      priceUsd: null,
-      source: 'unknown',
-      metadata: {},
-    };
+    // env override > on-chain > null (the former hard-coded fallbackPriceUsd is gone)
+    return fromSelection(await onchain(null, [rule.envVar]), rule.note ? { note: rule.note } : {});
   }
 
   if (rule.kind === 'proxy') {
-    if (rule.base === 'BTC') {
-      return {
-        priceUsd: btc.price,
-        source: 'coingecko_btc_proxy',
-        metadata: {
-          confidence: 'medium',
-          method: 'pricing_config_proxy',
-          proxy: 'BTC',
-          upstreamSource: btc.source,
-          upstreamMetadata: btc.metadata,
-        },
-      };
-    }
-
     if (rule.base === 'XLM') {
-      // Same price as native, whatever resolved it (CoinGecko or on-chain); null → skipped.
+      // Same price as native, whatever resolved it; null → skipped.
       return {
-        priceUsd: xlm.price,
+        priceUsd: xlm.priceUsd,
         source: xlm.source === 'coingecko_direct' ? 'coingecko_xlm_proxy' : `xlm_proxy:${xlm.source}`,
-        metadata: {
-          confidence: xlm.price === null ? 'none' : 'medium',
-          method: 'pricing_config_proxy',
-          proxy: 'XLM',
-          upstreamSource: xlm.source,
-          upstreamMetadata: xlm.metadata,
-        },
+        kind: xlm.kind,
+        metadata: { confidence: xlm.priceUsd === null ? 'none' : 'medium', method: 'pricing_config_proxy', proxy: 'XLM', upstreamSource: xlm.source },
       };
     }
+    // BTC proxies: CoinGecko bitcoin when a key answered; else the asset's own
+    // on-chain pool (e.g. SolvBTC vs XLM, two hops); else null. Phase B: Reflector.
+    if (btcUsd !== null) {
+      return { priceUsd: btcUsd, source: 'coingecko_btc_proxy', kind: 'coingecko', metadata: { confidence: 'medium', method: 'pricing_config_proxy', proxy: 'BTC' } };
+    }
+    return fromSelection(await onchain(null, [`MANUAL_${symbol.toUpperCase()}_USD`]), { proxy: 'BTC', proxyBase: 'none' });
   }
 
   if (rule.kind === 'coingecko') {
-    if (rule.id === 'stellar') {
-      // native: the shared XLM selection (CoinGecko > on-chain > null) — its
-      // fallbackEnvVar is honoured inside the selection as the manual override.
-      return { priceUsd: xlm.price, source: xlm.source, metadata: xlm.metadata };
-    }
-    const direct = coinGeckoPrices.get(rule.id);
-    if (direct !== undefined) {
-      return {
-        priceUsd: direct,
-        source: 'coingecko_direct',
-        metadata: {
-          confidence: 'high',
-          method: 'pricing_config_coingecko',
-          coinGeckoId: rule.id,
-        },
-      };
-    }
-
-    if (rule.fallbackEnvVar) {
-      const envPrice = getOptionalNumberEnv(rule.fallbackEnvVar);
-      if (envPrice !== null) {
-        return {
-          priceUsd: envPrice,
-          source: 'manual_env_fallback',
-          metadata: {
-            confidence: 'medium',
-            method: 'pricing_config_coingecko_env_fallback',
-            coinGeckoId: rule.id,
-            envVar: rule.fallbackEnvVar,
-          },
-        };
-      }
-    }
-
-    return {
-      priceUsd: null,
-      source: 'unknown',
-      metadata: {},
-    };
+    if (rule.id === 'stellar') return xlm;
+    const direct = coinGecko.get(rule.id) ?? null;
+    const selection = await onchain(direct, rule.fallbackEnvVar ? [rule.fallbackEnvVar] : []);
+    return fromSelection(selection, { coinGeckoId: rule.id });
   }
 
-  return {
-    priceUsd: null,
-    source: 'unknown',
-    metadata: {},
-  };
+  return { priceUsd: null, source: 'none', kind: 'none', metadata: { method: 'unknown_rule' } };
 }
 
 async function main() {
@@ -341,6 +155,7 @@ async function main() {
 
   try {
     const observedAt = nowIso();
+    const now = new Date(observedAt);
 
     const assetsRes = await client.query(
       `
@@ -350,26 +165,52 @@ async function main() {
       order by symbol asc nulls last
       `
     );
+    const assets = (assetsRes.rows as AssetRow[]).filter((a) => (a.symbol ?? '').trim());
 
-    const { xlm, btc, coinGeckoPrices } = await resolveCoinGeckoBasePrices(client);
+    // Reserve sets once per run; every asset derives its candidates from them.
+    const sets = await loadPoolReserveSets(client);
+    console.log(`on-chain reserve sets loaded: ${sets.length} constant-product pools`);
+
+    // CoinGecko once per run, only with a key.
+    const coinGeckoIds = Object.values(PRICING_RULES_BY_SYMBOL)
+      .filter((rule): rule is Extract<PricingRule, { kind: 'coingecko' }> => rule.kind === 'coingecko')
+      .map((rule) => rule.id);
+    const cg = await fetchCoinGeckoPrices(Array.from(new Set(['bitcoin', ...coinGeckoIds])));
+
+    // XLM first: two-hop candidates of every other asset depend on it.
+    const xlm = fromSelection(
+      await resolveAssetPrice(client, {
+        symbol: 'native',
+        coingecko: cg.prices.get('stellar') ?? null,
+        manualEnvVars: ['MANUAL_XLM_USD', 'XLM_USD_FALLBACK'],
+        xlmUsd: null,
+        sets,
+        now,
+      }),
+      cg.error ? { coingeckoError: cg.error } : {}
+    );
+    const btcUsd = cg.prices.get('bitcoin') ?? null;
 
     let inserted = 0;
+    const summary: Record<string, string> = {};
 
-    for (const asset of assetsRes.rows as AssetRow[]) {
+    for (const asset of assets) {
       const symbol = (asset.symbol ?? '').trim();
-      if (!symbol) continue;
-
       const rule = PRICING_RULES_BY_SYMBOL[symbol] ?? PRICING_RULES_BY_SYMBOL[symbol.toUpperCase()];
+      const resolved =
+        symbol === 'native' ? xlm : await resolveRule({ client, symbol, rule, coinGecko: cg.prices, xlm, btcUsd, sets, now });
 
-      const resolved = resolvePriceFromRule({
-        symbol,
-        rule,
-        xlm,
-        btc,
-        coinGeckoPrices,
-      });
+      console.log(`price source: ${symbol} ${resolved.kind} (${resolved.source}) => ${resolved.priceUsd ?? 'null'}`);
+      summary[symbol] = resolved.priceUsd === null ? 'null' : resolved.source;
 
       if (resolved.priceUsd === null) {
+        // No qualifying source: no row is written (never an invented value). Readers
+        // keep the asset's last row until the max-age rule (phase A2) hides it.
+        const rejectedList = (resolved.metadata.rejected as unknown[] | undefined) ?? [];
+        const why = rejectedList.length
+          ? `rejected: ${JSON.stringify(rejectedList)}`
+          : 'no candidate pool (no constant-product pool quotes it vs USDC or XLM)';
+        console.warn(`no qualifying source for ${symbol}: skipped this run (${why})`);
         continue;
       }
 
@@ -379,27 +220,19 @@ async function main() {
         values ($1, $2, $3, $4, $5::jsonb)
         on conflict (asset_id, source, observed_at) do nothing
         `,
-        [
-          asset.id,
-          resolved.priceUsd,
-          resolved.source,
-          observedAt,
-          JSON.stringify(resolved.metadata),
-        ]
+        [asset.id, resolved.priceUsd, resolved.source, observedAt, JSON.stringify(resolved.metadata)]
       );
-
       inserted += 1;
-      console.log(symbol || asset.contract_address, '=>', resolved.priceUsd, resolved.source);
     }
 
-    console.log(`xlm price source: ${xlm.metadata.kind} (${xlm.source}) => ${xlm.price ?? 'null'}`);
     console.log({
       completedAt: observedAt,
       inserted,
-      nativeUsd: xlm.price,
+      skipped: assets.length - inserted,
+      coingeckoCalled: cg.called,
+      nativeUsd: xlm.priceUsd,
       nativeSource: xlm.source,
-      btcUsd: btc.price,
-      btcSource: btc.source,
+      sources: summary,
     });
   } finally {
     await client.end();

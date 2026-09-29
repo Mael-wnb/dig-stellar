@@ -5,6 +5,9 @@ import '../../lib/ops-capture';
 import { nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
 import { safeDivide } from '../shared/pricing';
+import { priceMaxAgeMinutes } from '../shared/prices';
+import { PRICING_RULES_BY_SYMBOL } from '../shared/pricing-config';
+import { judgeCandidate, pairCandidate } from '../shared/xlm-price';
 
 function toNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
@@ -73,8 +76,12 @@ async function main() {
       asset_id: string;
       symbol: string | null;
       d_supply_scaled: string | null;
+      snapshot_at: Date;
     }>;
 
+    // Only FRESH rows count as "already priced" (price-sources v2): a stale row must
+    // not block the derivation any more. Same threshold as the venue freshness rule.
+    const maxAgeMinutes = priceMaxAgeMinutes();
     const latestPricesRes = await client.query(
       `
       select distinct on (ap.asset_id)
@@ -83,8 +90,10 @@ async function main() {
         ap.source,
         ap.observed_at
       from asset_prices ap
+      where ap.observed_at > now() - ($1::text || ' minutes')::interval
       order by ap.asset_id, ap.observed_at desc
-      `
+      `,
+      [String(maxAgeMinutes)]
     );
 
     const latestPriceByAsset = new Map<string, number>();
@@ -102,63 +111,75 @@ async function main() {
     const price1 = latestPriceByAsset.get(r1.asset_id) ?? null;
 
     let inserted = 0;
+    const now = new Date(observedAt);
+
+    // Exactly one leg priced (fresh) → derive the other, under the step-1 guards
+    // (freshness of the reserves, quote side ≥ 50k USD, no third hop). Never for an
+    // asset with a pricing-config rule: step 1 owns it, including its rejection.
+    const derive = async (
+      target: typeof r0,
+      targetReserve: number,
+      quote: typeof r0,
+      quoteReserve: number,
+      quotePriceUsd: number
+    ) => {
+      const targetSymbol = (target.symbol ?? '').trim();
+      if (!targetSymbol) return;
+      if (PRICING_RULES_BY_SYMBOL[targetSymbol] ?? PRICING_RULES_BY_SYMBOL[targetSymbol.toUpperCase()]) {
+        console.log(`${targetSymbol}: has a pricing rule — step 1 owns it, not derived here`);
+        return;
+      }
+      const candidate = pairCandidate({
+        pool: entitySlug,
+        targetSymbol,
+        targetReserve,
+        quoteSymbol: (quote.symbol ?? '').trim(),
+        quoteReserve,
+        quotePriceUsd,
+        observedAt: new Date(target.snapshot_at),
+      });
+      if (!candidate) {
+        console.log(`${targetSymbol}: quote ${quote.symbol} is neither USDC nor XLM — not derived (third hop)`);
+        return;
+      }
+      const verdict = judgeCandidate(candidate, now, null);
+      if (verdict.priceUsd === null) {
+        console.log(`${targetSymbol}: rejected — ${verdict.rejected}`);
+        return;
+      }
+      await client.query(
+        `
+        insert into asset_prices (asset_id, price_usd, source, observed_at, metadata)
+        values ($1, $2, $3, $4, $5::jsonb)
+        on conflict (asset_id, source, observed_at) do nothing
+        `,
+        [
+          target.asset_id,
+          verdict.priceUsd,
+          candidate.source,
+          observedAt,
+          JSON.stringify({
+            confidence: 'medium',
+            method: candidate.hops === 1 ? 'pool_implied_vs_usdc' : 'pool_implied_vs_xlm',
+            pool: entitySlug,
+            quoteKind: candidate.quoteKind,
+            hops: candidate.hops,
+            assetReserve: candidate.assetReserve,
+            quoteReserveUsd: candidate.quoteReserveUsd,
+            reservesObservedAt: candidate.observedAt.toISOString(),
+            derivedFrom: quote.symbol,
+          }),
+        ]
+      );
+      inserted += 1;
+      console.log(`price source: ${targetSymbol} onchain (${candidate.source}) => ${verdict.priceUsd} (derived from ${quote.symbol} via ${entitySlug})`);
+    };
 
     if (reserve0 !== null && reserve1 !== null && price0 !== null && price1 === null) {
-      const derived = safeDivide(reserve0 * price0, reserve1);
-
-      if (derived !== null) {
-        await client.query(
-          `
-          insert into asset_prices (asset_id, price_usd, source, observed_at, metadata)
-          values ($1, $2, $3, $4, $5::jsonb)
-          on conflict (asset_id, source, observed_at) do nothing
-          `,
-          [
-            r1.asset_id,
-            derived,
-            'soroswap_derived_pair',
-            observedAt,
-            JSON.stringify({
-              pair: entitySlug,
-              baseSymbol: r0.symbol,
-              quoteSymbol: r1.symbol,
-              method: 'derived_from_pair_reserves',
-            }),
-          ]
-        );
-
-        inserted += 1;
-        console.log(r1.symbol, '=>', derived, 'derived from', r0.symbol, 'via', entitySlug);
-      }
+      await derive(r1, reserve1, r0, reserve0, price0);
     }
-
     if (reserve0 !== null && reserve1 !== null && price1 !== null && price0 === null) {
-      const derived = safeDivide(reserve1 * price1, reserve0);
-
-      if (derived !== null) {
-        await client.query(
-          `
-          insert into asset_prices (asset_id, price_usd, source, observed_at, metadata)
-          values ($1, $2, $3, $4, $5::jsonb)
-          on conflict (asset_id, source, observed_at) do nothing
-          `,
-          [
-            r0.asset_id,
-            derived,
-            'soroswap_derived_pair',
-            observedAt,
-            JSON.stringify({
-              pair: entitySlug,
-              baseSymbol: r1.symbol,
-              quoteSymbol: r0.symbol,
-              method: 'derived_from_pair_reserves',
-            }),
-          ]
-        );
-
-        inserted += 1;
-        console.log(r0.symbol, '=>', derived, 'derived from', r1.symbol, 'via', entitySlug);
-      }
+      await derive(r0, reserve0, r1, reserve1, price1);
     }
 
     console.log({

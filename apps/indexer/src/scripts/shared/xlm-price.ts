@@ -1,34 +1,70 @@
 // apps/indexer/src/scripts/shared/xlm-price.ts
 //
-// XLM/USD price selection (hotfix 2026-09-29: keyless CoinGecko access is blocked
-// from datacenter IPs). Pure functions only — no I/O — so the rule is unit-tested
-// with node:test (see xlm-price.test.ts). The DB reads live in xlm-price-db.ts.
+// Price selection for ANY priced asset (price-sources v2, 2026-09-29; born as the XLM
+// hotfix e982fb2 — the XLM entry points are kept as thin wrappers). Pure functions
+// only — no I/O — unit-tested with node:test (xlm-price.test.ts). DB reads live in
+// xlm-price-db.ts.
 //
-// Order of precedence:
-//   1. manual override (MANUAL_XLM_USD / XLM_USD_FALLBACK) — explicit, traced as such;
-//   2. CoinGecko when it answered;
-//   3. the DEEPEST on-chain XLM/USDC constant-product pool that passes the guards;
+// Order of precedence, per asset:
+//   1. manual override (MANUAL_<ASSET>_USD env) — explicit, traced as such;
+//   2. CoinGecko when it was called (only with a configured key) and answered;
+//   3. the DEEPEST on-chain constant-product pool quoting the asset against USDC
+//      (direct) or against XLM (two hops, via the XLM/USD resolved earlier in the
+//      same run) that passes the guards;
 //   4. none → null. A null is the honest answer; no constant is ever used silently.
 //
-// This price is used for DISPLAY and USD VALUATION only (asset_prices,
-// network_stats_latest). It never feeds an execution path: action builders take
-// their quotes from the venue contracts, and the faucet witness prices from
-// asset_prices with its own 24h max age (apps/api witness.service.ts).
+// Guards (identical for every asset): reserves ≤ 60 min old, quote side ≥ 50 000 USD,
+// and ≤ 10 % deviation vs a CoinGecko reference younger than 6 h when one exists.
+// Without CoinGecko there is no reference, so freshness and liquidity are the only
+// protections (phase B makes Reflector the reference).
+//
+// These prices serve DISPLAY and USD VALUATION only (asset_prices, network stats,
+// wallet snapshots). They never feed an execution path: action builders take their
+// quotes from the venue contracts; the faucet witness prices from asset_prices with
+// its own 24h max age (apps/api witness.service.ts).
 
 export const XLM_ONCHAIN_MAX_AGE_MS = 60 * 60 * 1000; // reserves older than 60 min are not a price
 export const XLM_ONCHAIN_MIN_USDC_RESERVE = 50_000; // thinner pools are not a price
 export const XLM_REFERENCE_MAX_AGE_MS = 6 * 60 * 60 * 1000; // deviation guard only vs a < 6h CoinGecko reference
 export const XLM_MAX_DEVIATION = 0.1; // 10 %
 
-export type XlmOnchainCandidate = {
-  /** asset_prices.source value, e.g. 'onchain_sdex_xlm_usdc' */
+export type QuoteKind = 'usdc' | 'xlm';
+
+export type OnchainCandidate = {
+  /** asset_prices.source value, e.g. 'onchain_aquarius_ustry_usdc' */
   source: string;
   /** entity slug of the pool the reserves came from */
+  pool: string;
+  /** reserve of the asset being priced */
+  assetReserve: number;
+  /** the other leg, expressed in USD (USDC ×1, or XLM × the XLM/USD of this run) */
+  quoteReserveUsd: number;
+  quoteKind: QuoteKind;
+  /** 1 = direct vs USDC, 2 = via XLM */
+  hops: 1 | 2;
+  observedAt: Date;
+};
+
+/** XLM-specific shape kept for the hotfix call sites and tests (maps onto OnchainCandidate). */
+export type XlmOnchainCandidate = {
+  source: string;
   pool: string;
   xlmReserve: number;
   usdcReserve: number;
   observedAt: Date;
 };
+
+export function xlmCandidateToGeneric(c: XlmOnchainCandidate): OnchainCandidate {
+  return {
+    source: c.source,
+    pool: c.pool,
+    assetReserve: c.xlmReserve,
+    quoteReserveUsd: c.usdcReserve,
+    quoteKind: 'usdc',
+    hops: 1,
+    observedAt: c.observedAt,
+  };
+}
 
 export type XlmReference = { priceUsd: number; observedAt: Date };
 
@@ -41,29 +77,46 @@ export type XlmPriceSelection = {
   metadata: Record<string, unknown>;
 };
 
+export type PriceInputs = {
+  /** symbol being priced (for source/metadata labels) */
+  asset: string;
+  now: Date;
+  manualOverride: number | null;
+  /** MANUAL_<ASSET>_USD name, for tracing */
+  manualEnvVar: string;
+  coingecko: number | null;
+  /** latest CoinGecko-sourced row of this asset, for the deviation guard */
+  reference: XlmReference | null;
+  onchain: OnchainCandidate[];
+};
+
 export type XlmPriceInputs = {
   now: Date;
   manualOverride: number | null;
   coingecko: number | null;
-  /** latest CoinGecko-sourced native row, for the deviation guard */
   reference: XlmReference | null;
   onchain: XlmOnchainCandidate[];
 };
 
-export function poolImpliedXlmUsd(candidate: XlmOnchainCandidate): number | null {
-  if (!(candidate.xlmReserve > 0) || !(candidate.usdcReserve > 0)) return null;
-  const price = candidate.usdcReserve / candidate.xlmReserve; // USDC assumed 1.00
+export function poolImpliedPriceUsd(candidate: OnchainCandidate): number | null {
+  if (!(candidate.assetReserve > 0) || !(candidate.quoteReserveUsd > 0)) return null;
+  const price = candidate.quoteReserveUsd / candidate.assetReserve;
   return Number.isFinite(price) ? price : null;
 }
 
+/** XLM wrapper kept for the hotfix call sites. */
+export function poolImpliedXlmUsd(candidate: XlmOnchainCandidate): number | null {
+  return poolImpliedPriceUsd(xlmCandidateToGeneric(candidate));
+}
+
 export type CandidateVerdict = {
-  candidate: XlmOnchainCandidate;
+  candidate: OnchainCandidate;
   priceUsd: number | null;
   rejected: string | null;
 };
 
 export function judgeCandidate(
-  candidate: XlmOnchainCandidate,
+  candidate: OnchainCandidate,
   now: Date,
   reference: XlmReference | null
 ): CandidateVerdict {
@@ -71,14 +124,14 @@ export function judgeCandidate(
   if (!(ageMs <= XLM_ONCHAIN_MAX_AGE_MS)) {
     return { candidate, priceUsd: null, rejected: `stale reserves (${Math.round(ageMs / 60000)} min)` };
   }
-  if (!(candidate.usdcReserve >= XLM_ONCHAIN_MIN_USDC_RESERVE)) {
+  if (!(candidate.quoteReserveUsd >= XLM_ONCHAIN_MIN_USDC_RESERVE)) {
     return {
       candidate,
       priceUsd: null,
-      rejected: `thin pool (${Math.round(candidate.usdcReserve)} USDC < ${XLM_ONCHAIN_MIN_USDC_RESERVE})`,
+      rejected: `thin pool (${Math.round(candidate.quoteReserveUsd)} USD on the ${candidate.quoteKind} side < ${XLM_ONCHAIN_MIN_USDC_RESERVE})`,
     };
   }
-  const priceUsd = poolImpliedXlmUsd(candidate);
+  const priceUsd = poolImpliedPriceUsd(candidate);
   if (priceUsd === null) {
     return { candidate, priceUsd: null, rejected: 'non-positive reserves' };
   }
@@ -95,15 +148,15 @@ export function judgeCandidate(
   return { candidate, priceUsd, rejected: null };
 }
 
-export function selectXlmPrice(inputs: XlmPriceInputs): XlmPriceSelection {
-  const { now, manualOverride, coingecko, reference, onchain } = inputs;
+export function selectPrice(inputs: PriceInputs): XlmPriceSelection {
+  const { now, manualOverride, manualEnvVar, coingecko, reference, onchain } = inputs;
 
   if (manualOverride !== null && Number.isFinite(manualOverride) && manualOverride > 0) {
     return {
       priceUsd: manualOverride,
       source: 'manual_env',
       kind: 'manual',
-      metadata: { confidence: 'medium', method: 'manual_override_env', envVar: 'MANUAL_XLM_USD|XLM_USD_FALLBACK' },
+      metadata: { confidence: 'medium', method: 'manual_override_env', envVar: manualEnvVar },
     };
   }
 
@@ -116,9 +169,10 @@ export function selectXlmPrice(inputs: XlmPriceInputs): XlmPriceSelection {
     };
   }
 
-  // Deepest pool first (by USDC reserve); the first one passing every guard wins.
+  // Deepest pool first (by the USD value of the quote side); the first one passing
+  // every guard wins, whatever the quote kind.
   const verdicts = [...onchain]
-    .sort((a, b) => b.usdcReserve - a.usdcReserve)
+    .sort((a, b) => b.quoteReserveUsd - a.quoteReserveUsd)
     .map((c) => judgeCandidate(c, now, reference));
   const winner = verdicts.find((v) => v.priceUsd !== null);
   const rejected = verdicts
@@ -133,10 +187,12 @@ export function selectXlmPrice(inputs: XlmPriceInputs): XlmPriceSelection {
       kind: 'onchain',
       metadata: {
         confidence: 'medium',
-        method: 'pool_implied_xlm_usdc',
+        method: c.hops === 1 ? 'pool_implied_vs_usdc' : 'pool_implied_vs_xlm',
         pool: c.pool,
-        xlmReserve: c.xlmReserve,
-        usdcReserve: c.usdcReserve,
+        quoteKind: c.quoteKind,
+        hops: c.hops,
+        assetReserve: c.assetReserve,
+        quoteReserveUsd: c.quoteReserveUsd,
         reservesObservedAt: c.observedAt.toISOString(),
         referenceUsed: reference
           ? { priceUsd: reference.priceUsd, observedAt: reference.observedAt.toISOString() }
@@ -151,6 +207,100 @@ export function selectXlmPrice(inputs: XlmPriceInputs): XlmPriceSelection {
     source: 'none',
     kind: 'none',
     metadata: { method: 'no_qualifying_source', coingecko: coingecko === null ? 'failed' : 'invalid', rejected },
+  };
+}
+
+/** XLM entry point kept for the hotfix call sites (step 1 / step 9) and the existing tests. */
+export function selectXlmPrice(inputs: XlmPriceInputs): XlmPriceSelection {
+  return selectPrice({
+    asset: 'native',
+    now: inputs.now,
+    manualOverride: inputs.manualOverride,
+    manualEnvVar: 'MANUAL_XLM_USD|XLM_USD_FALLBACK',
+    coingecko: inputs.coingecko,
+    reference: inputs.reference,
+    onchain: inputs.onchain.map(xlmCandidateToGeneric),
+  });
+}
+
+// ── Candidates from the pools the refresh already captured ───────────────────
+// A "reserve set" is one pool's latest reserves (two legs for the pools we price
+// from). Only constant-product pools reach here (the loader excludes concentrated
+// pools). A candidate exists when the pool pairs the asset with USDC (direct) or
+// with XLM (two hops, needs this run's XLM/USD). Anything else (e.g. xSolvBTC/SolvBTC)
+// is not a candidate: three hops are excluded.
+export type PoolReserveSet = {
+  pool: string;
+  venue: 'aquarius' | 'soroswap' | 'sdex';
+  observedAt: Date;
+  reserves: Array<{ symbol: string; amount: number }>;
+};
+
+const sourceLabel = (symbol: string) => (symbol === 'native' ? 'xlm' : symbol.toLowerCase());
+
+export function candidatesFromPools(
+  symbol: string,
+  sets: PoolReserveSet[],
+  xlmUsd: number | null
+): OnchainCandidate[] {
+  const out: OnchainCandidate[] = [];
+  for (const set of sets) {
+    if (set.reserves.length !== 2) continue;
+    const mine = set.reserves.find((r) => r.symbol === symbol);
+    const other = set.reserves.find((r) => r.symbol !== symbol);
+    if (!mine || !other) continue;
+    if (other.symbol === 'USDC') {
+      out.push({
+        source: `onchain_${set.venue}_${sourceLabel(symbol)}_usdc`,
+        pool: set.pool,
+        assetReserve: mine.amount,
+        quoteReserveUsd: other.amount, // USDC assumed 1.00
+        quoteKind: 'usdc',
+        hops: 1,
+        observedAt: set.observedAt,
+      });
+    } else if (other.symbol === 'native' && symbol !== 'native' && xlmUsd !== null && xlmUsd > 0) {
+      out.push({
+        source: `onchain_${set.venue}_${sourceLabel(symbol)}_xlm`,
+        pool: set.pool,
+        assetReserve: mine.amount,
+        quoteReserveUsd: other.amount * xlmUsd,
+        quoteKind: 'xlm',
+        hops: 2,
+        observedAt: set.observedAt,
+      });
+    }
+  }
+  return out;
+}
+
+// ── Step 2 (Soroswap-derived) candidate ──────────────────────────────────────
+// Builds the candidate step 2 must judge with the SAME guards as step 1: the
+// unpriced leg of a Soroswap pair, quoted by the priced leg. Only a USDC or XLM
+// quote is accepted (anything else would be a third hop). Returns null when the
+// pair cannot be a candidate. Step 2 additionally never prices an asset that has a
+// pricing-config rule — step 1 owns those, including their rejections.
+export function pairCandidate(params: {
+  pool: string;
+  targetSymbol: string;
+  targetReserve: number;
+  quoteSymbol: string;
+  quoteReserve: number;
+  quotePriceUsd: number;
+  observedAt: Date;
+}): OnchainCandidate | null {
+  const { pool, targetSymbol, targetReserve, quoteSymbol, quoteReserve, quotePriceUsd, observedAt } = params;
+  if (quoteSymbol !== 'USDC' && quoteSymbol !== 'native') return null;
+  if (!(quotePriceUsd > 0)) return null;
+  const quoteKind: QuoteKind = quoteSymbol === 'USDC' ? 'usdc' : 'xlm';
+  return {
+    source: `onchain_soroswap_${sourceLabel(targetSymbol)}_${quoteKind}`,
+    pool,
+    assetReserve: targetReserve,
+    quoteReserveUsd: quoteReserve * quotePriceUsd,
+    quoteKind,
+    hops: quoteKind === 'usdc' ? 1 : 2,
+    observedAt,
   };
 }
 

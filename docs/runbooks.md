@@ -393,33 +393,46 @@ Known issue: `activeWallets` and `dexVolume24hUsd` come back `null`; the stellar
 endpoint returns 404 (pre-existing; needs a corrected endpoint). `updatedAt` is the row's `as_of`,
 not request time.
 
-### XLM/USD price sources (hotfix 2026-09-29)
+### Price sources (price-sources v2, 2026-09-29; born as the XLM hotfix)
 
-Keyless CoinGecko access is blocked from datacenter IPs (CloudFront 403), so the XLM/USD price
-is selected by one shared rule (`apps/indexer/src/scripts/shared/xlm-price.ts`, unit-tested with
-`pnpm -C apps/indexer test`), used by step 1 `prices:reference` (writes the `native` row and the
-XLM-proxy rows in `asset_prices`) and read back by step 9 `network-stats` (no second CoinGecko
-call in the same run):
+Keyless CoinGecko access is blocked from datacenter IPs (CloudFront 403). Since v2 **CoinGecko
+is called only when a key is configured** (`COINGECKO_PRO_API_KEY` → pro-api + `x-cg-pro-api-key`;
+`COINGECKO_API_KEY` → the former Demo shape); without a key there is no call. Every asset is
+priced by one shared rule (`apps/indexer/src/scripts/shared/xlm-price.ts`, unit-tested with
+`pnpm -C apps/indexer test`) in step 1 `prices:reference`, XLM first:
 
-1. `MANUAL_XLM_USD` / `XLM_USD_FALLBACK` — explicit manual override, traced as `manual_env`;
-2. CoinGecko (keyless, 5 s timeout) — `coingecko_direct`;
-3. the deepest on-chain XLM/USDC constant-product pool already captured by the refresh (SDEX
-   `stellar-native-native-usdc-pool`, Aquarius `aquarius-native-usdc-pool`, Soroswap
-   `soroswap-native-usdc-pair`) that passes the guards: reserves ≤ 60 min old, ≥ 50 000 USDC,
-   and ≤ 10 % deviation from the last CoinGecko row when that row is < 6 h old —
-   `onchain_sdex_xlm_usdc` / `onchain_aquarius_xlm_usdc` / `onchain_soroswap_xlm_usdc`;
-4. nothing → `null` and an explicit `xlm price: NO qualifying source` log line. No constant.
+1. `MANUAL_<ASSET>_USD` — explicit override, traced as `manual_env`;
+2. CoinGecko, when called and answered — `coingecko_direct` (BTC proxies: `coingecko_btc_proxy`);
+3. the deepest on-chain **constant-product** pool already captured by the refresh (Soroswap and
+   SDEX by design; Aquarius only when the registry type is explicitly `constant_product` —
+   `stable`, `concentrated` and unknown types are excluded) quoting the asset **vs USDC** (direct) or **vs XLM** (two
+   hops through this run's XLM/USD) that passes the guards: reserves ≤ 60 min old, quote side
+   ≥ 50 000 USD, ≤ 10 % deviation vs a CoinGecko reference younger than 6 h when one exists —
+   sources `onchain_<venue>_<asset>_<usdc|xlm>` (e.g. `onchain_aquarius_ustry_usdc`,
+   `onchain_sdex_aqua_xlm`); XLM proxies (yXLM) follow XLM as `xlm_proxy:<source>`;
+4. nothing → **no row** and a `no qualifying source for <ASSET>` log line. No constant exists
+   any more (the former EURC 1.16 / CETES 0.069 fallbacks are gone). Three-hop assets
+   (xSolvBTC) and assets with only a concentrated pool (BTC) resolve to null until phase B
+   (Reflector). Stablecoins USDC / PYUSD / yUSDC / oUSD stay `manual_stable` = 1.
 
-The price serves display and USD valuation only (plus the faucet witness's notional threshold,
-which reads `asset_prices` with its own 24 h max age); it never feeds a transaction build.
-Each run logs `xlm price source: <kind> (<source>) => <price>` in steps 1 and 9;
-`network_stats_latest.metadata.xlmPriceSource` carries the same. The `#status` "Price sources"
-tile keeps reporting the CoinGecko failure — it measures the upstream, not the published price.
+Without CoinGecko there is no reference for the deviation guard: freshness and liquidity are
+the only protections (phase B makes Reflector the reference). Step 2 (`prices:soroswap-derived`)
+now derives when a pair leg has no **fresh** row (`PRICE_MAX_AGE_MINUTES`, default 45, same
+threshold as `FRESHNESS_STALE_AFTER_MINUTES`), never for an asset that has a pricing rule (step 1
+owns it), and under the same guards (USDC or XLM quote only, reserves ≤ 60 min, quote side
+≥ 50 000 USD). Step 9
+(`network-stats`) reads the native row step 1 wrote in the same run.
+
+The prices serve display and USD valuation only (plus the faucet witness's notional threshold,
+which reads `asset_prices` with its own 24 h max age); they never feed a transaction build.
+Each run logs one `price source: <ASSET> <kind> (<source>) => <price|null>` line per asset.
+The `#status` "Price sources" tile measures the external providers still called (DefiLlama,
+stellar.expert) and turns red when one of them fails.
 
 Verify after a refresh:
 ```bash
-grep -n "xlm price source" /var/log/dig-stellar-refresh.log | tail -2
-psql "$DATABASE_URL" -Atc "select a.symbol, ap.source, ap.price_usd, ap.observed_at from asset_prices ap join assets a on a.id = ap.asset_id where a.symbol in ('native','yXLM') order by ap.observed_at desc limit 4"
+grep -n "price source:\|no qualifying source" /var/log/dig-stellar-refresh.log | tail -20
+psql "$DATABASE_URL" -Atc "select a.symbol, ap.source, round(ap.price_usd::numeric, 6), ap.observed_at, round(extract(epoch from (now() - ap.observed_at))/60) as age_min from (select distinct on (asset_id) * from asset_prices order by asset_id, observed_at desc) ap join assets a on a.id = ap.asset_id where a.chain = 'stellar-mainnet' order by age_min desc, a.symbol"
 ```
 
 ---

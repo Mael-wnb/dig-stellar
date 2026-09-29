@@ -106,3 +106,77 @@ test('24h change: nearest stored point within ±30 min, else null', () => {
   assert.equal(far.changePct, null);
   assert.equal(compute24hChangePct(null, history, now).changePct, null);
 });
+
+// ── price-sources v2: generic selection for any asset ────────────────────────
+import { candidatesFromPools, judgeCandidate, pairCandidate, selectPrice, type PoolReserveSet } from './xlm-price';
+
+const sets: PoolReserveSet[] = [
+  { pool: 'aquarius-ustry-usdc-pool', venue: 'aquarius', observedAt: minutesAgo(5), reserves: [{ symbol: 'USTRY', amount: 500_000 }, { symbol: 'USDC', amount: 540_000 }] },
+  { pool: 'soroswap-ustry-usdc-pair', venue: 'soroswap', observedAt: minutesAgo(5), reserves: [{ symbol: 'USTRY', amount: 20_000 }, { symbol: 'USDC', amount: 21_800 }] },
+  { pool: 'soroswap-native-eurc-pair', venue: 'soroswap', observedAt: minutesAgo(5), reserves: [{ symbol: 'native', amount: 400_000 }, { symbol: 'EURC', amount: 80_000 }] },
+  { pool: 'aquarius-xsolvbtc-solvbtc-pool', venue: 'aquarius', observedAt: minutesAgo(5), reserves: [{ symbol: 'xSolvBTC', amount: 10 }, { symbol: 'SolvBTC', amount: 10 }] },
+  { pool: 'stellar-native-native-usdc-pool', venue: 'sdex', observedAt: minutesAgo(5), reserves: [{ symbol: 'native', amount: 12_478_024 }, { symbol: 'USDC', amount: 2_828_992 }] },
+];
+
+test('candidates: direct vs USDC, two hops vs XLM only when XLM/USD is known, three hops never', () => {
+  const ustry = candidatesFromPools('USTRY', sets, 0.2267);
+  assert.deepEqual(ustry.map((c) => [c.source, c.hops, c.quoteKind]), [
+    ['onchain_aquarius_ustry_usdc', 1, 'usdc'],
+    ['onchain_soroswap_ustry_usdc', 1, 'usdc'],
+  ]);
+  const eurcWithXlm = candidatesFromPools('EURC', sets, 0.2267);
+  assert.equal(eurcWithXlm.length, 1);
+  assert.equal(eurcWithXlm[0].source, 'onchain_soroswap_eurc_xlm');
+  assert.equal(eurcWithXlm[0].hops, 2);
+  assert.ok(Math.abs(eurcWithXlm[0].quoteReserveUsd - 400_000 * 0.2267) < 1e-6);
+  assert.equal(candidatesFromPools('EURC', sets, null).length, 0, 'no XLM/USD → no two-hop candidate');
+  assert.equal(candidatesFromPools('xSolvBTC', sets, 0.2267).length, 0, 'xSolvBTC/SolvBTC is three hops → no candidate');
+  const xlm = candidatesFromPools('native', sets, null);
+  assert.deepEqual(xlm.map((c) => c.source), ['onchain_sdex_xlm_usdc'], 'XLM keeps its hotfix source name');
+});
+
+test('generic selection: deepest quote side wins across pools; guards unchanged; null otherwise', () => {
+  const ustry = selectPrice({ asset: 'USTRY', now, manualOverride: null, manualEnvVar: 'MANUAL_USTRY_USD', coingecko: null, reference: null, onchain: candidatesFromPools('USTRY', sets, 0.2267) });
+  assert.equal(ustry.source, 'onchain_aquarius_ustry_usdc');
+  assert.equal(ustry.priceUsd, 1.08);
+  assert.equal(ustry.metadata.hops, 1);
+
+  const eurc = selectPrice({ asset: 'EURC', now, manualOverride: null, manualEnvVar: 'MANUAL_EURC_USD', coingecko: null, reference: null, onchain: candidatesFromPools('EURC', sets, 0.2267) });
+  assert.equal(eurc.kind, 'onchain');
+  assert.ok(Math.abs((eurc.priceUsd ?? 0) - (400_000 * 0.2267) / 80_000) < 1e-9);
+  assert.equal(eurc.metadata.method, 'pool_implied_vs_xlm');
+
+  const thin = selectPrice({ asset: 'USTRY', now, manualOverride: null, manualEnvVar: 'x', coingecko: null, reference: null, onchain: candidatesFromPools('USTRY', [sets[1]], null) });
+  assert.equal(thin.priceUsd, null, '21.8k USDC side < 50k → null, no exception');
+
+  const nothing = selectPrice({ asset: 'BTC', now, manualOverride: null, manualEnvVar: 'MANUAL_BTC_USD', coingecko: null, reference: null, onchain: candidatesFromPools('BTC', sets, 0.2267) });
+  assert.equal(nothing.priceUsd, null);
+  assert.equal(nothing.source, 'none');
+
+  const manual = selectPrice({ asset: 'CETES', now, manualOverride: 0.07, manualEnvVar: 'MANUAL_CETES_USD', coingecko: null, reference: null, onchain: [] });
+  assert.equal(manual.source, 'manual_env');
+  assert.equal(manual.metadata.envVar, 'MANUAL_CETES_USD');
+});
+
+test('step 2: pair candidate is judged with the step-1 guards (thin pair → null), third hop → no candidate', () => {
+  // prod 2026-09-29 16:30Z: soroswap-ustry-usdc-pair = 46 366.02 USDC / 43 109.49 USTRY → below 50k
+  const thin = pairCandidate({ pool: 'soroswap-ustry-usdc-pair', targetSymbol: 'USTRY', targetReserve: 43_109.49, quoteSymbol: 'USDC', quoteReserve: 46_366.02, quotePriceUsd: 1, observedAt: minutesAgo(3) });
+  assert.ok(thin);
+  const v = judgeCandidate(thin!, now, null);
+  assert.equal(v.priceUsd, null);
+  assert.match(String(v.rejected), /thin pool/);
+
+  const deep = pairCandidate({ pool: 'soroswap-usdc-eurc-pair', targetSymbol: 'EURC', targetReserve: 246_356.52, quoteSymbol: 'USDC', quoteReserve: 277_674, quotePriceUsd: 1, observedAt: minutesAgo(3) });
+  const ok = judgeCandidate(deep!, now, null);
+  assert.ok(Math.abs((ok.priceUsd ?? 0) - 1.12712) < 1e-4);
+  assert.equal(deep!.source, 'onchain_soroswap_eurc_usdc');
+
+  const viaXlm = pairCandidate({ pool: 'soroswap-native-eurc-pair', targetSymbol: 'EURC', targetReserve: 219_334.32, quoteSymbol: 'native', quoteReserve: 1_091_882.08, quotePriceUsd: 0.226026, observedAt: minutesAgo(3) });
+  assert.equal(viaXlm!.hops, 2);
+  assert.ok(Math.abs((judgeCandidate(viaXlm!, now, null).priceUsd ?? 0) - 1.1252) < 1e-3);
+
+  assert.equal(pairCandidate({ pool: 'x', targetSymbol: 'ZONE', targetReserve: 1, quoteSymbol: 'EURC', quoteReserve: 1, quotePriceUsd: 1.12, observedAt: now }), null, 'quote must be USDC or XLM');
+
+  const stale = pairCandidate({ pool: 'soroswap-usdc-eurc-pair', targetSymbol: 'EURC', targetReserve: 246_356.52, quoteSymbol: 'USDC', quoteReserve: 277_674, quotePriceUsd: 1, observedAt: minutesAgo(61) });
+  assert.equal(judgeCandidate(stale!, now, null).priceUsd, null);
+});

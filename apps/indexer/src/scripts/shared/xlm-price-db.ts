@@ -1,30 +1,28 @@
 // apps/indexer/src/scripts/shared/xlm-price-db.ts
 //
-// DB reads for the XLM/USD selection (xlm-price.ts). Everything here is already
+// DB reads for the price selection (xlm-price.ts). Everything here is already
 // written by the refresh pipeline in the previous cycle — no new fetch, no schema:
-//   - Soroswap + Aquarius XLM/USDC constant-product pools → reserve_snapshots
-//     (symbol 'native' / 'USDC', d_supply_scaled);
-//   - SDEX XLM/USDC liquidity pool → pool_snapshots.metadata.reserves (Horizon shape
-//     [{asset:'native'|'USDC:G…', amount}]).
-// The Aquarius concentrated pool is deliberately excluded: its reserves ratio is
-// not a spot price.
+//   - Soroswap pairs (constant-product by design) + Aquarius pools whose registry
+//     type is EXPLICITLY 'constant_product' → reserve_snapshots (symbol,
+//     d_supply_scaled). Aquarius 'stable' (StableSwap), 'concentrated' and unknown
+//     types are excluded: their reserve ratio is not a spot price;
+//   - SDEX liquidity pools → pool_snapshots.metadata.reserves (Horizon shape
+//     [{asset:'native'|'CODE:ISSUER', amount}]).
+// The reserve sets are loaded ONCE per run (loadPoolReserveSets) and every asset
+// derives its candidates from them in memory (candidatesFromPools, pure).
 import type { Client } from 'pg';
 import { getOptionalNumberEnv } from './env';
 import {
+  candidatesFromPools,
   compute24hChangePct,
-  selectXlmPrice,
+  selectPrice,
+  type PoolReserveSet,
   type PricePoint,
-  type XlmOnchainCandidate,
   type XlmPriceSelection,
   type XlmReference,
 } from './xlm-price';
 
-const AMM_XLM_USDC_POOLS: ReadonlyArray<{ slug: string; source: string }> = [
-  { slug: 'aquarius-native-usdc-pool', source: 'onchain_aquarius_xlm_usdc' },
-  { slug: 'soroswap-native-usdc-pair', source: 'onchain_soroswap_xlm_usdc' },
-];
-const SDEX_XLM_USDC_POOL = { slug: 'stellar-native-native-usdc-pool', source: 'onchain_sdex_xlm_usdc' };
-const COINGECKO_NATIVE_SOURCES = ['coingecko_direct', 'coingecko_xlm_usd'];
+const COINGECKO_SOURCES = ['coingecko_direct', 'coingecko_xlm_usd'];
 
 function num(value: unknown): number | null {
   if (value === null || value === undefined) return null;
@@ -32,70 +30,78 @@ function num(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export async function loadOnchainXlmCandidates(client: Client): Promise<XlmOnchainCandidate[]> {
-  const out: XlmOnchainCandidate[] = [];
+export async function loadPoolReserveSets(client: Client): Promise<PoolReserveSet[]> {
+  const sets = new Map<string, PoolReserveSet>();
 
-  for (const pool of AMM_XLM_USDC_POOLS) {
-    const res = await client.query(
-      `
-      select distinct on (rs.asset_id) rs.symbol, rs.d_supply_scaled, rs.snapshot_at
+  // AMM pools (Aquarius constant-product + every Soroswap pair): latest reserve per leg.
+  const amm = await client.query(
+    `
+    with latest as (
+      select distinct on (rs.entity_id, rs.asset_id)
+        rs.entity_id, rs.symbol, rs.d_supply_scaled, rs.snapshot_at
       from reserve_snapshots rs
-      join entities e on e.id = rs.entity_id
-      where e.slug = $1
-      order by rs.asset_id, rs.snapshot_at desc, rs.created_at desc
-      `,
-      [pool.slug]
-    );
-    const rows = res.rows as Array<{ symbol: string | null; d_supply_scaled: unknown; snapshot_at: Date }>;
-    const xlm = rows.find((r) => r.symbol === 'native');
-    const usdc = rows.find((r) => r.symbol === 'USDC');
-    const xlmReserve = num(xlm?.d_supply_scaled);
-    const usdcReserve = num(usdc?.d_supply_scaled);
-    if (xlm && usdc && xlmReserve !== null && usdcReserve !== null) {
-      // Both legs of one snapshot share snapshot_at; take the older one to be safe.
-      const observedAt = new Date(Math.min(new Date(xlm.snapshot_at).getTime(), new Date(usdc.snapshot_at).getTime()));
-      out.push({ source: pool.source, pool: pool.slug, xlmReserve, usdcReserve, observedAt });
-    }
+      order by rs.entity_id, rs.asset_id, rs.snapshot_at desc, rs.created_at desc
+    )
+    select e.slug, v.slug as venue, l.symbol, l.d_supply_scaled, l.snapshot_at
+    from latest l
+    join entities e on e.id = l.entity_id
+    join venues v on v.id = e.venue_id
+    where e.is_active
+      and (
+        -- Soroswap pairs are constant-product by design.
+        v.slug = 'soroswap'
+        -- Aquarius: ONLY an explicit constant_product type (registry metadata copied into
+        -- entities.metadata by seed-core). 'stable' (StableSwap: the reserve ratio is not a
+        -- price — e.g. USDGLO/USDC at 0.899 for a $1 stablecoin), 'concentrated' and an
+        -- unknown type are all EXCLUDED.
+        or (v.slug = 'aquarius' and e.metadata->'info'->>'pool_type' = 'constant_product')
+      )
+      and e.slug not like '%-clpool'
+    `
+  );
+  for (const row of amm.rows as Array<{ slug: string; venue: 'aquarius' | 'soroswap'; symbol: string | null; d_supply_scaled: unknown; snapshot_at: Date }>) {
+    const amount = num(row.d_supply_scaled);
+    if (!row.symbol || amount === null) continue;
+    const at = new Date(row.snapshot_at);
+    const set = sets.get(row.slug) ?? { pool: row.slug, venue: row.venue, observedAt: at, reserves: [] };
+    // both legs share snapshot_at; keep the older one to be safe
+    if (at.getTime() < set.observedAt.getTime()) set.observedAt = at;
+    set.reserves.push({ symbol: row.symbol, amount });
+    sets.set(row.slug, set);
   }
 
-  const sdexRes = await client.query(
+  // SDEX liquidity pools: latest pool_snapshots row per entity, reserves in metadata.
+  const sdex = await client.query(
     `
-    select ps.snapshot_at, ps.metadata
+    select distinct on (ps.entity_id) e.slug, ps.snapshot_at, ps.metadata
     from pool_snapshots ps
     join entities e on e.id = ps.entity_id
-    where e.slug = $1
-    order by ps.snapshot_at desc
-    limit 1
-    `,
-    [SDEX_XLM_USDC_POOL.slug]
+    join venues v on v.id = e.venue_id
+    where v.slug = 'stellar-native' and e.is_active
+    order by ps.entity_id, ps.snapshot_at desc
+    `
   );
-  if (sdexRes.rowCount) {
-    const row = sdexRes.rows[0] as { snapshot_at: Date; metadata: { reserves?: Array<{ asset?: string; amount?: string }> } };
+  for (const row of sdex.rows as Array<{ slug: string; snapshot_at: Date; metadata: { reserves?: Array<{ asset?: string; amount?: string }> } }>) {
     const reserves = Array.isArray(row.metadata?.reserves) ? row.metadata.reserves : [];
-    const xlmReserve = num(reserves.find((r) => r.asset === 'native')?.amount);
-    const usdcReserve = num(reserves.find((r) => typeof r.asset === 'string' && r.asset.startsWith('USDC:'))?.amount);
-    if (xlmReserve !== null && usdcReserve !== null) {
-      out.push({
-        source: SDEX_XLM_USDC_POOL.source,
-        pool: SDEX_XLM_USDC_POOL.slug,
-        xlmReserve,
-        usdcReserve,
-        observedAt: new Date(row.snapshot_at),
-      });
-    }
+    const legs = reserves
+      .map((r) => ({ symbol: r.asset === 'native' ? 'native' : String(r.asset ?? '').split(':')[0], amount: num(r.amount) }))
+      .filter((l): l is { symbol: string; amount: number } => l.symbol !== '' && l.amount !== null);
+    if (legs.length !== 2) continue;
+    sets.set(row.slug, { pool: row.slug, venue: 'sdex', observedAt: new Date(row.snapshot_at), reserves: legs });
   }
 
-  return out;
+  return [...sets.values()];
 }
 
-export async function loadNativeAssetId(client: Client): Promise<string | null> {
+export async function loadAssetId(client: Client, symbol: string): Promise<string | null> {
   const res = await client.query(
-    `select id from assets where chain = 'stellar-mainnet' and symbol = 'native' limit 1`
+    `select id from assets where chain = 'stellar-mainnet' and symbol = $1 limit 1`,
+    [symbol]
   );
   return res.rowCount ? String(res.rows[0].id) : null;
 }
 
-export async function loadCoinGeckoReference(client: Client, nativeAssetId: string): Promise<XlmReference | null> {
+export async function loadCoinGeckoReference(client: Client, assetId: string): Promise<XlmReference | null> {
   const res = await client.query(
     `
     select price_usd, observed_at
@@ -104,23 +110,55 @@ export async function loadCoinGeckoReference(client: Client, nativeAssetId: stri
     order by observed_at desc
     limit 1
     `,
-    [nativeAssetId, COINGECKO_NATIVE_SOURCES]
+    [assetId, COINGECKO_SOURCES]
   );
   if (!res.rowCount) return null;
   const priceUsd = num(res.rows[0].price_usd);
   return priceUsd === null ? null : { priceUsd, observedAt: new Date(res.rows[0].observed_at) };
 }
 
-// The one entry point both steps use. `coingecko` is the price step 1 obtained
-// (or null when the call failed); the manual override comes from the env.
-export async function resolveXlmPrice(client: Client, coingecko: number | null, now: Date): Promise<XlmPriceSelection> {
-  const nativeAssetId = await loadNativeAssetId(client);
-  const [reference, onchain] = await Promise.all([
-    nativeAssetId ? loadCoinGeckoReference(client, nativeAssetId) : Promise.resolve(null),
-    loadOnchainXlmCandidates(client),
-  ]);
-  const manualOverride = getOptionalNumberEnv('MANUAL_XLM_USD') ?? getOptionalNumberEnv('XLM_USD_FALLBACK');
-  return selectXlmPrice({ now, manualOverride, coingecko, reference, onchain });
+export type ResolveAssetArgs = {
+  symbol: string;
+  /** CoinGecko price when it was called and answered for this asset, else null */
+  coingecko: number | null;
+  /** MANUAL_<ASSET>_USD-style env var(s) honoured as an explicit override */
+  manualEnvVars: string[];
+  /** XLM/USD resolved earlier in the run (enables two-hop candidates); null for XLM itself */
+  xlmUsd: number | null;
+  sets: PoolReserveSet[];
+  now: Date;
+};
+
+// The one entry point step 1 uses for every asset (XLM included, with xlmUsd null).
+export async function resolveAssetPrice(client: Client, args: ResolveAssetArgs): Promise<XlmPriceSelection> {
+  const assetId = await loadAssetId(client, args.symbol);
+  const reference = assetId ? await loadCoinGeckoReference(client, assetId) : null;
+  let manualOverride: number | null = null;
+  for (const name of args.manualEnvVars) {
+    manualOverride = getOptionalNumberEnv(name);
+    if (manualOverride !== null) break;
+  }
+  return selectPrice({
+    asset: args.symbol,
+    now: args.now,
+    manualOverride,
+    manualEnvVar: args.manualEnvVars.join('|'),
+    coingecko: args.coingecko,
+    reference,
+    onchain: candidatesFromPools(args.symbol, args.sets, args.xlmUsd),
+  });
+}
+
+/** XLM entry point kept for the hotfix call sites. */
+export async function resolveXlmPrice(client: Client, coingecko: number | null, now: Date, sets?: PoolReserveSet[]): Promise<XlmPriceSelection> {
+  return resolveAssetPrice(client, {
+    symbol: 'native',
+    coingecko,
+    manualEnvVars: ['MANUAL_XLM_USD', 'XLM_USD_FALLBACK'],
+    xlmUsd: null,
+    sets: sets ?? (await loadPoolReserveSets(client)),
+    now,
+  });
 }
 
 // Latest native row (any source) written within `maxAgeMs` — step 9 reads the row
