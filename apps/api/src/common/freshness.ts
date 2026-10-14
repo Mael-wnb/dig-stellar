@@ -53,3 +53,23 @@ export function computeFreshness(asOf: unknown): Freshness {
     ageSeconds,
   };
 }
+
+// ── Price max age (price-sources v2, phase A2) ────────────────────────────────
+// An asset_prices row older than this counts as ABSENT for every read query
+// (pool TVL, top assets, flows, series, token breakdowns), so a dead feed's last
+// row is never served forever. Same threshold as the venue freshness rule unless
+// PRICE_MAX_AGE_MINUTES overrides it. The faucet witness keeps its own 24 h rule.
+// The indexer applies the identical rule (apps/indexer/src/scripts/shared/prices.ts).
+export function priceMaxAgeMinutes(): number {
+  const raw = process.env.PRICE_MAX_AGE_MINUTES;
+  if (raw !== undefined && raw !== '') {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return staleAfterMinutes();
+}
+
+// SQL fragment for the asset_prices alias: "this price row is fresh".
+export function freshPriceSql(alias = 'ap'): string {
+  return `${alias}.observed_at > now() - interval '${Math.round(priceMaxAgeMinutes())} minutes'`;
+}

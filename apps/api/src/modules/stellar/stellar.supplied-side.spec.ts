@@ -53,7 +53,9 @@ describe('StellarService — lending "supplied" side reads b_supply_scaled', () 
     expect(queryRawUnsafe).toHaveBeenCalledTimes(2);
     const [sql, entityId] = queryRawUnsafe.mock.calls[1] as [string, string];
     expect(entityId).toBe(ENTITY_ID);
-    expect(sql).toMatch(/sum\(coalesce\(rs\.b_supply_scaled, 0\) \* coalesce\(p\.price_usd, 0\)\) as tvl_usd/);
+    // Phase A2 wraps the sum in a NULL guard (no priced reserve → NULL point); the
+    // supplied-side column choice is what this spec pins.
+    expect(sql).toMatch(/sum\(coalesce\(rs\.b_supply_scaled, 0\) \* coalesce\(p\.price_usd, 0\)\) end as tvl_usd/);
     expect(sql).not.toMatch(/rs\.d_supply_scaled/);
   });
 });

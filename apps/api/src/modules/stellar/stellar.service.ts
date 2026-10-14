@@ -2,7 +2,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Asset, Networks } from '@stellar/stellar-sdk';
 import { PrismaService } from '../../db/prisma.service';
-import { computeFreshness } from '../../common/freshness';
+import { freshPriceSql, computeFreshness } from '../../common/freshness';
 
 // Resolve a Horizon reserve asset ("native" or "CODE:ISSUER") to its Stellar
 // Asset Contract (SAC) id. stellar-native pools store reserves in Horizon
@@ -263,15 +263,14 @@ export class StellarService {
           va.venue_slug,
           a.symbol,
           a.logo_url,
-          va.amount * coalesce(
-            (
-              select ap.price_usd
-              from asset_prices ap
-              where ap.asset_id = va.asset_id
-              order by ap.observed_at desc
-              limit 1
-            ),
-            0
+          -- phase A2: only a FRESH price counts; no fresh price → tvl_usd NULL (never 0)
+          va.amount * (
+            select ap.price_usd
+            from asset_prices ap
+            where ap.asset_id = va.asset_id
+              and ${freshPriceSql('ap')}
+            order by ap.observed_at desc
+            limit 1
           ) as tvl_usd
         from venue_assets va
         join assets a on a.id = va.asset_id
@@ -281,7 +280,7 @@ export class StellarService {
         symbol,
         logo_url,
         tvl_usd,
-        row_number() over (partition by venue_slug order by tvl_usd desc) as rn,
+        row_number() over (partition by venue_slug order by tvl_usd desc nulls last) as rn,
         count(*) over (partition by venue_slug) as asset_count
       from priced
       order by venue_slug asc, rn asc
@@ -554,6 +553,7 @@ export class StellarService {
             select ap2.price_usd
             from asset_prices ap2
             where ap2.asset_id = a.id
+              and ${freshPriceSql('ap2')}
             order by ap2.observed_at desc
             limit 1
           ) as price_usd
@@ -800,12 +800,12 @@ export class StellarService {
         from normalized_events ne
         left join lateral (
           select ap.price_usd from asset_prices ap
-          where ap.asset_id = ne.token_in_asset_id
+          where ap.asset_id = ne.token_in_asset_id and ${freshPriceSql('ap')}
           order by ap.observed_at desc limit 1
         ) pin on true
         left join lateral (
           select ap.price_usd from asset_prices ap
-          where ap.asset_id = ne.token_out_asset_id
+          where ap.asset_id = ne.token_out_asset_id and ${freshPriceSql('ap')}
           order by ap.observed_at desc limit 1
         ) pout on true
         where ne.entity_id = $1::uuid
@@ -931,11 +931,14 @@ export class StellarService {
       select
         rs.snapshot_at,
         to_char(date_trunc('day', rs.snapshot_at at time zone 'UTC'), 'YYYY-MM-DD') as day,
-        sum(coalesce(rs.b_supply_scaled, 0) * coalesce(p.price_usd, 0)) as tvl_usd
+        -- phase A2: fresh prices only; a snapshot with NO priced reserve yields NULL
+        -- (the reducer skips it — a gap, never a $0 point)
+        case when count(p.price_usd) = 0 then null
+             else sum(coalesce(rs.b_supply_scaled, 0) * coalesce(p.price_usd, 0)) end as tvl_usd
       from reserve_snapshots rs
-      join lateral (
+      left join lateral (
         select ap.price_usd from asset_prices ap
-        where ap.asset_id = rs.asset_id
+        where ap.asset_id = rs.asset_id and ${freshPriceSql('ap')}
         order by ap.observed_at desc limit 1
       ) p on true
       where rs.entity_id = $1::uuid
@@ -1014,6 +1017,7 @@ export class StellarService {
               select ap.price_usd
               from asset_prices ap
               where ap.asset_id = a.id
+                and ${freshPriceSql('ap')}
               order by ap.observed_at desc
               limit 1
             ) as price_usd
