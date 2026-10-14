@@ -16,6 +16,7 @@
 
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../db/prisma.service';
+import { freshPriceSql } from '../../common/freshness';
 
 // numeric columns come back from $queryRawUnsafe as Prisma.Decimal; unwrap to a
 // plain number (or null) so the API never emits Decimal objects. Mirrors the
@@ -232,18 +233,26 @@ type LatestAssetPriceRow = {
   observed_at: unknown;
 };
 
-// Only assets priced recently count as "tracked" — an asset whose newest price
-// is older than this is no longer on the refresh path and must not be offered
-// for new price rules (honesty rule: creatable IFF the evaluator has data).
-const PRICED_ASSET_MAX_AGE = '7 days';
+// Only assets with a FRESH price count as "tracked" (price-sources v2, phase
+// A2-bis): the same max-age rule as every other asset_prices reader
+// (PRICE_MAX_AGE_MINUTES, else the venue freshness threshold, default 45 —
+// common/freshness.ts freshPriceSql). Honesty rule: an asset is offered for a
+// new price rule IFF the evaluator would have data for it this sweep; a dead
+// feed's last row is never offered nor evaluated.
 
 // Lot N (N3) — the two-batch TVL window the tvl_drop_pct evaluator consumes.
 export type PoolTvlWindow = {
   entityId: string;
+  // NULL when any reserve of the batch has no FRESH price (phase A2-bis): a
+  // TVL that is null or partial because a price is missing must never be read
+  // as a drop, so the evaluator skips the pool for this run.
   latestTvlUsd: number | null;
   prevTvlUsd: number | null;
   latestAt: unknown;
   prevAt: unknown;
+  // Reserves of the latest batch: how many have a fresh price / how many exist.
+  latestPricedReserves: number;
+  latestReserves: number;
 };
 
 type PoolTvlWindowRow = {
@@ -252,6 +261,8 @@ type PoolTvlWindowRow = {
   prev_tvl_usd: unknown;
   latest_at: unknown;
   prev_at: unknown;
+  latest_priced_reserves: unknown;
+  latest_reserves: unknown;
 };
 
 // Lot N (N3) — a pool eligible for TVL-drop rules (modal target list).
@@ -645,8 +656,10 @@ export class AlertsRepository {
   // Lot N — price family reads/writes
   // -------------------------------------------------------------------------
 
-  // Latest price per asset for the evaluator (one query for the whole sweep).
-  // DISTINCT ON picks the newest observation across sources.
+  // Latest FRESH price per asset for the evaluator (one query for the whole
+  // sweep). DISTINCT ON picks the newest observation across sources; a row older
+  // than the max-age rule is absent, so the evaluator neither fires nor resolves
+  // on it (phase A2-bis).
   async latestPricesByAsset(
     assetIds: string[]
   ): Promise<Map<string, LatestAssetPrice>> {
@@ -660,6 +673,7 @@ export class AlertsRepository {
       from asset_prices ap
       join assets a on a.id = ap.asset_id
       where ap.asset_id = any($1::uuid[])
+        and ${freshPriceSql('ap')}
       order by ap.asset_id, ap.observed_at desc
       `,
       ids
@@ -672,8 +686,8 @@ export class AlertsRepository {
     return map;
   }
 
-  // The vetted asset list for the rule modal: every asset with a recent price
-  // (see PRICED_ASSET_MAX_AGE), latest observation each, ordered by symbol.
+  // The vetted asset list for the rule modal: every asset with a FRESH price
+  // (same max-age rule as the evaluator), latest observation each, by symbol.
   async listPricedAssets(): Promise<LatestAssetPrice[]> {
     const rows = (await this.prisma.$queryRawUnsafe(
       `
@@ -682,7 +696,7 @@ export class AlertsRepository {
           ap.asset_id, a.symbol, a.name, ap.price_usd, ap.observed_at
         from asset_prices ap
         join assets a on a.id = ap.asset_id
-        where ap.observed_at > now() - interval '${PRICED_ASSET_MAX_AGE}'
+        where ${freshPriceSql('ap')}
         order by ap.asset_id, ap.observed_at desc
       ) priced
       order by lower(coalesce(priced.symbol, priced.name, ''))
@@ -755,8 +769,11 @@ export class AlertsRepository {
   // snapshot_at — never a per-asset latest (that resurrects removed reserves).
   // The supplied side mirrors compute-pool-metrics.ts: lending pools hold the
   // supplied amount in b_supply_scaled; AMM pools hold the reserve amount in
-  // d_supply_scaled. Both batches are valued with the SAME latest price per
-  // asset, so the ratio isolates real liquidity movement at current valuation.
+  // d_supply_scaled. Both batches are valued with the SAME latest FRESH price
+  // per asset, so the ratio isolates real liquidity movement at current
+  // valuation. A reserve with no fresh price makes the batch TVL NULL (phase
+  // A2-bis): an absent price is never a $0 reserve, so a pool whose TVL is null
+  // or partial for lack of a price is excluded from the evaluation this run.
   // The previous batch must sit 12–36h behind the latest one — closer would
   // fake a "24h" window, farther is a different claim; pools without such a
   // batch (young history, e.g. stellar-native which writes no reserve batches
@@ -795,14 +812,17 @@ export class AlertsRepository {
       ),
       tvl as (
         select rs.entity_id, rs.snapshot_at,
-               sum(
-                 coalesce(
-                   case when v.venue_type = 'lending'
-                     then rs.b_supply_scaled
-                     else rs.d_supply_scaled
-                   end, 0
-                 ) * coalesce(px.price_usd, 0)
-               ) as tvl_usd
+               count(*) as reserve_count,
+               count(px.price_usd) as priced_count,
+               case when count(px.price_usd) < count(*) then null
+                    else sum(
+                      coalesce(
+                        case when v.venue_type = 'lending'
+                          then rs.b_supply_scaled
+                          else rs.d_supply_scaled
+                        end, 0
+                      ) * px.price_usd
+                    ) end as tvl_usd
         from reserve_snapshots rs
         join entities e on e.id = rs.entity_id
         join venues v on v.id = e.venue_id
@@ -810,7 +830,7 @@ export class AlertsRepository {
           and rs.snapshot_at in (pk.latest_snap, pk.prev_snap)
         left join lateral (
           select ap.price_usd from asset_prices ap
-          where ap.asset_id = rs.asset_id
+          where ap.asset_id = rs.asset_id and ${freshPriceSql('ap')}
           order by ap.observed_at desc limit 1
         ) px on true
         group by rs.entity_id, rs.snapshot_at
@@ -819,7 +839,9 @@ export class AlertsRepository {
              tl.tvl_usd as latest_tvl_usd,
              tp.tvl_usd as prev_tvl_usd,
              pk.latest_snap as latest_at,
-             pk.prev_snap as prev_at
+             pk.prev_snap as prev_at,
+             tl.priced_count as latest_priced_reserves,
+             tl.reserve_count as latest_reserves
       from picked pk
       join tvl tl on tl.entity_id = pk.entity_id and tl.snapshot_at = pk.latest_snap
       join tvl tp on tp.entity_id = pk.entity_id and tp.snapshot_at = pk.prev_snap
@@ -835,6 +857,8 @@ export class AlertsRepository {
         prevTvlUsd: toNumber(row.prev_tvl_usd),
         latestAt: row.latest_at,
         prevAt: row.prev_at,
+        latestPricedReserves: toNumber(row.latest_priced_reserves) ?? 0,
+        latestReserves: toNumber(row.latest_reserves) ?? 0,
       });
     }
     return map;

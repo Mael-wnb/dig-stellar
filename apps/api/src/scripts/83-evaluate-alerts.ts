@@ -222,9 +222,10 @@ async function main() {
 
         const px = priceMap.get(rule.assetId);
         if (!px || px.priceUsd === null) {
-          // No observed price → neither fire nor resolve; state untouched.
+          // No FRESH price (max-age rule, phase A2-bis) → neither fire nor
+          // resolve; state untouched. A dead feed's last row never evaluates.
           console.warn(
-            `[evaluate-alerts] price rule ${rule.id}: no recent price for asset ${rule.assetId} — skipped`,
+            `[evaluate-alerts] price rule ${rule.id}: no fresh price for asset ${rule.assetId} — skipped`,
           );
           continue;
         }
@@ -320,10 +321,19 @@ async function main() {
         if (rule.poolEntityId === null || rule.threshold === null) continue;
 
         const win = tvlWindows.get(rule.poolEntityId);
-        if (!win || win.latestTvlUsd === null || win.prevTvlUsd === null) {
+        if (!win) {
           // Not enough batch history for an honest 24h claim — never fire.
           console.warn(
             `[evaluate-alerts] tvl rule ${rule.id}: no 24h batch window for pool ${rule.poolEntityId} — skipped`
+          );
+          continue;
+        }
+        if (win.latestTvlUsd === null || win.prevTvlUsd === null) {
+          // A reserve has no FRESH price (phase A2-bis): the batch TVL is null,
+          // never a $0 reserve — an absent price must not read as a drop. Skip
+          // the pool for this run, state untouched.
+          console.warn(
+            `[evaluate-alerts] tvl rule ${rule.id}: unpriced reserve in pool ${rule.poolEntityId} (${win.latestPricedReserves}/${win.latestReserves} priced) — skipped`
           );
           continue;
         }
