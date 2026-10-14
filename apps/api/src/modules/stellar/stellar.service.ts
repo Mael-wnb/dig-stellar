@@ -375,7 +375,7 @@ export class StellarService {
       join venues v on v.id = e.venue_id
       left join pool_metrics_latest pml on pml.entity_id = e.id
       ${whereClause}
-      order by ${sortColumn} ${sortColumn === 'v.slug, e.slug' ? '' : sortDirection}, e.slug asc
+      order by ${sortColumn} ${sortColumn === 'v.slug, e.slug' ? '' : `${sortDirection} nulls last`}, e.slug asc
       `,
       ...params
     )) as PoolListRow[];

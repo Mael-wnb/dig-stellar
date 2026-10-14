@@ -60,6 +60,20 @@ describe('StellarService — asset_prices reads accept fresh rows only (phase A2
     expect(sql).toMatch(/left join lateral/);
   });
 
+  it('getPools?sort=tvlUsd: NULL-TVL pools rank last in both directions (phase A2-bis)', async () => {
+    const queryRawUnsafe = jest.fn().mockResolvedValue([]);
+    const svc = serviceWith(queryRawUnsafe);
+    await svc.getPools(undefined, 'tvlUsd', 'desc');
+    await svc.getPools('aquarius', 'tvlUsd', 'asc');
+    await svc.getPools();
+    // getPools issues a second (swap-count) query per call: keep the list queries only.
+    const lists = queryRawUnsafe.mock.calls.map((c) => c[0] as string).filter((q) => /from entities e\s+join venues v/.test(q) && /order by/.test(q));
+    expect(lists).toHaveLength(3);
+    expect(lists[0]).toMatch(/order by pml\.tvl_usd desc nulls last, e\.slug asc/);
+    expect(lists[1]).toMatch(/order by pml\.tvl_usd asc nulls last, e\.slug asc/);
+    expect(lists[2]).toMatch(/order by v\.slug, e\.slug , e\.slug asc/);
+  });
+
   it('getPoolSeries reducer: a NULL point is a gap, never a $0 point', async () => {
     const queryRawUnsafe = jest
       .fn()
