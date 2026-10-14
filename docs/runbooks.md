@@ -423,6 +423,12 @@ owns it), and under the same guards (USDC or XLM quote only, reserves ≤ 60 min
 ≥ 50 000 USD). Step 9
 (`network-stats`) reads the native row step 1 wrote in the same run.
 
+**Max age (phase A2):** every reader of `asset_prices` — indexer metric writers, wallet snapshots,
+step 2, and the `/v1/*` pool/top-asset/flow/series queries — accepts only rows younger than
+`PRICE_MAX_AGE_MINUTES` (default = `FRESHNESS_STALE_AFTER_MINUTES`, 45): an older row counts as
+absent, and a pool with no priced reserve gets `tvl_usd = null` (shown as `—`, never `$0`). The
+faucet witness keeps its own 24 h rule. Evidence: `docs/evidence/price-sources-v2/04-phase-a2.md`.
+
 The prices serve display and USD valuation only (plus the faucet witness's notional threshold,
 which reads `asset_prices` with its own 24 h max age); they never feed a transaction build.
 Each run logs one `price source: <ASSET> <kind> (<source>) => <price|null>` line per asset.
