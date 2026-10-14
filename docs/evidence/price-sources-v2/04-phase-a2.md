@@ -86,10 +86,12 @@ aquarius-xsolvbtc-solvbtc-pool | tvl_usd NULL                          # still n
 
 BTC and xSolvBTC (last row 69 846 at 17:00Z) and USDGLO (last row 06:30Z) become absent at the
 first refresh after the deploy: their pools' TVL drops their contribution (SolvBTC keeps its
-live price; `aquarius-xsolvbtc-solvbtc-pool` → NULL, `aquarius-usdglo-usdc-pool` → partial
-(USDC leg only), `aquarius-btc-usdc-clpool` / `btc-eth` → BTC leg absent). Every other asset
-has a fresh on-chain row each run, so nothing else changes. Wallet snapshots price holdings
-of those three assets as NULL (no USD) from the next wallet refresh.
+live on-chain price, so `aquarius-xsolvbtc-solvbtc-pool` → **partial sum (SolvBTC leg only)**,
+not NULL — corrected 2026-10-14, the local capture above showed NULL only because both legs
+were stale locally; `aquarius-usdglo-usdc-pool` → partial (USDC leg only);
+`aquarius-btc-usdc-clpool` / `btc-eth` → BTC leg absent). Every other asset has a fresh
+on-chain row each run, so nothing else changes. Wallet snapshots price holdings of those three
+assets as NULL (no USD) from the next wallet refresh.
 
 ## Deploy (founder executes; **the API changes → build + restart are mandatory**)
 
@@ -120,10 +122,34 @@ docker exec -i dig_stellar_postgres psql -U dig -d dig_stellar -Atc "select e.sl
 curl -s https://stellar-api.getdig.ai/v1/pools/aquarius-xsolvbtc-solvbtc-pool | head -c 600; echo
 curl -s https://stellar-api.getdig.ai/v1/network/stats | head -c 400; echo
 ```
-Expected: `/health` version == HEAD; the xSolvBTC/SolvBTC pool shows `tvlUsd: null` on the API
-and `—` in the UI (and drops out of the Aquarius pool list under the $100 floor — flagged
-above); USDGLO/USDC shows only its USDC leg; `network/stats` TVL moves by the removed
-contributions only.
+Expected: `/health` version == HEAD; the xSolvBTC/SolvBTC pool shows its SolvBTC leg only
+(partial sum, `priceUsd: null` on the xSolvBTC reserve); USDGLO/USDC shows only its USDC leg;
+BTC/USDC shows only its USDC leg; `network/stats` TVL moves by the removed contributions only.
+A pool with **no** priced reserve would show `tvlUsd: null` / `—` and drop out of the protocol
+pool list under the $100 floor (flagged above) — no prod pool is in that case today.
+
+**Deployment decision (2026-10-14):** A2 does **not** ship alone. It ships in one deployment
+with A2-bis (below) and phase B (`05-phase-b-design.md`), so BTC / xSolvBTC / USDGLO go
+straight from their dead row to a real price without ever showing `—`. The null rule is a
+safety net that must practically never trigger.
+
+## A2-bis (2026-10-14) — alert evaluator + pool list ordering
+
+The 2026-10-14 review found three `asset_prices` readers outside the A2 rule, all in
+`apps/api/src/modules/alerts/alerts.repository.ts`, plus one ordering gap. Fixed, zero SQL:
+
+| Reader | Before | After |
+|---|---|---|
+| `latestPricesByAsset` (price family, `83-evaluate-alerts.ts`) | newest row, any age → a BTC rule evaluated against the 15-day-old 69 846 | `freshPriceSql('ap')`; a stale asset is absent from the map → the evaluator logs `no fresh price … — skipped`, state untouched (neither fires nor resolves) |
+| `getPoolTvlWindows` (TVL-drop family) | `coalesce(px.price_usd, 0)` on the newest row of any age → a price turning absent read as a reserve worth $0 = a fake drop | fresh filter on the lateral; batch `tvl_usd` is `NULL` when `count(px.price_usd) < count(*)` (any unpriced reserve, i.e. null **or partial** TVL); the evaluator skips the pool for the run with `unpriced reserve in pool … (x/y priced) — skipped`. Consequence: a pool holding a reserve that is never priced is never TVL-drop-evaluated (before, that reserve silently counted $0) — acceptable, every perimeter reserve is on the pricing path |
+| `listPricedAssets` (rule modal) | own 7-day window | aligned on the rule: the modal offers an asset IFF the evaluator would have data for it this sweep (the constant's stated honesty rule) — an asset is not creatable during an outage longer than the window, which is the honest answer |
+| `GET /v1/pools?sort=…` | `order by pml.tvl_usd desc` → Postgres puts NULLs first | `nulls last` on every non-default sort column |
+
+Tests: `alerts.price-max-age.spec.ts` (3 SQL shapes + NULL-window mapping) and a `getPools`
+ordering case in `stellar.price-max-age.spec.ts` → API **17 suites, 158 tests pass**, `nest build`
+OK. Unchanged: the `exists (select 1 from asset_prices …)` flow filters (gate "ever priceable"
+only), step-1 internal readers (`xlm-price-db.ts`: own 6 h reference / 24 h change windows),
+step 9 (`SAME_RUN_MAX_AGE_MS` 20 min on the native row), the faucet witness (24 h).
 
 ## Follow-ups
 
