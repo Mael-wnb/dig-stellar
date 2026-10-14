@@ -10,6 +10,31 @@ export function priceMaxAgeMinutes(): number {
   return Number.isFinite(raw) && raw > 0 ? raw : 45;
 }
 
+// SQL fragment: "this asset_prices row is fresh". Every reader of asset_prices
+// (indexer writers, wallet snapshots, step 2) appends it so a dead feed's last row
+// counts as ABSENT instead of being served forever (price-sources v2, phase A2).
+// The API applies the same rule (apps/api/src/common/freshness.ts).
+export function freshPriceSql(alias = 'ap'): string {
+  const minutes = Math.round(priceMaxAgeMinutes());
+  return `${alias}.observed_at > now() - interval '${minutes} minutes'`;
+}
+
+export type PricedLeg = { amount: number | null; priceUsd: number | null };
+
+// Pool TVL from priced legs: the sum of the priced ones, or NULL when no leg is
+// priced (a pool whose reserves have no fresh price has no TVL, not a TVL of 0).
+// A partially priced pool still sums what it can (documented follow-up).
+export function tvlFromLegs(legs: PricedLeg[]): { tvlUsd: number | null; priced: number; total: number } {
+  let sum = 0;
+  let priced = 0;
+  for (const leg of legs) {
+    if (leg.amount === null || leg.priceUsd === null || !Number.isFinite(leg.amount) || !Number.isFinite(leg.priceUsd)) continue;
+    sum += leg.amount * leg.priceUsd;
+    priced += 1;
+  }
+  return { tvlUsd: legs.length > 0 && priced === 0 ? null : sum, priced, total: legs.length };
+}
+
 export async function getLatestAssetPricesMap(client: Client): Promise<Map<string, number>> {
   const res = await client.query(
     `
@@ -17,6 +42,7 @@ export async function getLatestAssetPricesMap(client: Client): Promise<Map<strin
       ap.asset_id,
       ap.price_usd
     from asset_prices ap
+    where ${freshPriceSql('ap')}
     order by ap.asset_id, ap.observed_at desc
     `
   );

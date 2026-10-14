@@ -51,11 +51,11 @@ export type BlendReserveAsset = {
   };
   
   export type BlendPoolMetrics = {
-    tvlUsd: number;
+    tvlUsd: number | null; // null when no reserve has a fresh price (phase A2)
     totalSuppliedUsd: number;
     totalBorrowedUsd: number;
     totalBackstopCreditUsd: number;
-    netLiquidityUsd: number;
+    netLiquidityUsd: number | null;
     weightedSupplyApy: number | null;
     weightedBorrowApy: number | null;
     reserveBreakdown: Array<{

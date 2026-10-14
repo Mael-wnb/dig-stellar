@@ -22,7 +22,7 @@ export type DefindexVaultFetch = {
 export type DefindexVaultMetrics = {
   completedAt: string;
   entitySlug: string;
-  tvlUsd: number;
+  tvlUsd: number | null;
   supplyApy: number | null; // fraction (0.0714), as stored in pool_metrics_latest
   pricedHoldings: number;
   unpricedHoldings: number;

@@ -1,5 +1,6 @@
 // apps/indexer/src/lib/protocols/aquarius/persist-pool-metrics.ts
 import type { Client, PoolClient } from 'pg';
+import { freshPriceSql, tvlFromLegs, type PricedLeg } from '../../../scripts/shared/prices';
 import { nowIso } from '../../../scripts/discovery/00-common';
 import {
   getEntityBySlugOrThrow,
@@ -54,6 +55,7 @@ export async function persistAquariusPoolMetrics(params: {
       ap.asset_id,
       ap.price_usd
     from asset_prices ap
+    where ${freshPriceSql('ap')}
     order by ap.asset_id, ap.observed_at desc
   `);
 
@@ -73,13 +75,13 @@ export async function persistAquariusPoolMetrics(params: {
     [entity.id]
   );
 
-  let tvlUsd = 0;
-
-  for (const row of reserveRes.rows) {
-    const price = priceMap.get(row.asset_id) ?? 0;
-    const reserve = row.d_supply_scaled ? Number(row.d_supply_scaled) : 0;
-    tvlUsd += reserve * price;
-  }
+  // NULL when no reserve has a fresh price (phase A2) — never a TVL of 0 by default.
+  const legs: PricedLeg[] = reserveRes.rows.map((row) => ({
+    amount: row.d_supply_scaled ? Number(row.d_supply_scaled) : 0,
+    priceUsd: priceMap.has(row.asset_id) ? priceMap.get(row.asset_id) ?? null : null,
+  }));
+  const { tvlUsd, priced: pricedReserves, total: totalReserves } = tvlFromLegs(legs);
+  if (tvlUsd === null) console.warn(`[aquarius] ${entitySlug}: no reserve priced (${pricedReserves}/${totalReserves}) — tvl_usd = null`);
 
   const eventsRes = await client.query<NormalizedEventRow>(
     `

@@ -5,7 +5,7 @@ import '../../lib/ops-capture';
 import { nowIso } from '../discovery/00-common';
 import { createPgClient } from '../shared/db';
 import { safeDivide } from '../shared/pricing';
-import { priceMaxAgeMinutes } from '../shared/prices';
+import { freshPriceSql, priceMaxAgeMinutes } from '../shared/prices';
 import { PRICING_RULES_BY_SYMBOL } from '../shared/pricing-config';
 import { judgeCandidate, pairCandidate } from '../shared/xlm-price';
 
@@ -82,6 +82,7 @@ async function main() {
     // Only FRESH rows count as "already priced" (price-sources v2): a stale row must
     // not block the derivation any more. Same threshold as the venue freshness rule.
     const maxAgeMinutes = priceMaxAgeMinutes();
+    console.log(`fresh-price window: ${maxAgeMinutes} min`);
     const latestPricesRes = await client.query(
       `
       select distinct on (ap.asset_id)
@@ -90,10 +91,9 @@ async function main() {
         ap.source,
         ap.observed_at
       from asset_prices ap
-      where ap.observed_at > now() - ($1::text || ' minutes')::interval
+      where ${freshPriceSql('ap')}
       order by ap.asset_id, ap.observed_at desc
-      `,
-      [String(maxAgeMinutes)]
+      `
     );
 
     const latestPriceByAsset = new Map<string, number>();

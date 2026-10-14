@@ -1,7 +1,7 @@
 import type { Client, PoolClient } from "pg";
 
 import { getVenueBySlugOrThrow } from "../../../scripts/shared/lookup";
-import { getLatestAssetPricesMap } from "../../../scripts/shared/prices";
+import { getLatestAssetPricesMap, tvlFromLegs, type PricedLeg } from "../../../scripts/shared/prices";
 import { horizonAssetToSacContractId } from "./asset-utils";
 import { fetchPoolTrades, type PoolTradeMetrics } from "./fetch-pool-trades";
 
@@ -114,7 +114,7 @@ export async function persistStellarNativePoolMetrics(
     const reserves =
       row.metadata?.reserves ?? [];
 
-    let tvlUsd = 0;
+    const legs: PricedLeg[] = [];
 
     for (const reserve of reserves) {
       // Resolve the reserve to its SAC contract (the key the assets table uses)
@@ -135,14 +135,18 @@ export async function persistStellarNativePoolMetrics(
       }
 
       const priceUsd =
-        priceMap.get(assetId) ?? 0;
+        priceMap.get(assetId) ?? null;
 
       const amount = Number(
         reserve.amount
       );
 
-      tvlUsd += amount * priceUsd;
+      legs.push({ amount, priceUsd });
     }
+
+    // NULL when no reserve has a fresh price (phase A2) — never a TVL of 0 by default.
+    const { tvlUsd, priced: pricedReserves, total: totalReserves } = tvlFromLegs(legs);
+    if (tvlUsd === null) console.warn(`[stellar-native] ${row.pool_id ?? row.entity_id}: no reserve priced (${pricedReserves}/${totalReserves}) — tvl_usd = null`);
 
     // 24h volume / fees / trade count, from the concurrent trade fetch above.
     // Only active pools were fetched (legacy entities are skipped to keep the

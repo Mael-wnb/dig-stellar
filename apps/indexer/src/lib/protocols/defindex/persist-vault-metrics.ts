@@ -1,5 +1,6 @@
 // apps/indexer/src/lib/protocols/defindex/persist-vault-metrics.ts
 import type { Client, PoolClient } from 'pg';
+import { freshPriceSql } from '../../../scripts/shared/prices';
 import { nowIso } from '../../../scripts/discovery/00-common';
 import {
   getEntityBySlugOrThrow,
@@ -53,6 +54,7 @@ export async function persistDefindexVaultMetrics(params: {
               select ap.price_usd
               from asset_prices ap
               where ap.asset_id = a.id
+                and ${freshPriceSql('ap')}
               order by ap.observed_at desc
               limit 1
             ) as price_usd
@@ -68,7 +70,7 @@ export async function persistDefindexVaultMetrics(params: {
     priceRows.map((row) => [row.contract_address, row])
   );
 
-  let tvlUsd = 0;
+  let tvlSum = 0;
   let pricedHoldings = 0;
   let unpricedHoldings = 0;
 
@@ -86,9 +88,13 @@ export async function persistDefindexVaultMetrics(params: {
     }
 
     const humanAmount = Number(holding.rawAmount) / 10 ** decimals;
-    tvlUsd += humanAmount * price;
+    tvlSum += humanAmount * price;
     pricedHoldings += 1;
   }
+
+  // NULL when no holding has a fresh price (phase A2) — never a TVL of 0 by default.
+  const tvlUsd: number | null = fetched.holdings.length > 0 && pricedHoldings === 0 ? null : tvlSum;
+  if (tvlUsd === null) console.warn(`[defindex] ${entitySlug}: no holding priced (0/${fetched.holdings.length}) — tvl_usd = null`);
 
   const supplyApy =
     fetched.apyPct !== null && Number.isFinite(fetched.apyPct)

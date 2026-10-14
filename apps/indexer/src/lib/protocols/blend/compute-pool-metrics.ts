@@ -1,6 +1,7 @@
 // apps/indexer/src/lib/protocols/blend/compute-pool-metrics.ts
 
 import type { Client, PoolClient } from 'pg';
+import { freshPriceSql } from '../../../scripts/shared/prices';
 import { getEntityBySlugOrThrow } from '../../../scripts/shared/lookup';
 import { BlendPoolMetrics } from './types';
 
@@ -43,6 +44,7 @@ export async function computeBlendPoolMetrics(params: {
       ap.asset_id,
       ap.price_usd
     from asset_prices ap
+    where ${freshPriceSql('ap')}
     order by ap.asset_id, ap.observed_at desc
     `
   );
@@ -80,6 +82,8 @@ export async function computeBlendPoolMetrics(params: {
     [entity.id]
   );
 
+  let pricedReserves = 0;
+
   let totalSuppliedUsd = 0;
   let totalBorrowedUsd = 0;
   let totalBackstopCreditUsd = 0;
@@ -102,6 +106,7 @@ export async function computeBlendPoolMetrics(params: {
     const borrowedUsd = priceUsd !== null ? borrowed * priceUsd : null;
     const backstopCreditUsd = priceUsd !== null ? backstopCredit * priceUsd : null;
 
+    if (priceUsd !== null) pricedReserves += 1;
     if (suppliedUsd !== null) totalSuppliedUsd += suppliedUsd;
     if (borrowedUsd !== null) totalBorrowedUsd += borrowedUsd;
     if (backstopCreditUsd !== null) totalBackstopCreditUsd += backstopCreditUsd;
@@ -142,11 +147,12 @@ export async function computeBlendPoolMetrics(params: {
     totalBorrowedUsd > 0 ? weightedBorrowApyNumerator / totalBorrowedUsd : null;
 
   return {
-    tvlUsd: totalSuppliedUsd,
+    // NULL when no reserve has a fresh price (phase A2) — never a TVL of 0 by default.
+    tvlUsd: pricedReserves === 0 && reserveRes.rows.length > 0 ? null : totalSuppliedUsd,
     totalSuppliedUsd,
     totalBorrowedUsd,
     totalBackstopCreditUsd,
-    netLiquidityUsd: totalSuppliedUsd - totalBorrowedUsd,
+    netLiquidityUsd: pricedReserves === 0 && reserveRes.rows.length > 0 ? null : totalSuppliedUsd - totalBorrowedUsd,
     weightedSupplyApy,
     weightedBorrowApy,
     reserveBreakdown,

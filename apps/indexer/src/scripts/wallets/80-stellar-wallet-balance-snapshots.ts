@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { createPgClient } from '../shared/db';
+import { freshPriceSql } from '../shared/prices';
 import { fetchJson, nowIso } from '../discovery/00-common';
 
 type ActiveWalletRow = {
@@ -128,7 +129,8 @@ async function main() {
       select distinct on (asset_id)
         asset_id,
         price_usd
-      from asset_prices
+      from asset_prices ap
+      where ${freshPriceSql('ap')}
       order by asset_id, observed_at desc
       `
     );

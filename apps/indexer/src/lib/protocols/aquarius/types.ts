@@ -105,7 +105,7 @@ export type AquariusAsset = {
   };
   
   export type AquariusPoolMetrics = {
-    tvlUsd: number;
+    tvlUsd: number | null;
     volume24hUsd: number;
     fees24hUsd: number;
     swaps24h: number;

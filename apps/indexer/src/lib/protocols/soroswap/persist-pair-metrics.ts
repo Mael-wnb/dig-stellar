@@ -1,5 +1,6 @@
 // apps/indexer/src/lib/protocols/soroswap/persist-pair-metrics.ts
 import type { Client } from 'pg';
+import { freshPriceSql, tvlFromLegs, type PricedLeg } from '../../../scripts/shared/prices';
 
 import { nowIso } from '../../../scripts/discovery/00-common';
 import {
@@ -43,7 +44,7 @@ export async function persistSoroswapPairMetrics(params: {
 }): Promise<{
   completedAt: string;
   entitySlug: string;
-  tvlUsd: number;
+  tvlUsd: number | null;
   volume24hUsd: number;
   fees24hUsd: number;
   swaps24h: number;
@@ -58,6 +59,7 @@ export async function persistSoroswapPairMetrics(params: {
       ap.asset_id,
       ap.price_usd
     from asset_prices ap
+    where ${freshPriceSql('ap')}
     order by ap.asset_id, ap.observed_at desc
   `);
 
@@ -80,7 +82,7 @@ export async function persistSoroswapPairMetrics(params: {
     [entity.id]
   );
 
-  let tvlUsd = 0;
+  const legs: PricedLeg[] = [];
 
   const reserveBreakdown: SoroswapPairMetrics['reserveBreakdown'] = [];
 
@@ -88,10 +90,7 @@ export async function persistSoroswapPairMetrics(params: {
     const reserve = toFiniteNumber(row.d_supply_scaled);
     const priceUsd = priceMap.has(row.asset_id) ? priceMap.get(row.asset_id) ?? null : null;
     const reserveUsd = priceUsd !== null ? reserve * priceUsd : null;
-
-    if (reserveUsd !== null) {
-      tvlUsd += reserveUsd;
-    }
+    legs.push({ amount: reserve, priceUsd });
 
     reserveBreakdown.push({
       assetId: row.asset_id,
@@ -103,6 +102,9 @@ export async function persistSoroswapPairMetrics(params: {
     });
   }
 
+  // NULL when no reserve has a fresh price (phase A2) — never a TVL of 0 by default.
+  const { tvlUsd, priced: pricedReserves, total: totalReserves } = tvlFromLegs(legs);
+  if (tvlUsd === null) console.warn(`[soroswap] ${entitySlug}: no reserve priced (${pricedReserves}/${totalReserves}) — tvl_usd = null`);
   const eventsRes = await client.query<NormalizedEventRow>(
     `
     select
