@@ -91,6 +91,7 @@ const priceSourcesLine = computed(() => {
   const parts = [`${ps.pricedAssets}/${ps.totalAssets} assets priced`]
   parts.push(ps.unpricedAssets.length ? `unpriced: ${ps.unpricedAssets.join(', ')}` : 'none unpriced')
   parts.push(ps.singleSourceAssets.length ? `single-source: ${ps.singleSourceAssets.join(', ')}` : 'no single-source asset')
+  if (ps.referenceAssets?.length) parts.push(`reference: ${ps.referenceAssets.join(', ')} = 1`)
   parts.push(
     ps.disagreements.length
       ? `cross-check disagreements: ${ps.disagreements.map((d) => `${d.symbol} (${d.deviationPct > 0 ? '+' : ''}${d.deviationPct.toFixed(2)} %)`).join(', ')}`

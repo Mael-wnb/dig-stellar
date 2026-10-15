@@ -65,6 +65,8 @@ export type OpsStatusResponse = {
     pricedAssets: number
     totalAssets: number
     unpricedAssets: string[]
+    // the reference currency (USDC = 1 by convention), reported apart from single-source
+    referenceAssets?: string[]
     singleSourceAssets: string[]
     disagreements: Array<{ symbol: string; source: string; deviationPct: number }>
   }

@@ -366,18 +366,20 @@ describe('OpsController /v1/ops/status window guard', () => {
 // Price-sources v2, phase B — the minimal #status signal: priced / single-source /
 // disagreements, from the latest fresh asset_prices row per asset.
 describe('summarizePriceSources', () => {
-  it('counts priced assets, lists single-source ones and disagreements, unpriced stay visible', () => {
+  it('counts priced assets, lists single-source ones and disagreements, unpriced stay visible; USDC is the reference, not single-source', () => {
     const out = summarizePriceSources([
       { symbol: 'BTC', source: 'reflector_cex_btc', sourcesQualified: 2, crossCheckAgrees: true, crossCheckDeviationPct: -0.88 },
+      { symbol: 'USDC', source: 'manual_stable', sourcesQualified: 1, crossCheckAgrees: null, crossCheckDeviationPct: null },
       { symbol: 'USDGLO', source: 'reflector_sdex_usdglo', sourcesQualified: 2, crossCheckAgrees: false, crossCheckDeviationPct: -3.1 },
       { symbol: 'USDY', source: 'onchain_aquarius_usdy_usdc', sourcesQualified: 1, crossCheckAgrees: null, crossCheckDeviationPct: null },
       { symbol: 'oUSD', source: 'manual_stable', sourcesQualified: 1, crossCheckAgrees: null, crossCheckDeviationPct: null },
       { symbol: 'PYUSD', source: null, sourcesQualified: null, crossCheckAgrees: null, crossCheckDeviationPct: null },
     ]);
     expect(out).toEqual({
-      pricedAssets: 4,
-      totalAssets: 5,
+      pricedAssets: 5,
+      totalAssets: 6,
       unpricedAssets: ['PYUSD'],
+      referenceAssets: ['USDC'],
       singleSourceAssets: ['USDY', 'oUSD'],
       disagreements: [{ symbol: 'USDGLO', source: 'reflector_sdex_usdglo', deviationPct: -3.1 }],
     });

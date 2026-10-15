@@ -111,22 +111,30 @@ export type PriceSourceRow = {
   crossCheckDeviationPct: number | null;
 };
 
+// The reference currency: priced at 1 by convention (every other price is expressed
+// in it; the Reflector USDC/USD read is only traced as a sanity value on its row). It
+// is reported apart, never as a "single-source" weakness (founder decision 2026-10-15).
+export const REFERENCE_ASSETS = ['USDC'];
+
 export type PriceSourcesSummary = {
   pricedAssets: number;
   totalAssets: number;
   unpricedAssets: string[];
+  referenceAssets: string[];
   singleSourceAssets: string[];
   disagreements: Array<{ symbol: string; source: string; deviationPct: number }>;
 };
 
 export function summarizePriceSources(rows: PriceSourceRow[]): PriceSourcesSummary {
   const priced = rows.filter((r) => r.source !== null);
+  const reference = new Set(REFERENCE_ASSETS);
   return {
     pricedAssets: priced.length,
     totalAssets: rows.length,
     unpricedAssets: rows.filter((r) => r.source === null).map((r) => r.symbol).sort(),
+    referenceAssets: priced.filter((r) => reference.has(r.symbol)).map((r) => r.symbol).sort(),
     singleSourceAssets: priced
-      .filter((r) => r.sourcesQualified !== null && r.sourcesQualified < 2)
+      .filter((r) => !reference.has(r.symbol) && r.sourcesQualified !== null && r.sourcesQualified < 2)
       .map((r) => r.symbol)
       .sort(),
     disagreements: priced
