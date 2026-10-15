@@ -20,6 +20,9 @@ import {
 
   export type ContractArg =
   | { type: "address"; value: string }
+  // Escape hatch for enum / struct arguments (e.g. Reflector's `Asset` enum,
+  // price-sources v2 phase B): a ready-made ScVal is passed through untouched.
+  | { type: "scval"; value: xdr.ScVal }
   | { type: "u32"; value: number }
   | { type: "i128"; value: string | number | bigint }
   | { type: "u128"; value: string | number | bigint }
@@ -36,6 +39,10 @@ import {
       "type" in arg &&
       "value" in arg
     ) {
+      if (arg.type === "scval") {
+        return arg.value;
+      }
+
       if (arg.type === "address") {
         return new Address(arg.value).toScVal();
       }
