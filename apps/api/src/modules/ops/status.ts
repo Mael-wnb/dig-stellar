@@ -94,7 +94,47 @@ export const RPC_LABELS: Record<string, string> = {
   horizon: 'Horizon',
   'defindex-api': 'DeFindex API',
   'price-sources': 'Price sources',
+  // Phase B (price-sources v2): the Reflector `lastprice` simulations of step 1.
+  'price-oracle': 'Reflector oracle',
 };
+
+// ── Price sources summary (price-sources v2, phase B) ────────────────────────
+// Minimal #status signal, computed at read time from the latest FRESH
+// asset_prices row per active asset (the A2 max-age rule): how many assets have
+// a price, which ones rest on a single source (USDY, oUSD by design), and which
+// primaries disagree with their cross-check this run (primary kept, traced).
+export type PriceSourceRow = {
+  symbol: string;
+  source: string | null; // null = no fresh row
+  sourcesQualified: number | null;
+  crossCheckAgrees: boolean | null;
+  crossCheckDeviationPct: number | null;
+};
+
+export type PriceSourcesSummary = {
+  pricedAssets: number;
+  totalAssets: number;
+  unpricedAssets: string[];
+  singleSourceAssets: string[];
+  disagreements: Array<{ symbol: string; source: string; deviationPct: number }>;
+};
+
+export function summarizePriceSources(rows: PriceSourceRow[]): PriceSourcesSummary {
+  const priced = rows.filter((r) => r.source !== null);
+  return {
+    pricedAssets: priced.length,
+    totalAssets: rows.length,
+    unpricedAssets: rows.filter((r) => r.source === null).map((r) => r.symbol).sort(),
+    singleSourceAssets: priced
+      .filter((r) => r.sourcesQualified !== null && r.sourcesQualified < 2)
+      .map((r) => r.symbol)
+      .sort(),
+    disagreements: priced
+      .filter((r) => r.crossCheckAgrees === false)
+      .map((r) => ({ symbol: r.symbol, source: r.source as string, deviationPct: r.crossCheckDeviationPct ?? 0 }))
+      .sort((a, b) => a.symbol.localeCompare(b.symbol)),
+  };
+}
 
 export type OpsStatusInput = {
   now: Date;
@@ -160,6 +200,8 @@ export type OpsStatusPayload = {
     failedSteps24h: number;
   };
   components: OpsStatusComponent[];
+  // Phase B: present once the service has read asset_prices (absent in pure fixtures).
+  priceSources?: PriceSourcesSummary;
 };
 
 function round4(value: number): number {

@@ -14,9 +14,10 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../db/prisma.service';
 import { FaucetService } from '../faucet/faucet.service';
-import { staleAfterSeconds } from '../../common/freshness';
+import { freshPriceSql, staleAfterSeconds } from '../../common/freshness';
 import {
   computeOpsStatus,
+  summarizePriceSources,
   type OpsStatusPayload,
   type RpcRunRow as StatusRpcRow,
   type StepRunRow as StatusStepRow,
@@ -240,7 +241,7 @@ export class OpsService {
       p99Ms: toInt(row.p99_ms),
     }));
 
-    return computeOpsStatus({
+    const payload = computeOpsStatus({
       now: new Date(),
       staleAfterSeconds: staleAfterSeconds(),
       historySince:
@@ -250,6 +251,47 @@ export class OpsService {
       stepRows: statusStepRows,
       rpcRows: statusRpcRows,
     });
+
+    // Phase B (price-sources v2): latest FRESH price row per mainnet asset, with
+    // the step-1 trace (sourcesQualified, crossCheck) — no new table.
+    const priceRows = (await this.prisma.$queryRawUnsafe(
+      `
+      select a.symbol,
+             ap.source,
+             (ap.metadata->>'sourcesQualified')::int as sources_qualified,
+             (ap.metadata->'crossCheck'->>'agrees')::boolean as cross_check_agrees,
+             (ap.metadata->'crossCheck'->>'deviationPct')::float as cross_check_deviation_pct
+      from assets a
+      left join lateral (
+        select ap.source, ap.metadata
+        from asset_prices ap
+        where ap.asset_id = a.id and ${freshPriceSql('ap')}
+        order by ap.observed_at desc
+        limit 1
+      ) ap on true
+      where a.chain = 'stellar-mainnet' and a.symbol is not null
+      order by a.symbol
+      `,
+    )) as Array<{
+      symbol: string;
+      source: string | null;
+      sources_qualified: number | null;
+      cross_check_agrees: boolean | null;
+      cross_check_deviation_pct: number | null;
+    }>;
+
+    return {
+      ...payload,
+      priceSources: summarizePriceSources(
+        priceRows.map((row) => ({
+          symbol: row.symbol,
+          source: row.source,
+          sourcesQualified: row.sources_qualified == null ? null : Number(row.sources_qualified),
+          crossCheckAgrees: row.cross_check_agrees,
+          crossCheckDeviationPct: row.cross_check_deviation_pct == null ? null : Number(row.cross_check_deviation_pct),
+        })),
+      ),
+    };
   }
 
   // E3: fire-and-forget adoption event. A logging failure must NEVER fail the

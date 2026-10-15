@@ -83,6 +83,28 @@ const CHIP_STYLE: Record<OpsComponentState, { color: string; tint: string }> = {
 const stepComponents = computed(
   () => data.value?.components.filter((c) => c.kind === 'step') ?? [],
 )
+// Price-sources v2 (phase B): one honest line on the prices actually served —
+// rendered from the API payload, never recomputed here.
+const priceSourcesLine = computed(() => {
+  const ps = data.value?.priceSources
+  if (!ps) return null
+  const parts = [`${ps.pricedAssets}/${ps.totalAssets} assets priced`]
+  parts.push(ps.unpricedAssets.length ? `unpriced: ${ps.unpricedAssets.join(', ')}` : 'none unpriced')
+  parts.push(ps.singleSourceAssets.length ? `single-source: ${ps.singleSourceAssets.join(', ')}` : 'no single-source asset')
+  parts.push(
+    ps.disagreements.length
+      ? `cross-check disagreements: ${ps.disagreements.map((d) => `${d.symbol} (${d.deviationPct > 0 ? '+' : ''}${d.deviationPct.toFixed(2)} %)`).join(', ')}`
+      : 'no cross-check disagreement',
+  )
+  return parts.join(' · ')
+})
+const priceSourcesTone = computed(() => {
+  const ps = data.value?.priceSources
+  if (!ps) return 'var(--dig-faint)'
+  if (ps.unpricedAssets.length || ps.disagreements.length) return SEVERITY_STYLE.warning.color
+  return 'var(--dig-text-2)'
+})
+
 const rpcComponents = computed(
   () => data.value?.components.filter((c) => c.kind === 'rpc') ?? [],
 )
@@ -274,6 +296,11 @@ const LEGEND = [
           </div>
         </div>
       </section>
+
+      <!-- Price sources (price-sources v2, phase B): primary = Reflector, cross-check = on-chain pool -->
+      <p v-if="priceSourcesLine" class="mt-[18px] text-[12px] leading-[1.6]" :style="{ color: priceSourcesTone }">
+        Price sources · {{ priceSourcesLine }}
+      </p>
 
       <!-- Honest boundary footer (verbatim copy — Lot ST refinement 6) -->
       <p class="mt-[20px] text-[12px] leading-[1.6]" style="color: var(--dig-faint)">

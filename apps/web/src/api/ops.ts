@@ -60,6 +60,14 @@ export type OpsStatusResponse = {
     failedSteps24h: number
   }
   components: OpsStatusComponent[]
+  // Price-sources v2 (phase B): minimal signal on the prices actually served.
+  priceSources?: {
+    pricedAssets: number
+    totalAssets: number
+    unpricedAssets: string[]
+    singleSourceAssets: string[]
+    disagreements: Array<{ symbol: string; source: string; deviationPct: number }>
+  }
 }
 
 export async function fetchOpsStatus(): Promise<OpsStatusResponse> {
