@@ -402,21 +402,45 @@ priced by one shared rule (`apps/indexer/src/scripts/shared/xlm-price.ts`, unit-
 `pnpm -C apps/indexer test`) in step 1 `prices:reference`, XLM first:
 
 1. `MANUAL_<ASSET>_USD` — explicit override, traced as `manual_env`;
-2. CoinGecko, when called and answered — `coingecko_direct` (BTC proxies: `coingecko_btc_proxy`);
-3. the deepest on-chain **constant-product** pool already captured by the refresh (Soroswap and
+2. **Reflector (phase B, 2026-10-14) — the primary source for every asset it lists**: the
+   "External CEXs & DEXs" feed for XLM / BTC / ETH / EURC (`reflector_cex_<asset>`), the
+   "Stellar Mainnet DEX" feed for the Stellar tokens (`reflector_sdex_<asset>`: AQUA, USDGLO,
+   CETES, USTRY, TESOURO, SolvBTC, PYUSD, yUSDC); accepted only when the oracle timestamp is
+   ≤ 900 s old, read by `simulateTransaction` through the configured RPC
+   (`STELLAR_SOURCE_ACCOUNT` required; unset → oracle disabled, logged). The rules below are
+   then the **cross-check**: tolerance 1 % (dollar / NAV coins) or 3 % (XLM, BTC, ETH, SolvBTC,
+   xSolvBTC, EURC, AQUA); on disagreement the primary is kept, `metadata.crossCheck.agrees =
+   false` is written and the log line says `DISAGREES … primary kept` — never averaged;
+3. CoinGecko, when called and answered — `coingecko_direct`;
+4. the deepest on-chain **constant-product** pool already captured by the refresh (Soroswap and
    SDEX by design; Aquarius only when the registry type is explicitly `constant_product` —
    `stable`, `concentrated` and unknown types are excluded) quoting the asset **vs USDC** (direct) or **vs XLM** (two
-   hops through this run's XLM/USD) that passes the guards: reserves ≤ 60 min old, quote side
-   ≥ 50 000 USD, ≤ 10 % deviation vs a CoinGecko reference younger than 6 h when one exists —
-   sources `onchain_<venue>_<asset>_<usdc|xlm>` (e.g. `onchain_aquarius_ustry_usdc`,
-   `onchain_sdex_aqua_xlm`); XLM proxies (yXLM) follow XLM as `xlm_proxy:<source>`;
-4. nothing → **no row** and a `no qualifying source for <ASSET>` log line. No constant exists
-   any more (the former EURC 1.16 / CETES 0.069 fallbacks are gone). Three-hop assets
-   (xSolvBTC) and assets with only a concentrated pool (BTC) resolve to null until phase B
-   (Reflector). Stablecoins USDC / PYUSD / yUSDC / oUSD stay `manual_stable` = 1.
+   hops through this run's XLM/USD, or **vs ETH** for BTC through `aquarius-btc-eth-pool`)
+   that passes the guards: reserves ≤ 60 min old, quote side ≥ 50 000 USD, ≤ 10 % deviation vs
+   a CoinGecko reference younger than 6 h when one exists — sources
+   `onchain_<venue>_<asset>_<usdc|xlm|eth>` (e.g. `onchain_aquarius_ustry_usdc`,
+   `onchain_sdex_aqua_xlm`, `onchain_aquarius_btc_eth`); XLM proxies (yXLM) follow XLM as
+   `xlm_proxy:<source>`;
+5. **StableSwap mid quotes** (`estimate_swap` both ways, geometric mean so the fee cancels,
+   pool ≥ 50 000 USD on the quote side): **xSolvBTC** = SolvBTC (this run) × the
+   xSolvBTC/SolvBTC mid — `derived_quote_aquarius_xsolvbtc_solvbtc`; and for **USDGLO, PYUSD,
+   yUSDC**, whose only pool is StableSwap, the mid vs USDC — `quote_aquarius_<asset>_usdc` — is
+   the fallback when Reflector is absent and the cross-check (1 %) when it is primary, so a
+   Reflector outage never turns three stablecoins into "no price";
+6. nothing → **no row** and a `no qualifying source for <ASSET>` log line. No constant exists
+   any more. **Single-source assets, by design:** USDY (its cp pool only; sanity band
+   [1.00, 1.25] and |Δ 24 h| ≤ 2 % vs our previous row, else no row) and oUSD (`manual_stable`
+   = 1, Blend's Orbit oracle hard-codes the same peg — parity). USDC stays 1 by convention;
+   the Reflector USDC/USD read is traced on its row (`metadata.reflectorUsdcUsd`) and flagged
+   beyond ±1 %. Not on the production path: the Blend pool oracles (Reflector proxies with
+   hard-coded pegs) and the BTC/USDC concentrated pool (thin) — both stay in the read-only
+   `discovery/qa-price-sources.ts` comparison script.
 
-Without CoinGecko there is no reference for the deviation guard: freshness and liquidity are
-the only protections (phase B makes Reflector the reference). Step 2 (`prices:soroswap-derived`)
+RPC budget of step 1 with Reflector: 36 sequential simulations per run (1 `assets()`, 2
+`decimals()`, 5 CEX + 10 Stellar DEX `lastprice`, 4 stable-pool quotes × 5), 120 ms apart,
+≈ 5 s; a 429 / timeout is retried once then the source is absent for the run (never a failed
+step). They are recorded on `#status` under the **Reflector oracle** target (`price-oracle`;
+they also transit the RPC host, so the Soroban RPC row counts them once more). Step 2 (`prices:soroswap-derived`)
 now derives when a pair leg has no **fresh** row (`PRICE_MAX_AGE_MINUTES`, default 45, same
 threshold as `FRESHNESS_STALE_AFTER_MINUTES`), never for an asset that has a pricing rule (step 1
 owns it), and under the same guards (USDC or XLM quote only, reserves ≤ 60 min, quote side
@@ -434,7 +458,11 @@ The prices serve display and USD valuation only (plus the faucet witness's notio
 which reads `asset_prices` with its own 24 h max age); they never feed a transaction build.
 Each run logs one `price source: <ASSET> <kind> (<source>) => <price|null>` line per asset.
 The `#status` "Price sources" tile measures the external providers still called (DefiLlama,
-stellar.expert) and turns red when one of them fails.
+stellar.expert) and turns red when one of them fails; the "Reflector oracle" row measures the
+step-1 oracle simulations; the "Price sources ·" line under the groups reads
+`/v1/ops/status.priceSources` (assets priced / unpriced / single-source / cross-check
+disagreements, from the latest fresh row per asset). Evidence:
+`docs/evidence/price-sources-v2/05-phase-b-design.md`.
 
 Verify after a refresh:
 ```bash
