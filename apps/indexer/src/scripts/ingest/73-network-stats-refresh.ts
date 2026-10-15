@@ -197,7 +197,7 @@ async function safeGetAvgTxFee(): Promise<number | null> {
 type XlmPriceResult = {
   priceUsd: number | null;
   change24hPct: number | null;
-  // 'coingecko' | 'onchain' | 'manual' | 'none' + the asset_prices.source detail
+  // 'reflector' | 'coingecko' | 'onchain' | 'manual' | 'none' + the asset_prices.source detail
   source: string;
   sourceDetail: string | null;
   changeMethod: 'coingecko' | 'stored_history' | null;
@@ -205,6 +205,7 @@ type XlmPriceResult = {
 };
 
 function kindOfSource(source: string): string {
+  if (source.startsWith('reflector_')) return 'reflector'; // phase B primary (step 1)
   if (source.startsWith('coingecko')) return 'coingecko';
   if (source.startsWith('onchain_')) return 'onchain';
   if (source.startsWith('manual')) return 'manual';

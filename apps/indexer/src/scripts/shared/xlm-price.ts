@@ -28,7 +28,7 @@ export const XLM_ONCHAIN_MIN_USDC_RESERVE = 50_000; // thinner pools are not a p
 export const XLM_REFERENCE_MAX_AGE_MS = 6 * 60 * 60 * 1000; // deviation guard only vs a < 6h CoinGecko reference
 export const XLM_MAX_DEVIATION = 0.1; // 10 %
 
-export type QuoteKind = 'usdc' | 'xlm';
+export type QuoteKind = 'usdc' | 'xlm' | 'eth';
 
 export type OnchainCandidate = {
   /** asset_prices.source value, e.g. 'onchain_aquarius_ustry_usdc' */
@@ -37,10 +37,10 @@ export type OnchainCandidate = {
   pool: string;
   /** reserve of the asset being priced */
   assetReserve: number;
-  /** the other leg, expressed in USD (USDC ×1, or XLM × the XLM/USD of this run) */
+  /** the other leg, expressed in USD (USDC ×1, XLM × this run's XLM/USD, or ETH × this run's ETH/USD) */
   quoteReserveUsd: number;
   quoteKind: QuoteKind;
-  /** 1 = direct vs USDC, 2 = via XLM */
+  /** 1 = direct vs USDC, 2 = via XLM or via ETH (phase B: BTC through the BTC/ETH pool) */
   hops: 1 | 2;
   observedAt: Date;
 };
@@ -187,7 +187,7 @@ export function selectPrice(inputs: PriceInputs): XlmPriceSelection {
       kind: 'onchain',
       metadata: {
         confidence: 'medium',
-        method: c.hops === 1 ? 'pool_implied_vs_usdc' : 'pool_implied_vs_xlm',
+        method: `pool_implied_vs_${c.quoteKind}`,
         pool: c.pool,
         quoteKind: c.quoteKind,
         hops: c.hops,
@@ -241,7 +241,8 @@ const sourceLabel = (symbol: string) => (symbol === 'native' ? 'xlm' : symbol.to
 export function candidatesFromPools(
   symbol: string,
   sets: PoolReserveSet[],
-  xlmUsd: number | null
+  xlmUsd: number | null,
+  ethUsd: number | null = null
 ): OnchainCandidate[] {
   const out: OnchainCandidate[] = [];
   for (const set of sets) {
@@ -266,6 +267,18 @@ export function candidatesFromPools(
         assetReserve: mine.amount,
         quoteReserveUsd: other.amount * xlmUsd,
         quoteKind: 'xlm',
+        hops: 2,
+        observedAt: set.observedAt,
+      });
+    } else if (other.symbol === 'ETH' && symbol !== 'ETH' && ethUsd !== null && ethUsd > 0) {
+      // Phase B (founder arbitration 2026-10-14 §1): BTC's second source is the
+      // BTC/ETH constant-product pool valued through this run's ETH/USD.
+      out.push({
+        source: `onchain_${set.venue}_${sourceLabel(symbol)}_eth`,
+        pool: set.pool,
+        assetReserve: mine.amount,
+        quoteReserveUsd: other.amount * ethUsd,
+        quoteKind: 'eth',
         hops: 2,
         observedAt: set.observedAt,
       });

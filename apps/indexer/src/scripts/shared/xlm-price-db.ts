@@ -125,6 +125,8 @@ export type ResolveAssetArgs = {
   manualEnvVars: string[];
   /** XLM/USD resolved earlier in the run (enables two-hop candidates); null for XLM itself */
   xlmUsd: number | null;
+  /** ETH/USD resolved earlier in the run (enables the BTC/ETH two-hop candidate, phase B) */
+  ethUsd?: number | null;
   sets: PoolReserveSet[];
   now: Date;
 };
@@ -145,7 +147,7 @@ export async function resolveAssetPrice(client: Client, args: ResolveAssetArgs):
     manualEnvVar: args.manualEnvVars.join('|'),
     coingecko: args.coingecko,
     reference,
-    onchain: candidatesFromPools(args.symbol, args.sets, args.xlmUsd),
+    onchain: candidatesFromPools(args.symbol, args.sets, args.xlmUsd, args.ethUsd ?? null),
   });
 }
 

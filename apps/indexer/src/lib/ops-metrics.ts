@@ -22,7 +22,10 @@ import { appendFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolveRpcUrl } from './rpc-config';
 
-export type OpsTarget = 'soroban-rpc' | 'horizon' | 'defindex-api' | 'price-sources';
+// price-oracle (phase B): the Reflector `lastprice` simulations of step 1, recorded
+// explicitly by the SorobanReader hook (they also transit the RPC host, so the
+// soroban-rpc row counts them once more — documented, ~15 calls per run).
+export type OpsTarget = 'soroban-rpc' | 'horizon' | 'defindex-api' | 'price-sources' | 'price-oracle';
 
 export type OpsSample = {
   target: OpsTarget;
