@@ -19,6 +19,14 @@ import { useView } from './composables/useView'
 import { useModals } from './composables/useModals'
 import { useDrawer } from './composables/useDrawer'
 import bgUrl from './assets/design/stellar-defi-bg.png'
+import { defineAsyncComponent } from 'vue'
+
+// Lot EP (EP1): dev-only ownership-proof panel. `import.meta.env.DEV` is a
+// build-time constant, so in production this is `null`, the dynamic import is
+// never emitted and nothing of the panel reaches dist (checked by grep).
+const DevProofPanel = import.meta.env.DEV
+  ? defineAsyncComponent(() => import('./components/dev/DevProofPanel.vue'))
+  : null
 
 const { view } = useView()
 const { modal, actionCtx, closeModal } = useModals()
@@ -56,6 +64,7 @@ const { drawerOpen } = useDrawer()
 
     <!-- Shell-level modals (C5) -->
     <ConnectModal v-if="modal === 'connect'" @close="closeModal" />
+    <DevProofPanel v-if="DevProofPanel" />
     <ActionModal v-if="modal === 'action' && actionCtx" :ctx="actionCtx" @close="closeModal" />
   </div>
 </template>

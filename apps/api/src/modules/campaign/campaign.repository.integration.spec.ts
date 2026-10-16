@@ -14,7 +14,8 @@ import { Keypair } from '@stellar/stellar-sdk';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../db/prisma.service';
 import { CampaignRepository } from './campaign.repository';
-import { CAMPAIGN_ID } from './campaign-config';
+import { CampaignService } from './campaign.service';
+import { CAMPAIGN_ID, RECOVERY_PROOF_MAX_AGE_SECONDS } from './campaign-config';
 
 const RUN = process.env.CAMPAIGN_IT === '1';
 const d = RUN ? describe : describe.skip;
@@ -26,13 +27,19 @@ d('CampaignRepository (integration, local Postgres)', () => {
   const otherWallet = Keypair.random().publicKey();
   const userId = randomUUID();
 
+  const thirdWallet = Keypair.random().publicKey();
+  const witnessHash = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
+
   const cleanup = async () => {
-    for (const a of [wallet, otherWallet]) {
+    for (const a of [wallet, otherWallet, thirdWallet]) {
       await prisma.$executeRawUnsafe(`delete from points_ledger where lower(address) = lower($1)`, a);
+      await prisma.$executeRawUnsafe(`delete from referrals where referee_address = $1 or referrer_address = $1`, a);
       await prisma.$executeRawUnsafe(`delete from wallet_daily_checkins where address = $1`, a);
       await prisma.$executeRawUnsafe(`delete from campaign_enrollments where lower(address) = lower($1)`, a);
+      await prisma.$executeRawUnsafe(`delete from wallet_ownership_proofs where lower(address) = lower($1)`, a);
       await prisma.$executeRawUnsafe(`delete from wallet_auth_challenges where address = $1`, a);
     }
+    await prisma.$executeRawUnsafe(`delete from action_witnesses where tx_hash = $1`, witnessHash);
   };
 
   beforeAll(async () => {
@@ -244,6 +251,164 @@ d('CampaignRepository (integration, local Postgres)', () => {
       });
       const r = await repo.checkinToday(CAMPAIGN_ID, otherWallet);
       expect(r.ok).toBe(true);
+    });
+  });
+  describe('ownership proofs', () => {
+    it('upsertBoundProof: one row per (address, userId); a second proof refreshes it', async () => {
+      const first = await repo.upsertBoundProof({ address: wallet, userId, provider: 'freighter', nonce: 'n'.repeat(32), variant: 'raw' });
+      const second = await repo.upsertBoundProof({ address: wallet, userId, provider: 'xbull', nonce: 'm'.repeat(32), variant: 'sha256' });
+      expect(second.id).toBe(first.id);
+      expect(second.provider).toBe('xbull');
+      expect(second.signature_variant).toBe('sha256');
+      expect(second.verified_at.getTime()).toBeGreaterThanOrEqual(first.verified_at.getTime());
+      expect(await repo.hasBoundProof(wallet, userId)).toBe(true);
+      expect(await repo.hasBoundProof(wallet, randomUUID())).toBe(false);
+    });
+
+    it('consumeUnboundProof: fresh unbound proof consumed exactly once and bound to the user; stale ones ignored', async () => {
+      const newUser = randomUUID();
+      await repo.insertUnboundProof({ address: otherWallet, provider: null, nonce: 'u'.repeat(32), variant: 'raw' });
+      const [a, b] = await Promise.all([
+        repo.consumeUnboundProof(otherWallet, newUser, RECOVERY_PROOF_MAX_AGE_SECONDS),
+        repo.consumeUnboundProof(otherWallet, newUser, RECOVERY_PROOF_MAX_AGE_SECONDS),
+      ]);
+      const consumed = [a, b].filter((r) => r != null);
+      expect(consumed).toHaveLength(1);
+      expect(consumed[0]).toMatchObject({ address: otherWallet, user_id: newUser });
+      expect(consumed[0]!.consumed_at).not.toBeNull();
+      expect(await repo.consumeUnboundProof(otherWallet, newUser, RECOVERY_PROOF_MAX_AGE_SECONDS)).toBeNull();
+
+      // an unbound proof older than the max age is never consumed
+      const stale = await repo.insertUnboundProof({ address: otherWallet, provider: null, nonce: 'v'.repeat(32), variant: 'raw' });
+      await prisma.$executeRawUnsafe(
+        `update wallet_ownership_proofs set verified_at = now() - interval '2 hours' where id = $1::uuid`,
+        stale.id,
+      );
+      expect(await repo.consumeUnboundProof(otherWallet, randomUUID(), RECOVERY_PROOF_MAX_AGE_SECONDS)).toBeNull();
+    });
+
+    it('D. the variant CHECK refuses anything but raw / sha256', async () => {
+      await expect(
+        repo.insertUnboundProof({ address: wallet, provider: null, nonce: 'w'.repeat(32), variant: 'ed25519-prefixed' as never }),
+      ).rejects.toThrow(/wallet_ownership_proofs_variant_check/);
+    });
+  });
+
+  describe('enrolment transaction (service + repository, real DB)', () => {
+    const live = () => {
+      process.env.CAMPAIGN_ENABLED = 'true';
+      process.env.CAMPAIGN_STARTS_AT = '2026-10-01T00:00:00Z';
+      delete process.env.CAMPAIGN_ENDS_AT;
+    };
+    afterAll(() => {
+      delete process.env.CAMPAIGN_ENABLED;
+      delete process.env.CAMPAIGN_STARTS_AT;
+    });
+
+    it('insertEnrollmentWithCodeRetry retries ONCE on a referral-code collision via a savepoint, inside one transaction', async () => {
+      const takenCode = (await repo.findEnrollment(CAMPAIGN_ID, wallet))!.referral_code; // 'ITTEST01' from the H block
+      const codes = [takenCode, 'ITTEST03'];
+      const row = await repo.transaction((r) =>
+        r.insertEnrollmentWithCodeRetry(
+          { campaign: CAMPAIGN_ID, address: thirdWallet, userId: randomUUID(), referredByCode: null },
+          () => codes.shift()!,
+        ),
+      );
+      expect(row.referral_code).toBe('ITTEST03');
+      expect(codes).toHaveLength(0);
+      // the transaction survived the first failed statement (savepoint rollback) and committed
+      expect((await repo.findEnrollment(CAMPAIGN_ID, thirdWallet))?.referral_code).toBe('ITTEST03');
+    });
+
+    it('a wallet-level collision propagates with its key columns (not swallowed)', async () => {
+      await expect(
+        repo.transaction((r) =>
+          r.insertEnrollmentWithCodeRetry(
+            { campaign: CAMPAIGN_ID, address: thirdWallet, userId: randomUUID(), referredByCode: null },
+            () => 'ITTEST04',
+          ),
+        ),
+      ).rejects.toThrow(/Key \(campaign, lower\(address\)\)=/);
+    });
+
+    it('service.enroll with a referral code writes the enrolment and the referral link in one transaction', async () => {
+      live();
+      const svc = new CampaignService(repo);
+      const referee = Keypair.random().publicKey();
+      const refereeUser = randomUUID();
+      try {
+        // no proof yet → refused, nothing written
+        expect(await svc.enroll({ address: referee, userId: refereeUser, referralCode: 'ITTEST03' })).toMatchObject({
+          enrolled: false, reason: 'ownership-proof-required',
+        });
+        await repo.upsertBoundProof({ address: referee, userId: refereeUser, provider: null, nonce: 'r'.repeat(32), variant: 'raw' });
+
+        // self-referral through the real lookup
+        await repo.upsertBoundProof({ address: thirdWallet, userId: (await repo.findEnrollment(CAMPAIGN_ID, thirdWallet))!.user_id, provider: null, nonce: 's'.repeat(32), variant: 'raw' });
+        const out = await svc.enroll({ address: referee, userId: refereeUser, referralCode: 'ITTEST03' });
+        expect(out).toMatchObject({ enrolled: true, referredBy: 'ITTEST03' });
+        expect(await repo.referredByCode(CAMPAIGN_ID, referee)).toBe('ITTEST03');
+        const link = (await prisma.$queryRawUnsafe(
+          `select referrer_address, credited_at from referrals where campaign = $1 and referee_address = $2`,
+          CAMPAIGN_ID,
+          referee,
+        )) as Array<{ referrer_address: string; credited_at: Date | null }>;
+        expect(link[0]).toEqual({ referrer_address: thirdWallet, credited_at: null });
+        // second enrolment of the same wallet → already-enrolled
+        expect(await svc.enroll({ address: referee, userId: refereeUser, referralCode: null })).toMatchObject({ enrolled: false, reason: 'already-enrolled' });
+      } finally {
+        await prisma.$executeRawUnsafe(`delete from referrals where referee_address = $1`, referee);
+        await prisma.$executeRawUnsafe(`delete from campaign_enrollments where lower(address) = lower($1)`, referee);
+        await prisma.$executeRawUnsafe(`delete from wallet_ownership_proofs where lower(address) = lower($1)`, referee);
+      }
+    });
+  });
+
+  describe('leaderboard, rank and pending verification (real SQL)', () => {
+    it('ranks by sum(points) desc, address asc; rankOf agrees; zero balances are not listed', async () => {
+      // wallet: 5 (streak) - 5 (adjust) = 0 → excluded; otherWallet: 5; thirdWallet: no rows
+      const rows = await repo.leaderboard(CAMPAIGN_ID, 50);
+      const mine = rows.filter((r) => [wallet, otherWallet, thirdWallet].includes(r.address));
+      expect(mine).toEqual([{ address: otherWallet, points: 5 }]);
+      expect(await repo.rankOf(CAMPAIGN_ID, wallet)).toBeNull();
+      const r = await repo.rankOf(CAMPAIGN_ID, otherWallet);
+      expect(r?.points).toBe(5);
+      expect(r?.rank).toBeGreaterThanOrEqual(1);
+    });
+
+    it('pendingVerificationCount counts awardable in-window witnesses without a ledger row, and drops once awarded', async () => {
+      await prisma.$executeRawUnsafe(
+        `insert into action_witnesses (tx_hash, network, wallet_address, user_id, kind, op_summary, notional_xlm, min_notional_xlm, meets_min_notional, ledger_closed_at)
+         values ($1, 'testnet', $2, $3::uuid, 'sdex-swap', '{}'::jsonb, 10, 1, true, '2026-10-10T12:00:00Z')`,
+        witnessHash,
+        wallet,
+        userId,
+      );
+      const window = { startsAtMs: Date.UTC(2026, 9, 1), endsAtMs: null };
+      expect(await repo.pendingVerificationCount(CAMPAIGN_ID, wallet, window)).toBe(1);
+      expect(await repo.pendingVerificationCount(CAMPAIGN_ID, wallet, { startsAtMs: Date.UTC(2026, 9, 11), endsAtMs: null })).toBe(0);
+      expect(await repo.pendingVerificationCount(CAMPAIGN_ID, wallet, { startsAtMs: null, endsAtMs: null })).toBe(0);
+
+      await prisma.$executeRawUnsafe(
+        `insert into points_ledger (campaign, address, user_id, reason, base_points, multiplier, points, witness_tx_hash, counted_day)
+         values ($1, $2, $3::uuid, 'action:sdex-swap', 50, 1, 50, $4, '2026-10-10')`,
+        CAMPAIGN_ID,
+        wallet,
+        userId,
+        witnessHash,
+      );
+      expect(await repo.pendingVerificationCount(CAMPAIGN_ID, wallet, window)).toBe(0);
+      // A. the witness idempotency index refuses a second award for the same tx
+      await expect(
+        prisma.$executeRawUnsafe(
+          `insert into points_ledger (campaign, address, user_id, reason, base_points, multiplier, points, witness_tx_hash, counted_day)
+           values ($1, $2, $3::uuid, 'action:sdex-swap', 50, 1, 50, $4, '2026-10-10')`,
+          CAMPAIGN_ID,
+          wallet,
+          userId,
+          witnessHash,
+        ),
+      ).rejects.toThrow(/Key \(campaign, reason, witness_tx_hash\)=/);
     });
   });
 });

@@ -7,6 +7,11 @@ import {
   XBULL_ID,
 } from "@creit.tech/stellar-wallets-kit";
 import { useNetwork, toWalletNetwork } from "./useNetwork";
+import {
+  requestAuthChallenge,
+  verifyAuthChallenge,
+  type AuthVerifyResult,
+} from "../api/campaign";
 
 // useNetwork is the single source of truth for the active network. Resolve it
 // once at module scope (this also runs restoreNetwork() so the value already
@@ -181,6 +186,54 @@ async function signTransaction(
   });
 
   return { signedTxXdr };
+}
+
+/**
+ * Lot EP (EP1): wallet-ownership proof. Challenge → kit.signMessage → verify.
+ * The message is plain text from the API stating that this is NOT a
+ * transaction (nothing is built, simulated or submitted; no XDR exists, so the
+ * §2 XDR gates do not apply). The signature is verified server-side with the
+ * public key only. `userId` binds the proof to the current app user; omit it
+ * for the unbound recovery proof. Returns the API result unchanged.
+ * Requires the address to be the currently connected wallet.
+ */
+// Module-level export on purpose (NOT a property of the useWalletSession()
+// return object): an unused named export is tree-shaken out of the production
+// bundle together with the /auth/* client calls, whereas an object key would
+// survive minification. Only the DEV-only panel imports it in EP1.
+export async function signProof(
+  address: string,
+  userId: string | null,
+): Promise<{ challenge: { nonce: string; message: string; expiresAt: string }; result: AuthVerifyResult }> {
+  if (!connectedAddress.value || connectedAddress.value !== address) {
+    throw new Error("The address to prove must be the connected wallet.");
+  }
+  if (!connectedProvider.value) {
+    throw new Error("No wallet provider selected.");
+  }
+
+  const challenge = await requestAuthChallenge(address);
+
+  // Same defensive re-select as signTransaction: the kit's selected wallet is
+  // in-memory only and can drift after a reload.
+  kit.setWallet(connectedProvider.value);
+  const { signedMessage } = await kit.signMessage(challenge.message, {
+    networkPassphrase: toWalletNetwork(network.value),
+    address,
+  });
+
+  const result = await verifyAuthChallenge({
+    address,
+    nonce: challenge.nonce,
+    signedMessage,
+    provider: connectedProvider.value,
+    userId,
+  });
+
+  return {
+    challenge: { nonce: challenge.nonce, message: challenge.message, expiresAt: challenge.expiresAt },
+    result,
+  };
 }
 
 const shortConnectedAddress = computed(() => {
