@@ -21,15 +21,21 @@ For the fresh-machine quickstart (clone → rendering dashboard, proven end-to-e
 
 ### Database schema (manual apply, no migration runner)
 The raw SQL schemas are applied by hand on each environment (local **and** VPS); the DDL is
-idempotent. On the VPS, after `git pull` and **before** the cron runs a new step:
+idempotent. On the VPS, after `git pull` and **before** the cron runs a new step. Same
+canonical list and order as `docs/runbooks.md` (Lot EP aligned the lists on 2026-10-15):
 ```bash
-psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1.sql
-psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_metrics.sql
-psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_bridge.sql   # Allbridge bridge flows (T2-D3)
-psql "$DATABASE_URL" -f apps/api/src/db/stellar_v2_multiwallet.sql   # incl. T2-D1 is_active_signer column + singleton index, + Gap B wallet_pool_health table
-psql "$DATABASE_URL" -f apps/api/src/db/stellar_v3_alerting.sql   # D2 alerting (apply AFTER v1 + v2): alert_rules, alert_rule_state, notifications
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1.sql   # v1 base (pgcrypto, venues/entities/assets/snapshots/prices)
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_metrics.sql   # v1 latest rollups read by /v1/*
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_logos.sql   # F3: venue/asset logo_url columns (bootstrap:logos fills them)
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_network_tvl.sql   # G0 (T3-D3): network_tvl_snapshots, one TVL point per refresh cycle
-psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_ops_metrics.sql   # E2 (Lot E, T3-D3): rpc_metrics_runs + refresh_step_runs
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_ops_metrics.sql   # E2 (Lot E, T3-D3): rpc_metrics_runs + refresh_step_runs + action_events; R1 adds action_events.metadata (re-run once)
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_bridge.sql   # T2-D3: Allbridge bridge_flows (then run the allbridge bootstrap once, below)
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_action_witness.sql   # R1 (Lot R, T3-D2): action_witnesses, verified execution witnesses (apply BEFORE deploying the R1 api)
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v2_multiwallet.sql   # v2 wallets: user_wallets (+ T2-D1 is_active_signer + singleton index), snapshots, wallet_pool_health
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v3_alerting.sql   # D2 alerting (apply AFTER v1 + v2): alert_rules, alert_rule_state, notifications
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v4_faucet.sql   # R2 (Lot R, T3-D2): faucet_claims (money path, depends on action_witnesses); deploys dark (FAUCET_ENABLED unset)
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v5_faucet_campaign2.sql   # Lot R2: campaign 2, campaign/action_family columns + per-family uniqueness (apply BEFORE the campaign-2 api build)
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v6_campaign.sql   # Lot EP (EP1): Earn & Points — proofs, enrollments, points_ledger, check-ins, referrals (points only, no key; depends on v2 + action_witnesses); deploys dark (CAMPAIGN_ENABLED unset)
 # Allbridge needs its venue + USDC asset seeded once before the first refresh:
 pnpm -C apps/indexer tsx src/scripts/bootstrap/allbridge-upsert-core.ts
 ```

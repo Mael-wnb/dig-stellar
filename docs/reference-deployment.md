@@ -44,7 +44,7 @@ What happens on first `up`:
 1. **postgres** initializes and applies the raw SQL schema automatically: the
    `stellar_v*.sql` files are mounted into `/docker-entrypoint-initdb.d/` with explicit
    numeric prefixes in **dependency order** (v1 base → v1 satellites → v2 multiwallet →
-   v3 alerting → v4 faucet). The numbering in `docker-compose.yml` is the ordering
+   v3 alerting → v4/v5 faucet → v6 campaign). The numbering in `docker-compose.yml` is the ordering
    contract; init runs only on an empty data volume, so `down && up` is idempotent and
    the manual `psql -f` path below stays valid for existing volumes.
 2. **indexer** waits for postgres to be healthy, seeds the vetted perimeter
@@ -129,14 +129,16 @@ Apply the raw SQL files **in this order** (idempotent, safe to re-run; same list
 ```bash
 for f in stellar_v1 stellar_v1_metrics stellar_v1_logos stellar_v1_network_tvl \
          stellar_v1_ops_metrics stellar_v1_bridge stellar_v1_action_witness \
-         stellar_v2_multiwallet stellar_v3_alerting stellar_v4_faucet; do
+         stellar_v2_multiwallet stellar_v3_alerting stellar_v4_faucet \
+         stellar_v5_faucet_campaign2 stellar_v6_campaign; do
   docker compose exec -T postgres psql -U dig -d dig_stellar < apps/api/src/db/$f.sql
 done
 ```
 
 (Same files, same order as the compose init mounts; the full set includes the Lot R
 witness/faucet tables so `POST /v1/actions/witness` works; the faucet stays dark unless
-`FAUCET_ENABLED` is set. On a **fresh** compose volume this step is automatic.)
+`FAUCET_ENABLED` is set, and the Lot EP campaign tables (`stellar_v6_campaign.sql`) stay
+dark unless `CAMPAIGN_ENABLED` is set. On a **fresh** compose volume this step is automatic.)
 
 ## 6. Bootstrap seeds
 

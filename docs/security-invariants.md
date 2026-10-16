@@ -32,13 +32,24 @@ Status markers: ✅ implemented, 🔲 to implement before Mainnet ungating (Lot 
   anything a USER owns: the `stellar-sdk` `Keypair` signing APIs must not appear in `apps/api`
   action code. *Sole scoped exception (Lot R, 2026-08-17): the reward-faucet treasury, DIG's own
   wallet, DIG's own funds, isolated in `modules/faucet/faucet-payout.service.ts`. See §9.*
+  *Narrow verify-only exception (Lot EP, 2026-10-15):
+  `modules/campaign/verify-wallet-signature.ts` is the ONE file allowed to use `Keypair` outside
+  the faucet payout service, and only as `Keypair.fromPublicKey(address).verify(bytes, sig)`:
+  verify-only, public key, holds no secret. It never reads an env variable, never derives,
+  generates or imports a secret, and never signs. `verify-wallet-signature.spec.ts` asserts this
+  against the source text (no `fromSecret` / `fromRawEd25519Seed` / `Keypair.random` /
+  `.sign(` / `process.env`) and against the behaviour. It checks a user's signature over our
+  challenge message (wallet-ownership proof); it cannot produce one.*
 - **INV-1.3** ✅ Signing happens **exclusively in-wallet** via Stellar Wallets Kit. The web app
   never handles raw secrets either (no manual secret-key input field, ever).
 - **INV-1.4** ✅ Submission uses the wallet-signed envelope as returned by the Kit, unmodified.
 
 Review check: grep the diff for `Keypair`, `secret`, `sign(` in `apps/api`; confirm no new DB
 columns or logs carry envelope + signature material beyond what submission requires. A hit
-anywhere OUTSIDE `modules/faucet/faucet-payout.service.ts` (the §9 exception) is a defect.
+anywhere OUTSIDE `modules/faucet/faucet-payout.service.ts` (the §9 exception) and
+`modules/campaign/verify-wallet-signature.ts` (the verify-only exception above; `fromPublicKey`
++ `verify` only) is a defect. Spec files may construct throwaway keypairs to sign test vectors
+(`faucet-payout.spec.ts`, `verify-wallet-signature.spec.ts`); non-spec source may not.
 
 ## 2. Client-side XDR validation before signing
 

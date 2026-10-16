@@ -168,18 +168,22 @@ psql "postgresql://dig:dig@localhost:5432/dig_stellar"
 
 ### Apply raw SQL schemas (manual; no migration runner for v1/v2)
 The v1/v2 schemas are applied by hand. The DDL is idempotent (`create table if not exists`), so
-re-running is safe.
+re-running is safe. **This list is THE canonical order** (dependency order, identical to the
+`docker-compose.yml` initdb mounts, `docs/reference-deployment.md` and `docs/deployment.md`;
+Lot EP aligned all four on 2026-10-15 — keep them identical when adding a file).
 ```bash
-psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1.sql
-psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_metrics.sql
-psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_bridge.sql
-psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v2_multiwallet.sql
-psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v3_alerting.sql   # D2 alerting: alert_rules, alert_rule_state, notifications (depends on v1 entities + v2 user_wallets)
-psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_network_tvl.sql   # G0 (T3-D3): network_tvl_snapshots, one TVL point per refresh cycle (written at tail of step 7)
-psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_ops_metrics.sql   # E2 (Lot E, T3-D3): rpc_metrics_runs + refresh_step_runs, written at end of each job:refresh; R1 adds action_events.metadata (re-run once)
-psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_action_witness.sql # R1 (Lot R, T3-D2): action_witnesses, verified execution witnesses (apply BEFORE deploying the R1 api)
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1.sql   # v1 base (pgcrypto, venues/entities/assets/snapshots/prices)
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_metrics.sql   # v1 latest rollups read by /v1/*
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_logos.sql   # F3: venue/asset logo_url columns (bootstrap:logos fills them)
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_network_tvl.sql   # G0 (T3-D3): network_tvl_snapshots, one TVL point per refresh cycle
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_ops_metrics.sql   # E2 (Lot E, T3-D3): rpc_metrics_runs + refresh_step_runs + action_events; R1 adds action_events.metadata (re-run once)
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_bridge.sql   # T2-D3: Allbridge bridge_flows (then run the allbridge bootstrap once, below)
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_action_witness.sql   # R1 (Lot R, T3-D2): action_witnesses, verified execution witnesses (apply BEFORE deploying the R1 api)
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v2_multiwallet.sql   # v2 wallets: user_wallets (+ T2-D1 is_active_signer + singleton index), snapshots, wallet_pool_health
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v3_alerting.sql   # D2 alerting (apply AFTER v1 + v2): alert_rules, alert_rule_state, notifications
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v4_faucet.sql   # R2 (Lot R, T3-D2): faucet_claims (money path, depends on action_witnesses); deploys dark (FAUCET_ENABLED unset)
-psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v5_faucet_campaign2.sql # Lot R2: campaign 2, campaign/action_family columns + per-family uniqueness (apply BEFORE the campaign-2 api build)
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v5_faucet_campaign2.sql   # Lot R2: campaign 2, campaign/action_family columns + per-family uniqueness (apply BEFORE the campaign-2 api build)
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v6_campaign.sql   # Lot EP (EP1): Earn & Points — proofs, enrollments, points_ledger, check-ins, referrals (points only, no key; depends on v2 + action_witnesses); deploys dark (CAMPAIGN_ENABLED unset)
 ```
 Manually-applied schemas (local AND VPS): `stellar_v1.sql`, `stellar_v1_metrics.sql`,
 `stellar_v1_bridge.sql` (Allbridge bridge flows, T2-D3), `stellar_v2_multiwallet.sql`,
@@ -188,7 +192,9 @@ Manually-applied schemas (local AND VPS): `stellar_v1.sql`, `stellar_v1_metrics.
 `stellar_v1_ops_metrics.sql` (E2 ops observability, T3-D3; R1 added the
 `action_events.metadata` column: re-run once BEFORE deploying the R1 api, or the
 fire-and-forget adoption inserts start failing silently),
-`stellar_v1_action_witness.sql` (R1 execution witnesses, T3-D2, Lot R).
+`stellar_v1_action_witness.sql` (R1 execution witnesses, T3-D2, Lot R),
+`stellar_v4_faucet.sql` + `stellar_v5_faucet_campaign2.sql` (Lot R/R2 faucet claims),
+`stellar_v6_campaign.sql` (Lot EP Earn & Points: points only, no key, deploys dark).
 Note: when a new table **or column** is added to one of these files (e.g. `network_stats_latest`
 in `stellar_v1_metrics.sql`, `bridge_flows` in `stellar_v1_bridge.sql`, or the T2-D1
 `is_active_signer` column + `user_wallets_one_signer_per_user` index, or the T2-D1 Gap B
