@@ -16,6 +16,13 @@ import { useAppUser } from './useAppUser'
 import { useSharedWallets } from './useSharedWallets'
 import { signProof, useWalletSession } from './useWalletSession'
 
+// Lot EP (Gate 2B follow-up): shown when the no-session recovery needs a
+// wallet-ownership proof and the connected wallet cannot produce one.
+const PROOF_UNSUPPORTED_MESSAGE =
+  'This wallet cannot sign messages, so it cannot recover an existing account. ' +
+  'Connect with a wallet that supports message signing (for example Freighter or xBull), ' +
+  'or continue with a new account.'
+
 export function useConnectFlow() {
   const { userId, setUserId, clearUser } = useAppUser()
   const {
@@ -58,8 +65,13 @@ export function useConnectFlow() {
       // verified server-side with the public key). Prove once, unbound, then
       // retry the same connect. Same-session reconnects never hit this.
       if (res?.connected === false && res.reason === 'ownership-proof-required') {
-        const { result } = await signProof(session.address, null)
-        if (!result.ok) throw new Error(`Wallet ownership proof failed (${result.reason}).`)
+        let proven = false
+        try {
+          proven = (await signProof(session.address, null)).result.ok
+        } catch {
+          proven = false
+        }
+        if (!proven) throw new Error(PROOF_UNSUPPORTED_MESSAGE)
         res = await connectWalletApi({
           chain: 'stellar',
           address: session.address,

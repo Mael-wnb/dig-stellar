@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
 import { WalletsService } from './wallets.service';
 
 type CreateWalletBody = {
@@ -44,7 +44,11 @@ type UpdateWalletBody = {
 export class WalletsController {
   constructor(private readonly walletsService: WalletsService) {}
 
+  // Lot EP (Gate 2B follow-up): success AND the 'ownership-proof-required'
+  // refusal both answer 200 (the web only checks response.ok); 4xx stays for
+  // malformed input.
   @Post('connect')
+  @HttpCode(HttpStatus.OK)
   connectWallet(@Body() body?: ConnectWalletBody) {
     return this.walletsService.connectWallet({
       userId: body?.userId,
