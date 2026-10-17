@@ -75,14 +75,24 @@ function makeService(
     $executeRawUnsafe: jest.fn(handler),
   } as never;
 
-  const service = new WalletsService(prisma);
+  // Lot EP (Gate 2B): the no-session recovery path consumes an unbound
+  // ownership proof. Default: a fresh proof exists (the pre-EP behaviour of
+  // these cases is preserved); wallets.recovery-proof.spec.ts covers the
+  // refusal, consumption and expiry rules.
+  const campaignRepository = {
+    consumeUnboundProof: jest.fn(async (address: string, userId: string) => ({
+      id: 'proof', address, user_id: userId, provider: null, nonce: 'n'.repeat(32),
+      signature_variant: 'raw' as const, verified_at: new Date(), consumed_at: new Date(),
+    })),
+  };
+  const service = new WalletsService(prisma, campaignRepository as never);
 
   // The overview payload is orthogonal to the attach logic under test.
   jest
     .spyOn(service, 'getWalletsOverview')
     .mockImplementation(async (userId?: string) => ({ userId }) as never);
 
-  return { service, calls };
+  return { service, calls, campaignRepository };
 }
 
 // Default routing: promote/demote echo back scoped rows; insert echoes the
@@ -226,7 +236,7 @@ describe('connectWallet — no session (recovery)', () => {
 
     expect(result.createdUser).toBe(false);
     expect(result.createdWallet).toBe(false);
-    expect(result.wallet.userId).toBe(SIGNER_OWNER);
+    expect(result.wallet!.userId).toBe(SIGNER_OWNER);
   });
 
   it('(c2) a watch-only-elsewhere match alone does NOT recover — forks fresh', async () => {

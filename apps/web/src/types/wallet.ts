@@ -140,10 +140,12 @@ export interface ConnectWalletRequest {
 
 export interface ConnectWalletResponse {
   connected: boolean;
+  /** Lot EP (Gate 2B): set with connected=false when a no-session recovery needs a wallet-ownership proof. */
+  reason?: 'ownership-proof-required';
   createdUser: boolean;
   createdWallet: boolean;
-  userId: string;
-  wallet: WalletItem;
+  userId: string | null;
+  wallet: WalletItem | null;
   wallets: WalletItem[];
   summary: {
     totalWallets: number;

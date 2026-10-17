@@ -9,6 +9,10 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { PrismaService } from '../../db/prisma.service';
+// Lot EP (Gate 2B): the wallet-ownership proof primitive, read/consumed only.
+// Nothing from the campaign service or controllers; see wallets.module.ts.
+import { CampaignRepository } from '../campaign/campaign.repository';
+import { RECOVERY_PROOF_MAX_AGE_SECONDS } from '../campaign/campaign-config';
 
 function toNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
@@ -195,7 +199,10 @@ const POSITION_ASSET_JOIN = `
 
 @Injectable()
 export class WalletsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly campaignRepository: CampaignRepository,
+  ) {}
 
   // STANDING DEBT (flagged in W1, fix out of scope): an ABSENT userId silently
   // falls back to the shared demo account below instead of being rejected —
@@ -613,6 +620,32 @@ export class WalletsService {
     const signerWallet = await this.findSignerWalletByAddress({ chain, address });
 
     if (signerWallet) {
+      // Lot EP (Gate 2B, 2026-10-16): a signer address is public on-chain
+      // data, so recovering its account by address alone handed the account's
+      // userId to anyone (recon §1.5). Recovery now requires a FRESH, UNBOUND
+      // wallet-ownership proof (POST /v1/auth/challenge + /verify without a
+      // userId, signed in-wallet, verified with the public key only). The
+      // proof is consumed and bound to the recovered user in ONE atomic
+      // statement (consumeUnboundProof: consumed_at set + user_id bound), so
+      // it can never recover twice. Without it: a structured refusal and NO
+      // userId. Same-userId reconnects (branch above) and brand-new addresses
+      // (fork below) are unchanged.
+      const proof = await this.campaignRepository.consumeUnboundProof(
+        address,
+        signerWallet.user_id,
+        RECOVERY_PROOF_MAX_AGE_SECONDS,
+      );
+      if (!proof) {
+        return {
+          connected: false,
+          reason: 'ownership-proof-required' as const,
+          createdUser: false,
+          createdWallet: false,
+          wallet: null,
+          userId: null,
+        };
+      }
+
       const promoted = await this.promoteToActiveSigner(
         signerWallet.user_id,
         signerWallet.id

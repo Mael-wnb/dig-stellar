@@ -78,7 +78,8 @@ function makeService() {
     $executeRawUnsafe: jest.fn(handler),
   } as never;
 
-  const service = new WalletsService(prisma);
+  // Lot EP (Gate 2B): proof repository stubbed — the track path never recovers.
+  const service = new WalletsService(prisma, {} as never);
   return { service, calls };
 }
 

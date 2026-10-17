@@ -43,7 +43,9 @@ function makeService(rowsForSelect: unknown[]) {
     $queryRawUnsafe: jest.fn(handler),
     $executeRawUnsafe: jest.fn(handler),
   } as never;
-  return { service: new WalletsService(prisma), calls };
+  // Lot EP (Gate 2B): the proof repository is only reached by the no-session
+  // recovery path, which these specs never exercise.
+  return { service: new WalletsService(prisma, {} as never), calls };
 }
 
 describe('updateWalletLabel — ownership + clear semantics', () => {

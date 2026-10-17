@@ -14,7 +14,7 @@ import { computed, ref } from 'vue'
 import { connectWallet as connectWalletApi } from '../api/wallets'
 import { useAppUser } from './useAppUser'
 import { useSharedWallets } from './useSharedWallets'
-import { useWalletSession } from './useWalletSession'
+import { signProof, useWalletSession } from './useWalletSession'
 
 export function useConnectFlow() {
   const { userId, setUserId, clearUser } = useAppUser()
@@ -46,12 +46,27 @@ export function useConnectFlow() {
 
       const previousUserId = userId.value
 
-      const res = await connectWalletApi({
+      let res = await connectWalletApi({
         chain: 'stellar',
         address: session.address,
         label: options?.label?.trim() || '',
         userId: previousUserId ?? undefined,
       })
+
+      // Lot EP (Gate 2B): recovering an existing account WITHOUT a session now
+      // requires a wallet-ownership proof (a signed message, NOT a transaction;
+      // verified server-side with the public key). Prove once, unbound, then
+      // retry the same connect. Same-session reconnects never hit this.
+      if (res?.connected === false && res.reason === 'ownership-proof-required') {
+        const { result } = await signProof(session.address, null)
+        if (!result.ok) throw new Error(`Wallet ownership proof failed (${result.reason}).`)
+        res = await connectWalletApi({
+          chain: 'stellar',
+          address: session.address,
+          label: options?.label?.trim() || '',
+          userId: undefined,
+        })
+      }
 
       const backendUserId = res?.userId?.trim()
       if (!backendUserId) throw new Error('Backend did not return userId.')
