@@ -157,6 +157,73 @@ same pattern (`*/15`, its own lock and log). An earlier version of this example 
 Prereq: `stellar_v3_alerting.sql` applied. A non-zero exit from the health refresh (81) aborts the
 evaluator (83) for that run and logs; stale/half-written health rows are never evaluated.
 
+### Campaign award job (Lot EP, Earn & Points): periodic points award
+
+Points only: the job pays nothing, signs nothing and holds no key. It is the ONLY writer of
+`action:*` and `referral:*` rows in `points_ledger`; every insert is `on conflict do nothing` on
+the ledger's unique indexes, so re-runs, crashes mid-way and overlapping manual runs can never
+double-award. It reads `action_witnesses` (the Horizon-verified executions written by
+`POST /v1/actions/witness`) and awards enrolled wallets inside the campaign window.
+```bash
+# Canonical entry point (85 → 84):
+pnpm -C apps/indexer job:campaign          # wrapper: spawns `pnpm run job:campaign-award` in apps/api
+pnpm -C apps/api job:campaign-award        # the award script itself (ts-node), same thing without the wrapper
+```
+Env (apps/api/.env, names only): `CAMPAIGN_ENABLED` (default off → "campaign dark, nothing to
+award", exit 0), `CAMPAIGN_STARTS_AT` (REQUIRED, fail-closed when unset; only witnesses that
+closed at or after it earn points), `CAMPAIGN_ENDS_AT` (optional). Prereq: `stellar_v6_campaign.sql`
+applied.
+
+**DRAFT cron line — not installed yet (EP3 deploy step).** Same shape as the two live lines
+(AC2 capture): offset minutes so the three jobs never collide, its own `flock` and log.
+```cron
+# m         h  dom mon dow  command
+3,18,33,48 * * * * cd /root/dig-stellar && /usr/bin/flock -n /tmp/dig-stellar-campaign.lock bash -lc 'export PATH=/root/.nvm/versions/node/v24.19.0/bin:$PATH && pnpm --dir apps/indexer job:campaign' >> /var/log/dig-stellar-campaign.log 2>&1
+```
+The AD1 deploy script must take this third lock blocking (`flock -w`) next to the refresh and
+alert locks (see `docs/deployment.md`, cron locks) before it stops the API.
+
+**How to read the summary line** (`/var/log/dig-stellar-campaign.log`, one line per step, counts
+only — never an address or a hash):
+```
+[campaign-award] window campaign=1 starts=2026-11-01T00:00:00.000Z ends=none
+[campaign-award] actions candidates=7 awarded=6 skipped={"outside-window":0,"kind-not-awarded":0,"below-min-notional":1,"daily-cap-reached":0}
+[campaign-award] referrals uncredited=1 credited=1 pending=0
+[campaign-award] summary awarded_actions=6 skipped_by_reason={…} referrals_credited=1 duration_ms=41
+```
+`candidates` = awardable witnesses (swap / Blend deposit) of enrolled wallets inside the window
+with no ledger row yet; `awarded` = rows inserted this run; `skipped` = candidates refused by the
+pure rules (`below-min-notional`: the witness's stored `meets_min_notional` is false;
+`daily-cap-reached`: 5 swaps / 3 deposits per wallet per UTC day; the other two reasons are
+structurally 0 here because the selection is already window- and kind-bounded). `pending` =
+referral links whose referee has no qualifying witness yet. A non-zero exit means a thrown
+error: the wrapper relays it and the next tick retries from the same state.
+
+**Stuck "pending verification"** (`GET /v1/campaign/me` shows `pendingVerification > 0` for a
+witness that never earns): the witness exists, the ledger row does not. Check, in order:
+1. window — `ledger_closed_at` is at or after `CAMPAIGN_STARTS_AT` (and before `CAMPAIGN_ENDS_AT`);
+2. min notional — `action_witnesses.meets_min_notional` is true (the faucet threshold,
+   `FAUCET_MIN_NOTIONAL_XLM`, stored per row at witness time);
+3. enrolment — the wallet has a `campaign_enrollments` row for this campaign (proof + enrol);
+4. daily cap — the wallet already has 5 swaps / 3 deposits counted for that UTC day (known EP1
+   limit: a capped witness stays in the pending count);
+then run the job by hand (`pnpm -C apps/indexer job:campaign`) and read the summary line.
+```bash
+psql "$DATABASE_URL" -c "select kind, meets_min_notional, ledger_closed_at from action_witnesses where tx_hash = '<hash>'"
+psql "$DATABASE_URL" -c "select reason, points, counted_day from points_ledger where witness_tx_hash = '<hash>'"
+```
+
+**Revoke points** (founder review): the ledger is append-only — never `update` or `delete` a
+row. Insert a negative `adjust:<note>` row pointing at the row being corrected; the balance is
+always `sum(points)`, so the correction is visible and auditable:
+```sql
+insert into points_ledger (campaign, address, user_id, reason, base_points, multiplier, points, adjusts_id)
+select campaign, address, user_id, 'adjust:founder-review-2026-11-05', 0, 1, -points, id
+  from points_ledger where id = <ledger id>;
+```
+(`points_ledger_points_check` only allows negative points on `adjust:*` rows; the `reason`
+regex requires a non-empty note.)
+
 ---
 
 ## Database

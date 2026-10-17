@@ -95,13 +95,30 @@ export interface LeaderboardRow {
   points: number;
 }
 
+export interface ActionCandidateRow {
+  tx_hash: string;
+  address: string;
+  user_id: string;
+  kind: ActionKind;
+  meets_min_notional: boolean;
+  ledger_closed_at: Date;
+}
+
+export interface ReferralRow {
+  campaign: number;
+  referee_address: string;
+  referrer_address: string;
+  code: string;
+  linked_at: Date;
+}
+
 /** Witness kinds that can earn points (the award job + pending count agree). */
 export const AWARDABLE_KINDS: ReadonlyArray<ActionKind> = ['sdex-swap', 'blend-deposit'];
 
 @Injectable()
 export class CampaignRepository {
   /** The connection every query runs on: the pool, or a transaction client when bound. */
-  private db: Db;
+  db: Db;
 
   constructor(private readonly prisma: PrismaService) {
     this.db = prisma;
@@ -522,5 +539,163 @@ export class CampaignRepository {
       campaign,
     )) as Array<{ n: number }>;
     return rows[0]?.n ?? 0;
+  }
+  // -------------------------------------------------------------------------
+  // Award job (84-campaign-award.ts): the ONLY writer of action:* and
+  // referral:* rows. Serialized by the cron flock, so no row lock (rule H).
+  // -------------------------------------------------------------------------
+
+  /**
+   * Awardable witnesses of ENROLLED wallets inside the campaign window that
+   * have no action ledger row yet, oldest first. Rows below the min notional
+   * are included so the job can count the skip; withdraws never are.
+   */
+  async findActionCandidates(
+    campaign: number,
+    window: { startsAtMs: number; endsAtMs: number | null },
+  ): Promise<ActionCandidateRow[]> {
+    return (await this.db.$queryRawUnsafe(
+      `select w.tx_hash, e.address, e.user_id, w.kind, w.meets_min_notional, w.ledger_closed_at
+         from action_witnesses w
+         join campaign_enrollments e
+           on e.campaign = $1 and lower(e.address) = lower(w.wallet_address)
+        where w.kind = any($2::text[])
+          and w.ledger_closed_at >= $3::timestamptz
+          and ($4::timestamptz is null or w.ledger_closed_at < $4::timestamptz)
+          and not exists (
+            select 1 from points_ledger l
+             where l.campaign = $1 and l.reason = 'action:' || w.kind and l.witness_tx_hash = w.tx_hash
+          )
+        order by w.ledger_closed_at asc, w.tx_hash asc`,
+      campaign,
+      [...AWARDABLE_KINDS],
+      new Date(window.startsAtMs).toISOString(),
+      window.endsAtMs != null ? new Date(window.endsAtMs).toISOString() : null,
+    )) as ActionCandidateRow[];
+  }
+
+  /** Existing action awards per (wallet, reason, UTC day): the daily-cap baseline. */
+  async countedActionsByDay(campaign: number): Promise<Array<{ address: string; reason: string; day: string; n: number }>> {
+    return (await this.db.$queryRawUnsafe(
+      `select address, reason, counted_day::text as day, count(*)::int as n
+         from points_ledger
+        where campaign = $1 and reason like 'action:%' and counted_day is not null
+        group by address, reason, counted_day`,
+      campaign,
+    )) as Array<{ address: string; reason: string; day: string; n: number }>;
+  }
+
+  /** Every check-in day of every wallet in the campaign (streak inputs). */
+  async checkinDaysByWallet(campaign: number): Promise<Array<{ address: string; day: string }>> {
+    return (await this.db.$queryRawUnsafe(
+      `select address, day::text as day from wallet_daily_checkins where campaign = $1`,
+      campaign,
+    )) as Array<{ address: string; day: string }>;
+  }
+
+  /** Idempotent: the witness unique index makes a repeat a no-op (returns 0). */
+  async insertActionAward(row: {
+    campaign: number;
+    address: string;
+    userId: string | null;
+    reason: string;
+    basePoints: number;
+    multiplier: number;
+    points: number;
+    witnessTxHash: string;
+    countedDay: string;
+  }): Promise<number> {
+    return this.db.$executeRawUnsafe(
+      `insert into points_ledger
+         (campaign, address, user_id, reason, base_points, multiplier, points, witness_tx_hash, counted_day)
+       values ($1, $2, $3::uuid, $4, $5, $6, $7, $8, $9::date)
+       on conflict do nothing`,
+      row.campaign,
+      row.address,
+      row.userId,
+      row.reason,
+      row.basePoints,
+      row.multiplier,
+      row.points,
+      row.witnessTxHash,
+      row.countedDay,
+    );
+  }
+
+  async findUncreditedReferrals(campaign: number): Promise<ReferralRow[]> {
+    return (await this.db.$queryRawUnsafe(
+      `select campaign, referee_address, referrer_address, code, linked_at
+         from referrals
+        where campaign = $1 and credited_at is null
+        order by linked_at asc`,
+      campaign,
+    )) as ReferralRow[];
+  }
+
+  /** The referee's earliest awardable, min-notional witness at or after the link. */
+  async findRefereeFirstQualifyingWitness(
+    refereeAddress: string,
+    linkedAt: Date,
+  ): Promise<{ tx_hash: string; ledger_closed_at: Date } | null> {
+    const rows = (await this.db.$queryRawUnsafe(
+      `select tx_hash, ledger_closed_at
+         from action_witnesses
+        where lower(wallet_address) = lower($1)
+          and kind = any($2::text[])
+          and meets_min_notional = true
+          and ledger_closed_at >= $3::timestamptz
+        order by ledger_closed_at asc, tx_hash asc
+        limit 1`,
+      refereeAddress,
+      [...AWARDABLE_KINDS],
+      linkedAt.toISOString(),
+    )) as Array<{ tx_hash: string; ledger_closed_at: Date }>;
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Credit a referral in ONE transaction: the two ledger rows (both keyed by
+   * the referee address) and credited_at/credited_tx_hash on the link. The
+   * ledger inserts are on-conflict-do-nothing, so a partial earlier run
+   * (rows written, link not marked) converges on the next run.
+   */
+  async creditReferral(params: {
+    campaign: number;
+    refereeAddress: string;
+    referrerAddress: string;
+    txHash: string;
+    countedDay: string;
+    referrerPoints: number;
+    refereePoints: number;
+  }): Promise<void> {
+    await this.transaction(async (r) => {
+      const [referee, referrer] = await Promise.all([
+        r.findEnrollment(params.campaign, params.refereeAddress),
+        r.findEnrollment(params.campaign, params.referrerAddress),
+      ]);
+      const insert = (address: string, userId: string | null, reason: string, points: number) =>
+        r.db.$executeRawUnsafe(
+          `insert into points_ledger
+             (campaign, address, user_id, reason, base_points, multiplier, points, referral_referee, counted_day)
+           values ($1, $2, $3::uuid, $4, $5, 1, $5, $6, $7::date)
+           on conflict do nothing`,
+          params.campaign,
+          address,
+          userId,
+          reason,
+          points,
+          params.refereeAddress,
+          params.countedDay,
+        );
+      await insert(params.referrerAddress, referrer?.user_id ?? null, 'referral:referrer', params.referrerPoints);
+      await insert(params.refereeAddress, referee?.user_id ?? null, 'referral:referee', params.refereePoints);
+      await r.db.$executeRawUnsafe(
+        `update referrals set credited_at = now(), credited_tx_hash = $3
+          where campaign = $1 and referee_address = $2 and credited_at is null`,
+        params.campaign,
+        params.refereeAddress,
+        params.txHash,
+      );
+    });
   }
 }

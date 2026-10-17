@@ -228,7 +228,10 @@ Strict variant (only worth it when a web change would break on the old API): pus
 `needrestart` on this Ubuntu auto-restarts services after an `apt` install (it restarted nginx,
 cron, ssh, redis-server and more when `docker-compose-v2` was installed). Any `apt` on the VPS
 runs with `NEEDRESTART_MODE=l` (list only) and never inside a maintenance window that holds the
-cron locks:
+cron locks (three since Lot EP: `/tmp/dig-stellar-refresh.lock`, `/tmp/dig-stellar-alert.lock`
+and `/tmp/dig-stellar-campaign.lock` — the AD1 deploy script must take all three blocking with
+`flock -w`; `docs/evidence/lot-ad/s1-remediation-runbook.md` shows the first two, add the third
+when the campaign cron line is installed, see `docs/runbooks.md` "Campaign award job"):
 ```bash
 NEEDRESTART_MODE=l apt-get install -y <package>
 ```

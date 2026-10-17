@@ -16,6 +16,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "job:alerts": "ts-node --transpile-only src/scripts/83-evaluate-alerts.ts",
+    "job:campaign-award": "ts-node --transpile-only src/scripts/84-campaign-award.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
