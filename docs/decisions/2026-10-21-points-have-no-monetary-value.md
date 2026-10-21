@@ -32,6 +32,16 @@ The Earn & Points campaign (Lot EP, post-grant) issues **points only**:
    there are no page views. Adoption numbers earned under the campaign are always reported with
    that context.
 
+## Update 2026-10-21 (EP4, founder decision)
+
+Perks are recorded by the backend (`wallet_perks`, served on `GET /v1/campaign/me` as `perks`,
+`nextPerk`, `flags`) but are **not surfaced in the UI yet**: the Earn view no longer renders the
+perks block (component kept). User-facing copy is **neutral by founder decision** — the served
+line is "Points unlock perks on Dig as the campaign grows.", rendered once at the top of the Earn
+view; it makes no promise and no denial, and the "Are points worth anything?" FAQ entry is gone.
+The **internal position is unchanged**: points are non-monetary, nothing pays, no token, no
+airdrop; the grep rule on the copy (no "reward", "airdrop", "token", "earn XLM") still applies.
+
 ## Why
 
 - **Legal and reputational surface.** A points programme that could be read as a token

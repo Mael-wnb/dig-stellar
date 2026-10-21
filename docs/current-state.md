@@ -40,6 +40,11 @@ In prod the campaign answers `campaign-disabled` until the founder sets `CAMPAIG
 not deployed yet (`docs/evidence/lot-ep/ep3-deploy.md`). Honesty rule for later reporting: every
 adoption number earned during the campaign is stated WITH the campaign context (points incentive,
 window, self-declared social), never as organic adoption.
+EP4 (2026-10-21, `feat/lot-ep4`, uncommitted, not deployed): daily streak ramp (+0.05 per streak day
+on action points, cap ×1.35 at 7 days, still fixed on D-1), Earn v1.1 cards (hero, 7-day strip,
+"Earn more", activity feed), neutral user-facing copy ("Points unlock perks on Dig as the campaign
+grows.", rendered once), perks recorded by the backend but not surfaced in the UI
+(`docs/evidence/lot-ep/ep4-implementation.md`).
 
 **Lot AN0 — Google Analytics 4 (2026-10-21, `apps/web` only, uncommitted):** GA4 with Consent Mode
 v2 (all signals default `denied`; gtag.js is only injected after an explicit "Accept analytics" in a

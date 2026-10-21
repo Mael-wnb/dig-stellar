@@ -205,7 +205,19 @@ are never logged and never in a public payload (`docs/security-invariants.md` §
 priority-rwa at 1500) into `wallet_perks`, `on conflict do nothing`. A perk once granted STAYS
 granted even if a later negative adjust drops the balance under the threshold; the job only
 inserts. `GET /v1/campaign/me` lists them (`perks`, `nextPerk`, `flags.beta`); nothing in the
-product is gated on a perk yet. Revocation is a founder-only manual SQL ("Revoke a perk" below).
+product is gated on a perk yet, and since EP4 the Earn view does not surface them (founder
+decision 2026-10-21; the `PerksBlock` component is kept, not rendered). Revocation is a
+founder-only manual SQL ("Revoke a perk" below).
+
+**Streak ramp (EP4, founder decision 2026-10-21):** the streak multiplier on ACTION points is a
+daily ramp, `multiplier = min(1 + 0.05 × streak days before the action's UTC day, 1.35)`
+(`STREAK_RAMP` in `campaign-rules.ts`): 0 days → ×1.00, 1 → ×1.05, 4 → ×1.20, 6 → ×1.30, 7 or
+more → ×1.35. It is still computed from the check-ins up to D-1 (a check-in on the action's own
+day never changes that day's award), and `round(base × multiplier)` is done in integer
+hundredths with half rounding up (50 × 1.15 = 58, 50 × 1.35 = 68). Daily check-in stays +5.
+Ledger history is untouched (every row stores its own `multiplier`); only awards written after the
+deploy use the ramp. `GET /v1/campaign` serves it as `rules.streak` (`stepPerDay`, `cap`,
+`dailyPoints`, `daysToCap`, `ladder`) so the web renders the figures and computes none.
 
 #### Install the campaign cron line (EP3, VPS, founder)
 

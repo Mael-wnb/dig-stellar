@@ -51,6 +51,9 @@ with; the tables and notes below are kept as the historical record of how each c
   boundary string on `#status`. Prod answers `campaign-disabled` until the founder activates it
   (`docs/runbooks.md`); EP3 + the cron line await the dark deploy (`docs/evidence/lot-ep/ep3-deploy.md`).
   Honesty rule: adoption numbers earned under the campaign will be stated with the campaign context.
+- **Lot EP4 — Earn v1.1 (2026-10-21): built on `feat/lot-ep4`, not deployed.** Daily streak ramp
+  (+0.05/day, cap ×1.35 at 7 days), hero card, 7-day strip, "Earn more" and activity cards, neutral
+  copy, perks hidden in the UI; `docs/evidence/lot-ep/ep4-implementation.md`.
 - T3 headline: **T3-D1 is DONE in prod** (Aug 4 — DeFindex live as the 5th protocol ≈$18.8M,
   first-class freshness + standardized backoff retries; demo capture remaining) and **T3-D2 mainnet
   actions are LIVE and evidenced end-to-end** (swaps ungated Aug 2 behind kill-switch + 100 XLM cap

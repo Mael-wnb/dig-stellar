@@ -384,8 +384,10 @@ Evidence: `docs/evidence/lot-ep/`.
   only `Keypair` use outside the faucet payout service. No server key is involved; nothing is
   ever signed server-side. The proof is bound to `(address, userId)`; every campaign write
   requires it, so a `userId` alone earns nothing.
-- **INV-11.2** Points have no monetary value and are not convertible: the API's `disclaimer`
-  string travels in every campaign payload and the web renders it once per surface. No payout
+- **INV-11.2** Points have no monetary value and are not convertible (internal position,
+  `docs/decisions/2026-10-21-points-have-no-monetary-value.md`); the copy makes no promise of
+  monetary value, tokens or airdrops: the API's `disclaimer` string (neutral since EP4) travels
+  in every campaign payload and the web renders it once, at the top of the Earn view. No payout
   path exists in code — `modules/campaign/` imports nothing from `modules/faucet/`,
   `modules/actions/` or `modules/wallets/`, and the faucet treasury key (§9) is never read,
   referenced or reachable from the campaign. Points are never folded into an APY: they are a
