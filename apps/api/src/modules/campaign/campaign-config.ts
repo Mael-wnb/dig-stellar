@@ -32,6 +32,9 @@ export const RECOVERY_PROOF_MAX_AGE_SECONDS = 600;
 export const LEADERBOARD_LIMIT = 50;
 export const LEADERBOARD_CACHE_MS = 60_000;
 
+/** EP3: GET /v1/campaign/metrics in-process cache lifetime (public, counts only). */
+export const METRICS_CACHE_MS = 60_000;
+
 /** CAMPAIGN_ENABLED kill-switch. Default OFF — everything deploys dark. */
 export function isCampaignEnabled(): boolean {
   return process.env.CAMPAIGN_ENABLED === 'true';

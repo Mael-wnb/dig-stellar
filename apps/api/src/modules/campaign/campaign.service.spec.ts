@@ -5,10 +5,10 @@
 // check-in), and the reads (me streak maths, leaderboard shortening + cache).
 
 import { Keypair } from '@stellar/stellar-sdk';
-import { CampaignService } from './campaign.service';
-import { CampaignRepository, type EnrollmentRow, type ProofRow } from './campaign.repository';
-import { CHALLENGE_TTL_SECONDS, CAMPAIGN_ID, LEADERBOARD_CACHE_MS } from './campaign-config';
-import { DISCLAIMER, REFERRAL_CODE_RE } from './campaign-rules';
+import { CampaignService, METRICS_BOUNDARY } from './campaign.service';
+import { CampaignRepository, type EnrollmentRow, type MetricsFacts, type ProofRow } from './campaign.repository';
+import { CHALLENGE_TTL_SECONDS, CAMPAIGN_ID, LEADERBOARD_CACHE_MS, METRICS_CACHE_MS } from './campaign-config';
+import { DISCLAIMER, PERK_TIERS, REFERRAL_CODE_RE } from './campaign-rules';
 import { buildChallengeMessage } from './challenge-message';
 
 const USER = '00000000-0000-4000-8000-0000000000aa';
@@ -44,8 +44,21 @@ type Fake = jest.Mocked<Pick<
   | 'createChallenge' | 'deleteStaleChallenges' | 'consumeChallenge' | 'upsertBoundProof' | 'insertUnboundProof'
   | 'hasBoundProof' | 'findEnrollment' | 'findEnrollmentByCode' | 'insertEnrollmentWithCodeRetry' | 'insertReferral'
   | 'referredByCode' | 'checkinToday' | 'checkinDays' | 'todayUtc' | 'balance' | 'leaderboard' | 'rankOf'
-  | 'pendingVerificationCount' | 'listSocialClaims' | 'transaction'
+  | 'pendingVerificationCount' | 'listSocialClaims' | 'listPerks' | 'metricsFacts' | 'transaction'
 >>;
+
+const facts = (overrides: Partial<MetricsFacts> = {}): MetricsFacts => ({
+  walletsRegisteredInWindow: 12,
+  walletsProvenInWindow: 9,
+  walletsEnrolled: 7,
+  walletsWithVerifiedActionInWindow: 4,
+  verifiedActionsByKind: { 'sdex-swap': 10, 'blend-deposit': 3, 'blend-withdraw': 1 },
+  referralsCredited: 2,
+  socialClaimsActive: 5,
+  pointsIssued: 1234,
+  perksGranted: { 'early-access': 3, 'beta-features': 1, 'priority-rwa': 0 },
+  ...overrides,
+});
 
 function fakeRepo(): Fake {
   const repo = {
@@ -70,6 +83,8 @@ function fakeRepo(): Fake {
     rankOf: jest.fn().mockResolvedValue(null),
     pendingVerificationCount: jest.fn().mockResolvedValue(0),
     listSocialClaims: jest.fn().mockResolvedValue([]),
+    listPerks: jest.fn().mockResolvedValue([]),
+    metricsFacts: jest.fn().mockResolvedValue(facts()),
     transaction: jest.fn(),
   } as unknown as Fake;
   // transaction(fn) hands the same fake back, so writes are observable.
@@ -322,7 +337,7 @@ describe('me', () => {
     const notYetToday = await service(repo).me({ address: ADDRESS, userId: USER });
     expect(notYetToday).toMatchObject({
       active: true, proven: true, enrolled: true, referralCode: 'ABCDEFGH', referredBy: 'FRIENDCD', balance: 135,
-      streak: { current: 7, multiplierForToday: 1.2 }, checkedInToday: false, pendingVerification: 2, perks: [], disclaimer: DISCLAIMER,
+      streak: { current: 7, multiplierForToday: 1.2 }, checkedInToday: false, pendingVerification: 2, perks: [], nextPerk: { key: 'early-access', threshold: 100, pointsRemaining: 0 }, flags: { beta: false }, disclaimer: DISCLAIMER,
     });
 
     repo.checkinDays.mockResolvedValue(['2026-10-16', '2026-10-15', '2026-10-14', '2026-10-13', '2026-10-12', '2026-10-11', '2026-10-10', '2026-10-09']);
@@ -403,5 +418,129 @@ describe('violatedUniqueKey (Postgres "Key (…)=" detail vs constraint-name dri
     expect(violatedUniqueKey({ message: 'duplicate key value violates unique constraint "uq_x"' })).toBe('uq_x');
     expect(violatedUniqueKey(new Error('connection refused'))).toBeNull();
     expect(violatedUniqueKey(null)).toBeNull();
+  });
+});
+
+describe('EP3: perks on /me and the public metrics', () => {
+  it('/me lists granted perks as {key, grantedAt}, derives flags.beta and the next tier from them', async () => {
+    liveEnv();
+    const repo = fakeRepo();
+    repo.findEnrollment.mockResolvedValue(enrollmentRow());
+    repo.balance.mockResolvedValue(620);
+    repo.listPerks.mockResolvedValue([
+      { perk_key: 'early-access', granted_at: new Date('2026-11-02T10:00:00Z') },
+      { perk_key: 'beta-features', granted_at: new Date('2026-11-05T10:00:00Z') },
+    ]);
+    const out = await service(repo).me({ address: ADDRESS, userId: USER });
+    expect(out.perks).toEqual([
+      { key: 'early-access', grantedAt: '2026-11-02T10:00:00.000Z' },
+      { key: 'beta-features', grantedAt: '2026-11-05T10:00:00.000Z' },
+    ]);
+    expect(out.flags).toEqual({ beta: true });
+    expect(out.nextPerk).toEqual({ key: 'priority-rwa', threshold: 1500, pointsRemaining: 880 });
+    expect(repo.listPerks).toHaveBeenCalledWith(CAMPAIGN_ID, ADDRESS);
+  });
+
+  it('/me: a perk stays listed when the balance dropped under its threshold; reached-but-ungranted reads 0 remaining', async () => {
+    liveEnv();
+    const repo = fakeRepo();
+    repo.findEnrollment.mockResolvedValue(enrollmentRow());
+    repo.balance.mockResolvedValue(40);
+    repo.listPerks.mockResolvedValue([{ perk_key: 'early-access', granted_at: new Date('2026-11-02T10:00:00Z') }]);
+    const kept = await service(repo).me({ address: ADDRESS, userId: USER });
+    expect(kept.perks.map((p) => p.key)).toEqual(['early-access']);
+    expect(kept.flags.beta).toBe(false);
+    expect(kept.nextPerk).toEqual({ key: 'beta-features', threshold: 500, pointsRemaining: 460 });
+
+    repo.balance.mockResolvedValue(130);
+    repo.listPerks.mockResolvedValue([]);
+    const pending = await service(repo).me({ address: ADDRESS, userId: USER });
+    expect(pending.perks).toEqual([]);
+    expect(pending.nextPerk).toEqual({ key: 'early-access', threshold: 100, pointsRemaining: 0 });
+  });
+
+  it('GET /campaign serves the perk tiers in the rules block', () => {
+    liveEnv();
+    expect(service(fakeRepo()).getCampaign().rules.perks).toEqual(PERK_TIERS);
+  });
+
+  it('metrics: dark (disabled or no start date) → zeros, dark:true, no repository call, boundary still present', async () => {
+    darkEnv();
+    const repo = fakeRepo();
+    const out = await service(repo).metrics(Date.UTC(2026, 10, 10));
+    expect(out).toMatchObject({
+      campaign: CAMPAIGN_ID,
+      active: false,
+      reason: 'campaign-disabled',
+      dark: true,
+      window: { startsAt: null, endsAt: null },
+      walletsRegisteredInWindow: 0,
+      walletsProvenInWindow: 0,
+      walletsEnrolled: 0,
+      walletsWithVerifiedActionInWindow: 0,
+      verifiedActionsByKind: { 'sdex-swap': 0, 'blend-deposit': 0, 'blend-withdraw': 0 },
+      referralsCredited: 0,
+      socialClaimsActive: 0,
+      pointsIssued: 0,
+      perksGranted: { 'early-access': 0, 'beta-features': 0, 'priority-rwa': 0 },
+      boundary: METRICS_BOUNDARY,
+      disclaimer: DISCLAIMER,
+    });
+    expect(repo.metricsFacts).not.toHaveBeenCalled();
+
+    // enabled but no start date: still dark (fail-closed, same as the job)
+    process.env.CAMPAIGN_ENABLED = 'true';
+    const noStart = await service(repo).metrics(Date.UTC(2026, 10, 10));
+    expect(noStart).toMatchObject({ dark: true, active: false, reason: 'campaign-not-started', walletsEnrolled: 0 });
+    expect(repo.metricsFacts).not.toHaveBeenCalled();
+  });
+
+  it('metrics: live → the repository facts over [startsAt, endsAt), cached 60 s', async () => {
+    liveEnv();
+    process.env.CAMPAIGN_ENDS_AT = '2026-12-01T00:00:00Z';
+    const repo = fakeRepo();
+    const svc = service(repo);
+    const t0 = Date.UTC(2026, 10, 10);
+    const out = await svc.metrics(t0);
+    expect(out).toMatchObject({
+      active: true,
+      dark: false,
+      window: { startsAt: '2026-10-01T00:00:00.000Z', endsAt: '2026-12-01T00:00:00.000Z' },
+      asOf: new Date(t0).toISOString(),
+      ...facts(),
+    });
+    expect(out.reason).toBeUndefined();
+    expect(repo.metricsFacts).toHaveBeenCalledWith(CAMPAIGN_ID, {
+      startsAtMs: Date.UTC(2026, 9, 1),
+      endsAtMs: Date.UTC(2026, 11, 1),
+    });
+    expect(JSON.stringify(out)).not.toContain(ADDRESS);
+
+    await svc.metrics(t0 + METRICS_CACHE_MS - 1);
+    expect(repo.metricsFacts).toHaveBeenCalledTimes(1);
+    await svc.metrics(t0 + METRICS_CACHE_MS + 1);
+    expect(repo.metricsFacts).toHaveBeenCalledTimes(2);
+  });
+
+  it('metrics: an ended campaign keeps its final numbers (not dark), a not-started one reads the real window', async () => {
+    liveEnv();
+    const repo = fakeRepo();
+    const ended = await service(repo).metrics(Date.UTC(2026, 9, 10));
+    expect(ended.active).toBe(true);
+    process.env.CAMPAIGN_ENDS_AT = '2026-10-05T00:00:00Z';
+    const after = await service(repo).metrics(Date.UTC(2026, 9, 10));
+    expect(after).toMatchObject({ active: false, reason: 'campaign-ended', dark: false, walletsEnrolled: 7 });
+    delete process.env.CAMPAIGN_ENDS_AT;
+    const early = await service(repo).metrics(Date.UTC(2026, 8, 1));
+    expect(early).toMatchObject({ active: false, reason: 'campaign-not-started', dark: false });
+    expect(repo.metricsFacts).toHaveBeenCalledTimes(3);
+  });
+
+  it('the boundary states executions vs builds, self-declared social, the start variable and no page views', () => {
+    expect(METRICS_BOUNDARY).toMatch(/EXECUTIONS/);
+    expect(METRICS_BOUNDARY).toMatch(/not server-side builds/);
+    expect(METRICS_BOUNDARY).toMatch(/self-declared/);
+    expect(METRICS_BOUNDARY).toMatch(/CAMPAIGN_STARTS_AT/);
+    expect(METRICS_BOUNDARY).toMatch(/no page views/);
   });
 });

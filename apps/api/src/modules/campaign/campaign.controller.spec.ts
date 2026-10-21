@@ -19,6 +19,7 @@ function stub() {
     checkin: jest.fn().mockResolvedValue('checkin'),
     me: jest.fn().mockResolvedValue('me'),
     leaderboard: jest.fn().mockResolvedValue('leaderboard'),
+    metrics: jest.fn().mockResolvedValue('metrics'),
   };
 }
 
@@ -134,5 +135,14 @@ describe('CampaignController', () => {
     expect(() => c.deleteSocial(undefined, { address: ADDRESS, userId: USER })).toThrow(BadRequestException);
     expect(() => c.deleteSocial(id, { address: ADDRESS })).toThrow(BadRequestException);
     expect(() => c.deleteSocial(id, undefined)).toThrow(BadRequestException);
+  });
+});
+
+describe('CampaignController (EP3)', () => {
+  it('metrics: no input, pass-through to the service', async () => {
+    const s = stub();
+    const c = campaignController(s);
+    expect(await c.metrics()).toBe('metrics');
+    expect(s.metrics).toHaveBeenCalledWith();
   });
 });

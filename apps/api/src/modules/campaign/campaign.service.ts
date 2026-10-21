@@ -10,6 +10,10 @@
 //
 // Ineligibility is a 200 with a structured reason (faucet convention); the
 // controllers reserve 4xx for malformed input.
+//
+// EP3: /me lists the wallet's NON-MONETARY perks (granted by the award job,
+// never here) and a flags object the web reads for gating; /metrics serves
+// the recon §8 counts with an explicit boundary string, zeros while dark.
 
 import { Injectable } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
@@ -18,6 +22,7 @@ import {
   CHALLENGE_TTL_SECONDS,
   LEADERBOARD_CACHE_MS,
   LEADERBOARD_LIMIT,
+  METRICS_CACHE_MS,
   campaignEndsAt,
   campaignStartsAt,
   isCampaignEnabled,
@@ -26,6 +31,7 @@ import {
 import {
   ACTION_RULES,
   DISCLAIMER,
+  PERK_TIERS,
   REFERRAL_POINTS,
   SOCIAL_DAILY_CAP,
   SOCIAL_TASKS,
@@ -34,6 +40,7 @@ import {
   campaignStatus,
   checkinEligibility,
   enrollEligibility,
+  nextPerkFor,
   previousUtcDay,
   referralCodeFromBytes,
   shortenAddress,
@@ -42,6 +49,8 @@ import {
   streakMultiplier,
   type CampaignInactiveReason,
   type CampaignWindow,
+  type NextPerk,
+  type PerkKey,
   type SocialTaskKey,
   type WriteIneligibleReason,
 } from './campaign-rules';
@@ -51,6 +60,7 @@ import {
   isUniqueViolation,
   violatedUniqueKey,
   type LeaderboardRow,
+  type MetricsFacts,
 } from './campaign.repository';
 import { buildChallengeMessage } from './challenge-message';
 import { verifyWalletSignature, type SignatureVariant } from './verify-wallet-signature';
@@ -96,6 +106,8 @@ export interface CampaignPayload {
     socialTasks: Record<SocialTaskKey, SocialTaskEntry>;
     socialDailyCap: number;
     referral: typeof REFERRAL_POINTS;
+    /** EP3: the non-monetary tiers (key + points threshold), ascending. */
+    perks: typeof PERK_TIERS;
   };
   disclaimer: string;
 }
@@ -123,9 +135,53 @@ export interface MePayload {
   pendingVerification: number;
   /** EP2: the social task catalogue with this wallet's claimed state (never the handle). */
   tasks: Array<SocialTaskEntry & { key: SocialTaskKey; claimed: boolean; claimId: string | null; claimedAt: string | null }>;
-  perks: string[];
+  /** EP3: perks granted by the award job (wallet_perks), oldest first. Never revoked here. */
+  perks: Array<{ key: PerkKey; grantedAt: string }>;
+  /** EP3: the lowest tier not granted yet and the points still missing; null when all are granted. */
+  nextPerk: NextPerk | null;
+  /** EP3: flags the web may gate on; derived from perks only. */
+  flags: { beta: boolean };
   disclaimer: string;
 }
+
+/**
+ * EP3: GET /v1/campaign/metrics — the recon §8 counts. `dark` (campaign
+ * disabled or no start date) → every count is 0 and the web hides the section.
+ * Otherwise the window counters cover [startsAt, endsAt) whatever `active`
+ * says, so a not-started campaign reads real zeros and an ended one keeps its
+ * final numbers.
+ */
+export interface MetricsPayload extends MetricsFacts {
+  campaign: number;
+  active: boolean;
+  reason?: CampaignInactiveReason;
+  dark: boolean;
+  window: { startsAt: string | null; endsAt: string | null };
+  asOf: string;
+  boundary: string;
+  disclaimer: string;
+}
+
+export const METRICS_BOUNDARY =
+  'Counts of wallets, not people: a person may hold several wallets. ' +
+  'Registered = first registration of a wallet (user_wallets.created_at; re-connects are invisible). ' +
+  'Proven = wallets that signed an ownership proof in the window. ' +
+  'Verified actions = Horizon-verified on-chain EXECUTIONS (action_witnesses.ledger_closed_at), not server-side builds; ' +
+  'only swaps and Blend deposits earn points, withdraws are listed but never awarded. ' +
+  'Social claims are self-declared (no X / Discord API check). ' +
+  'Every window counter starts at CAMPAIGN_STARTS_AT; no page views, no funnel, no historical backfill.';
+
+const ZERO_FACTS = (): MetricsFacts => ({
+  walletsRegisteredInWindow: 0,
+  walletsProvenInWindow: 0,
+  walletsEnrolled: 0,
+  walletsWithVerifiedActionInWindow: 0,
+  verifiedActionsByKind: { 'sdex-swap': 0, 'blend-deposit': 0, 'blend-withdraw': 0 },
+  referralsCredited: 0,
+  socialClaimsActive: 0,
+  pointsIssued: 0,
+  perksGranted: { 'early-access': 0, 'beta-features': 0, 'priority-rwa': 0 },
+});
 
 export interface LeaderboardPayload {
   campaign: number;
@@ -138,6 +194,7 @@ export interface LeaderboardPayload {
 @Injectable()
 export class CampaignService {
   private leaderboardCache: { at: number; rows: LeaderboardRow[] } | null = null;
+  private metricsCache: { at: number; facts: MetricsFacts } | null = null;
 
   constructor(private readonly repo: CampaignRepository) {}
 
@@ -230,6 +287,7 @@ export class CampaignService {
         socialTasks: this.socialTaskCatalogue(),
         socialDailyCap: SOCIAL_DAILY_CAP,
         referral: REFERRAL_POINTS,
+        perks: PERK_TIERS,
       },
       disclaimer: DISCLAIMER,
     };
@@ -315,7 +373,7 @@ export class CampaignService {
   async me(params: { address: string; userId: string }): Promise<MePayload> {
     const w = this.window();
     const status = campaignStatus(w);
-    const [proven, enrollment, balance, days, today, referredBy, pendingVerification, socialClaims] = await Promise.all([
+    const [proven, enrollment, balance, days, today, referredBy, pendingVerification, socialClaims, perkRows] = await Promise.all([
       this.repo.hasBoundProof(params.address, params.userId),
       this.repo.findEnrollment(CAMPAIGN_ID, params.address),
       this.repo.balance(CAMPAIGN_ID, params.address),
@@ -324,7 +382,10 @@ export class CampaignService {
       this.repo.referredByCode(CAMPAIGN_ID, params.address),
       this.repo.pendingVerificationCount(CAMPAIGN_ID, params.address, w),
       this.repo.listSocialClaims(CAMPAIGN_ID, params.address),
+      this.repo.listPerks(CAMPAIGN_ID, params.address),
     ]);
+    const perks = perkRows.map((p) => ({ key: p.perk_key, grantedAt: p.granted_at.toISOString() }));
+    const grantedKeys = perks.map((p) => p.key);
     const daySet = new Set(days);
     const checkedInToday = daySet.has(today);
     // "current" = the streak ending today, or the one ending yesterday if the
@@ -353,9 +414,39 @@ export class CampaignService {
           claimedAt: claim?.claimed_at.toISOString() ?? null,
         };
       }),
-      perks: [],
+      perks,
+      nextPerk: nextPerkFor(balance, grantedKeys),
+      flags: { beta: grantedKeys.includes('beta-features') },
       disclaimer: DISCLAIMER,
     };
+  }
+
+  /** EP3: public counts with a boundary string; zeros while dark; cached 60 s in-process. */
+  async metrics(now: number = Date.now()): Promise<MetricsPayload> {
+    const w = this.window(now);
+    const status = campaignStatus(w);
+    const dark = !w.enabled || w.startsAtMs == null;
+    const base = {
+      campaign: CAMPAIGN_ID,
+      active: status.active,
+      ...(status.active ? {} : { reason: status.reason }),
+      dark,
+      window: {
+        startsAt: w.startsAtMs != null ? new Date(w.startsAtMs).toISOString() : null,
+        endsAt: w.endsAtMs != null ? new Date(w.endsAtMs).toISOString() : null,
+      },
+      boundary: METRICS_BOUNDARY,
+      disclaimer: DISCLAIMER,
+    };
+    if (dark) return { ...base, asOf: new Date(now).toISOString(), ...ZERO_FACTS() };
+
+    if (!this.metricsCache || now - this.metricsCache.at > METRICS_CACHE_MS) {
+      this.metricsCache = {
+        at: now,
+        facts: await this.repo.metricsFacts(CAMPAIGN_ID, { startsAtMs: w.startsAtMs!, endsAtMs: w.endsAtMs }),
+      };
+    }
+    return { ...base, asOf: new Date(this.metricsCache.at).toISOString(), ...this.metricsCache.facts };
   }
 
   async leaderboard(callerAddress: string | null, now: number = Date.now()): Promise<LeaderboardPayload> {

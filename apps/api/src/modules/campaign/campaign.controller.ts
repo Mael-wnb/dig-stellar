@@ -8,6 +8,7 @@
 // The leaderboard never carries a full address or a handle.
 // EP2: POST /social and DELETE /social/:id (self-declared tasks). The handle
 // is normalised here and never echoed back.
+// EP3: GET /metrics — public counts only (never an address), cacheable 60 s.
 
 import { Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { CampaignService } from './campaign.service';
@@ -101,5 +102,11 @@ export class CampaignController {
   leaderboard(@Query('address') address?: string) {
     const caller = address != null && address !== '' ? requireAddress(address) : null;
     return this.campaign.leaderboard(caller);
+  }
+
+  @Get('metrics')
+  @Header('Cache-Control', 'public, max-age=60')
+  metrics() {
+    return this.campaign.metrics();
   }
 }
