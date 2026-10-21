@@ -74,8 +74,8 @@ create table if not exists wallet_ownership_proofs (
   user_id uuid,                              -- bound user; NULL = unbound (recovery flow)
   provider text,                             -- wallet kit provider id (e.g. 'freighter'); display only
   nonce text not null,                       -- the consumed challenge
-  signature_variant text not null            -- which SEP-43 byte form the wallet signed
-    constraint wallet_ownership_proofs_variant_check check (signature_variant in ('raw', 'sha256')),
+  signature_variant text not null            -- which byte form the wallet signed: raw utf8, sha256(utf8), or sep53
+    constraint wallet_ownership_proofs_variant_check check (signature_variant in ('raw', 'sha256', 'sep53')),
   verified_at timestamptz not null default now(),
   consumed_at timestamptz                    -- set when an unbound proof is consumed by wallet-connect recovery
 );

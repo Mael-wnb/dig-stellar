@@ -2,8 +2,9 @@
 //   1. SOURCE assertions — the helper's text never contains a secret-bearing
 //      Keypair API, an env read or a signing call (INV-1.2 narrow exception,
 //      docs/security-invariants.md §1).
-//   2. BEHAVIOUR — accepts a genuine Ed25519 signature over the raw message or
-//      its SHA-256 form (and reports which), rejects everything else.
+//   2. BEHAVIOUR — accepts a genuine Ed25519 signature over the raw message,
+//      its SHA-256 form or its SEP-53 form (and reports which), rejects
+//      everything else.
 // This spec file (not the helper) generates throwaway keypairs to sign test
 // vectors — the same pattern as faucet-payout.spec.ts.
 
@@ -55,6 +56,24 @@ describe('verifyWalletSignature', () => {
     const digest = createHash('sha256').update(Buffer.from(message, 'utf8')).digest();
     const sig = signer.sign(digest).toString('base64');
     expect(verifyWalletSignature(address, message, sig)).toEqual({ ok: true, variant: 'sha256' });
+  });
+
+  it('accepts a SEP-53 signature and reports variant=sep53', () => {
+    // SEP-53: Ed25519 over SHA-256(UTF-8("Stellar Signed Message:\n" + message)).
+    // Same construction Freighter 5.49.0 was measured to use (2026-10-21).
+    const prefixed = Buffer.from('Stellar Signed Message:\n' + message, 'utf8');
+    const digest = createHash('sha256').update(prefixed).digest();
+    const sig = signer.sign(digest).toString('base64');
+    expect(verifyWalletSignature(address, message, sig)).toEqual({ ok: true, variant: 'sep53' });
+  });
+
+  it('rejects the SEP-53 prefix without the hash, and the hash without the prefix', () => {
+    const prefixed = Buffer.from('Stellar Signed Message:\n' + message, 'utf8');
+    const unhashed = signer.sign(prefixed).toString('base64');
+    expect(verifyWalletSignature(address, message, unhashed).ok).toBe(false);
+    // sha256(message) without the prefix is the 'sha256' variant, not 'sep53'.
+    const bare = signer.sign(createHash('sha256').update(Buffer.from(message, 'utf8')).digest()).toString('base64');
+    expect(verifyWalletSignature(address, message, bare)).toEqual({ ok: true, variant: 'sha256' });
   });
 
   it('accepts a hex-encoded signature too', () => {
