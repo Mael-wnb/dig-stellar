@@ -1,10 +1,13 @@
 <script setup lang="ts">
-// EarnFaq — Lot EP (EP2). Short, honest answers (English). Numbers here are
-// the API's (rules), never hard-coded; the only fixed facts are the witness
-// window (recon §9.11) and the supported wallets (ep1-wallet-matrix.md).
+// EarnFaq — Lot EP (EP2, trimmed in EP4). Short, honest answers (English).
+// Numbers here are the API's (rules), never hard-coded; the only fixed facts
+// are the witness window (recon §9.11) and the supported wallets
+// (ep1-wallet-matrix.md). EP4 (founder decision 2026-10-21, neutral copy):
+// the "Are points worth anything?" entry is gone and the disclaimer is no
+// longer repeated here — it is rendered once at the top of the Earn view.
 import type { CampaignRules } from '../../api/campaign'
 
-defineProps<{ rules: CampaignRules | null; disclaimer: string | null }>()
+defineProps<{ rules: CampaignRules | null }>()
 </script>
 
 <template>
@@ -14,12 +17,6 @@ defineProps<{ rules: CampaignRules | null; disclaimer: string | null }>()
   >
     <h2 class="m-0 text-[14px] font-bold tracking-[-0.02em]">FAQ</h2>
     <dl class="m-0 mt-[10px] flex flex-col gap-[10px] text-[12.5px] leading-[1.6]">
-      <div>
-        <dt class="font-semibold" style="color: var(--dig-text)">Are points worth anything?</dt>
-        <dd class="m-0" style="color: var(--dig-text-2)">
-          No. {{ disclaimer ?? 'Points have no monetary value and are not convertible to money or tokens.' }}
-        </dd>
-      </div>
       <div>
         <dt class="font-semibold" style="color: var(--dig-text)">Which actions count?</dt>
         <dd class="m-0" style="color: var(--dig-text-2)">

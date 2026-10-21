@@ -1052,7 +1052,6 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
           :disclaimer="pointsDisclaimer"
           caption="Dig points once this deposit is verified on-chain (enrolled wallets)"
         />
-        <span v-if="!isWithdraw && pointsDisclaimer && pointsForAction('blend-deposit') !== null" class="text-[#9a9b99]">{{ pointsDisclaimer }}</span>
       </div>
 
       <!-- STILL PENDING — confirmation polling timed out. Not a failure: the tx was

@@ -1,10 +1,12 @@
 // src/api/campaign.ts
 //
-// Lot EP (EP1 + EP2 + EP3): the ownership-proof + campaign endpoints. POINTS ONLY —
-// the API's disclaimer travels in every campaign payload; the web renders it
-// and never computes points, streaks or multipliers (recon §6). Every type
-// below mirrors apps/api/src/modules/campaign/*.service.ts payloads 1:1; the
-// EP1 routes are a frozen contract.
+// Lot EP (EP1 + EP2 + EP3 + EP4): the ownership-proof + campaign endpoints.
+// POINTS ONLY — the API's disclaimer travels in every campaign payload; the web
+// renders it ONCE (top of the Earn view) and never computes points, streaks or
+// multipliers (recon §6). Every type below mirrors
+// apps/api/src/modules/campaign/*.service.ts payloads 1:1; the EP1 routes are a
+// frozen contract. EP4 adds the daily-ramp rules block, today's figures on /me
+// and GET /campaign/me/activity.
 import { apiFetch } from "./client";
 
 // --- Ownership proof (EP1) --------------------------------------------------
@@ -56,6 +58,8 @@ export function verifyAuthChallenge(payload: {
 // --- Campaign (EP1 reads/writes, EP2 social) --------------------------------
 
 export type ActionKind = "sdex-swap" | "blend-deposit" | "blend-withdraw";
+/** EP4: the two kinds that earn points (withdraws never do). */
+export type AwardableActionKind = "sdex-swap" | "blend-deposit";
 export type SocialTaskKey = "x-follow" | "x-repost" | "community-join";
 /** EP3: non-monetary perk tiers (badge / beta flag / early access), never money. */
 export type PerkKey = "early-access" | "beta-features" | "priority-rwa";
@@ -95,7 +99,20 @@ export interface SocialTaskEntry {
 export interface CampaignRules {
   actions: Record<ActionKind, { basePoints: number; dailyCap: number; requiresMinNotional: boolean }>;
   streakDailyPoints: number;
-  streakMultipliers: Array<{ minDays: number; multiplier: number }>;
+  /**
+   * EP4: the daily ramp — multiplier = min(1 + stepPerDay × streak days, cap),
+   * computed by the API on the day BEFORE an action. `ladder` lists days
+   * 1..daysToCap with the multiplier each gives. OPTIONAL on the web side:
+   * while an older API is still live the Earn view must render without it
+   * (no bar, no multiplier labels), never throw.
+   */
+  streak?: {
+    stepPerDay: number;
+    cap: number;
+    dailyPoints: number;
+    daysToCap: number;
+    ladder: Array<{ days: number; multiplier: number }>;
+  };
   socialTasks: Record<SocialTaskKey, SocialTaskEntry>;
   socialDailyCap: number;
   referral: { referrer: number; referee: number };
@@ -130,7 +147,26 @@ export interface CampaignMe {
   referralCode: string | null;
   referredBy: string | null;
   balance: number;
-  streak: { current: number; multiplierForToday: number };
+  // EP4 fields are OPTIONAL on the web side (deploy order: an older API may
+  // still answer while this web is live); every surface renders without them.
+  /** EP4: points counted on today's UTC day (sum over the ledger, adjust rows included). */
+  pointsToday?: number;
+  /** EP4: action awards counted today vs the daily cap, per awardable kind. */
+  actionsToday?: Record<AwardableActionKind, { counted: number; cap: number }>;
+  /** EP4: verified actions in the window with no points row yet, per kind (sum = pendingVerification). */
+  pendingByKind?: Record<AwardableActionKind, number>;
+  streak: {
+    current: number;
+    /** Fixed on the day before (D-1) by the API: today's check-in changes tomorrow, never today. */
+    multiplierForToday: number;
+    /** EP4: check-in days still needed before the streak reaches the cap length (0 = reached). */
+    daysToCap?: number;
+    /**
+     * EP4: the last 7 UTC days ending today, oldest first; `multiplier` is the
+     * one that applied ON that day (D-1 rule), computed by the API.
+     */
+    last7?: Array<{ day: string; checkedIn: boolean; multiplier: number }>;
+  };
   checkedInToday: boolean;
   pendingVerification: number;
   tasks: CampaignTask[];
@@ -140,6 +176,24 @@ export interface CampaignMe {
   nextPerk: { key: PerkKey; threshold: number; pointsRemaining: number } | null;
   /** EP3: gating flags derived by the API from the perks (nothing gated yet). */
   flags: { beta: boolean };
+  disclaimer: string;
+}
+
+/** EP4: one GET /campaign/me/activity row; txHashShort is the API's 8-char form, action rows only. */
+export interface CampaignActivityRow {
+  reason: string;
+  points: number;
+  multiplier: number;
+  countedDay: string | null;
+  createdAt: string;
+  txHashShort: string | null;
+}
+
+export interface CampaignActivity {
+  campaign: number;
+  address: string;
+  /** Newest first, at most 20. */
+  rows: CampaignActivityRow[];
   disclaimer: string;
 }
 
@@ -198,6 +252,11 @@ export function fetchCampaignMe(address: string, userId: string): Promise<Campai
   const qs = `?address=${encodeURIComponent(address)}&userId=${encodeURIComponent(userId)}`;
   // Polled after every write: never serve it from the HTTP cache.
   return apiFetch<CampaignMe>(`/campaign/me${qs}`, { cache: "no-store" });
+}
+
+export function fetchCampaignActivity(address: string, userId: string): Promise<CampaignActivity> {
+  const qs = `?address=${encodeURIComponent(address)}&userId=${encodeURIComponent(userId)}`;
+  return apiFetch<CampaignActivity>(`/campaign/me/activity${qs}`, { cache: "no-store" });
 }
 
 export function fetchCampaignMetrics(): Promise<CampaignMetrics> {

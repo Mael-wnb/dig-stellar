@@ -14,9 +14,9 @@
 // H2 (Lot H): `compact` renders the SAME three actions and copy at panel
 // density — tiles stacked vertically, no own card chrome — for embedding in
 // the dashboard "Your positions" panel. No forked variant, one component.
-import { computed, onMounted, ref } from 'vue'
-import { fetchPools } from '../../api/pools'
-import type { PoolListItem } from '../../types/protocol'
+import { computed, onMounted } from 'vue'
+import { useAdvertisedBlendPool } from '../../composables/useAdvertisedBlendPool'
+import { blendDepositActionContext, sdexSwapActionContext } from '../../lib/advertisedBlendPool'
 import { useModals } from '../../composables/useModals'
 import { useNetwork } from '../../composables/useNetwork'
 import FreshnessChip from '../FreshnessChip.vue'
@@ -35,28 +35,15 @@ const { pointsForAction, disclaimer: campaignDisclaimer, refreshCampaign } = use
 
 const isMainnet = computed(() => network.value === 'mainnet')
 
-// Pick a real Blend pool to surface a live supply APY + its freshness. We prefer
-// the highest-APY Blend pool that actually reports one; null → we simply omit the
-// number (honest: no fabricated APY, the deposit action still works).
-const blendPool = ref<PoolListItem | null>(null)
+// The real Blend pool whose live supply APY + freshness the tile surfaces
+// (highest finite APY; null → no fabricated number, the deposit still works).
+// EP4: the selection lives in lib/advertisedBlendPool + useAdvertisedBlendPool,
+// shared with the Earn "Earn more" card so both CTAs open the SAME pool.
+const { advertisedPool: blendPool, load: loadAdvertisedPool } = useAdvertisedBlendPool()
 
-onMounted(async () => {
+onMounted(() => {
   void refreshCampaign()
-  try {
-    const pools = await fetchPools()
-    const blend = pools.filter(
-      (p) =>
-        p.protocol.id === 'blend' &&
-        p.metrics.supplyApy !== null &&
-        p.metrics.supplyApy !== undefined &&
-        Number.isFinite(p.metrics.supplyApy),
-    )
-    blend.sort((a, b) => (b.metrics.supplyApy ?? 0) - (a.metrics.supplyApy ?? 0))
-    blendPool.value = blend[0] ?? null
-  } catch {
-    // No pool data → the Blend tile still works, just without the APY figure.
-    blendPool.value = null
-  }
+  void loadAdvertisedPool()
 })
 
 const apyLabel = computed(() => {
@@ -66,24 +53,11 @@ const apyLabel = computed(() => {
 })
 
 function trySwap() {
-  openAction({
-    slug: 'sdex-swap',
-    name: 'Swap XLM ↔ USDC',
-    venue: 'Stellar DEX',
-    kind: 'amm',
-  })
+  openAction(sdexSwapActionContext())
 }
 
 function depositBlend() {
-  const p = blendPool.value
-  openAction({
-    slug: p?.id ?? 'blend',
-    name: p?.name ?? 'Blend pool',
-    venue: p?.protocol.name ?? 'Blend',
-    kind: 'lending',
-    // A5: act on the pool this card advertised (undefined → network default).
-    poolSlug: p?.id,
-  })
+  openAction(blendDepositActionContext(blendPool.value))
 }
 </script>
 
@@ -175,9 +149,6 @@ function depositBlend() {
     <div class="text-[11.5px] mt-[16px]" style="color: var(--dig-faint)">
       Non-custodial: you sign everything in your own wallet. Dig never holds your keys or funds.
     </div>
-    <!-- Lot EP (EP2): the points disclaimer ONCE per surface (under the card, not under each chip). -->
-    <div v-if="campaignDisclaimer && pointsForAction('sdex-swap') !== null" class="text-[11px] mt-[6px] leading-[1.5]" style="color: var(--dig-faint)">
-      {{ campaignDisclaimer }}
-    </div>
+    <!-- Lot EP (EP4): the campaign line is rendered once, on the Earn view only. -->
   </div>
 </template>

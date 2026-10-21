@@ -21,9 +21,11 @@ import {
   deleteSocialClaim,
   enrollCampaign,
   fetchCampaign,
+  fetchCampaignActivity,
   fetchCampaignLeaderboard,
   fetchCampaignMe,
   type ActionKind,
+  type CampaignActivity,
   type CampaignLeaderboard,
   type CampaignMe,
   type CampaignState,
@@ -53,6 +55,8 @@ const REFRESH_MS = 60_000;
 const me = ref<CampaignMe | null>(null);
 const meLoading = ref(false);
 const leaderboard = ref<CampaignLeaderboard | null>(null);
+/** EP4: the connected wallet's last ledger rows (GET /campaign/me/activity); refreshed with /me. */
+const activity = ref<CampaignActivity | null>(null);
 
 async function refreshCampaign(force = false): Promise<void> {
   const now = Date.now();
@@ -96,10 +100,24 @@ export function useCampaign() {
     return pointsForActionIn(campaign.value, kind);
   }
 
+  async function refreshActivity(): Promise<void> {
+    const id = identity.value;
+    if (!id) {
+      activity.value = null;
+      return;
+    }
+    try {
+      activity.value = await fetchCampaignActivity(id.address, id.userId);
+    } catch {
+      activity.value = null;
+    }
+  }
+
   async function refreshMe(): Promise<void> {
     const id = identity.value;
     if (!id) {
       me.value = null;
+      activity.value = null;
       return;
     }
     meLoading.value = true;
@@ -110,6 +128,8 @@ export function useCampaign() {
     } finally {
       meLoading.value = false;
     }
+    // EP4: every write path calls refreshMe, so the feed follows the balance.
+    await refreshActivity();
   }
 
   async function refreshLeaderboard(): Promise<void> {
@@ -182,12 +202,14 @@ export function useCampaign() {
     me,
     meLoading,
     leaderboard,
+    activity,
     identity,
     walletCanSignMessages,
     pendingReferralCode,
     pointsForAction,
     refreshCampaign,
     refreshMe,
+    refreshActivity,
     refreshLeaderboard,
     enroll,
     checkin,

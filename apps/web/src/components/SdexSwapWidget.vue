@@ -643,7 +643,6 @@ function reset() {
           :disclaimer="pointsDisclaimer"
           caption="Dig points once this swap is verified on-chain (enrolled wallets)"
         />
-        <span v-if="pointsDisclaimer && pointsForAction('sdex-swap') !== null" style="color: var(--dig-faint)">{{ pointsDisclaimer }}</span>
       </div>
 
       <!-- ERROR -->
