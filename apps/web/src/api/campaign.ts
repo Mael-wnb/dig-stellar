@@ -1,6 +1,6 @@
 // src/api/campaign.ts
 //
-// Lot EP (EP1 + EP2): the ownership-proof + campaign endpoints. POINTS ONLY —
+// Lot EP (EP1 + EP2 + EP3): the ownership-proof + campaign endpoints. POINTS ONLY —
 // the API's disclaimer travels in every campaign payload; the web renders it
 // and never computes points, streaks or multipliers (recon §6). Every type
 // below mirrors apps/api/src/modules/campaign/*.service.ts payloads 1:1; the
@@ -57,6 +57,8 @@ export function verifyAuthChallenge(payload: {
 
 export type ActionKind = "sdex-swap" | "blend-deposit" | "blend-withdraw";
 export type SocialTaskKey = "x-follow" | "x-repost" | "community-join";
+/** EP3: non-monetary perk tiers (badge / beta flag / early access), never money. */
+export type PerkKey = "early-access" | "beta-features" | "priority-rwa";
 
 export type CampaignInactiveReason =
   | "campaign-disabled"
@@ -97,6 +99,8 @@ export interface CampaignRules {
   socialTasks: Record<SocialTaskKey, SocialTaskEntry>;
   socialDailyCap: number;
   referral: { referrer: number; referee: number };
+  /** EP3: the tiers, ascending by threshold; the copy for each key lives in PerksBlock. */
+  perks: Array<{ key: PerkKey; threshold: number }>;
 }
 
 export interface CampaignState {
@@ -130,7 +134,34 @@ export interface CampaignMe {
   checkedInToday: boolean;
   pendingVerification: number;
   tasks: CampaignTask[];
-  perks: string[];
+  /** EP3: granted by the award job; a perk once granted stays listed. */
+  perks: Array<{ key: PerkKey; grantedAt: string }>;
+  /** EP3: lowest tier not granted yet; pointsRemaining 0 = reached, granted at the next job tick. */
+  nextPerk: { key: PerkKey; threshold: number; pointsRemaining: number } | null;
+  /** EP3: gating flags derived by the API from the perks (nothing gated yet). */
+  flags: { beta: boolean };
+  disclaimer: string;
+}
+
+/** EP3: GET /campaign/metrics — public counts with the API's boundary string. */
+export interface CampaignMetrics {
+  campaign: number;
+  active: boolean;
+  reason?: CampaignInactiveReason;
+  /** Disabled or no start date: every count is 0 and the status section hides. */
+  dark: boolean;
+  window: { startsAt: string | null; endsAt: string | null };
+  asOf: string;
+  walletsRegisteredInWindow: number;
+  walletsProvenInWindow: number;
+  walletsEnrolled: number;
+  walletsWithVerifiedActionInWindow: number;
+  verifiedActionsByKind: Record<ActionKind, number>;
+  referralsCredited: number;
+  socialClaimsActive: number;
+  pointsIssued: number;
+  perksGranted: Record<PerkKey, number>;
+  boundary: string;
   disclaimer: string;
 }
 
@@ -167,6 +198,10 @@ export function fetchCampaignMe(address: string, userId: string): Promise<Campai
   const qs = `?address=${encodeURIComponent(address)}&userId=${encodeURIComponent(userId)}`;
   // Polled after every write: never serve it from the HTTP cache.
   return apiFetch<CampaignMe>(`/campaign/me${qs}`, { cache: "no-store" });
+}
+
+export function fetchCampaignMetrics(): Promise<CampaignMetrics> {
+  return apiFetch<CampaignMetrics>("/campaign/metrics");
 }
 
 export function fetchCampaignLeaderboard(address?: string | null): Promise<CampaignLeaderboard> {

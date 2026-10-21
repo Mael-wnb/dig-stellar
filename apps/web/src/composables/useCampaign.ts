@@ -78,6 +78,8 @@ export function useCampaign() {
 
   const active = computed(() => !!campaign.value?.active);
   const rules = computed(() => campaign.value?.rules ?? null);
+  /** EP3: gating flags straight from /me (derived by the API from granted perks). Nothing is gated yet. */
+  const flags = computed(() => me.value?.flags ?? { beta: false });
   const disclaimer = computed(() => campaign.value?.disclaimer ?? me.value?.disclaimer ?? null);
 
   /** Both halves the campaign writes need: the connected signer AND the app user. */
@@ -170,6 +172,7 @@ export function useCampaign() {
     campaign,
     active,
     rules,
+    flags,
     disclaimer,
     me,
     meLoading,

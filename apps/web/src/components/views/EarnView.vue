@@ -10,6 +10,7 @@ import EnrollCard from '../earn/EnrollCard.vue'
 import StreakStrip from '../earn/StreakStrip.vue'
 import TasksList from '../earn/TasksList.vue'
 import ReferralCard from '../earn/ReferralCard.vue'
+import PerksBlock from '../earn/PerksBlock.vue'
 import LeaderboardTable from '../earn/LeaderboardTable.vue'
 import EarnFaq from '../earn/EarnFaq.vue'
 import type { CampaignTask, SocialTaskKey } from '../../api/campaign'
@@ -131,7 +132,6 @@ const catalogueTasks = computed<CampaignTask[]>(() => {
           </span>
           <span v-else>No action awaiting verification</span>
           <span v-if="leaderboard?.me">Rank #{{ leaderboard.me.rank }} on the leaderboard</span>
-          <span v-if="me.perks.length">Perks: {{ me.perks.join(', ') }}</span>
         </div>
       </section>
 
@@ -139,6 +139,7 @@ const catalogueTasks = computed<CampaignTask[]>(() => {
 
       <div v-if="enrolled && me && rules" class="mt-[14px] flex flex-col gap-[14px]">
         <StreakStrip :me="me" :rules="rules" />
+        <PerksBlock :me="me" :rules="rules" />
         <TasksList :tasks="me.tasks" enrolled />
         <ReferralCard v-if="me.referralCode" :code="me.referralCode" :rules="rules" />
       </div>

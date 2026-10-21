@@ -29,6 +29,7 @@ const state = (active: boolean, swapPoints: number): CampaignState => ({
     },
     socialDailyCap: 50,
     referral: { referrer: 100, referee: 50 },
+    perks: [{ key: 'early-access', threshold: 100 }],
   },
   disclaimer: 'DISCLAIMER-FROM-API',
 })

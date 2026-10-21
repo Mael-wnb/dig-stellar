@@ -7,6 +7,7 @@
 // uptime probe.
 import { computed } from 'vue'
 import StatusBar from '../status/StatusBar.vue'
+import CampaignMetricsSection from '../status/CampaignMetricsSection.vue'
 import { useOpsStatus } from '../../composables/useOpsStatus'
 import { useBridgeUpstreamPaused } from '../../composables/useBridge'
 import { SEVERITY_STYLE } from '../../composables/useAlerts'
@@ -310,5 +311,9 @@ const LEGEND = [
         an external uptime probe of the API or the dashboard.
       </p>
     </template>
+
+    <!-- Lot EP (EP3): public campaign counts, independent of the pipeline state above.
+         Renders nothing while the campaign is dark. -->
+    <CampaignMetricsSection />
   </div>
 </template>
