@@ -21,6 +21,7 @@ import {
   campaignEndsAt,
   campaignStartsAt,
   isCampaignEnabled,
+  xRepostUrl,
 } from './campaign-config';
 import {
   ACTION_RULES,
@@ -41,6 +42,7 @@ import {
   streakMultiplier,
   type CampaignInactiveReason,
   type CampaignWindow,
+  type SocialTaskKey,
   type WriteIneligibleReason,
 } from './campaign-rules';
 import {
@@ -70,6 +72,17 @@ export type VerifyPayload =
     }
   | { ok: false; reason: 'challenge-invalid-or-expired' | 'signature-invalid' };
 
+/**
+ * EP2: one social task as the UI sees it. `url` is where to do it (the X post
+ * for x-repost comes from CAMPAIGN_X_REPOST_URL; null when unset), `available`
+ * false = listed as not yet open and refused by the claim rule.
+ */
+export interface SocialTaskEntry {
+  points: number;
+  url: string | null;
+  available: boolean;
+}
+
 export interface CampaignPayload {
   campaign: number;
   active: boolean;
@@ -80,7 +93,7 @@ export interface CampaignPayload {
     actions: typeof ACTION_RULES;
     streakDailyPoints: number;
     streakMultipliers: typeof STREAK_MULTIPLIERS;
-    socialTasks: typeof SOCIAL_TASKS;
+    socialTasks: Record<SocialTaskKey, SocialTaskEntry>;
     socialDailyCap: number;
     referral: typeof REFERRAL_POINTS;
   };
@@ -108,6 +121,8 @@ export interface MePayload {
   streak: { current: number; multiplierForToday: number };
   checkedInToday: boolean;
   pendingVerification: number;
+  /** EP2: the social task catalogue with this wallet's claimed state (never the handle). */
+  tasks: Array<SocialTaskEntry & { key: SocialTaskKey; claimed: boolean; claimId: string | null; claimedAt: string | null }>;
   perks: string[];
   disclaimer: string;
 }
@@ -189,6 +204,16 @@ export class CampaignService {
 
   // --- Public campaign state ------------------------------------------------
 
+  /** EP2: the social task catalogue (points from the rules, x-repost URL from the env). */
+  socialTaskCatalogue(): Record<SocialTaskKey, SocialTaskEntry> {
+    const repost = xRepostUrl();
+    return {
+      'x-follow': { points: SOCIAL_TASKS['x-follow'], url: null, available: true },
+      'x-repost': { points: SOCIAL_TASKS['x-repost'], url: repost, available: repost != null },
+      'community-join': { points: SOCIAL_TASKS['community-join'], url: null, available: true },
+    };
+  }
+
   getCampaign(): CampaignPayload {
     const w = this.window();
     const status = campaignStatus(w);
@@ -202,7 +227,7 @@ export class CampaignService {
         actions: ACTION_RULES,
         streakDailyPoints: STREAK_DAILY_POINTS,
         streakMultipliers: STREAK_MULTIPLIERS,
-        socialTasks: SOCIAL_TASKS,
+        socialTasks: this.socialTaskCatalogue(),
         socialDailyCap: SOCIAL_DAILY_CAP,
         referral: REFERRAL_POINTS,
       },
@@ -290,7 +315,7 @@ export class CampaignService {
   async me(params: { address: string; userId: string }): Promise<MePayload> {
     const w = this.window();
     const status = campaignStatus(w);
-    const [proven, enrollment, balance, days, today, referredBy, pendingVerification] = await Promise.all([
+    const [proven, enrollment, balance, days, today, referredBy, pendingVerification, socialClaims] = await Promise.all([
       this.repo.hasBoundProof(params.address, params.userId),
       this.repo.findEnrollment(CAMPAIGN_ID, params.address),
       this.repo.balance(CAMPAIGN_ID, params.address),
@@ -298,6 +323,7 @@ export class CampaignService {
       this.repo.todayUtc(),
       this.repo.referredByCode(CAMPAIGN_ID, params.address),
       this.repo.pendingVerificationCount(CAMPAIGN_ID, params.address, w),
+      this.repo.listSocialClaims(CAMPAIGN_ID, params.address),
     ]);
     const daySet = new Set(days);
     const checkedInToday = daySet.has(today);
@@ -317,6 +343,16 @@ export class CampaignService {
       streak: { current, multiplierForToday: streakMultiplier(streakLengthBefore(daySet, today)) },
       checkedInToday,
       pendingVerification,
+      tasks: (Object.entries(this.socialTaskCatalogue()) as Array<[SocialTaskKey, SocialTaskEntry]>).map(([key, entry]) => {
+        const claim = socialClaims.find((c) => c.task_key === key) ?? null;
+        return {
+          key,
+          ...entry,
+          claimed: claim != null,
+          claimId: claim?.id ?? null,
+          claimedAt: claim?.claimed_at.toISOString() ?? null,
+        };
+      }),
       perks: [],
       disclaimer: DISCLAIMER,
     };

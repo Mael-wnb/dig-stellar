@@ -61,3 +61,19 @@ export function campaignEndsAt(): Date | null {
   const parsed = new Date(raw);
   return Number.isFinite(parsed.getTime()) ? parsed : null;
 }
+
+/**
+ * EP2: the campaign post to repost (CAMPAIGN_X_REPOST_URL, https URL), served
+ * in GET /v1/campaign rules.socialTasks['x-repost'].url. When unset the task is
+ * listed as not yet available and cannot be claimed. Lazy like every flag.
+ */
+export function xRepostUrl(): string | null {
+  const raw = process.env.CAMPAIGN_X_REPOST_URL?.trim();
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    return u.protocol === 'https:' ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}

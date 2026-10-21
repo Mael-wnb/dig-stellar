@@ -6,10 +6,20 @@
 // for malformed input. Every payload carries the no-monetary-value disclaimer.
 // Public reads: GET /v1/campaign is cacheable (60 s); /me is no-store (polled).
 // The leaderboard never carries a full address or a handle.
+// EP2: POST /social and DELETE /social/:id (self-declared tasks). The handle
+// is normalised here and never echoed back.
 
-import { Body, Controller, Get, Header, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { CampaignService } from './campaign.service';
-import { optionalReferralCode, requireAddress, requireUserId } from './request-validation';
+import { CampaignSocialService } from './campaign-social.service';
+import {
+  optionalReferralCode,
+  requireAddress,
+  requireClaimId,
+  requireHandle,
+  requireTaskKey,
+  requireUserId,
+} from './request-validation';
 
 interface EnrollBody {
   address?: string;
@@ -22,9 +32,17 @@ interface CheckinBody {
   userId?: string;
 }
 
+interface SocialClaimBody extends CheckinBody {
+  task?: string;
+  handle?: string;
+}
+
 @Controller('v1/campaign')
 export class CampaignController {
-  constructor(private readonly campaign: CampaignService) {}
+  constructor(
+    private readonly campaign: CampaignService,
+    private readonly social: CampaignSocialService,
+  ) {}
 
   @Get()
   @Header('Cache-Control', 'public, max-age=60')
@@ -48,6 +66,27 @@ export class CampaignController {
     return this.campaign.checkin({
       address: requireAddress(body?.address),
       userId: requireUserId(body?.userId),
+    });
+  }
+
+  @Post('social')
+  @HttpCode(HttpStatus.OK)
+  claimSocial(@Body() body?: SocialClaimBody) {
+    return this.social.claim({
+      address: requireAddress(body?.address),
+      userId: requireUserId(body?.userId),
+      task: requireTaskKey(body?.task),
+      handle: requireHandle(body?.handle),
+    });
+  }
+
+  @Delete('social/:id')
+  @HttpCode(HttpStatus.OK)
+  deleteSocial(@Param('id') id?: string, @Body() body?: CheckinBody) {
+    return this.social.remove({
+      address: requireAddress(body?.address),
+      userId: requireUserId(body?.userId),
+      id: requireClaimId(id),
     });
   }
 

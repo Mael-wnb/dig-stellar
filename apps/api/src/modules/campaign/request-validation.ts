@@ -8,12 +8,14 @@
 
 import { BadRequestException } from '@nestjs/common';
 import { REFERRAL_CODE_RE } from './campaign-rules';
+import { HANDLE_RE, normaliseHandle } from './social-claims';
 
 export const STELLAR_PUBKEY_RE = /^G[A-Z2-7]{55}$/;
 export const NONCE_RE = /^[0-9a-f]{32}$/;
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_SIGNATURE_CHARS = 512;
 const MAX_PROVIDER_CHARS = 64;
+const MAX_TASK_KEY_CHARS = 32;
 
 export function requireAddress(value: unknown, field = 'address'): string {
   const v = typeof value === 'string' ? value.trim() : '';
@@ -60,5 +62,29 @@ export function optionalReferralCode(value: unknown): string | null {
   if (value == null || value === '') return null;
   const v = typeof value === 'string' ? value.trim().toUpperCase() : '';
   if (!REFERRAL_CODE_RE.test(v)) throw new BadRequestException('referralCode must be 8 characters (A-Z, 2-9)');
+  return v;
+}
+
+// --- Lot EP (EP2): social tasks ---------------------------------------------
+
+/** Syntactic only: a short string. Whether it names a task is the rules' decision ('unknown-task'). */
+export function requireTaskKey(value: unknown): string {
+  const v = typeof value === 'string' ? value.trim() : '';
+  if (!v || v.length > MAX_TASK_KEY_CHARS) throw new BadRequestException('task must be a short string');
+  return v;
+}
+
+/** Normalised (lowercase, leading @ stripped) and validated; the raw value is never kept. */
+export function requireHandle(value: unknown): string {
+  const v = typeof value === 'string' ? normaliseHandle(value) : '';
+  if (!HANDLE_RE.test(v)) {
+    throw new BadRequestException('handle must be 1-32 characters: letters, digits, "_" or "."');
+  }
+  return v;
+}
+
+export function requireClaimId(value: unknown): string {
+  const v = typeof value === 'string' ? value.trim() : '';
+  if (!UUID_RE.test(v)) throw new BadRequestException('id must be a UUID');
   return v;
 }

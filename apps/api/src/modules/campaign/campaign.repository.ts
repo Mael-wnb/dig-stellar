@@ -29,6 +29,7 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../db/prisma.service';
 import { STREAK_DAILY_POINTS, type ActionKind } from './campaign-rules';
 import type { SignatureVariant } from './verify-wallet-signature';
+import { listSocialClaims, type SocialClaimRow } from './social-claims.queries';
 
 type Db = PrismaService | Prisma.TransactionClient;
 
@@ -455,6 +456,16 @@ export class CampaignRepository {
       `select (now() at time zone 'utc')::date::text as day`,
     )) as Array<{ day: string }>;
     return rows[0].day;
+  }
+
+  // -------------------------------------------------------------------------
+  // Social tasks (EP2): the SQL lives in social-claims.queries.ts; the writes
+  // run inside transaction() from CampaignSocialService. Only the /me read is
+  // exposed here (no handle in the row).
+  // -------------------------------------------------------------------------
+
+  async listSocialClaims(campaign: number, address: string): Promise<SocialClaimRow[]> {
+    return listSocialClaims(this.db, campaign, address);
   }
 
   // -------------------------------------------------------------------------

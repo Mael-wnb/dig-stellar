@@ -44,7 +44,7 @@ type Fake = jest.Mocked<Pick<
   | 'createChallenge' | 'deleteStaleChallenges' | 'consumeChallenge' | 'upsertBoundProof' | 'insertUnboundProof'
   | 'hasBoundProof' | 'findEnrollment' | 'findEnrollmentByCode' | 'insertEnrollmentWithCodeRetry' | 'insertReferral'
   | 'referredByCode' | 'checkinToday' | 'checkinDays' | 'todayUtc' | 'balance' | 'leaderboard' | 'rankOf'
-  | 'pendingVerificationCount' | 'transaction'
+  | 'pendingVerificationCount' | 'listSocialClaims' | 'transaction'
 >>;
 
 function fakeRepo(): Fake {
@@ -69,6 +69,7 @@ function fakeRepo(): Fake {
     leaderboard: jest.fn().mockResolvedValue([]),
     rankOf: jest.fn().mockResolvedValue(null),
     pendingVerificationCount: jest.fn().mockResolvedValue(0),
+    listSocialClaims: jest.fn().mockResolvedValue([]),
     transaction: jest.fn(),
   } as unknown as Fake;
   // transaction(fn) hands the same fake back, so writes are observable.
@@ -328,6 +329,34 @@ describe('me', () => {
     const afterCheckin = await service(repo).me({ address: ADDRESS, userId: USER });
     expect(afterCheckin.streak).toEqual({ current: 8, multiplierForToday: 1.2 }); // still from D-1 (7 days)
     expect(afterCheckin.checkedInToday).toBe(true);
+  });
+
+  it('EP2: tasks lists the whole catalogue with claimed state and claim id, never a handle', async () => {
+    liveEnv();
+    const repo = fakeRepo();
+    repo.findEnrollment.mockResolvedValue(enrollmentRow());
+    repo.listSocialClaims.mockResolvedValue([
+      { id: '33333333-3333-4333-8333-333333333333', campaign: CAMPAIGN_ID, address: ADDRESS, task_key: 'x-follow', claimed_at: new Date('2026-10-16T08:00:00Z') },
+    ]);
+    const out = await service(repo).me({ address: ADDRESS, userId: USER });
+    expect(out.tasks).toEqual([
+      { key: 'x-follow', points: 20, url: null, available: true, claimed: true, claimId: '33333333-3333-4333-8333-333333333333', claimedAt: '2026-10-16T08:00:00.000Z' },
+      { key: 'x-repost', points: 10, url: null, available: false, claimed: false, claimId: null, claimedAt: null },
+      { key: 'community-join', points: 20, url: null, available: true, claimed: false, claimId: null, claimedAt: null },
+    ]);
+    expect(JSON.stringify(out)).not.toContain('handle');
+  });
+
+  it('EP2: x-repost carries CAMPAIGN_X_REPOST_URL (https only) and is available only when it is set', () => {
+    const svc = service(fakeRepo());
+    delete process.env.CAMPAIGN_X_REPOST_URL;
+    expect(svc.getCampaign().rules.socialTasks['x-repost']).toEqual({ points: 10, url: null, available: false });
+    process.env.CAMPAIGN_X_REPOST_URL = 'http://x.com/not-https';
+    expect(svc.getCampaign().rules.socialTasks['x-repost']).toEqual({ points: 10, url: null, available: false });
+    process.env.CAMPAIGN_X_REPOST_URL = ' https://x.com/Dig_Agentic/status/123 ';
+    expect(svc.getCampaign().rules.socialTasks['x-repost']).toEqual({ points: 10, url: 'https://x.com/Dig_Agentic/status/123', available: true });
+    expect(svc.getCampaign().rules.socialTasks['x-follow']).toEqual({ points: 20, url: null, available: true });
+    delete process.env.CAMPAIGN_X_REPOST_URL;
   });
 
   it('a broken streak reads 0 and x1.0; a dark campaign still answers with reason', async () => {
