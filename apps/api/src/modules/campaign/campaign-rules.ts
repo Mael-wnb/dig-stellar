@@ -8,8 +8,9 @@
 // functions — there is one decision procedure per rule.
 //
 // POINTS ONLY. Points have no monetary value and are not convertible to money
-// or tokens (DISCLAIMER below travels in every API payload). Nothing here is a
-// reward amount, a price or a yield; points are never folded into an APY.
+// or tokens (internal position, docs/decisions/2026-10-21-points-have-no-monetary-value.md;
+// the DISCLAIMER below is the neutral user-facing line and travels in every API
+// payload). Nothing here is a price or a yield; points are never folded into an APY.
 //
 // Founder-decided values (2026-10-15, Lot EP gate 1; gate 1-bis 2026-10-16).
 // The ledger stores base_points, multiplier and points per row, so changing
@@ -18,9 +19,15 @@
 // "Day" is always UTC, explicitly: utcDay() here, (now() at time zone 'utc')::date
 // in SQL. Never the server's or the user's local time zone.
 
-export const DISCLAIMER =
-  'Points have no monetary value and are not convertible to money or tokens. ' +
-  'They only unlock non-monetary perks such as beta or early access.';
+/**
+ * EP4 (founder decision 2026-10-21): NEUTRAL copy — no promise, no denial.
+ * The internal position is unchanged (points are non-monetary, see
+ * docs/decisions/2026-10-21-points-have-no-monetary-value.md); the user-facing
+ * line simply does not raise the question. Rendered ONCE at the top of the
+ * Earn view, nowhere else. Must never mention a token, an airdrop or a reward
+ * (challenge-message.spec.ts and campaign-rules.spec.ts forbid those words).
+ */
+export const DISCLAIMER = 'Points unlock perks on Dig as the campaign grows.';
 
 export type ActionKind = 'sdex-swap' | 'blend-deposit' | 'blend-withdraw';
 
@@ -62,14 +69,22 @@ export const ACTION_RULES: Readonly<Record<ActionKind, ActionRule>> = {
 export const STREAK_DAILY_POINTS = 5;
 
 /**
- * Applied to ACTION points only, from the streak length ending on the UTC day
- * BEFORE the action's day (streakLengthBefore). See actionAward.
+ * EP4 (founder decision 2026-10-21): the streak multiplier is a DAILY RAMP,
+ *   multiplier = min(1 + stepPerDay × streakDaysBeforeDay, cap)
+ * i.e. 0 → ×1.00, 1 → ×1.05, 4 → ×1.20, 6 → ×1.30, 7+ → ×1.35. Applied to
+ * ACTION points only, from the streak length ending on the UTC day BEFORE the
+ * action's day (streakLengthBefore, determinism rule unchanged). Replaces the
+ * 7-day / 30-day tiers of EP1; ledger history is untouched (every row stores
+ * its own multiplier), only awards written after the change use the ramp.
  */
-export const STREAK_MULTIPLIERS: ReadonlyArray<{ minDays: number; multiplier: number }> = [
-  { minDays: 30, multiplier: 1.35 },
-  { minDays: 7, multiplier: 1.2 },
-  { minDays: 0, multiplier: 1 },
-];
+export const STREAK_RAMP = { stepPerDay: 0.05, cap: 1.35 } as const;
+
+/** Integer hundredths so 0.05 × 3 is exactly 115, never 1.1500000000000001. */
+const RAMP_STEP_HUNDREDTHS = Math.round(STREAK_RAMP.stepPerDay * 100);
+const RAMP_CAP_HUNDREDTHS = Math.round(STREAK_RAMP.cap * 100);
+
+/** Streak length (days before D) at which the ramp reaches its cap: 7. */
+export const STREAK_DAYS_TO_CAP = Math.ceil((RAMP_CAP_HUNDREDTHS - 100) / RAMP_STEP_HUNDREDTHS);
 
 export const SOCIAL_TASKS: Readonly<Record<SocialTaskKey, number>> = {
   'x-follow': 20,
@@ -123,10 +138,29 @@ export function streakLengthBefore(checkinDays: ReadonlySet<string>, day: string
 }
 
 export function streakMultiplier(streakDays: number): number {
-  for (const tier of STREAK_MULTIPLIERS) {
-    if (streakDays >= tier.minDays) return tier.multiplier;
-  }
-  return 1;
+  const days = Math.max(0, Math.floor(streakDays));
+  const hundredths = Math.min(100 + RAMP_STEP_HUNDREDTHS * days, RAMP_CAP_HUNDREDTHS);
+  return hundredths / 100;
+}
+
+/**
+ * The ramp as a ladder the web renders verbatim (one entry per streak length
+ * from 1 to STREAK_DAYS_TO_CAP): the multiplier that streak length gives to
+ * the NEXT day's actions. Served in GET /v1/campaign rules.streak.ladder so
+ * nothing in apps/web computes a multiplier.
+ */
+export function streakLadder(): Array<{ days: number; multiplier: number }> {
+  const ladder: Array<{ days: number; multiplier: number }> = [];
+  for (let days = 1; days <= STREAK_DAYS_TO_CAP; days += 1) ladder.push({ days, multiplier: streakMultiplier(days) });
+  return ladder;
+}
+
+/**
+ * round(base × multiplier) computed in integer hundredths, so 50 × 1.15 is
+ * 57.5 → 58 and never 57.49999999999999 → 57. Half rounds up (Math.round).
+ */
+export function pointsFor(basePoints: number, multiplier: number): number {
+  return Math.round((basePoints * Math.round(multiplier * 100)) / 100);
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +256,7 @@ export function actionAward(f: ActionAwardFacts): ActionAward {
     reason: `action:${f.kind}`,
     basePoints: rule.basePoints,
     multiplier,
-    points: Math.round(rule.basePoints * multiplier),
+    points: pointsFor(rule.basePoints, multiplier),
     countedDay: utcDay(f.closedAtMs),
   };
 }

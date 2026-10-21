@@ -11,6 +11,8 @@ import {
   SOCIAL_DAILY_CAP,
   SOCIAL_TASKS,
   STREAK_DAILY_POINTS,
+  STREAK_DAYS_TO_CAP,
+  STREAK_RAMP,
   actionAward,
   campaignStatus,
   checkinEligibility,
@@ -23,8 +25,10 @@ import {
   referralCredit,
   shortenAddress,
   socialAward,
+  streakLadder,
   streakLengthOn,
   streakMultiplier,
+  pointsFor,
   utcDay,
   withinWindow,
   type CampaignWindow,
@@ -50,15 +54,16 @@ describe('constants (founder gate-1 values, 2026-10-15)', () => {
 
   it('pins streak, social and referral values', () => {
     expect(STREAK_DAILY_POINTS).toBe(5);
+    expect(STREAK_RAMP).toEqual({ stepPerDay: 0.05, cap: 1.35 }); // EP4 ramp (founder, 2026-10-21)
+    expect(STREAK_DAYS_TO_CAP).toBe(7);
     expect(SOCIAL_TASKS).toEqual({ 'x-follow': 20, 'x-repost': 10, 'community-join': 20 });
     expect(SOCIAL_DAILY_CAP).toBe(50);
     expect(REFERRAL_POINTS).toEqual({ referrer: 100, referee: 50 });
   });
 
-  it('the disclaimer says no monetary value and no conversion, and never mentions a token reward or airdrop', () => {
-    expect(DISCLAIMER).toMatch(/no monetary value/);
-    expect(DISCLAIMER).toMatch(/not convertible to money or tokens/);
-    expect(DISCLAIMER).not.toMatch(/airdrop/i);
+  it('EP4: the disclaimer is the neutral founder line — no promise, no denial, no token / airdrop / reward / XLM', () => {
+    expect(DISCLAIMER).toBe('Points unlock perks on Dig as the campaign grows.');
+    expect(DISCLAIMER).not.toMatch(/token|airdrop|reward|xlm|monetary/i);
   });
 });
 
@@ -131,13 +136,39 @@ describe('streakLengthOn / streakMultiplier', () => {
     expect(streakLengthBefore(new Set(['2026-10-15']), '2026-10-15')).toBe(0); // first-ever check-in on D
   });
 
-  it('multiplier is x1.0 under 7 days, x1.2 from 7, x1.35 from 30', () => {
+  it('EP4 ramp: +0.05 per streak day before D, capped at x1.35 from 7 days', () => {
     expect(streakMultiplier(0)).toBe(1);
-    expect(streakMultiplier(6)).toBe(1);
-    expect(streakMultiplier(7)).toBe(1.2);
-    expect(streakMultiplier(29)).toBe(1.2);
+    expect(streakMultiplier(1)).toBe(1.05);
+    expect(streakMultiplier(3)).toBe(1.15); // exact, not 1.1500000000000001
+    expect(streakMultiplier(4)).toBe(1.2);
+    expect(streakMultiplier(5)).toBe(1.25);
+    expect(streakMultiplier(6)).toBe(1.3);
+    expect(streakMultiplier(7)).toBe(1.35);
     expect(streakMultiplier(30)).toBe(1.35);
     expect(streakMultiplier(400)).toBe(1.35);
+    expect(streakMultiplier(-2)).toBe(1); // defensive: never below x1.0
+  });
+
+  it('EP4: the ladder lists days 1..7 with the multiplier each streak length gives', () => {
+    expect(streakLadder()).toEqual([
+      { days: 1, multiplier: 1.05 },
+      { days: 2, multiplier: 1.1 },
+      { days: 3, multiplier: 1.15 },
+      { days: 4, multiplier: 1.2 },
+      { days: 5, multiplier: 1.25 },
+      { days: 6, multiplier: 1.3 },
+      { days: 7, multiplier: 1.35 },
+    ]);
+  });
+
+  it('EP4: pointsFor rounds half up in integer hundredths (no floating-point 57.4999)', () => {
+    expect(pointsFor(50, 1)).toBe(50);
+    expect(pointsFor(50, 1.05)).toBe(53); // 52.5
+    expect(pointsFor(50, 1.15)).toBe(58); // 57.5 — 50 * 1.15 is 57.49999999999999 in IEEE doubles
+    expect(pointsFor(50, 1.25)).toBe(63); // 62.5
+    expect(pointsFor(50, 1.35)).toBe(68); // 67.5
+    expect(pointsFor(100, 1.15)).toBe(115);
+    expect(pointsFor(100, 1.35)).toBe(135);
   });
 });
 
@@ -210,26 +241,30 @@ describe('actionAward', () => {
     });
   });
 
-  it('awards 100 for a Blend deposit and applies the streak multiplier to action points', () => {
-    const r = actionAward({ ...base(), kind: 'blend-deposit', streakDaysBeforeDay: 7 });
+  it('awards 100 for a Blend deposit and applies the ramp multiplier to action points', () => {
+    const r = actionAward({ ...base(), kind: 'blend-deposit', streakDaysBeforeDay: 4 });
     expect(r).toMatchObject({ award: true, basePoints: 100, multiplier: 1.2, points: 120 });
+    const r1 = actionAward({ ...base(), streakDaysBeforeDay: 1 });
+    expect(r1).toMatchObject({ award: true, basePoints: 50, multiplier: 1.05, points: 53 }); // round(52.5)
+    const r7 = actionAward({ ...base(), streakDaysBeforeDay: 7 });
+    expect(r7).toMatchObject({ award: true, basePoints: 50, multiplier: 1.35, points: 68 }); // round(67.5)
     const r30 = actionAward({ ...base(), streakDaysBeforeDay: 30 });
-    expect(r30).toMatchObject({ award: true, basePoints: 50, multiplier: 1.35, points: 68 }); // round(67.5)
+    expect(r30).toMatchObject({ award: true, basePoints: 50, multiplier: 1.35, points: 68 }); // capped
   });
 
   it('E: the multiplier of an action on day D is fixed by check-ins up to D-1; a check-in later on D changes nothing', () => {
     const closedAtMs = Date.UTC(2026, 9, 15, 9, 0); // action at 09:00Z on D = 2026-10-15
     const D = utcDay(closedAtMs);
-    const checkins = consecutiveDaysEndingOn(previousUtcDay(D), 6); // 9th..14th → 6 days before D
+    const checkins = consecutiveDaysEndingOn(previousUtcDay(D), 6); // 9th..14th → 6 days before D → x1.30
     const before = actionAward({ ...base(), closedAtMs, streakDaysBeforeDay: streakLengthBefore(checkins, D) });
-    expect(before).toMatchObject({ award: true, multiplier: 1, points: 50 });
+    expect(before).toMatchObject({ award: true, multiplier: 1.3, points: 65 });
 
     checkins.add(D); // the user checks in at 18:00Z on D, after the action, before the job runs
     const after = actionAward({ ...base(), closedAtMs, streakDaysBeforeDay: streakLengthBefore(checkins, D) });
     expect(after).toEqual(before);
   });
 
-  it('E: 7-day and 30-day boundaries are computed on D-1', () => {
+  it('E: every ramp step and the cap are computed on D-1', () => {
     const closedAtMs = Date.UTC(2026, 9, 15, 9, 0);
     const D = utcDay(closedAtMs);
     const run = (daysEndingOnDminus1: number) =>
@@ -238,14 +273,16 @@ describe('actionAward', () => {
         closedAtMs,
         streakDaysBeforeDay: streakLengthBefore(consecutiveDaysEndingOn(previousUtcDay(D), daysEndingOnDminus1), D),
       });
-    expect(run(6)).toMatchObject({ multiplier: 1, points: 50 });
-    expect(run(7)).toMatchObject({ multiplier: 1.2, points: 60 });
-    expect(run(29)).toMatchObject({ multiplier: 1.2, points: 60 });
+    expect(run(0)).toMatchObject({ multiplier: 1, points: 50 });
+    expect(run(1)).toMatchObject({ multiplier: 1.05, points: 53 });
+    expect(run(4)).toMatchObject({ multiplier: 1.2, points: 60 });
+    expect(run(6)).toMatchObject({ multiplier: 1.3, points: 65 });
+    expect(run(7)).toMatchObject({ multiplier: 1.35, points: 68 });
     expect(run(30)).toMatchObject({ multiplier: 1.35, points: 68 });
-    // 7 consecutive days that END on D (not D-1) are only 6 before D: still x1.0.
+    // 7 consecutive days that END on D (not D-1) are only 6 before D: x1.30, not the cap.
     const endingOnD = consecutiveDaysEndingOn(D, 7);
     expect(actionAward({ ...base(), closedAtMs, streakDaysBeforeDay: streakLengthBefore(endingOnD, D) })).toMatchObject({
-      multiplier: 1,
+      multiplier: 1.3,
     });
   });
 

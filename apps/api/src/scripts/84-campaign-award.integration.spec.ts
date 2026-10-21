@@ -1,8 +1,10 @@
 // Lot EP (EP1, gate 3): the award job against the LOCAL dev Postgres only,
 // gated by CAMPAIGN_IT=1 (CI has no database). Seeds two enrolled wallets, one
 // referral link, and witnesses inside / outside the window / below min
-// notional / a withdraw / six same-day swaps, plus seven check-in days ending
-// on D-1 for the x1.2 multiplier; runs the job twice; asserts the exact ledger
+// notional / a withdraw / six same-day swaps, plus FOUR check-in days ending
+// on D-1 for the x1.2 multiplier (EP4 ramp: 1 + 0.05 × 4; seven days would be
+// the x1.35 cap and push wallet A past 500 on run 1); runs the job twice;
+// asserts the exact ledger
 // after run 1, zero new rows after run 2, the referral credited once, and the
 // summary counts. EP3: the perks step grants early-access to both wallets on
 // run 1 (470 and 100 points), nothing on run 2, keeps a perk after a negative
@@ -91,9 +93,9 @@ d('84-campaign-award (integration, local Postgres)', () => {
       referrer,
     );
 
-    // seven check-in days ending on D-1 → x1.2 on D
+    // four check-in days ending on D-1 → x1.2 on D (EP4 ramp)
     let cursor = previousUtcDay(DAY);
-    for (let i = 0; i < 7; i += 1) {
+    for (let i = 0; i < 4; i += 1) {
       await prisma.$executeRawUnsafe(`insert into wallet_daily_checkins (campaign, address, day) values ($1, $2, $3::date)`, CAMPAIGN_ID, referee, cursor);
       cursor = previousUtcDay(cursor);
     }

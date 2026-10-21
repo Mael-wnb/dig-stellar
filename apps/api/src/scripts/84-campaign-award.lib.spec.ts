@@ -60,7 +60,7 @@ describe('planActionAwards', () => {
     expect(plan.skipped['daily-cap-reached']).toBe(1);
   });
 
-  it('applies the streak multiplier from check-ins up to D-1, never D', () => {
+  it('applies the ramp multiplier from check-ins up to D-1, never D (EP4: +0.05/day, cap x1.35 at 7)', () => {
     const day = '2026-10-10';
     const sevenBefore: Array<{ address: string; day: string }> = [];
     let cursor = previousUtcDay(day);
@@ -69,13 +69,18 @@ describe('planActionAwards', () => {
       cursor = previousUtcDay(cursor);
     }
     const checkins = checkinSetsFromRows(sevenBefore);
-    expect(planActionAwards([swap(1)], new Map(), checkins, window).awards[0]).toMatchObject({ multiplier: 1.2, points: 60 });
+    expect(planActionAwards([swap(1)], new Map(), checkins, window).awards[0]).toMatchObject({ multiplier: 1.35, points: 68 }); // round(67.5)
 
     const withToday = checkinSetsFromRows([...sevenBefore, { address: A, day }]);
-    expect(planActionAwards([swap(1)], new Map(), withToday, window).awards[0]).toMatchObject({ multiplier: 1.2, points: 60 });
+    expect(planActionAwards([swap(1)], new Map(), withToday, window).awards[0]).toMatchObject({ multiplier: 1.35, points: 68 });
 
-    const sixOnly = checkinSetsFromRows(sevenBefore.slice(0, 6));
-    expect(planActionAwards([swap(1)], new Map(), sixOnly, window).awards[0]).toMatchObject({ multiplier: 1, points: 50 });
+    const fourOnly = checkinSetsFromRows(sevenBefore.slice(0, 4));
+    expect(planActionAwards([swap(1)], new Map(), fourOnly, window).awards[0]).toMatchObject({ multiplier: 1.2, points: 60 });
+
+    const oneOnly = checkinSetsFromRows(sevenBefore.slice(0, 1));
+    expect(planActionAwards([swap(1)], new Map(), oneOnly, window).awards[0]).toMatchObject({ multiplier: 1.05, points: 53 }); // round(52.5)
+
+    expect(planActionAwards([swap(1)], new Map(), new Map(), window).awards[0]).toMatchObject({ multiplier: 1, points: 50 });
   });
 
   it('counts skips without planning them: below min notional, withdraw, outside window', () => {
