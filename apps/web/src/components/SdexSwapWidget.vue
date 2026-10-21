@@ -21,6 +21,7 @@ import {
   type TestnetSwapAsset,
 } from "../config/testnetSwapPairs";
 import { MAINNET_SWAP_ASSETS } from "../config/mainnetSwapPairs";
+import { track } from "../lib/analytics";
 // H3 (Lot H): presentation-only custom asset picker — receives the SAME
 // `assets` whitelist the native <select> bound and emits the same asset keys.
 import TokenSelect from "./common/TokenSelect.vue";
@@ -404,6 +405,8 @@ async function onSwap() {
     if (result.status === "PENDING" || result.status === "SUCCESS") {
       txHash.value = result.hash ?? "";
       status.value = "success";
+      // Lot AN0: asset codes only — no hash, amount, address or user id.
+      track("swap_success", { pair: `${fromCode.value}/${toCode.value}` });
       // R1 (Lot R): report the executed swap for server-side verification.
       // Fire-and-forget — never blocks or fails the swap flow.
       if (txHash.value) {

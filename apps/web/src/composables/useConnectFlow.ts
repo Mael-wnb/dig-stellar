@@ -15,6 +15,7 @@ import { connectWallet as connectWalletApi } from '../api/wallets'
 import { useAppUser } from './useAppUser'
 import { useSharedWallets } from './useSharedWallets'
 import { signProof, useWalletSession } from './useWalletSession'
+import { track } from '../lib/analytics'
 
 // Lot EP (Gate 2B follow-up): shown when the no-session recovery needs a
 // wallet-ownership proof and the connected wallet cannot produce one.
@@ -84,6 +85,9 @@ export function useConnectFlow() {
       if (!backendUserId) throw new Error('Backend did not return userId.')
 
       setUserId(backendUserId)
+
+      // Lot AN0: provider id only (freighter, xbull, …) — never the address.
+      track('wallet_connect', { provider: session.providerId })
 
       // Attaching to the SAME account leaves userId unchanged, so the
       // useSharedWallets watcher (which reloads on userId CHANGE) never fires —

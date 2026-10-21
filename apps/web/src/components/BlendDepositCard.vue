@@ -26,6 +26,7 @@ import {
   type TrustlineIntent,
 } from "../lib/validateDepositXdr";
 import { friendlyContractError } from "../lib/blendContractErrors";
+import { track } from "../lib/analytics";
 
 // UX-only mainnet gate (Lot A2): the Blend card has its OWN kill-switch, independent
 // of the swap, and the withdraw (Lot A3) rides the SAME one — no new flag. The API
@@ -559,6 +560,8 @@ async function onDeposit() {
 
     txHash.value = hash;
     status.value = "success";
+    // Lot AN0: pool slug from the client registry only — no hash, amount or address.
+    track("deposit_success", { pool: requirePool().slug });
     // R1 (Lot R): report the executed deposit for server-side verification.
     // Fire-and-forget — never blocks or fails the deposit flow.
     reportTxWitness(hash);

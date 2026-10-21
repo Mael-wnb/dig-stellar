@@ -34,6 +34,7 @@ import {
   type SocialTaskKey,
 } from "../api/campaign";
 import { pointsForActionIn } from "../lib/pointsForAction";
+import { track } from "../lib/analytics";
 import { useAppUser } from "./useAppUser";
 import { signProof, useWalletSession } from "./useWalletSession";
 import { useView } from "./useView";
@@ -139,7 +140,10 @@ export function useCampaign() {
     if (!proven) throw new Error("The wallet signature could not be verified. Please try again.");
 
     const res = await enrollCampaign({ ...id, referralCode: pendingReferralCode.value });
-    if (res.enrolled) pendingReferralCode.value = null; // used once, never stored
+    if (res.enrolled) {
+      pendingReferralCode.value = null; // used once, never stored
+      track("campaign_enroll"); // Lot AN0: no parameters at all
+    }
     await refreshMe();
     return res;
   }
@@ -148,6 +152,7 @@ export function useCampaign() {
     const id = identity.value;
     if (!id) throw new Error("Connect a wallet first.");
     const res = await checkinCampaign(id);
+    if (res.checkedIn) track("campaign_checkin"); // Lot AN0: no parameters at all
     await refreshMe();
     return res;
   }
