@@ -5,6 +5,7 @@ import {
   ACTION_RULES,
   DISCLAIMER,
   LEDGER_REASON_RE,
+  PERK_TIERS,
   REFERRAL_CODE_RE,
   REFERRAL_POINTS,
   SOCIAL_DAILY_CAP,
@@ -14,6 +15,8 @@ import {
   campaignStatus,
   checkinEligibility,
   enrollEligibility,
+  nextPerkFor,
+  perksFor,
   previousUtcDay,
   referralCodeFromBytes,
   streakLengthBefore,
@@ -389,5 +392,51 @@ describe('display helpers', () => {
     expect(code).toMatch(REFERRAL_CODE_RE);
     expect(code).toHaveLength(8);
     expect(() => referralCodeFromBytes(new Uint8Array(3))).toThrow();
+  });
+});
+
+describe('perks (EP3): non-monetary tiers by balance', () => {
+  it('pins the founder-decided tiers, ascending', () => {
+    expect(PERK_TIERS).toEqual([
+      { key: 'early-access', threshold: 100 },
+      { key: 'beta-features', threshold: 500 },
+      { key: 'priority-rwa', threshold: 1500 },
+    ]);
+  });
+
+  it('perksFor: boundaries at 99/100, 499/500, 1499/1500', () => {
+    expect(perksFor(0)).toEqual([]);
+    expect(perksFor(99)).toEqual([]);
+    expect(perksFor(100)).toEqual(['early-access']);
+    expect(perksFor(499)).toEqual(['early-access']);
+    expect(perksFor(500)).toEqual(['early-access', 'beta-features']);
+    expect(perksFor(1499)).toEqual(['early-access', 'beta-features']);
+    expect(perksFor(1500)).toEqual(['early-access', 'beta-features', 'priority-rwa']);
+    expect(perksFor(1_000_000)).toHaveLength(3);
+    // a negative balance (adjust rows) reaches nothing
+    expect(perksFor(-50)).toEqual([]);
+  });
+
+  it('nextPerkFor: the lowest tier not granted, points remaining never negative', () => {
+    expect(nextPerkFor(0, [])).toEqual({ key: 'early-access', threshold: 100, pointsRemaining: 100 });
+    expect(nextPerkFor(60, [])).toEqual({ key: 'early-access', threshold: 100, pointsRemaining: 40 });
+    // reached but not granted yet (next job tick): 0 remaining, same tier
+    expect(nextPerkFor(120, [])).toEqual({ key: 'early-access', threshold: 100, pointsRemaining: 0 });
+    expect(nextPerkFor(120, ['early-access'])).toEqual({ key: 'beta-features', threshold: 500, pointsRemaining: 380 });
+    // granted perks are kept even if the balance dropped below their threshold
+    expect(nextPerkFor(30, ['early-access'])).toEqual({ key: 'beta-features', threshold: 500, pointsRemaining: 470 });
+    expect(nextPerkFor(2000, ['early-access', 'beta-features', 'priority-rwa'])).toBeNull();
+  });
+
+  it('the perk keys are exactly the wallet_perks_perk_key_check set of stellar_v8_campaign_perks.sql', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require('node:fs') as typeof import('node:fs');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const path = require('node:path') as typeof import('node:path');
+    const sql = fs.readFileSync(path.resolve(__dirname, '../../db/stellar_v8_campaign_perks.sql'), 'utf8');
+    const match = sql.match(/perk_key in \(([^)]+)\)/);
+    expect(match).not.toBeNull();
+    const inSql = match![1].split(',').map((k) => k.trim().replace(/^'|'$/g, '')).sort();
+    expect(inSql).toEqual(PERK_TIERS.map((t) => t.key).sort());
   });
 });

@@ -322,6 +322,51 @@ export function referralCredit(f: ReferralCreditFacts): ReferralCredit {
 }
 
 // ---------------------------------------------------------------------------
+// Perks (EP3): NON-MONETARY tiers unlocked by points balance
+// ---------------------------------------------------------------------------
+
+export type PerkKey = 'early-access' | 'beta-features' | 'priority-rwa';
+
+/**
+ * Founder-decided tiers (2026-10-21, EP3). Ascending by threshold; the keys
+ * are the SAME closed set as wallet_perks_perk_key_check in
+ * stellar_v8_campaign_perks.sql (campaign-rules.spec.ts asserts this), so a
+ * new perk is a schema change AND a rules change, never one alone.
+ *
+ * A perk is a badge / early access / a beta flag — never money, never a token.
+ * Once granted it STAYS granted even if the balance later drops (the award job
+ * only inserts; revocation is a founder-only manual SQL in docs/runbooks.md).
+ */
+export const PERK_TIERS: ReadonlyArray<{ key: PerkKey; threshold: number }> = [
+  { key: 'early-access', threshold: 100 },
+  { key: 'beta-features', threshold: 500 },
+  { key: 'priority-rwa', threshold: 1500 },
+];
+
+/** Every tier whose threshold the balance reaches (balance >= threshold), ascending. */
+export function perksFor(balance: number): PerkKey[] {
+  return PERK_TIERS.filter((t) => balance >= t.threshold).map((t) => t.key);
+}
+
+export interface NextPerk {
+  key: PerkKey;
+  threshold: number;
+  /** 0 when the balance already reaches the tier but the job has not granted it yet. */
+  pointsRemaining: number;
+}
+
+/**
+ * The lowest tier NOT yet granted, with the points still missing. Grants are
+ * the job's (wallet_perks), the balance is live, so a wallet can sit at
+ * pointsRemaining 0 for up to one job tick. null when every tier is granted.
+ */
+export function nextPerkFor(balance: number, granted: ReadonlyArray<PerkKey>): NextPerk | null {
+  const tier = PERK_TIERS.find((t) => !granted.includes(t.key));
+  if (!tier) return null;
+  return { key: tier.key, threshold: tier.threshold, pointsRemaining: Math.max(0, tier.threshold - balance) };
+}
+
+// ---------------------------------------------------------------------------
 // Display helpers
 // ---------------------------------------------------------------------------
 
