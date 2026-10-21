@@ -174,6 +174,16 @@ award", exit 0), `CAMPAIGN_STARTS_AT` (REQUIRED, fail-closed when unset; only wi
 closed at or after it earn points), `CAMPAIGN_ENDS_AT` (optional). Prereq: `stellar_v6_campaign.sql`
 applied.
 
+**Retroactive awards:** witnesses that closed at or after `CAMPAIGN_STARTS_AT` earn points once
+the wallet enrols, even if the enrolment comes later — the job selects by window and enrolment at
+run time, not by enrolment date (`campaign.repository.ts` `findActionCandidates`: join on
+`campaign_enrollments` by address, window on `ledger_closed_at` only).
+
+**Supported wallets for proofs:** Freighter ≥ 5.x and xBull (both sign SEP-53,
+`signature_variant = 'sep53'`); Lobstr is unsupported — the Kit 1.9.5 Lobstr module does not
+implement `signMessage`, so Lobstr users cannot enrol or recover an account without a session
+(`docs/evidence/lot-ep/ep1-wallet-matrix.md`).
+
 **DRAFT cron line — not installed yet (EP3 deploy step).** Same shape as the two live lines
 (AC2 capture): offset minutes so the three jobs never collide, its own `flock` and log.
 ```cron
