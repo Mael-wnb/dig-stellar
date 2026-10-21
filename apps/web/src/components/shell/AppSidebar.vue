@@ -11,6 +11,7 @@ import { useNotifications } from '../../composables/useNotifications'
 import { useSharedWallets } from '../../composables/useSharedWallets'
 import { useModals } from '../../composables/useModals'
 import { useCampaign } from '../../composables/useCampaign'
+import { isAnalyticsConfigured, openAnalyticsBanner } from '../../lib/analytics'
 import digWordmark from '../../assets/design/dig-wordmark.svg'
 import { onMounted } from 'vue'
 
@@ -88,6 +89,10 @@ function goWallet() {
 // it must NOT flip this label — otherwise the footer would read "testnet" while
 // the whole dashboard/portfolio still shows Mainnet data.
 const networkLabel = 'Stellar mainnet'
+
+// Lot AN0: the consent banner can be re-opened from here (change of mind).
+// Hidden when no measurement id is configured — nothing to consent to.
+const analyticsConfigured = isAnalyticsConfigured()
 </script>
 
 <template>
@@ -207,6 +212,17 @@ const networkLabel = 'Stellar mainnet'
         <span class="text-[12px]" style="color: var(--dig-faint)">/</span>
         <span class="text-[12px] font-medium" style="color: var(--dig-muted)">{{ networkLabel }}</span>
       </div>
+      <!-- Lot AN0: re-open the analytics consent banner (change of mind). -->
+      <button
+        v-if="analyticsConfigured"
+        type="button"
+        class="mt-[6px] text-[11px] cursor-pointer bg-transparent border-0 p-0 underline-offset-2 hover:underline"
+        style="color: var(--dig-faint)"
+        title="Change your analytics choice"
+        @click="openAnalyticsBanner"
+      >
+        Analytics
+      </button>
       <div class="flex gap-[8px] mt-[12px]">
         <a
           href="https://x.com/Dig_Agentic"

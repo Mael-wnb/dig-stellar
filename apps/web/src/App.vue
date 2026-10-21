@@ -16,6 +16,7 @@ import AppTopbar from './components/shell/AppTopbar.vue'
 import AppDrawer from './components/shell/AppDrawer.vue'
 import ConnectModal from './components/modals/ConnectModal.vue'
 import ActionModal from './components/modals/ActionModal.vue'
+import AnalyticsConsentBanner from './components/common/AnalyticsConsentBanner.vue'
 import { useView } from './composables/useView'
 import { useModals } from './composables/useModals'
 import { useDrawer } from './composables/useDrawer'
@@ -68,5 +69,8 @@ const { drawerOpen } = useDrawer()
     <ConnectModal v-if="modal === 'connect'" @close="closeModal" />
     <DevProofPanel v-if="DevProofPanel" />
     <ActionModal v-if="modal === 'action' && actionCtx" :ctx="actionCtx" @close="closeModal" />
+
+    <!-- Analytics consent (Lot AN0): renders nothing without a measurement id. -->
+    <AnalyticsConsentBanner />
   </div>
 </template>
