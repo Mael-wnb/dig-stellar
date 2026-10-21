@@ -171,8 +171,8 @@ pnpm -C apps/api job:campaign-award        # the award script itself (ts-node), 
 ```
 Env (apps/api/.env, names only): `CAMPAIGN_ENABLED` (default off → "campaign dark, nothing to
 award", exit 0), `CAMPAIGN_STARTS_AT` (REQUIRED, fail-closed when unset; only witnesses that
-closed at or after it earn points), `CAMPAIGN_ENDS_AT` (optional). Prereq: `stellar_v6_campaign.sql`
-applied.
+closed at or after it earn points), `CAMPAIGN_ENDS_AT` (optional). Prereq: `stellar_v6_campaign.sql` and
+`stellar_v7_social_claim_delete.sql` applied, in that order.
 
 **Retroactive awards:** witnesses that closed at or after `CAMPAIGN_STARTS_AT` earn points once
 the wallet enrols, even if the enrolment comes later — the job selects by window and enrolment at
@@ -183,6 +183,22 @@ run time, not by enrolment date (`campaign.repository.ts` `findActionCandidates`
 `signature_variant = 'sep53'`); Lobstr is unsupported — the Kit 1.9.5 Lobstr module does not
 implement `signMessage`, so Lobstr users cannot enrol or recover an account without a session
 (`docs/evidence/lot-ep/ep1-wallet-matrix.md`).
+
+**Social tasks (EP2):** self-declared — the API takes the person's word and records the handle,
+there is no X / Discord API check. Rules enforced in `modules/campaign/social-claims.ts` and the
+v6/v7 indexes: one claim per task per wallet, ONE handle per wallet across all tasks (a different
+handle on a second task is `handle-mismatch`, a handle already declared by another wallet is
+`handle-already-used`), and a GROSS daily cap (`SOCIAL_DAILY_CAP`, 50): points of a claim deleted
+the same UTC day still count toward that day's cap, so a same-day re-claim is refused until the next
+UTC day. Delete (`DELETE /v1/campaign/social/:id`, proof required, works while the campaign is dark)
+is SOFT: one transaction under the enrollment row lock sets `deleted_at = now()` and scrubs
+`handle_normalized` to `'deleted'` on the claim, then inserts the negative `adjust:social-delete`
+ledger row whose `adjusts_id` points at the credited row — the ledger stays append-only, balance =
+`sum(points)` nets the claim out, and the handle leaves the database. The task can be claimed again
+afterwards (partial unique indexes, `stellar_v7_social_claim_delete.sql`). The repost task opens only
+when `CAMPAIGN_X_REPOST_URL` (https URL of the post, apps/api/.env, name only here) is set: unset, it
+is served as `available: false` ("coming soon" in the UI) and refused with `task-unavailable`. Handles
+are never logged and never in a public payload (`docs/security-invariants.md` §11).
 
 **DRAFT cron line — not installed yet (EP3 deploy step).** Same shape as the two live lines
 (AC2 capture): offset minutes so the three jobs never collide, its own `flock` and log.
@@ -261,6 +277,7 @@ psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stella
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v4_faucet.sql   # R2 (Lot R, T3-D2): faucet_claims (money path, depends on action_witnesses); deploys dark (FAUCET_ENABLED unset)
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v5_faucet_campaign2.sql   # Lot R2: campaign 2, campaign/action_family columns + per-family uniqueness (apply BEFORE the campaign-2 api build)
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v6_campaign.sql   # Lot EP (EP1): Earn & Points — proofs, enrollments, points_ledger, check-ins, referrals (points only, no key; depends on v2 + action_witnesses); deploys dark (CAMPAIGN_ENABLED unset)
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v7_social_claim_delete.sql   # Lot EP (EP2): soft delete of social task claims (deleted_at + partial unique indexes); depends on v6, apply after it
 ```
 Manually-applied schemas (local AND VPS): `stellar_v1.sql`, `stellar_v1_metrics.sql`,
 `stellar_v1_bridge.sql` (Allbridge bridge flows, T2-D3), `stellar_v2_multiwallet.sql`,
@@ -271,7 +288,8 @@ Manually-applied schemas (local AND VPS): `stellar_v1.sql`, `stellar_v1_metrics.
 fire-and-forget adoption inserts start failing silently),
 `stellar_v1_action_witness.sql` (R1 execution witnesses, T3-D2, Lot R),
 `stellar_v4_faucet.sql` + `stellar_v5_faucet_campaign2.sql` (Lot R/R2 faucet claims),
-`stellar_v6_campaign.sql` (Lot EP Earn & Points: points only, no key, deploys dark).
+`stellar_v6_campaign.sql` (Lot EP Earn & Points: points only, no key, deploys dark),
+`stellar_v7_social_claim_delete.sql` (Lot EP EP2: soft delete of social task claims, after v6).
 Note: when a new table **or column** is added to one of these files (e.g. `network_stats_latest`
 in `stellar_v1_metrics.sql`, `bridge_flows` in `stellar_v1_bridge.sql`, or the T2-D1
 `is_active_signer` column + `user_wallets_one_signer_per_user` index, or the T2-D1 Gap B

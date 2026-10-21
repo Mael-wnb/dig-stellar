@@ -36,6 +36,7 @@ psql "$DATABASE_URL" -f apps/api/src/db/stellar_v3_alerting.sql   # D2 alerting 
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v4_faucet.sql   # R2 (Lot R, T3-D2): faucet_claims (money path, depends on action_witnesses); deploys dark (FAUCET_ENABLED unset)
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v5_faucet_campaign2.sql   # Lot R2: campaign 2, campaign/action_family columns + per-family uniqueness (apply BEFORE the campaign-2 api build)
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v6_campaign.sql   # Lot EP (EP1): Earn & Points — proofs, enrollments, points_ledger, check-ins, referrals (points only, no key; depends on v2 + action_witnesses); deploys dark (CAMPAIGN_ENABLED unset)
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v7_social_claim_delete.sql   # Lot EP (EP2): soft delete of social task claims (deleted_at + partial unique indexes); depends on v6, apply after it
 # Allbridge needs its venue + USDC asset seeded once before the first refresh:
 pnpm -C apps/indexer tsx src/scripts/bootstrap/allbridge-upsert-core.ts
 ```

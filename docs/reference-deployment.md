@@ -130,7 +130,7 @@ Apply the raw SQL files **in this order** (idempotent, safe to re-run; same list
 for f in stellar_v1 stellar_v1_metrics stellar_v1_logos stellar_v1_network_tvl \
          stellar_v1_ops_metrics stellar_v1_bridge stellar_v1_action_witness \
          stellar_v2_multiwallet stellar_v3_alerting stellar_v4_faucet \
-         stellar_v5_faucet_campaign2 stellar_v6_campaign; do
+         stellar_v5_faucet_campaign2 stellar_v6_campaign stellar_v7_social_claim_delete; do
   docker compose exec -T postgres psql -U dig -d dig_stellar < apps/api/src/db/$f.sql
 done
 ```

@@ -367,3 +367,42 @@ see. Evidence: `docs/evidence/lot-ad/ad0-security-findings.md`.
 
 Review check (any compose / deploy change): grep `ports:` blocks for entries without
 `127.0.0.1:`; grep the diff for `POSTGRES_PASSWORD` / `DATABASE_URL` literals.
+
+## 11. Ownership proofs and points (Lot EP, 2026-10-21)
+
+Lot EP (Earn & Points, post-grant) adds a wallet-ownership proof (`/v1/auth/*`) and a points
+campaign (`/v1/campaign/*`, `modules/campaign/`). Points only: the lot introduces no key, no
+payout and no token. Schema: `stellar_v6_campaign.sql` + `stellar_v7_social_claim_delete.sql`.
+Evidence: `docs/evidence/lot-ep/`.
+
+- **INV-11.1** Ownership proofs are verified with the PUBLIC key only. The server issues a
+  nonce challenge, the wallet signs the plain text (never a transaction, no XDR exists), and
+  `modules/campaign/verify-wallet-signature.ts` checks it with
+  `Keypair.fromPublicKey(address).verify(...)` — the narrow verify-only exception of §1, the
+  only `Keypair` use outside the faucet payout service. No server key is involved; nothing is
+  ever signed server-side. The proof is bound to `(address, userId)`; every campaign write
+  requires it, so a `userId` alone earns nothing.
+- **INV-11.2** Points have no monetary value and are not convertible: the API's `disclaimer`
+  string travels in every campaign payload and the web renders it once per surface. No payout
+  path exists in code — `modules/campaign/` imports nothing from `modules/faucet/`,
+  `modules/actions/` or `modules/wallets/`, and the faucet treasury key (§9) is never read,
+  referenced or reachable from the campaign. Points are never folded into an APY: they are a
+  separate field and a separate DOM node.
+- **INV-11.3** Social handles are user-supplied PII that link a person to a wallet. They are
+  stored normalised (`handle_normalized`: lowercase, leading `@` stripped), never logged, never
+  returned in any payload (`/me` lists tasks and claim ids, the leaderboard shows shortened
+  addresses only), and removable by their owner: `DELETE /v1/campaign/social/:id` soft-deletes
+  the claim (`deleted_at`) and scrubs `handle_normalized` to `'deleted'` in the same
+  transaction. The campaign never logs an address either (no hashed-identifier convention
+  exists; the rule is "log nothing identifying").
+- **INV-11.4** `points_ledger` is append-only. No code path updates or deletes a ledger row;
+  every correction is a negative `adjust:<note>` row whose `adjusts_id` points at the corrected
+  row (the social delete writes `adjust:social-delete`), and balance is always `sum(points)`.
+  `base_points`, `multiplier` and `points` are stored per row so a later change of the rule
+  constants never rewrites history.
+
+Review check (any change under `modules/campaign/` or `apps/web/src/components/earn/`): grep
+the diff for `handle_normalized` in log statements and in payload types/returns (it may appear
+only in SQL and in the in-transaction decision inputs); grep for `update points_ledger` /
+`delete from points_ledger` outside specs and cleanup helpers; grep for `Keypair` outside the
+two allowed files; grep the web copy for "reward", "airdrop", "token" and "earn XLM".
