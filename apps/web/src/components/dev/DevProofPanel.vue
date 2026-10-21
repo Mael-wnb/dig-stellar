@@ -15,6 +15,17 @@ const { userId } = useAppUser();
 const busy = ref(false);
 const output = ref<string>("");
 
+function formatError(err: unknown): string {
+  if (err instanceof Error) {
+    return err.stack ? `${err.message}\n${err.stack}` : err.message;
+  }
+  try {
+    return JSON.stringify(err, Object.getOwnPropertyNames(err), 2);
+  } catch {
+    return String(err);
+  }
+}
+
 async function run(bind: boolean) {
   output.value = "";
   if (!connectedAddress.value) {
@@ -30,13 +41,17 @@ async function run(bind: boolean) {
         address: connectedAddress.value,
         userId: bind ? userId.value : null,
         challenge: res.challenge,
+        signedMessage: res.signedMessage,
         result: res.result,
       },
       null,
       2,
     );
   } catch (err) {
-    output.value = `ERROR: ${err instanceof Error ? err.message : String(err)}`;
+    // Show the raw error: the Kit / Freighter sometimes throws a plain object,
+    // which String() renders as "[object Object]".
+    console.error("[dev-proof]", err);
+    output.value = `ERROR: ${formatError(err)}`;
   } finally {
     busy.value = false;
   }

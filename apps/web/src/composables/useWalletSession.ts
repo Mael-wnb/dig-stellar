@@ -1,5 +1,5 @@
 // src/composables/useWalletSession.ts
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import {
   StellarWalletsKit,
   WalletNetwork,
@@ -16,7 +16,7 @@ import {
 // useNetwork is the single source of truth for the active network. Resolve it
 // once at module scope (this also runs restoreNetwork() so the value already
 // reflects localStorage / the env default) so the kit can be built on the
-// current network and a single watcher can keep it in sync.
+// current network.
 const { network } = useNetwork();
 
 const STORAGE_CONNECTED_ADDRESS_KEY = "dig_stellar_connected_address";
@@ -32,24 +32,29 @@ const connectedProvider = ref<string | null>(null);
 const isConnecting = ref(false);
 const initialized = ref(false);
 
+// Wallet picker perimeter: exactly the seven modules Kit 1.0.0 shipped. Kit
+// 1.9.5's allowAllModules() also adds HOT, Klever (and exposes Ledger/Trezor);
+// untested wallets stay out of the modal until a wallet matrix covers them.
+const ALLOWED_WALLET_IDS: ReadonlySet<string> = new Set([
+  "albedo",
+  "freighter",
+  "hana",
+  "lobstr",
+  "rabet",
+  "wallet_connect",
+  "xbull",
+]);
+
 const kit = new StellarWalletsKit({
   network: toWalletNetwork(network.value),
   selectedWalletId: XBULL_ID,
-  modules: allowAllModules(),
+  modules: allowAllModules({ filterBy: (m) => ALLOWED_WALLET_IDS.has(m.productId) }),
 });
 
-// Keep the kit aligned with the toggle. Registered ONCE at module scope (next
-// to the kit instance), NOT inside useWalletSession() — otherwise every mounted
-// component would add its own watcher. `immediate` reasserts the network the
-// kit was already built with, which is harmless and guards against drift.
-watch(
-  network,
-  (next) => {
-    kit.setNetwork(toWalletNetwork(next));
-    console.log("[wallet-session] kit network synced", { network: next });
-  },
-  { immediate: true },
-);
+// Network toggle: Kit >= 1.9 has no `setNetwork`; its constructor network is
+// only a fallback passphrase when a signing call omits `networkPassphrase`.
+// Every signing call in this app passes the passphrase explicitly from
+// useNetwork (signTransaction / signProof), so no kit-level sync is needed.
 
 function persistSession(address: string, providerId: string): void {
   connectedAddress.value = address;
@@ -204,7 +209,11 @@ async function signTransaction(
 export async function signProof(
   address: string,
   userId: string | null,
-): Promise<{ challenge: { nonce: string; message: string; expiresAt: string }; result: AuthVerifyResult }> {
+): Promise<{
+  challenge: { nonce: string; message: string; expiresAt: string };
+  signedMessage: string;
+  result: AuthVerifyResult;
+}> {
   if (!connectedAddress.value || connectedAddress.value !== address) {
     throw new Error("The address to prove must be the connected wallet.");
   }
@@ -212,15 +221,25 @@ export async function signProof(
     throw new Error("No wallet provider selected.");
   }
 
-  const challenge = await requestAuthChallenge(address);
+  // DEV-only step tracing so the console tells which step failed and with what.
+  const failedAt = (step: "challenge" | "signMessage" | "verify", err: unknown): never => {
+    if (import.meta.env.DEV) {
+      console.error("[signProof] step failed", { step, err });
+    }
+    throw err;
+  };
+
+  const challenge = await requestAuthChallenge(address).catch((err) => failedAt("challenge", err));
 
   // Same defensive re-select as signTransaction: the kit's selected wallet is
   // in-memory only and can drift after a reload.
   kit.setWallet(connectedProvider.value);
-  const { signedMessage } = await kit.signMessage(challenge.message, {
-    networkPassphrase: toWalletNetwork(network.value),
-    address,
-  });
+  const { signedMessage } = await kit
+    .signMessage(challenge.message, {
+      networkPassphrase: toWalletNetwork(network.value),
+      address,
+    })
+    .catch((err) => failedAt("signMessage", err));
 
   const result = await verifyAuthChallenge({
     address,
@@ -228,10 +247,11 @@ export async function signProof(
     signedMessage,
     provider: connectedProvider.value,
     userId,
-  });
+  }).catch((err) => failedAt("verify", err));
 
   return {
     challenge: { nonce: challenge.nonce, message: challenge.message, expiresAt: challenge.expiresAt },
+    signedMessage,
     result,
   };
 }
