@@ -10,11 +10,18 @@ import { useView, type AppView } from '../../composables/useView'
 import { useNotifications } from '../../composables/useNotifications'
 import { useSharedWallets } from '../../composables/useSharedWallets'
 import { useModals } from '../../composables/useModals'
+import { useCampaign } from '../../composables/useCampaign'
 import digWordmark from '../../assets/design/dig-wordmark.svg'
+import { onMounted } from 'vue'
 
 const { view, setView } = useView()
 const { unreadCount } = useNotifications()
 const { openConnect } = useModals()
+
+// Lot EP (EP2): the Earn entry exists only while the API reports the campaign
+// active (hidden when inactive or unknown — the useFaucet rule).
+const { active: campaignActive, refreshCampaign } = useCampaign()
+onMounted(() => void refreshCampaign())
 
 // Shared wallets instance (loads the user's overview once, reused by the
 // portfolio view + pool-detail "Your position" card).
@@ -33,6 +40,7 @@ const ICONS: Record<string, string> = {
   layers: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2l9 5-9 5-9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/></svg>',
   wallet: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18"/><circle cx="17" cy="14" r="1.3" fill="currentColor" stroke="none"/></svg>',
   bell: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
+  spark: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2z"/></svg>',
 }
 
 const navItems = computed<NavItem[]>(() => [
@@ -45,6 +53,7 @@ const navItems = computed<NavItem[]>(() => [
     icon: ICONS.bell,
     badge: unreadCount.value > 0 ? unreadCount.value : undefined,
   },
+  ...(campaignActive.value ? [{ key: 'earn' as const, label: 'Earn', icon: ICONS.spark }] : []),
 ])
 
 // "Protocols" stays active while the pool sub-view is open.

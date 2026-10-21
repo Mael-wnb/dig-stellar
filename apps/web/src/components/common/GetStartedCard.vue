@@ -20,11 +20,18 @@ import type { PoolListItem } from '../../types/protocol'
 import { useModals } from '../../composables/useModals'
 import { useNetwork } from '../../composables/useNetwork'
 import FreshnessChip from '../FreshnessChip.vue'
+import PointsChip from '../earn/PointsChip.vue'
+import { useCampaign } from '../../composables/useCampaign'
 
 const props = withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
 
 const { openAction } = useModals()
 const { network } = useNetwork()
+
+// Lot EP (EP2): "+N pts" next to the APY — a SIBLING node fed only by the API
+// rules block; null (campaign inactive/unknown) renders nothing. The APY node
+// and its helper above are untouched; points are never folded into the rate.
+const { pointsForAction, disclaimer: campaignDisclaimer, refreshCampaign } = useCampaign()
 
 const isMainnet = computed(() => network.value === 'mainnet')
 
@@ -34,6 +41,7 @@ const isMainnet = computed(() => network.value === 'mainnet')
 const blendPool = ref<PoolListItem | null>(null)
 
 onMounted(async () => {
+  void refreshCampaign()
   try {
     const pools = await fetchPools()
     const blend = pools.filter(
@@ -124,6 +132,10 @@ function depositBlend() {
           Swap between vetted assets on the Stellar DEX. Every transaction is decoded
           and verified against your request before you sign.
         </div>
+        <!-- Lot EP (EP2): Dig points for a verified swap (API rules block only). -->
+        <div class="mt-[6px]">
+          <PointsChip :points="pointsForAction('sdex-swap')" :disclaimer="campaignDisclaimer" caption="Dig points per verified swap" />
+        </div>
         <div class="text-[11px] mt-[10px] font-semibold" style="color: var(--dig-accent)">Open swap →</div>
       </button>
 
@@ -140,6 +152,10 @@ function depositBlend() {
         </div>
         <div v-if="apyLabel" class="text-[10.5px] mt-[2px]" style="color: var(--dig-faint)">
           Current supply APY (variable)
+        </div>
+        <!-- Lot EP (EP2): Dig points for a verified deposit, separate from the APY above. -->
+        <div class="mt-[6px]">
+          <PointsChip :points="pointsForAction('blend-deposit')" :disclaimer="campaignDisclaimer" caption="Dig points per verified deposit" />
         </div>
         <div class="text-[12px] mt-[6px] flex-1" style="color: var(--dig-faint)">
           Supply an asset as collateral and earn the pool's variable rate. Not a
@@ -158,6 +174,10 @@ function depositBlend() {
 
     <div class="text-[11.5px] mt-[16px]" style="color: var(--dig-faint)">
       Non-custodial: you sign everything in your own wallet. Dig never holds your keys or funds.
+    </div>
+    <!-- Lot EP (EP2): the points disclaimer ONCE per surface (under the card, not under each chip). -->
+    <div v-if="campaignDisclaimer && pointsForAction('sdex-swap') !== null" class="text-[11px] mt-[6px] leading-[1.5]" style="color: var(--dig-faint)">
+      {{ campaignDisclaimer }}
     </div>
   </div>
 </template>

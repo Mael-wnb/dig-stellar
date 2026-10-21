@@ -11,6 +11,8 @@ import { useActiveSigner } from "../composables/useActiveSigner";
 import { useAppUser } from "../composables/useAppUser";
 import { useFaucet } from "../composables/useFaucet";
 import FaucetClaimPanel from "./FaucetClaimPanel.vue";
+import PointsChip from "./earn/PointsChip.vue";
+import { useCampaign } from "../composables/useCampaign";
 import { useNetwork, toWalletNetwork } from "../composables/useNetwork";
 import { validateSwapXdr, type SwapIntent, type AssetId } from "../lib/validateSwapXdr";
 import {
@@ -48,10 +50,16 @@ const { userId } = useAppUser();
 // R3 (Lot R): upfront reward note — rendered ONLY while the campaign is live
 // on THIS network (never a stale promise), plus the post-swap claim panel.
 const { campaign: faucetCampaign, campaignLiveFor, refreshCampaign } = useFaucet();
+// Lot EP (EP2): "+N pts" in the success block, from the API rules block only;
+// renders nothing while the campaign is inactive/unknown.
+const { pointsForAction, disclaimer: pointsDisclaimer, refreshCampaign: refreshPointsCampaign } = useCampaign();
 const faucetPromo = computed(() =>
   campaignLiveFor(network.value) ? faucetCampaign.value : null,
 );
-onMounted(() => void refreshCampaign());
+onMounted(() => {
+  void refreshCampaign();
+  void refreshPointsCampaign();
+});
 
 const rpcUrl = computed(() =>
   network.value === "testnet" ? TESTNET_RPC_URL : MAINNET_RPC_URL,
@@ -623,6 +631,16 @@ function reset() {
           :tx-hash="txHash"
           family="swap"
         />
+
+        <!-- POINTS (Lot EP, EP2): INSIDE the success block for the same
+             chain-integrity reason. Value from the API rules block; hidden
+             when the campaign is inactive. -->
+        <PointsChip
+          :points="pointsForAction('sdex-swap')"
+          :disclaimer="pointsDisclaimer"
+          caption="Dig points once this swap is verified on-chain (enrolled wallets)"
+        />
+        <span v-if="pointsDisclaimer && pointsForAction('sdex-swap') !== null" style="color: var(--dig-faint)">{{ pointsDisclaimer }}</span>
       </div>
 
       <!-- ERROR -->

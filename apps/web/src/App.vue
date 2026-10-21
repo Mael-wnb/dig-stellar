@@ -10,6 +10,7 @@ import PoolDetailView from './components/views/PoolDetailView.vue'
 import PortfolioView from './components/views/PortfolioView.vue'
 import AlertsView from './components/AlertsView.vue'
 import StatusView from './components/views/StatusView.vue'
+import EarnView from './components/views/EarnView.vue'
 import AppSidebar from './components/shell/AppSidebar.vue'
 import AppTopbar from './components/shell/AppTopbar.vue'
 import AppDrawer from './components/shell/AppDrawer.vue'
@@ -56,6 +57,7 @@ const { drawerOpen } = useDrawer()
         <PortfolioView v-else-if="view === 'portfolio'" />
         <AlertsView v-else-if="view === 'alerts'" />
         <StatusView v-else-if="view === 'status'" />
+        <EarnView v-else-if="view === 'earn'" />
       </main>
     </div>
 

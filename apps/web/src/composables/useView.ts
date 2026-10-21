@@ -19,24 +19,39 @@ export type AppView =
   | 'alerts'
   // Lot ST: public status page (#status) — sits outside the product nav.
   | 'status'
+  // Lot EP (EP2): Earn & Points (#earn, optionally #earn?ref=CODE).
+  | 'earn'
 
-const VIEWS: AppView[] = ['dashboard', 'protocols', 'pool', 'portfolio', 'alerts', 'status']
+const VIEWS: AppView[] = ['dashboard', 'protocols', 'pool', 'portfolio', 'alerts', 'status', 'earn']
+
+// Lot EP (EP2): a referral code arriving as `#earn?ref=CODE`. Kept IN MEMORY
+// only (this ref), passed to the enrol call once, never persisted — the API
+// validates it (8 chars, A-Z/2-9) and decides whether it is known.
+const REF_CODE_RE = /^[A-HJ-NP-Z2-9]{8}$/
 
 // Lightweight hash sync (NOT a router): the URL hash mirrors the active view so
 // a refresh keeps you where you were, and a view is shareable/deep-linkable
 // (`#pool:blend-fixed-pool`). Five views + a shared ref — no route table, no
 // navigation guards, no dependency.
-function parseHash(): { view: AppView; poolId: string | null } | null {
+function parseHash(): { view: AppView; poolId: string | null; ref: string | null } | null {
   if (typeof window === 'undefined') return null
   const raw = window.location.hash.replace(/^#\/?/, '')
   if (!raw) return null
-  const [name, poolId] = raw.split(':')
+  // `#earn?ref=CODE`: strip the query part before the view/pool split so a
+  // referral link still resolves to the Earn view.
+  const [path, query] = raw.split('?')
+  const [name, poolId] = path.split(':')
   if (!VIEWS.includes(name as AppView)) return null
-  return { view: name as AppView, poolId: poolId || null }
+  const rawRef = query ? new URLSearchParams(query).get('ref') : null
+  const ref = rawRef && REF_CODE_RE.test(rawRef.toUpperCase()) ? rawRef.toUpperCase() : null
+  return { view: name as AppView, poolId: poolId || null, ref }
 }
 
 const initial = parseHash()
 const view = ref<AppView>(initial?.view ?? 'dashboard')
+
+// Lot EP (EP2): the referral code from the URL, in memory only (never stored).
+const pendingReferralCode = ref<string | null>(initial?.view === 'earn' ? (initial?.ref ?? null) : null)
 
 // The pool slug/id currently open in the `pool` sub-view. Set when navigating
 // from a protocol/pool row; read by the pool-detail view.
@@ -63,5 +78,5 @@ export function useView() {
     view.value = 'pool'
   }
 
-  return { view, activePoolId, setView, openPool }
+  return { view, activePoolId, pendingReferralCode, setView, openPool }
 }

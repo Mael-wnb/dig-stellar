@@ -12,6 +12,8 @@ import { useActiveSigner } from "../composables/useActiveSigner";
 import { useAppUser } from "../composables/useAppUser";
 import { useFaucet } from "../composables/useFaucet";
 import FaucetClaimPanel from "./FaucetClaimPanel.vue";
+import PointsChip from "./earn/PointsChip.vue";
+import { useCampaign } from "../composables/useCampaign";
 import { useNetwork, toWalletNetwork } from "../composables/useNetwork";
 import { blendPoolFor } from "../config/blendPools";
 import { formatTokenAmountCompact, formatTokenAmountExact } from "../utils/format";
@@ -46,10 +48,16 @@ const { userId } = useAppUser();
 // R3 (Lot R): upfront reward note (supply side only — withdraws never earn)
 // + the post-deposit claim panel. Live-campaign-gated: never a stale promise.
 const { campaign: faucetCampaign, campaignLiveFor, refreshCampaign } = useFaucet();
+// Lot EP (EP2): "+N pts" in the success block (deposits only), from the API
+// rules block only; renders nothing while the campaign is inactive/unknown.
+const { pointsForAction, disclaimer: pointsDisclaimer, refreshCampaign: refreshPointsCampaign } = useCampaign();
 const faucetPromo = computed(() =>
   campaignLiveFor(network.value) ? faucetCampaign.value : null,
 );
-onMounted(() => void refreshCampaign());
+onMounted(() => {
+  void refreshCampaign();
+  void refreshPointsCampaign();
+});
 
 // Per-pool, per-network Blend config (pool id, reserve SACs, classic USDC issuer,
 // endpoints). This is the CLIENT-SIDE intent source for the validation gates — never
@@ -1032,6 +1040,16 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
           :tx-hash="txHash"
           family="blend-supply"
         />
+
+        <!-- POINTS (Lot EP, EP2): deposits only, INSIDE the success block.
+             Value from the API rules block; hidden when the campaign is inactive. -->
+        <PointsChip
+          v-if="!isWithdraw"
+          :points="pointsForAction('blend-deposit')"
+          :disclaimer="pointsDisclaimer"
+          caption="Dig points once this deposit is verified on-chain (enrolled wallets)"
+        />
+        <span v-if="!isWithdraw && pointsDisclaimer && pointsForAction('blend-deposit') !== null" class="text-[#9a9b99]">{{ pointsDisclaimer }}</span>
       </div>
 
       <!-- STILL PENDING — confirmation polling timed out. Not a failure: the tx was
