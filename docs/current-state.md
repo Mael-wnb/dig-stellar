@@ -41,6 +41,14 @@ not deployed yet (`docs/evidence/lot-ep/ep3-deploy.md`). Honesty rule for later 
 adoption number earned during the campaign is stated WITH the campaign context (points incentive,
 window, self-declared social), never as organic adoption.
 
+**Lot AN0 — Google Analytics 4 (2026-10-21, `apps/web` only, uncommitted):** GA4 with Consent Mode
+v2 (all signals default `denied`; gtag.js is only injected after an explicit "Accept analytics" in a
+bottom banner, re-openable from the sidebar "Analytics" link; Decline sends nothing). Events after
+consent only: `page_view` on view switch, `wallet_connect{provider}`, `campaign_enroll`,
+`campaign_checkin`, `swap_success{pair}`, `deposit_success{pool}` — no address, user id or handle
+ever (`lib/analytics.ts` drops them, spec-pinned). Off entirely without `VITE_GA_MEASUREMENT_ID`
+(Vercel Production only, never in the repo). Evidence: `docs/evidence/lot-an0/an0-implementation.md`.
+
 ---
 
 ## Data architecture reality (read this first)
