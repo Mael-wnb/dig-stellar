@@ -411,4 +411,162 @@ d('CampaignRepository (integration, local Postgres)', () => {
       ).rejects.toThrow(/Key \(campaign, reason, witness_tx_hash\)=/);
     });
   });
+
+  describe('EP3: perks rows and metrics facts (real SQL)', () => {
+    // Own throwaway rows, a window in 2030 so no other local row can fall inside it;
+    // the campaign-scoped counts (enrolled, referrals, social, points, perks) are
+    // asserted as deltas because the local DB may hold real campaign rows.
+    const a = Keypair.random().publicKey();
+    const b = Keypair.random().publicKey();
+    const userA = randomUUID();
+    const userB = randomUUID();
+    const hashes: string[] = [];
+    const hash = () => {
+      const h = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
+      hashes.push(h);
+      return h;
+    };
+    const WINDOW = { startsAtMs: Date.UTC(2030, 0, 1), endsAtMs: Date.UTC(2030, 0, 2) };
+    const IN = '2030-01-01T12:00:00Z';
+    const OUT = '2030-01-02T00:00:00Z'; // endsAt is exclusive
+    let before: Awaited<ReturnType<typeof repo.metricsFacts>>;
+
+    const seedWitness = (address: string, userId: string, kind: string, closedAt: string) =>
+      prisma.$executeRawUnsafe(
+        `insert into action_witnesses (tx_hash, network, wallet_address, user_id, kind, op_summary, notional_xlm, min_notional_xlm, meets_min_notional, ledger_closed_at)
+         values ($1, 'testnet', $2, $3::uuid, $4, '{}'::jsonb, 10, 1, true, $5::timestamptz)`,
+        hash(),
+        address,
+        userId,
+        kind,
+        closedAt,
+      );
+
+    const cleanupEp3 = async () => {
+      for (const addr of [a, b]) {
+        await prisma.$executeRawUnsafe(`delete from wallet_perks where lower(address) = lower($1)`, addr);
+        await prisma.$executeRawUnsafe(`delete from points_ledger where lower(address) = lower($1)`, addr);
+        await prisma.$executeRawUnsafe(`delete from social_task_claims where lower(address) = lower($1)`, addr);
+        await prisma.$executeRawUnsafe(`delete from referrals where referee_address = $1 or referrer_address = $1`, addr);
+        await prisma.$executeRawUnsafe(`delete from campaign_enrollments where lower(address) = lower($1)`, addr);
+        await prisma.$executeRawUnsafe(`delete from wallet_ownership_proofs where lower(address) = lower($1)`, addr);
+        await prisma.$executeRawUnsafe(`delete from user_wallets where address = $1`, addr);
+      }
+      if (hashes.length) await prisma.$executeRawUnsafe(`delete from action_witnesses where tx_hash = any($1::text[])`, hashes);
+    };
+
+    beforeAll(async () => {
+      await cleanupEp3();
+      before = await repo.metricsFacts(CAMPAIGN_ID, WINDOW);
+
+      // registered: A inside the window, B outside (at endsAt, exclusive)
+      await prisma.$executeRawUnsafe(
+        `insert into user_wallets (user_id, chain, address, created_at) values ($1::uuid, 'stellar', $2, $3::timestamptz)`,
+        userA, a, IN,
+      );
+      await prisma.$executeRawUnsafe(
+        `insert into user_wallets (user_id, chain, address, created_at) values ($1::uuid, 'stellar', $2, $3::timestamptz)`,
+        userB, b, OUT,
+      );
+      // proven: A twice inside the window (distinct → 1), B outside
+      await repo.upsertBoundProof({ address: a, userId: userA, provider: null, nonce: 'n1', variant: 'raw' });
+      await repo.insertUnboundProof({ address: a, provider: null, nonce: 'n2', variant: 'raw' });
+      await prisma.$executeRawUnsafe(`update wallet_ownership_proofs set verified_at = $2::timestamptz where lower(address) = lower($1)`, a, IN);
+      await repo.upsertBoundProof({ address: b, userId: userB, provider: null, nonce: 'n3', variant: 'raw' });
+      await prisma.$executeRawUnsafe(`update wallet_ownership_proofs set verified_at = $2::timestamptz where lower(address) = lower($1)`, b, OUT);
+      // enrolled: both
+      await repo.insertEnrollment({ campaign: CAMPAIGN_ID, address: a, userId: userA, referralCode: 'EP3METRA', referredByCode: null });
+      await repo.insertEnrollment({ campaign: CAMPAIGN_ID, address: b, userId: userB, referralCode: 'EP3METRB', referredByCode: 'EP3METRA' });
+      // witnesses: A swap + deposit + withdraw inside, A swap outside; B withdraw only (not an awardable kind)
+      await seedWitness(a, userA, 'sdex-swap', IN);
+      await seedWitness(a, userA, 'blend-deposit', IN);
+      await seedWitness(a, userA, 'blend-withdraw', IN);
+      await seedWitness(a, userA, 'sdex-swap', OUT);
+      await seedWitness(b, userB, 'blend-withdraw', IN);
+      // referrals: one credited, one not
+      await prisma.$executeRawUnsafe(
+        `insert into referrals (campaign, referee_address, referrer_address, code, credited_at) values ($1, $2, $3, 'EP3METRA', now())`,
+        CAMPAIGN_ID, b, a,
+      );
+      // social: one active, one soft-deleted
+      await prisma.$executeRawUnsafe(
+        `insert into social_task_claims (campaign, address, task_key, handle_normalized) values ($1, $2, 'x-follow', $3)`,
+        CAMPAIGN_ID, a, `ep3_${a.slice(1, 9).toLowerCase()}`,
+      );
+      await prisma.$executeRawUnsafe(
+        `insert into social_task_claims (campaign, address, task_key, handle_normalized, deleted_at) values ($1, $2, 'x-follow', 'deleted', now())`,
+        CAMPAIGN_ID, b,
+      );
+      // points: +50 (action) and -20 (adjust) → issued counts positives only
+      await repo.insertActionAward({
+        campaign: CAMPAIGN_ID, address: a, userId: userA, reason: 'action:sdex-swap',
+        basePoints: 50, multiplier: 1, points: 50, witnessTxHash: hashes[0], countedDay: '2030-01-01',
+      });
+      await prisma.$executeRawUnsafe(
+        `insert into points_ledger (campaign, address, user_id, reason, base_points, multiplier, points)
+         values ($1, $2, $3::uuid, 'adjust:it-metrics', 0, 1, -20)`,
+        CAMPAIGN_ID, a, userA,
+      );
+    });
+
+    afterAll(cleanupEp3);
+
+    it('insertPerk is idempotent on the primary key; listPerks returns key + grantedAt only', async () => {
+      expect(await repo.insertPerk({ campaign: CAMPAIGN_ID, address: a, perkKey: 'early-access', pointsAtGrant: 100 })).toBe(1);
+      expect(await repo.insertPerk({ campaign: CAMPAIGN_ID, address: a, perkKey: 'early-access', pointsAtGrant: 999 })).toBe(0);
+      expect(await repo.insertPerk({ campaign: CAMPAIGN_ID, address: b, perkKey: 'beta-features', pointsAtGrant: 500 })).toBe(1);
+      const rows = await repo.listPerks(CAMPAIGN_ID, a);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].perk_key).toBe('early-access');
+      expect(rows[0].granted_at).toBeInstanceOf(Date);
+      expect(Object.keys(rows[0]).sort()).toEqual(['granted_at', 'perk_key']);
+    });
+
+    it('wallet_perks CHECKs refuse an unknown perk key, a bad address and a negative points_at_grant', async () => {
+      await expect(
+        repo.insertPerk({ campaign: CAMPAIGN_ID, address: a, perkKey: 'vip' as never, pointsAtGrant: 0 }),
+      ).rejects.toThrow(/wallet_perks_perk_key_check/);
+      await expect(
+        repo.insertPerk({ campaign: CAMPAIGN_ID, address: a.toLowerCase(), perkKey: 'priority-rwa', pointsAtGrant: 0 }),
+      ).rejects.toThrow(/wallet_perks_address_check/);
+      await expect(
+        repo.insertPerk({ campaign: CAMPAIGN_ID, address: a, perkKey: 'priority-rwa', pointsAtGrant: -1 }),
+      ).rejects.toThrow(/wallet_perks_points_at_grant_check/);
+    });
+
+    it('balancesOfEnrolled lists every enrolled wallet, 0 for one without a ledger row', async () => {
+      const rows = await repo.balancesOfEnrolled(CAMPAIGN_ID);
+      expect(rows.find((r) => r.address === a)?.balance).toBe(30);
+      expect(rows.find((r) => r.address === b)?.balance).toBe(0);
+    });
+
+    it('metricsFacts follows the recon §8 definitions (window-bounded vs campaign-scoped)', async () => {
+      const after = await repo.metricsFacts(CAMPAIGN_ID, WINDOW);
+      // window-bounded on the stated column; endsAt exclusive
+      expect(after.walletsRegisteredInWindow).toBe(before.walletsRegisteredInWindow + 1);
+      expect(after.walletsProvenInWindow).toBe(before.walletsProvenInWindow + 1);
+      expect(after.walletsWithVerifiedActionInWindow).toBe(before.walletsWithVerifiedActionInWindow + 1); // B's withdraw is not awardable
+      expect(after.verifiedActionsByKind).toEqual({
+        'sdex-swap': before.verifiedActionsByKind['sdex-swap'] + 1,
+        'blend-deposit': before.verifiedActionsByKind['blend-deposit'] + 1,
+        'blend-withdraw': before.verifiedActionsByKind['blend-withdraw'] + 2,
+      });
+      // campaign-scoped
+      expect(after.walletsEnrolled).toBe(before.walletsEnrolled + 2);
+      expect(after.referralsCredited).toBe(before.referralsCredited + 1);
+      expect(after.socialClaimsActive).toBe(before.socialClaimsActive + 1);
+      expect(after.pointsIssued).toBe(before.pointsIssued + 50);
+      expect(after.perksGranted).toEqual({
+        'early-access': before.perksGranted['early-access'] + 1,
+        'beta-features': before.perksGranted['beta-features'] + 1,
+        'priority-rwa': before.perksGranted['priority-rwa'],
+      });
+      // no window → nothing registered / proven / acted inside it
+      const empty = await repo.metricsFacts(CAMPAIGN_ID, { startsAtMs: Date.UTC(2031, 0, 1), endsAtMs: null });
+      expect(empty.walletsRegisteredInWindow).toBe(0);
+      expect(empty.walletsProvenInWindow).toBe(0);
+      expect(empty.walletsWithVerifiedActionInWindow).toBe(0);
+      expect(empty.verifiedActionsByKind).toEqual({ 'sdex-swap': 0, 'blend-deposit': 0, 'blend-withdraw': 0 });
+    });
+  });
 });

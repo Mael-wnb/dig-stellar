@@ -4,7 +4,10 @@
 // notional / a withdraw / six same-day swaps, plus seven check-in days ending
 // on D-1 for the x1.2 multiplier; runs the job twice; asserts the exact ledger
 // after run 1, zero new rows after run 2, the referral credited once, and the
-// summary counts. Every seeded row is deleted in afterAll.
+// summary counts. EP3: the perks step grants early-access to both wallets on
+// run 1 (470 and 100 points), nothing on run 2, keeps a perk after a negative
+// adjust drops the balance under 100, and grants the next tier when a later
+// positive adjust reaches 500. Every seeded row is deleted in afterAll.
 
 import { Keypair } from '@stellar/stellar-sdk';
 import { randomUUID } from 'node:crypto';
@@ -48,6 +51,7 @@ d('84-campaign-award (integration, local Postgres)', () => {
 
   const cleanup = async () => {
     for (const a of [referee, referrer]) {
+      await prisma.$executeRawUnsafe(`delete from wallet_perks where lower(address) = lower($1)`, a);
       await prisma.$executeRawUnsafe(`delete from points_ledger where lower(address) = lower($1)`, a);
       await prisma.$executeRawUnsafe(`delete from referrals where referee_address = $1 or referrer_address = $1`, a);
       await prisma.$executeRawUnsafe(`delete from wallet_daily_checkins where address = $1`, a);
@@ -63,6 +67,13 @@ d('84-campaign-award (integration, local Postgres)', () => {
       CAMPAIGN_ID,
       address,
     )) as Array<Record<string, unknown>>;
+
+  const perks = async (address: string) =>
+    (await prisma.$queryRawUnsafe(
+      `select perk_key, points_at_grant from wallet_perks where campaign = $1 and lower(address) = lower($2) order by perk_key`,
+      CAMPAIGN_ID,
+      address,
+    )) as Array<{ perk_key: string; points_at_grant: number }>;
 
   beforeAll(async () => {
     await prisma.$connect();
@@ -111,6 +122,7 @@ d('84-campaign-award (integration, local Postgres)', () => {
       skippedByReason: { 'outside-window': 0, 'kind-not-awarded': 0, 'below-min-notional': 1, 'daily-cap-reached': 1 },
       referralsCredited: 1,
       referralsPending: 0,
+      perksGranted: 2, // early-access for A (470) and for B (100): the referral credit counted first
     });
     expect(summary.durationMs).toBeGreaterThanOrEqual(0);
 
@@ -146,6 +158,10 @@ d('84-campaign-award (integration, local Postgres)', () => {
     expect(await repo.balance(CAMPAIGN_ID, referee)).toBe(5 * 60 + 120 + 50);
     expect(await repo.balance(CAMPAIGN_ID, referrer)).toBe(100);
 
+    // EP3: perks granted from the balance AFTER this run's awards; the 100 boundary is inclusive
+    expect(await perks(referee)).toEqual([{ perk_key: 'early-access', points_at_grant: 470 }]);
+    expect(await perks(referrer)).toEqual([{ perk_key: 'early-access', points_at_grant: 100 }]);
+
     // log lines carry counts only — never an address or a hash
     for (const line of logs) {
       expect(line).not.toContain(referee);
@@ -153,12 +169,13 @@ d('84-campaign-award (integration, local Postgres)', () => {
       for (const h of hashes) expect(line).not.toContain(h);
     }
     expect(logs.some((l) => l.includes('summary awarded_actions=6'))).toBe(true);
+    expect(logs.some((l) => /perks wallets=\d+ granted=2$/.test(l))).toBe(true); // wallets= includes any real local enrolment
   });
 
   it('run 2 is a no-op: zero new rows, nothing re-credited', async () => {
     const before = (await ledger(referee)).length + (await ledger(referrer)).length;
     const summary = await runCampaignAward(repo, { log: () => undefined });
-    expect(summary).toMatchObject({ awardedActions: 0, referralsCredited: 0, referralsPending: 0 });
+    expect(summary).toMatchObject({ awardedActions: 0, referralsCredited: 0, referralsPending: 0, perksGranted: 0 });
     // the below-min and the capped sixth swap are still candidates (no ledger row) and are skipped again each run
     expect(summary.skippedByReason).toEqual({ 'outside-window': 0, 'kind-not-awarded': 0, 'below-min-notional': 1, 'daily-cap-reached': 1 });
     const after = (await ledger(referee)).length + (await ledger(referrer)).length;
@@ -169,14 +186,49 @@ d('84-campaign-award (integration, local Postgres)', () => {
     await prisma.$executeRawUnsafe(`update referrals set credited_at = null, credited_tx_hash = null where campaign = $1 and referee_address = $2`, CAMPAIGN_ID, referee);
     const summary = await runCampaignAward(repo, { log: () => undefined });
     expect(summary.referralsCredited).toBe(1);
+    expect(summary.perksGranted).toBe(0);
     expect((await ledger(referrer)).length).toBe(1);
     expect((await ledger(referee)).filter((r) => r.reason === 'referral:referee')).toHaveLength(1);
+  });
+
+  it('a later negative adjust never removes a granted perk; a re-run grants nothing', async () => {
+    // founder-style adjust: B drops from 100 to 40 (< early-access threshold)
+    await prisma.$executeRawUnsafe(
+      `insert into points_ledger (campaign, address, user_id, reason, base_points, multiplier, points, adjusts_id)
+       select campaign, address, user_id, 'adjust:it-revoke-test', 0, 1, -60, id from points_ledger
+        where campaign = $1 and lower(address) = lower($2) and reason = 'referral:referrer'`,
+      CAMPAIGN_ID,
+      referrer,
+    );
+    expect(await repo.balance(CAMPAIGN_ID, referrer)).toBe(40);
+    const summary = await runCampaignAward(repo, { log: () => undefined });
+    expect(summary.perksGranted).toBe(0);
+    expect(await perks(referrer)).toEqual([{ perk_key: 'early-access', points_at_grant: 100 }]);
+  });
+
+  it('crossing the next tier later grants exactly that tier once, with the balance seen at grant', async () => {
+    // A goes 470 → 570 (>= 500): beta-features, and only that one
+    await prisma.$executeRawUnsafe(
+      `insert into points_ledger (campaign, address, user_id, reason, base_points, multiplier, points)
+       values ($1, $2, $3::uuid, 'adjust:it-galxe-import-test', 100, 1, 100)`,
+      CAMPAIGN_ID,
+      referee,
+      refereeUser,
+    );
+    const summary = await runCampaignAward(repo, { log: () => undefined });
+    expect(summary.perksGranted).toBe(1);
+    expect(await perks(referee)).toEqual([
+      { perk_key: 'beta-features', points_at_grant: 570 },
+      { perk_key: 'early-access', points_at_grant: 470 },
+    ]);
+    const again = await runCampaignAward(repo, { log: () => undefined });
+    expect(again.perksGranted).toBe(0);
   });
 
   it('dark campaign: exits without touching the DB', async () => {
     delete process.env.CAMPAIGN_ENABLED;
     const summary = await runCampaignAward(repo, { log: (l) => logs.push(l) });
-    expect(summary).toMatchObject({ dark: true, awardedActions: 0, referralsCredited: 0 });
+    expect(summary).toMatchObject({ dark: true, awardedActions: 0, referralsCredited: 0, perksGranted: 0 });
     expect(logs.at(-1)).toContain('campaign dark, nothing to award');
     process.env.CAMPAIGN_ENABLED = 'true';
   });

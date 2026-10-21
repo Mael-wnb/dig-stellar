@@ -27,7 +27,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../db/prisma.service';
-import { STREAK_DAILY_POINTS, type ActionKind } from './campaign-rules';
+import { STREAK_DAILY_POINTS, type ActionKind, type PerkKey } from './campaign-rules';
 import type { SignatureVariant } from './verify-wallet-signature';
 import { listSocialClaims, type SocialClaimRow } from './social-claims.queries';
 
@@ -111,6 +111,28 @@ export interface ReferralRow {
   referrer_address: string;
   code: string;
   linked_at: Date;
+}
+
+export interface PerkRow {
+  perk_key: PerkKey;
+  granted_at: Date;
+}
+
+/**
+ * EP3: the raw counts behind GET /v1/campaign/metrics (recon §8 definitions).
+ * Every window-bounded figure uses [startsAt, endsAt) on the column named in
+ * the metrics boundary string; the campaign-scoped ones ignore the window.
+ */
+export interface MetricsFacts {
+  walletsRegisteredInWindow: number;
+  walletsProvenInWindow: number;
+  walletsEnrolled: number;
+  walletsWithVerifiedActionInWindow: number;
+  verifiedActionsByKind: Record<ActionKind, number>;
+  referralsCredited: number;
+  socialClaimsActive: number;
+  pointsIssued: number;
+  perksGranted: Record<PerkKey, number>;
 }
 
 /** Witness kinds that can earn points (the award job + pending count agree). */
@@ -708,5 +730,135 @@ export class CampaignRepository {
         params.txHash,
       );
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // Perks (EP3): wallet_perks, written ONLY by the award job (step 4), read by
+  // /me and the metrics. Insert-only: no code path updates or deletes a row.
+  // -------------------------------------------------------------------------
+
+  /** Every enrolled wallet with its live balance (sum(points); 0 when no ledger row). */
+  async balancesOfEnrolled(campaign: number): Promise<Array<{ address: string; balance: number }>> {
+    return (await this.db.$queryRawUnsafe(
+      `select e.address, coalesce(sum(l.points), 0)::int as balance
+         from campaign_enrollments e
+         left join points_ledger l
+           on l.campaign = e.campaign and lower(l.address) = lower(e.address)
+        where e.campaign = $1
+        group by e.address
+        order by e.address asc`,
+      campaign,
+    )) as Array<{ address: string; balance: number }>;
+  }
+
+  /** Idempotent: the primary key makes a repeat a no-op (returns 0). */
+  async insertPerk(row: { campaign: number; address: string; perkKey: PerkKey; pointsAtGrant: number }): Promise<number> {
+    return this.db.$executeRawUnsafe(
+      `insert into wallet_perks (campaign, address, perk_key, points_at_grant)
+       values ($1, $2, $3, $4)
+       on conflict do nothing`,
+      row.campaign,
+      row.address,
+      row.perkKey,
+      row.pointsAtGrant,
+    );
+  }
+
+  /** One wallet's granted perks, oldest first. */
+  async listPerks(campaign: number, address: string): Promise<PerkRow[]> {
+    return (await this.db.$queryRawUnsafe(
+      `select perk_key, granted_at
+         from wallet_perks
+        where campaign = $1 and lower(address) = lower($2)
+        order by granted_at asc, perk_key asc`,
+      campaign,
+      address,
+    )) as PerkRow[];
+  }
+
+  // -------------------------------------------------------------------------
+  // Metrics (EP3): counts only, never an address. Read by GET /v1/campaign/metrics.
+  // -------------------------------------------------------------------------
+
+  async metricsFacts(
+    campaign: number,
+    window: { startsAtMs: number; endsAtMs: number | null },
+  ): Promise<MetricsFacts> {
+    const startsAt = new Date(window.startsAtMs).toISOString();
+    const endsAt = window.endsAtMs != null ? new Date(window.endsAtMs).toISOString() : null;
+    const one = async (sql: string, ...params: unknown[]): Promise<number> => {
+      const rows = (await this.db.$queryRawUnsafe(sql, ...params)) as Array<{ n: number | bigint | null }>;
+      return Number(rows[0]?.n ?? 0);
+    };
+    const [
+      walletsRegisteredInWindow,
+      walletsProvenInWindow,
+      walletsEnrolled,
+      walletsWithVerifiedActionInWindow,
+      actionsByKind,
+      referralsCredited,
+      socialClaimsActive,
+      pointsIssued,
+      perksByKey,
+    ] = await Promise.all([
+      one(
+        `select count(*)::int as n from user_wallets
+          where created_at >= $1::timestamptz and ($2::timestamptz is null or created_at < $2::timestamptz)`,
+        startsAt,
+        endsAt,
+      ),
+      one(
+        `select count(distinct lower(address))::int as n from wallet_ownership_proofs
+          where verified_at >= $1::timestamptz and ($2::timestamptz is null or verified_at < $2::timestamptz)`,
+        startsAt,
+        endsAt,
+      ),
+      one(`select count(*)::int as n from campaign_enrollments where campaign = $1`, campaign),
+      one(
+        `select count(distinct lower(wallet_address))::int as n from action_witnesses
+          where kind = any($3::text[])
+            and ledger_closed_at >= $1::timestamptz
+            and ($2::timestamptz is null or ledger_closed_at < $2::timestamptz)`,
+        startsAt,
+        endsAt,
+        [...AWARDABLE_KINDS],
+      ),
+      this.db.$queryRawUnsafe(
+        `select kind, count(*)::int as n from action_witnesses
+          where ledger_closed_at >= $1::timestamptz
+            and ($2::timestamptz is null or ledger_closed_at < $2::timestamptz)
+          group by kind`,
+        startsAt,
+        endsAt,
+      ) as Promise<Array<{ kind: string; n: number }>>,
+      one(`select count(*)::int as n from referrals where campaign = $1 and credited_at is not null`, campaign),
+      one(`select count(*)::int as n from social_task_claims where campaign = $1 and deleted_at is null`, campaign),
+      one(`select coalesce(sum(points), 0)::int as n from points_ledger where campaign = $1 and points > 0`, campaign),
+      this.db.$queryRawUnsafe(
+        `select perk_key, count(*)::int as n from wallet_perks where campaign = $1 group by perk_key`,
+        campaign,
+      ) as Promise<Array<{ perk_key: PerkKey; n: number }>>,
+    ]);
+
+    const verifiedActionsByKind: Record<ActionKind, number> = { 'sdex-swap': 0, 'blend-deposit': 0, 'blend-withdraw': 0 };
+    for (const r of actionsByKind) {
+      if (r.kind in verifiedActionsByKind) verifiedActionsByKind[r.kind as ActionKind] = Number(r.n);
+    }
+    const perksGranted: Record<PerkKey, number> = { 'early-access': 0, 'beta-features': 0, 'priority-rwa': 0 };
+    for (const r of perksByKey) {
+      if (r.perk_key in perksGranted) perksGranted[r.perk_key] = Number(r.n);
+    }
+
+    return {
+      walletsRegisteredInWindow,
+      walletsProvenInWindow,
+      walletsEnrolled,
+      walletsWithVerifiedActionInWindow,
+      verifiedActionsByKind,
+      referralsCredited,
+      socialClaimsActive,
+      pointsIssued,
+      perksGranted,
+    };
   }
 }

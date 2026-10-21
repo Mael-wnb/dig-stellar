@@ -22,8 +22,13 @@
 //   3. referrals— uncredited links whose referee has a qualifying witness at or
 //                 after the link, inside the window: two ledger rows + the link
 //                 marked, in one transaction.
-//   4. summary  — awarded_actions, skipped_by_reason, referrals_credited,
-//                 duration_ms. Exit 0; any thrown error → exit 1.
+//   4. perks    — (EP3) for every enrolled wallet, balance = sum(points);
+//                 insert the PERK_TIERS reached, on conflict do nothing
+//                 (wallet_perks' primary key). Insert-only: a later negative
+//                 adjust never removes a perk. This script is the ONLY writer
+//                 of wallet_perks.
+//   5. summary  — awarded_actions, skipped_by_reason, referrals_credited,
+//                 perks_granted, duration_ms. Exit 0; any thrown error → exit 1.
 
 import 'dotenv/config';
 import { PrismaService } from '../db/prisma.service';
@@ -34,7 +39,7 @@ import {
   campaignStartsAt,
   isCampaignEnabled,
 } from '../modules/campaign/campaign-config';
-import { referralCredit, utcDay } from '../modules/campaign/campaign-rules';
+import { perksFor, referralCredit, utcDay } from '../modules/campaign/campaign-rules';
 import {
   checkinSetsFromRows,
   countsFromRows,
@@ -50,6 +55,8 @@ export interface AwardSummary {
   skippedByReason: SkipCounts;
   referralsCredited: number;
   referralsPending: number;
+  /** EP3: wallet_perks rows inserted this run (every tier reached, all wallets). */
+  perksGranted: number;
   durationMs: number;
 }
 
@@ -66,6 +73,7 @@ export async function runCampaignAward(
     skippedByReason: EMPTY_SKIPS(),
     referralsCredited: 0,
     referralsPending: 0,
+    perksGranted: 0,
     durationMs: 0,
   };
 
@@ -150,12 +158,22 @@ export async function runCampaignAward(
       `pending=${summary.referralsPending}`,
   );
 
-  // 4. summary
+  // 4. perks (after actions + referrals so this run's awards count)
+  const balances = await repo.balancesOfEnrolled(CAMPAIGN_ID);
+  for (const { address, balance } of balances) {
+    for (const perkKey of perksFor(balance)) {
+      summary.perksGranted += await repo.insertPerk({ campaign: CAMPAIGN_ID, address, perkKey, pointsAtGrant: balance });
+    }
+  }
+  log(`[campaign-award] perks wallets=${balances.length} granted=${summary.perksGranted}`);
+
+  // 5. summary
   summary.durationMs = Date.now() - startedAt;
   log(
     `[campaign-award] summary awarded_actions=${summary.awardedActions} ` +
       `skipped_by_reason=${JSON.stringify(summary.skippedByReason)} ` +
-      `referrals_credited=${summary.referralsCredited} duration_ms=${summary.durationMs}`,
+      `referrals_credited=${summary.referralsCredited} perks_granted=${summary.perksGranted} ` +
+      `duration_ms=${summary.durationMs}`,
   );
   return summary;
 }
