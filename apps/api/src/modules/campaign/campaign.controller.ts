@@ -3,12 +3,14 @@
 // Lot EP (EP1): the campaign routes. Thin validation only (faucet convention);
 // every decision — window, proof, enrolment, caps — lives in the service and
 // the pure rules. Ineligibility is a 200 with a structured reason; 4xx only
-// for malformed input. Every payload carries the no-monetary-value disclaimer.
+// for malformed input. Every payload carries the campaign disclaimer line.
 // Public reads: GET /v1/campaign is cacheable (60 s); /me is no-store (polled).
 // The leaderboard never carries a full address or a handle.
 // EP2: POST /social and DELETE /social/:id (self-declared tasks). The handle
 // is normalised here and never echoed back.
 // EP3: GET /metrics — public counts only (never an address), cacheable 60 s.
+// EP4: GET /me/activity — the wallet's last ledger rows, same access rule as
+// /me (address + userId, no proof for reads), no-store.
 
 import { Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { CampaignService } from './campaign.service';
@@ -95,6 +97,12 @@ export class CampaignController {
   @Header('Cache-Control', 'no-store')
   me(@Query('address') address?: string, @Query('userId') userId?: string) {
     return this.campaign.me({ address: requireAddress(address), userId: requireUserId(userId) });
+  }
+
+  @Get('me/activity')
+  @Header('Cache-Control', 'no-store')
+  activity(@Query('address') address?: string, @Query('userId') userId?: string) {
+    return this.campaign.activity({ address: requireAddress(address), userId: requireUserId(userId) });
   }
 
   @Get('leaderboard')

@@ -44,7 +44,8 @@ type Fake = jest.Mocked<Pick<
   | 'createChallenge' | 'deleteStaleChallenges' | 'consumeChallenge' | 'upsertBoundProof' | 'insertUnboundProof'
   | 'hasBoundProof' | 'findEnrollment' | 'findEnrollmentByCode' | 'insertEnrollmentWithCodeRetry' | 'insertReferral'
   | 'referredByCode' | 'checkinToday' | 'checkinDays' | 'todayUtc' | 'balance' | 'leaderboard' | 'rankOf'
-  | 'pendingVerificationCount' | 'listSocialClaims' | 'listPerks' | 'metricsFacts' | 'transaction'
+  | 'pendingVerificationCount' | 'pendingVerificationByKind' | 'pointsOn' | 'actionsCountedOn' | 'recentLedger'
+  | 'listSocialClaims' | 'listPerks' | 'metricsFacts' | 'transaction'
 >>;
 
 const facts = (overrides: Partial<MetricsFacts> = {}): MetricsFacts => ({
@@ -82,6 +83,10 @@ function fakeRepo(): Fake {
     leaderboard: jest.fn().mockResolvedValue([]),
     rankOf: jest.fn().mockResolvedValue(null),
     pendingVerificationCount: jest.fn().mockResolvedValue(0),
+    pendingVerificationByKind: jest.fn().mockResolvedValue({ 'sdex-swap': 0, 'blend-deposit': 0 }),
+    pointsOn: jest.fn().mockResolvedValue(0),
+    actionsCountedOn: jest.fn().mockResolvedValue({ 'sdex-swap': 0, 'blend-deposit': 0 }),
+    recentLedger: jest.fn().mockResolvedValue([]),
     listSocialClaims: jest.fn().mockResolvedValue([]),
     listPerks: jest.fn().mockResolvedValue([]),
     metricsFacts: jest.fn().mockResolvedValue(facts()),
@@ -205,7 +210,24 @@ describe('GET /v1/campaign payload', () => {
     expect(out).toMatchObject({ campaign: CAMPAIGN_ID, active: false, reason: 'campaign-disabled', startsAt: null, disclaimer: DISCLAIMER });
     expect(out.rules.actions['sdex-swap'].basePoints).toBe(50);
     expect(out.rules.streakDailyPoints).toBe(5);
-    expect(JSON.stringify(out).toLowerCase()).not.toMatch(/airdrop/);
+    // EP4: the ramp is served as numbers + a ladder; the web never computes a multiplier
+    expect(out.rules.streak).toEqual({
+      stepPerDay: 0.05,
+      cap: 1.35,
+      dailyPoints: 5,
+      daysToCap: 7,
+      ladder: [
+        { days: 1, multiplier: 1.05 },
+        { days: 2, multiplier: 1.1 },
+        { days: 3, multiplier: 1.15 },
+        { days: 4, multiplier: 1.2 },
+        { days: 5, multiplier: 1.25 },
+        { days: 6, multiplier: 1.3 },
+        { days: 7, multiplier: 1.35 },
+      ],
+    });
+    expect(out.rules).not.toHaveProperty('streakMultipliers');
+    expect(JSON.stringify(out).toLowerCase()).not.toMatch(/airdrop|reward|token/);
   });
 
   it('reports active with ISO window when enabled and started', () => {
@@ -324,26 +346,102 @@ describe('checkin', () => {
 });
 
 describe('me', () => {
-  it('streak.current ends today when checked in today, otherwise yesterday; multiplierForToday is from D-1', async () => {
+  it('streak.current ends today when checked in today, otherwise yesterday; multiplierForToday is from D-1 (ramp)', async () => {
     liveEnv();
     const repo = fakeRepo();
     repo.todayUtc.mockResolvedValue('2026-10-16');
-    repo.checkinDays.mockResolvedValue(['2026-10-15', '2026-10-14', '2026-10-13', '2026-10-12', '2026-10-11', '2026-10-10', '2026-10-09']);
+    repo.checkinDays.mockResolvedValue(['2026-10-15', '2026-10-14', '2026-10-13', '2026-10-12']); // 4 days ending D-1
     repo.findEnrollment.mockResolvedValue(enrollmentRow());
     repo.balance.mockResolvedValue(135);
     repo.referredByCode.mockResolvedValue('FRIENDCD');
-    repo.pendingVerificationCount.mockResolvedValue(2);
+    repo.pendingVerificationByKind.mockResolvedValue({ 'sdex-swap': 2, 'blend-deposit': 0 });
 
     const notYetToday = await service(repo).me({ address: ADDRESS, userId: USER });
     expect(notYetToday).toMatchObject({
       active: true, proven: true, enrolled: true, referralCode: 'ABCDEFGH', referredBy: 'FRIENDCD', balance: 135,
-      streak: { current: 7, multiplierForToday: 1.2 }, checkedInToday: false, pendingVerification: 2, perks: [], nextPerk: { key: 'early-access', threshold: 100, pointsRemaining: 0 }, flags: { beta: false }, disclaimer: DISCLAIMER,
+      streak: { current: 4, multiplierForToday: 1.2, daysToCap: 3 }, checkedInToday: false, pendingVerification: 2, perks: [], nextPerk: { key: 'early-access', threshold: 100, pointsRemaining: 0 }, flags: { beta: false }, disclaimer: DISCLAIMER,
     });
+    expect(notYetToday.pendingByKind).toEqual({ 'sdex-swap': 2, 'blend-deposit': 0 });
+    // the sum of pendingByKind IS pendingVerification; the EP1 count method is not called any more
+    expect(repo.pendingVerificationCount).not.toHaveBeenCalled();
 
-    repo.checkinDays.mockResolvedValue(['2026-10-16', '2026-10-15', '2026-10-14', '2026-10-13', '2026-10-12', '2026-10-11', '2026-10-10', '2026-10-09']);
+    repo.checkinDays.mockResolvedValue(['2026-10-16', '2026-10-15', '2026-10-14', '2026-10-13', '2026-10-12']);
     const afterCheckin = await service(repo).me({ address: ADDRESS, userId: USER });
-    expect(afterCheckin.streak).toEqual({ current: 8, multiplierForToday: 1.2 }); // still from D-1 (7 days)
+    expect(afterCheckin.streak).toMatchObject({ current: 5, multiplierForToday: 1.2, daysToCap: 2 }); // still from D-1 (4 days)
     expect(afterCheckin.checkedInToday).toBe(true);
+  });
+
+  it('EP4: last7 is the 7 UTC days ending today, oldest first, with the check-in flags; a 7-day streak reads daysToCap 0 and x1.35', async () => {
+    liveEnv();
+    const repo = fakeRepo();
+    repo.todayUtc.mockResolvedValue('2026-10-16');
+    repo.checkinDays.mockResolvedValue(['2026-10-16', '2026-10-14', '2026-10-09']); // today, a gap, D-2, an old one
+    const out = await service(repo).me({ address: ADDRESS, userId: USER });
+    // multiplier per day = the one that applied ON that day (D-1 rule): the 9th was checked, so the 10th reads x1.05;
+    // the 15th follows the lone 14th; today follows the missed 15th → x1.00 = multiplierForToday
+    expect(out.streak.last7).toEqual([
+      { day: '2026-10-10', checkedIn: false, multiplier: 1.05 },
+      { day: '2026-10-11', checkedIn: false, multiplier: 1 },
+      { day: '2026-10-12', checkedIn: false, multiplier: 1 },
+      { day: '2026-10-13', checkedIn: false, multiplier: 1 },
+      { day: '2026-10-14', checkedIn: true, multiplier: 1 },
+      { day: '2026-10-15', checkedIn: false, multiplier: 1.05 },
+      { day: '2026-10-16', checkedIn: true, multiplier: 1 },
+    ]);
+    expect(out.streak).toMatchObject({ current: 1, multiplierForToday: 1, daysToCap: 6 }); // D-1 missed → x1.00 today
+    expect(out.streak.last7[6].multiplier).toBe(out.streak.multiplierForToday);
+
+    // founder case: a run of 4 checked days ending yesterday + today → 1.00, 1.05, 1.10, 1.15, 1.20 on the last five days
+    repo.checkinDays.mockResolvedValue(['2026-10-16', '2026-10-15', '2026-10-14', '2026-10-13', '2026-10-12']);
+    const run = await service(repo).me({ address: ADDRESS, userId: USER });
+    expect(run.streak.last7.map((d) => d.multiplier)).toEqual([1, 1, 1, 1.05, 1.1, 1.15, 1.2]);
+    expect(run.streak.last7.map((d) => d.checkedIn)).toEqual([false, false, true, true, true, true, true]);
+    expect(run.streak).toMatchObject({ current: 5, multiplierForToday: 1.2, daysToCap: 2 });
+
+    repo.checkinDays.mockResolvedValue(['2026-10-15', '2026-10-14', '2026-10-13', '2026-10-12', '2026-10-11', '2026-10-10', '2026-10-09']);
+    const capped = await service(repo).me({ address: ADDRESS, userId: USER });
+    expect(capped.streak).toMatchObject({ current: 7, multiplierForToday: 1.35, daysToCap: 0 });
+    expect(capped.streak.last7.filter((d) => d.checkedIn)).toHaveLength(6); // today not yet
+    // month boundary: last7 crosses it without a gap
+    repo.todayUtc.mockResolvedValue('2026-11-02');
+    const nov = await service(repo).me({ address: ADDRESS, userId: USER });
+    expect(nov.streak.last7.map((d) => d.day)).toEqual(['2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02']);
+  });
+
+  it('EP4: pointsToday and actionsToday are read for the DB UTC day; caps come from the rules', async () => {
+    liveEnv();
+    const repo = fakeRepo();
+    repo.todayUtc.mockResolvedValue('2026-10-16');
+    repo.pointsOn.mockResolvedValue(125);
+    repo.actionsCountedOn.mockResolvedValue({ 'sdex-swap': 2, 'blend-deposit': 0 });
+    const out = await service(repo).me({ address: ADDRESS, userId: USER });
+    expect(out.pointsToday).toBe(125);
+    expect(out.actionsToday).toEqual({ 'sdex-swap': { counted: 2, cap: 5 }, 'blend-deposit': { counted: 0, cap: 3 } });
+    expect(repo.pointsOn).toHaveBeenCalledWith(CAMPAIGN_ID, ADDRESS, '2026-10-16');
+    expect(repo.actionsCountedOn).toHaveBeenCalledWith(CAMPAIGN_ID, ADDRESS, '2026-10-16');
+  });
+
+  it('EP4: activity maps the last ledger rows (newest first as the repo returns them), tx hash only as the 8-char short form', async () => {
+    liveEnv();
+    const repo = fakeRepo();
+    repo.recentLedger.mockResolvedValue([
+      { reason: 'action:sdex-swap', points: 60, multiplier: 1.2, counted_day: '2026-10-16', created_at: new Date('2026-10-16T10:00:00Z'), tx_hash_short: 'abcdef01' },
+      { reason: 'streak:daily', points: 5, multiplier: 1, counted_day: '2026-10-16', created_at: new Date('2026-10-16T08:00:00Z'), tx_hash_short: null },
+      { reason: 'adjust:founder-review', points: -5, multiplier: 1, counted_day: null, created_at: new Date('2026-10-15T08:00:00Z'), tx_hash_short: null },
+    ]);
+    const out = await service(repo).activity({ address: ADDRESS, userId: USER });
+    expect(repo.recentLedger).toHaveBeenCalledWith(CAMPAIGN_ID, ADDRESS, 20);
+    expect(out).toEqual({
+      campaign: CAMPAIGN_ID,
+      address: ADDRESS,
+      rows: [
+        { reason: 'action:sdex-swap', points: 60, multiplier: 1.2, countedDay: '2026-10-16', createdAt: '2026-10-16T10:00:00.000Z', txHashShort: 'abcdef01' },
+        { reason: 'streak:daily', points: 5, multiplier: 1, countedDay: '2026-10-16', createdAt: '2026-10-16T08:00:00.000Z', txHashShort: null },
+        { reason: 'adjust:founder-review', points: -5, multiplier: 1, countedDay: null, createdAt: '2026-10-15T08:00:00.000Z', txHashShort: null },
+      ],
+      disclaimer: DISCLAIMER,
+    });
+    expect(JSON.stringify(out)).not.toMatch(/handle|witness_tx_hash/);
   });
 
   it('EP2: tasks lists the whole catalogue with claimed state and claim id, never a handle', async () => {
@@ -379,7 +477,8 @@ describe('me', () => {
     const repo = fakeRepo();
     repo.checkinDays.mockResolvedValue(['2026-10-13']);
     const out = await service(repo).me({ address: ADDRESS, userId: USER });
-    expect(out).toMatchObject({ active: false, reason: 'campaign-disabled', enrolled: false, streak: { current: 0, multiplierForToday: 1 } });
+    expect(out).toMatchObject({ active: false, reason: 'campaign-disabled', enrolled: false, streak: { current: 0, multiplierForToday: 1, daysToCap: 7 } });
+    expect(out).toMatchObject({ pointsToday: 0, pendingByKind: { 'sdex-swap': 0, 'blend-deposit': 0 }, actionsToday: { 'sdex-swap': { counted: 0, cap: 5 }, 'blend-deposit': { counted: 0, cap: 3 } } });
   });
 });
 

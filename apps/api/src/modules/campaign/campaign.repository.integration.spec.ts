@@ -16,6 +16,7 @@ import { PrismaService } from '../../db/prisma.service';
 import { CampaignRepository } from './campaign.repository';
 import { CampaignService } from './campaign.service';
 import { CAMPAIGN_ID, RECOVERY_PROOF_MAX_AGE_SECONDS } from './campaign-config';
+import { previousUtcDay } from './campaign-rules';
 
 const RUN = process.env.CAMPAIGN_IT === '1';
 const d = RUN ? describe : describe.skip;
@@ -567,6 +568,141 @@ d('CampaignRepository (integration, local Postgres)', () => {
       expect(empty.walletsProvenInWindow).toBe(0);
       expect(empty.walletsWithVerifiedActionInWindow).toBe(0);
       expect(empty.verifiedActionsByKind).toEqual({ 'sdex-swap': 0, 'blend-deposit': 0, 'blend-withdraw': 0 });
+    });
+  });
+
+  describe('EP4: today reads, pending by kind, activity and the 7-day strip (real SQL)', () => {
+    const ep4Wallet = Keypair.random().publicKey();
+    const ep4User = randomUUID();
+    const hash = () => randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
+    const swapHash = hash(); // awarded today
+    const depositHash = hash(); // pending (no ledger row)
+    const smallHash = hash(); // below min notional: never pending
+    let today = '';
+    let yesterday = '';
+    const witness = (txHash: string, kind: string, meetsMin: boolean) =>
+      prisma.$executeRawUnsafe(
+        `insert into action_witnesses (tx_hash, network, wallet_address, user_id, kind, op_summary, notional_xlm, min_notional_xlm, meets_min_notional, ledger_closed_at)
+         values ($1, 'testnet', $2, $3::uuid, $4, '{}'::jsonb, 10, 1, $5, now())`,
+        txHash,
+        ep4Wallet,
+        ep4User,
+        kind,
+        meetsMin,
+      );
+    const adjust = (points: number, countedDay: string | null) =>
+      prisma.$executeRawUnsafe(
+        `insert into points_ledger (campaign, address, user_id, reason, base_points, multiplier, points, counted_day)
+         values ($1, $2, $3::uuid, 'adjust:it-ep4', $4, 1, $4, $5::date)`,
+        CAMPAIGN_ID,
+        ep4Wallet,
+        ep4User,
+        points,
+        countedDay,
+      );
+
+    beforeAll(async () => {
+      process.env.CAMPAIGN_ENABLED = 'true';
+      process.env.CAMPAIGN_STARTS_AT = '2026-10-01T00:00:00Z';
+      delete process.env.CAMPAIGN_ENDS_AT;
+      today = await repo.todayUtc();
+      yesterday = previousUtcDay(today);
+      await repo.insertEnrollment({ campaign: CAMPAIGN_ID, address: ep4Wallet, userId: ep4User, referralCode: 'ITEP4001', referredByCode: null });
+      // check-ins: today (through the real write path: 5 points, counted_day today) and a run of
+      // four days ending yesterday (D-4..D-1) → the founder's ramp case on last7
+      expect((await repo.checkinToday(CAMPAIGN_ID, ep4Wallet)).ok).toBe(true);
+      let day = yesterday;
+      for (let i = 0; i < 4; i += 1) {
+        await prisma.$executeRawUnsafe(
+          `insert into wallet_daily_checkins (campaign, address, day) values ($1, $2, $3::date)`,
+          CAMPAIGN_ID,
+          ep4Wallet,
+          day,
+        );
+        day = previousUtcDay(day);
+      }
+      await witness(swapHash, 'sdex-swap', true);
+      await witness(depositHash, 'blend-deposit', true);
+      await witness(smallHash, 'sdex-swap', false);
+      await prisma.$executeRawUnsafe(
+        `insert into points_ledger (campaign, address, user_id, reason, base_points, multiplier, points, witness_tx_hash, counted_day)
+         values ($1, $2, $3::uuid, 'action:sdex-swap', 50, 1.15, 58, $4, $5::date)`,
+        CAMPAIGN_ID,
+        ep4Wallet,
+        ep4User,
+        swapHash,
+        today,
+      );
+      await adjust(10, today); // an adjust row counted today IS in pointsToday
+      await adjust(100, yesterday); // counted yesterday: not today
+      await adjust(1000, null); // no counted_day: in the balance, never in a day
+    });
+
+    afterAll(async () => {
+      delete process.env.CAMPAIGN_ENABLED;
+      delete process.env.CAMPAIGN_STARTS_AT;
+      await prisma.$executeRawUnsafe(`delete from points_ledger where lower(address) = lower($1)`, ep4Wallet);
+      await prisma.$executeRawUnsafe(`delete from wallet_daily_checkins where address = $1`, ep4Wallet);
+      await prisma.$executeRawUnsafe(`delete from campaign_enrollments where lower(address) = lower($1)`, ep4Wallet);
+      await prisma.$executeRawUnsafe(`delete from action_witnesses where tx_hash = any($1::text[])`, [swapHash, depositHash, smallHash]);
+    });
+
+    it('pointsOn sums every row counted on that UTC day, adjust rows included; the balance keeps everything', async () => {
+      expect(await repo.pointsOn(CAMPAIGN_ID, ep4Wallet, today)).toBe(5 + 58 + 10);
+      expect(await repo.pointsOn(CAMPAIGN_ID, ep4Wallet, yesterday)).toBe(100);
+      expect(await repo.pointsOn(CAMPAIGN_ID, ep4Wallet, '2020-01-01')).toBe(0);
+      expect(await repo.balance(CAMPAIGN_ID, ep4Wallet)).toBe(5 + 58 + 10 + 100 + 1000);
+    });
+
+    it('actionsCountedOn counts action rows only, per kind, with both keys present', async () => {
+      expect(await repo.actionsCountedOn(CAMPAIGN_ID, ep4Wallet, today)).toEqual({ 'sdex-swap': 1, 'blend-deposit': 0 });
+      expect(await repo.actionsCountedOn(CAMPAIGN_ID, ep4Wallet, yesterday)).toEqual({ 'sdex-swap': 0, 'blend-deposit': 0 });
+    });
+
+    it('pendingVerificationByKind: the awarded swap is not pending, the deposit is, the below-min swap never; the sum is pendingVerificationCount', async () => {
+      const window = { startsAtMs: Date.UTC(2026, 9, 1), endsAtMs: null };
+      expect(await repo.pendingVerificationByKind(CAMPAIGN_ID, ep4Wallet, window)).toEqual({ 'sdex-swap': 0, 'blend-deposit': 1 });
+      expect(await repo.pendingVerificationCount(CAMPAIGN_ID, ep4Wallet, window)).toBe(1);
+      expect(await repo.pendingVerificationByKind(CAMPAIGN_ID, ep4Wallet, { startsAtMs: null, endsAtMs: null })).toEqual({ 'sdex-swap': 0, 'blend-deposit': 0 });
+    });
+
+    it('recentLedger: newest first, limit honoured, tx hash truncated to 8 chars on action rows only', async () => {
+      const all = await repo.recentLedger(CAMPAIGN_ID, ep4Wallet, 20);
+      expect(all).toHaveLength(5);
+      expect(all.map((r) => r.reason)).toEqual(['adjust:it-ep4', 'adjust:it-ep4', 'adjust:it-ep4', 'action:sdex-swap', 'streak:daily']);
+      const action = all.find((r) => r.reason === 'action:sdex-swap')!;
+      expect(action).toMatchObject({ points: 58, multiplier: 1.15, counted_day: today, tx_hash_short: swapHash.slice(0, 8) });
+      expect(typeof action.multiplier).toBe('number');
+      for (const r of all.filter((r) => r.reason !== 'action:sdex-swap')) expect(r.tx_hash_short).toBeNull();
+      expect(JSON.stringify(all)).not.toContain(swapHash);
+      expect(await repo.recentLedger(CAMPAIGN_ID, ep4Wallet, 2)).toHaveLength(2);
+    });
+
+    it('service.me on the real DB: pointsToday, actionsToday, pendingByKind and last7 agree with the rows above', async () => {
+      const svc = new CampaignService(repo);
+      const me = await svc.me({ address: ep4Wallet, userId: ep4User });
+      expect(me).toMatchObject({
+        enrolled: true,
+        checkedInToday: true,
+        balance: 1173,
+        pointsToday: 73,
+        actionsToday: { 'sdex-swap': { counted: 1, cap: 5 }, 'blend-deposit': { counted: 0, cap: 3 } },
+        pendingByKind: { 'sdex-swap': 0, 'blend-deposit': 1 },
+        pendingVerification: 1,
+        streak: { current: 5, multiplierForToday: 1.2, daysToCap: 2 }, // 4 days before today → x1.20 today
+      });
+      expect(me.streak.last7).toHaveLength(7);
+      expect(me.streak.last7[6]).toEqual({ day: today, checkedIn: true, multiplier: 1.2 });
+      expect(me.streak.last7[5]).toEqual({ day: yesterday, checkedIn: true, multiplier: 1.15 });
+      // the multiplier of each day is the one that applied ON that day (D-1 rule): 1.00, 1.05, 1.10, 1.15, 1.20
+      expect(me.streak.last7.map((d) => d.multiplier)).toEqual([1, 1, 1, 1.05, 1.1, 1.15, 1.2]);
+      expect(me.streak.last7.map((d) => d.checkedIn)).toEqual([false, false, true, true, true, true, true]);
+
+      const activity = await svc.activity({ address: ep4Wallet, userId: ep4User });
+      expect(activity.rows).toHaveLength(5);
+      expect(activity.rows.filter((r) => r.txHashShort != null)).toEqual([
+        expect.objectContaining({ reason: 'action:sdex-swap', points: 58, multiplier: 1.15, countedDay: today, txHashShort: swapHash.slice(0, 8) }),
+      ]);
     });
   });
 });

@@ -14,6 +14,10 @@
 // EP3: /me lists the wallet's NON-MONETARY perks (granted by the award job,
 // never here) and a flags object the web reads for gating; /metrics serves
 // the recon §8 counts with an explicit boundary string, zeros while dark.
+// EP4: /me adds today's points, today's action counts vs caps, the pending
+// witnesses per kind and the 7-day strip; /me/activity lists the last ledger
+// rows (tx hash truncated in SQL). Every number the Earn view shows is
+// computed HERE or in the rules — the web renders only.
 
 import { Injectable } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
@@ -36,7 +40,8 @@ import {
   SOCIAL_DAILY_CAP,
   SOCIAL_TASKS,
   STREAK_DAILY_POINTS,
-  STREAK_MULTIPLIERS,
+  STREAK_DAYS_TO_CAP,
+  STREAK_RAMP,
   campaignStatus,
   checkinEligibility,
   enrollEligibility,
@@ -44,9 +49,11 @@ import {
   previousUtcDay,
   referralCodeFromBytes,
   shortenAddress,
+  streakLadder,
   streakLengthBefore,
   streakLengthOn,
   streakMultiplier,
+  type ActionKind,
   type CampaignInactiveReason,
   type CampaignWindow,
   type NextPerk,
@@ -60,7 +67,9 @@ import {
   isUniqueViolation,
   violatedUniqueKey,
   type LeaderboardRow,
+  type LedgerActivityRow,
   type MetricsFacts,
+  type PendingByKind,
 } from './campaign.repository';
 import { buildChallengeMessage } from './challenge-message';
 import { verifyWalletSignature, type SignatureVariant } from './verify-wallet-signature';
@@ -102,7 +111,18 @@ export interface CampaignPayload {
   rules: {
     actions: typeof ACTION_RULES;
     streakDailyPoints: number;
-    streakMultipliers: typeof STREAK_MULTIPLIERS;
+    /**
+     * EP4: the daily ramp (multiplier = min(1 + stepPerDay × days, cap)) plus
+     * the ladder the strip renders verbatim and the day count at which the
+     * cap is reached. Replaces EP1's streakMultipliers tiers.
+     */
+    streak: {
+      stepPerDay: number;
+      cap: number;
+      dailyPoints: number;
+      daysToCap: number;
+      ladder: Array<{ days: number; multiplier: number }>;
+    };
     socialTasks: Record<SocialTaskKey, SocialTaskEntry>;
     socialDailyCap: number;
     referral: typeof REFERRAL_POINTS;
@@ -130,7 +150,26 @@ export interface MePayload {
   referralCode: string | null;
   referredBy: string | null;
   balance: number;
-  streak: { current: number; multiplierForToday: number };
+  /** EP4: sum(points) with counted_day = today (UTC), adjust rows included. */
+  pointsToday: number;
+  /** EP4: action awards counted today vs the daily cap, per awardable kind. */
+  actionsToday: Record<AwardableActionKind, { counted: number; cap: number }>;
+  /** EP4: in-window witnesses without a ledger row yet, per awardable kind (sum = pendingVerification). */
+  pendingByKind: PendingByKind;
+  streak: {
+    current: number;
+    /** From the streak ending on D-1 (determinism rule): a check-in today changes tomorrow, never today. */
+    multiplierForToday: number;
+    /** EP4: check-in days still needed (today included when not yet checked in) before the streak reaches the cap length. */
+    daysToCap: number;
+    /**
+     * EP4: the last 7 UTC days ending today, oldest first. `multiplier` is the
+     * one that applied ON that day under the D-1 rule (streak ending the day
+     * before), so today's entry equals multiplierForToday. Computed here, never
+     * in the web.
+     */
+    last7: Array<{ day: string; checkedIn: boolean; multiplier: number }>;
+  };
   checkedInToday: boolean;
   pendingVerification: number;
   /** EP2: the social task catalogue with this wallet's claimed state (never the handle). */
@@ -161,6 +200,28 @@ export interface MetricsPayload extends MetricsFacts {
   boundary: string;
   disclaimer: string;
 }
+
+export type AwardableActionKind = Extract<ActionKind, 'sdex-swap' | 'blend-deposit'>;
+
+/** EP4: one GET /v1/campaign/me/activity row. txHashShort = first 8 chars, action rows only. */
+export interface ActivityRow {
+  reason: string;
+  points: number;
+  multiplier: number;
+  countedDay: string | null;
+  createdAt: string;
+  txHashShort: string | null;
+}
+
+export interface ActivityPayload {
+  campaign: number;
+  address: string;
+  rows: ActivityRow[];
+  disclaimer: string;
+}
+
+/** EP4: rows served by /me/activity. */
+export const ACTIVITY_LIMIT = 20;
 
 export const METRICS_BOUNDARY =
   'Counts of wallets, not people: a person may hold several wallets. ' +
@@ -283,7 +344,13 @@ export class CampaignService {
       rules: {
         actions: ACTION_RULES,
         streakDailyPoints: STREAK_DAILY_POINTS,
-        streakMultipliers: STREAK_MULTIPLIERS,
+        streak: {
+          stepPerDay: STREAK_RAMP.stepPerDay,
+          cap: STREAK_RAMP.cap,
+          dailyPoints: STREAK_DAILY_POINTS,
+          daysToCap: STREAK_DAYS_TO_CAP,
+          ladder: streakLadder(),
+        },
         socialTasks: this.socialTaskCatalogue(),
         socialDailyCap: SOCIAL_DAILY_CAP,
         referral: REFERRAL_POINTS,
@@ -373,17 +440,21 @@ export class CampaignService {
   async me(params: { address: string; userId: string }): Promise<MePayload> {
     const w = this.window();
     const status = campaignStatus(w);
-    const [proven, enrollment, balance, days, today, referredBy, pendingVerification, socialClaims, perkRows] = await Promise.all([
-      this.repo.hasBoundProof(params.address, params.userId),
-      this.repo.findEnrollment(CAMPAIGN_ID, params.address),
-      this.repo.balance(CAMPAIGN_ID, params.address),
-      this.repo.checkinDays(CAMPAIGN_ID, params.address),
-      this.repo.todayUtc(),
-      this.repo.referredByCode(CAMPAIGN_ID, params.address),
-      this.repo.pendingVerificationCount(CAMPAIGN_ID, params.address, w),
-      this.repo.listSocialClaims(CAMPAIGN_ID, params.address),
-      this.repo.listPerks(CAMPAIGN_ID, params.address),
-    ]);
+    // Today (UTC, from the DB clock) first: the day-scoped reads depend on it.
+    const today = await this.repo.todayUtc();
+    const [proven, enrollment, balance, days, referredBy, pendingByKind, socialClaims, perkRows, pointsToday, countedToday] =
+      await Promise.all([
+        this.repo.hasBoundProof(params.address, params.userId),
+        this.repo.findEnrollment(CAMPAIGN_ID, params.address),
+        this.repo.balance(CAMPAIGN_ID, params.address),
+        this.repo.checkinDays(CAMPAIGN_ID, params.address),
+        this.repo.referredByCode(CAMPAIGN_ID, params.address),
+        this.repo.pendingVerificationByKind(CAMPAIGN_ID, params.address, w),
+        this.repo.listSocialClaims(CAMPAIGN_ID, params.address),
+        this.repo.listPerks(CAMPAIGN_ID, params.address),
+        this.repo.pointsOn(CAMPAIGN_ID, params.address, today),
+        this.repo.actionsCountedOn(CAMPAIGN_ID, params.address, today),
+      ]);
     const perks = perkRows.map((p) => ({ key: p.perk_key, grantedAt: p.granted_at.toISOString() }));
     const grantedKeys = perks.map((p) => p.key);
     const daySet = new Set(days);
@@ -391,6 +462,19 @@ export class CampaignService {
     // "current" = the streak ending today, or the one ending yesterday if the
     // user has not checked in yet today (so it is not shown as broken at 00:01Z).
     const current = checkedInToday ? streakLengthOn(daySet, today) : streakLengthOn(daySet, previousUtcDay(today));
+    // EP4: the last 7 UTC days ending today, oldest first (strip boxes), each
+    // with the multiplier that applied on that day (D-1 rule).
+    const last7: Array<{ day: string; checkedIn: boolean; multiplier: number }> = [];
+    let cursor = today;
+    for (let i = 0; i < 7; i += 1) {
+      last7.unshift({
+        day: cursor,
+        checkedIn: daySet.has(cursor),
+        multiplier: streakMultiplier(streakLengthBefore(daySet, cursor)),
+      });
+      cursor = previousUtcDay(cursor);
+    }
+    const pendingVerification = pendingByKind['sdex-swap'] + pendingByKind['blend-deposit'];
     return {
       campaign: CAMPAIGN_ID,
       active: status.active,
@@ -401,7 +485,18 @@ export class CampaignService {
       referralCode: enrollment?.referral_code ?? null,
       referredBy,
       balance,
-      streak: { current, multiplierForToday: streakMultiplier(streakLengthBefore(daySet, today)) },
+      pointsToday,
+      actionsToday: {
+        'sdex-swap': { counted: countedToday['sdex-swap'], cap: ACTION_RULES['sdex-swap'].dailyCap },
+        'blend-deposit': { counted: countedToday['blend-deposit'], cap: ACTION_RULES['blend-deposit'].dailyCap },
+      },
+      pendingByKind,
+      streak: {
+        current,
+        multiplierForToday: streakMultiplier(streakLengthBefore(daySet, today)),
+        daysToCap: Math.max(0, STREAK_DAYS_TO_CAP - current),
+        last7,
+      },
       checkedInToday,
       pendingVerification,
       tasks: (Object.entries(this.socialTaskCatalogue()) as Array<[SocialTaskKey, SocialTaskEntry]>).map(([key, entry]) => {
@@ -417,6 +512,28 @@ export class CampaignService {
       perks,
       nextPerk: nextPerkFor(balance, grantedKeys),
       flags: { beta: grantedKeys.includes('beta-features') },
+      disclaimer: DISCLAIMER,
+    };
+  }
+
+  /**
+   * EP4: GET /v1/campaign/me/activity — the wallet's last ACTIVITY_LIMIT ledger
+   * rows, newest first. Same access rule as /me (address + userId, no proof
+   * for reads); no-store. The tx hash is truncated by the repository.
+   */
+  async activity(params: { address: string; userId: string }): Promise<ActivityPayload> {
+    const rows = await this.repo.recentLedger(CAMPAIGN_ID, params.address, ACTIVITY_LIMIT);
+    return {
+      campaign: CAMPAIGN_ID,
+      address: params.address,
+      rows: rows.map((r: LedgerActivityRow) => ({
+        reason: r.reason,
+        points: r.points,
+        multiplier: r.multiplier,
+        countedDay: r.counted_day,
+        createdAt: r.created_at.toISOString(),
+        txHashShort: r.tx_hash_short,
+      })),
       disclaimer: DISCLAIMER,
     };
   }

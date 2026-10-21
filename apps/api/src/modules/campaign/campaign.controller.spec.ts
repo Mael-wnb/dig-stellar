@@ -18,6 +18,7 @@ function stub() {
     enroll: jest.fn().mockResolvedValue('enroll'),
     checkin: jest.fn().mockResolvedValue('checkin'),
     me: jest.fn().mockResolvedValue('me'),
+    activity: jest.fn().mockResolvedValue('activity'),
     leaderboard: jest.fn().mockResolvedValue('leaderboard'),
     metrics: jest.fn().mockResolvedValue('metrics'),
   };
@@ -144,5 +145,18 @@ describe('CampaignController (EP3)', () => {
     const c = campaignController(s);
     expect(await c.metrics()).toBe('metrics');
     expect(s.metrics).toHaveBeenCalledWith();
+  });
+});
+
+describe('CampaignController (EP4)', () => {
+  it('me/activity: address + userId required and validated like /me, pass-through otherwise', async () => {
+    const s = stub();
+    const c = campaignController(s);
+    expect(await c.activity(` ${ADDRESS} `, USER)).toBe('activity');
+    expect(s.activity).toHaveBeenCalledWith({ address: ADDRESS, userId: USER });
+    expect(() => c.activity(undefined, USER)).toThrow(BadRequestException);
+    expect(() => c.activity(ADDRESS, undefined)).toThrow(BadRequestException);
+    expect(() => c.activity('not-an-address', USER)).toThrow(BadRequestException);
+    expect(() => c.activity(ADDRESS, 'not-a-uuid')).toThrow(BadRequestException);
   });
 });

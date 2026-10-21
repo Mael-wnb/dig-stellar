@@ -118,6 +118,20 @@ export interface PerkRow {
   granted_at: Date;
 }
 
+/** EP4: the two awardable kinds (withdraws never earn, never pend). */
+export type AwardableKind = 'sdex-swap' | 'blend-deposit';
+export type PendingByKind = Record<AwardableKind, number>;
+
+/** EP4: one activity-feed row as SQL returns it (tx hash already truncated). */
+export interface LedgerActivityRow {
+  reason: string;
+  points: number;
+  multiplier: number;
+  counted_day: string | null;
+  created_at: Date;
+  tx_hash_short: string | null;
+}
+
 /**
  * EP3: the raw counts behind GET /v1/campaign/metrics (recon §8 definitions).
  * Every window-bounded figure uses [startsAt, endsAt) on the column named in
@@ -552,9 +566,23 @@ export class CampaignRepository {
     address: string,
     window: { startsAtMs: number | null; endsAtMs: number | null },
   ): Promise<number> {
-    if (window.startsAtMs == null) return 0;
+    const byKind = await this.pendingVerificationByKind(campaign, address, window);
+    return Object.values(byKind).reduce((sum, n) => sum + n, 0);
+  }
+
+  /**
+   * EP4: the same pending count split per awardable kind (always both keys,
+   * 0 when none). The sum is pendingVerificationCount.
+   */
+  async pendingVerificationByKind(
+    campaign: number,
+    address: string,
+    window: { startsAtMs: number | null; endsAtMs: number | null },
+  ): Promise<PendingByKind> {
+    const out: PendingByKind = { 'sdex-swap': 0, 'blend-deposit': 0 };
+    if (window.startsAtMs == null) return out;
     const rows = (await this.db.$queryRawUnsafe(
-      `select count(*)::int as n
+      `select w.kind, count(*)::int as n
          from action_witnesses w
         where lower(w.wallet_address) = lower($1)
           and w.kind = any($2::text[])
@@ -564,14 +592,77 @@ export class CampaignRepository {
           and not exists (
             select 1 from points_ledger l
              where l.campaign = $5 and l.witness_tx_hash = w.tx_hash
-          )`,
+          )
+        group by w.kind`,
       address,
       [...AWARDABLE_KINDS],
       new Date(window.startsAtMs).toISOString(),
       window.endsAtMs != null ? new Date(window.endsAtMs).toISOString() : null,
       campaign,
+    )) as Array<{ kind: AwardableKind; n: number }>;
+    for (const r of rows) if (r.kind in out) out[r.kind] = r.n;
+    return out;
+  }
+
+  // -------------------------------------------------------------------------
+  // EP4 reads for the Earn v1.1 hero / actions / activity cards. All derived
+  // from points_ledger (sums and counts, nothing stored — rule I).
+  // -------------------------------------------------------------------------
+
+  /**
+   * Points counted against one UTC day: sum(points) over every row whose
+   * counted_day is `day`, adjust rows included (an adjust row only counts
+   * toward a day when the founder sets its counted_day). "+N today" in the UI.
+   */
+  async pointsOn(campaign: number, address: string, day: string): Promise<number> {
+    const rows = (await this.db.$queryRawUnsafe(
+      `select coalesce(sum(points), 0)::int as n
+         from points_ledger
+        where campaign = $1 and lower(address) = lower($2) and counted_day = $3::date`,
+      campaign,
+      address,
+      day,
     )) as Array<{ n: number }>;
     return rows[0]?.n ?? 0;
+  }
+
+  /** Action awards counted on one UTC day per awardable kind (the daily-cap numerator). */
+  async actionsCountedOn(campaign: number, address: string, day: string): Promise<PendingByKind> {
+    const out: PendingByKind = { 'sdex-swap': 0, 'blend-deposit': 0 };
+    const rows = (await this.db.$queryRawUnsafe(
+      `select reason, count(*)::int as n
+         from points_ledger
+        where campaign = $1 and lower(address) = lower($2)
+          and reason like 'action:%' and counted_day = $3::date
+        group by reason`,
+      campaign,
+      address,
+      day,
+    )) as Array<{ reason: string; n: number }>;
+    for (const r of rows) {
+      const kind = r.reason.slice('action:'.length) as AwardableKind;
+      if (kind in out) out[kind] = r.n;
+    }
+    return out;
+  }
+
+  /**
+   * The wallet's most recent ledger rows, newest first. The witness hash is
+   * truncated IN SQL to its first 8 characters (action rows only): the
+   * activity feed never carries a full tx hash, a handle or another address.
+   */
+  async recentLedger(campaign: number, address: string, limit: number): Promise<LedgerActivityRow[]> {
+    return (await this.db.$queryRawUnsafe(
+      `select reason, points, multiplier::float as multiplier, counted_day::text as counted_day, created_at,
+              case when reason like 'action:%' then left(witness_tx_hash, 8) else null end as tx_hash_short
+         from points_ledger
+        where campaign = $1 and lower(address) = lower($2)
+        order by created_at desc, id desc
+        limit $3`,
+      campaign,
+      address,
+      limit,
+    )) as LedgerActivityRow[];
   }
   // -------------------------------------------------------------------------
   // Award job (84-campaign-award.ts): the ONLY writer of action:* and
