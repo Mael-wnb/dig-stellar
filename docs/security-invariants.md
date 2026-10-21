@@ -372,7 +372,9 @@ Review check (any compose / deploy change): grep `ports:` blocks for entries wit
 
 Lot EP (Earn & Points, post-grant) adds a wallet-ownership proof (`/v1/auth/*`) and a points
 campaign (`/v1/campaign/*`, `modules/campaign/`). Points only: the lot introduces no key, no
-payout and no token. Schema: `stellar_v6_campaign.sql` + `stellar_v7_social_claim_delete.sql`.
+payout and no token. Schema: `stellar_v6_campaign.sql` + `stellar_v7_social_claim_delete.sql` +
+`stellar_v8_campaign_perks.sql` (EP3: `wallet_perks`, non-monetary tiers written only by the award
+job, never revoked by code — `docs/decisions/2026-10-21-points-have-no-monetary-value.md`).
 Evidence: `docs/evidence/lot-ep/`.
 
 - **INV-11.1** Ownership proofs are verified with the PUBLIC key only. The server issues a

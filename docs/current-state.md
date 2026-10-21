@@ -24,8 +24,22 @@ Blend supply/withdraw executed and Horizon-verified on Mainnet.
 acceptance of the final SDF report. The team rushed to finish before 15 August to apply to
 SCF 45; SCF 45 reviewers redirected the application to SCF 46 (8 November 2026) because SCF 43's
 final validation had not landed at their review time. Everything since — Lots AA/AB (responsive
-shell + watch-only-first), AC (Node 24), AD (CI/CD, in progress), ST (status page) — is
-**post-grant product hardening** while preparing the SCF 46 application.
+shell + watch-only-first), AC (Node 24), AD (CI/CD, in progress), ST (status page), EP (Earn &
+Points campaign, Oct 2026) — is **post-grant product hardening** while preparing the SCF 46
+application.
+
+**Lot EP — Earn & Points campaign (EP1 + EP2 + EP3, 2026-10-15 → 2026-10-21): delivered, deployed
+DARK, activation pending.** Points only: no payout, no token, no new server-side key. Wallet
+ownership proof by signed message (`/v1/auth/*`, public-key verification only), enrolment,
+Horizon-verified action points through the award job (`job:campaign`), daily streaks, self-declared
+social tasks, referrals, a public leaderboard (shortened addresses), non-monetary perk tiers
+(`wallet_perks`: early access 100 / beta features 500 / priority RWA 1500), and
+`GET /v1/campaign/metrics` with an explicit boundary string shown on `#status`. Schema v6/v7/v8.
+In prod the campaign answers `campaign-disabled` until the founder sets `CAMPAIGN_STARTS_AT` +
+`CAMPAIGN_ENABLED` (`docs/runbooks.md` "Activate the campaign"); EP3 code and the cron line are
+not deployed yet (`docs/evidence/lot-ep/ep3-deploy.md`). Honesty rule for later reporting: every
+adoption number earned during the campaign is stated WITH the campaign context (points incentive,
+window, self-declared social), never as organic adoption.
 
 ---
 
@@ -777,6 +791,8 @@ T3-D3 ops item.
 2. **Lot ST — status page deploy**: founder runs the ordered sequence in `docs/deployment.md`
    (API build + pm2 restart → three curl verifications → Vercel push → `#status` + 390px check)
 3. **SCF 46 application prep** (deadline 8 November 2026)
+4. **Lot EP activation** (after the EP3 dark deploy): founder sets the three env names, installs
+   the campaign cron line, runs the job by hand once (`docs/runbooks.md` "Activate the campaign")
 
 What should not dominate now: over-engineering auth/session, premature abstraction layers, broad
 refactors not tied to a product need, or polishing low-value UI ahead of the SCF 46 application.

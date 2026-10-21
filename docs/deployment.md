@@ -37,6 +37,7 @@ psql "$DATABASE_URL" -f apps/api/src/db/stellar_v4_faucet.sql   # R2 (Lot R, T3-
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v5_faucet_campaign2.sql   # Lot R2: campaign 2, campaign/action_family columns + per-family uniqueness (apply BEFORE the campaign-2 api build)
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v6_campaign.sql   # Lot EP (EP1): Earn & Points — proofs, enrollments, points_ledger, check-ins, referrals (points only, no key; depends on v2 + action_witnesses); deploys dark (CAMPAIGN_ENABLED unset)
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v7_social_claim_delete.sql   # Lot EP (EP2): soft delete of social task claims (deleted_at + partial unique indexes); depends on v6, apply after it
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v8_campaign_perks.sql   # Lot EP (EP3): wallet_perks, non-monetary perks granted by the award job (depends on v6; apply BEFORE the EP3 api build)
 # Allbridge needs its venue + USDC asset seeded once before the first refresh:
 pnpm -C apps/indexer tsx src/scripts/bootstrap/allbridge-upsert-core.ts
 ```
@@ -223,6 +224,18 @@ Strict variant (only worth it when a web change would break on the old API): pus
 `<api-commit>:main` first, deploy the VPS from it, then push the rest and pull again.
 
 ---
+
+## Campaign cron line (Lot EP, EP3)
+
+A third OS-cron line (`job:campaign`, every 15 min at minutes 3/18/33/48, lock
+`/tmp/dig-stellar-campaign.lock`, log `/var/log/dig-stellar-campaign.log`) runs the points award
+job. The exact line, the install steps and the founder's activation sequence are in
+`docs/runbooks.md` ("Install the campaign cron line", "Activate the campaign"). It is installed
+while the campaign is dark (the job exits 0 with "campaign dark") and stays as is after
+activation; activation itself is an env change (`CAMPAIGN_STARTS_AT`, `CAMPAIGN_ENABLED`,
+`CAMPAIGN_X_REPOST_URL` in `apps/api/.env`) + `pm2 restart --update-env`, no build, no web
+redeploy. Deploy checklist for the EP3 code itself: `docs/evidence/lot-ep/ep3-deploy.md`
+(`stellar_v8_campaign_perks.sql` BEFORE the API build).
 
 ## Package changes on the VPS (S1 lesson, 2026-09-29)
 

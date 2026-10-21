@@ -44,6 +44,13 @@ with; the tables and notes below are kept as the historical record of how each c
   post-grant product hardening/upgrades (Lots AA, AB, AC, AD in progress, ST) while preparing
   the **SCF 46 application (8 November 2026)** — SCF 45 reviewers redirected the application
   to SCF 46 because SCF 43's final validation had not landed at their review time.
+- **Post-grant Lot EP — Earn & Points campaign: DELIVERED (EP1/EP2/EP3), deployed DARK, activation
+  pending (2026-10-21).** Points only, no payout, no token, no new key; signed-message ownership
+  proofs, award job on Horizon-verified executions, streaks, self-declared social tasks, referrals,
+  leaderboard, non-monetary perk tiers (`wallet_perks`), public `GET /v1/campaign/metrics` with a
+  boundary string on `#status`. Prod answers `campaign-disabled` until the founder activates it
+  (`docs/runbooks.md`); EP3 + the cron line await the dark deploy (`docs/evidence/lot-ep/ep3-deploy.md`).
+  Honesty rule: adoption numbers earned under the campaign will be stated with the campaign context.
 - T3 headline: **T3-D1 is DONE in prod** (Aug 4 — DeFindex live as the 5th protocol ≈$18.8M,
   first-class freshness + standardized backoff retries; demo capture remaining) and **T3-D2 mainnet
   actions are LIVE and evidenced end-to-end** (swaps ungated Aug 2 behind kill-switch + 100 XLM cap
@@ -420,6 +427,8 @@ T1-D3 criteria.
 2. **Lot ST — status page deploy**: API → verify → Vercel per the Lot ST sequence in
    `docs/deployment.md` (built, staged, tests 147 green)
 3. **SCF 46 application prep** (deadline 8 November 2026)
+4. **Lot EP activation**: EP3 dark deploy (v8 before build), cron line installed, then the
+   founder's activation sequence — the campaign is the adoption lever for the SCF 46 narrative
 
 ---
 

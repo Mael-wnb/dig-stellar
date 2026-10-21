@@ -171,8 +171,8 @@ pnpm -C apps/api job:campaign-award        # the award script itself (ts-node), 
 ```
 Env (apps/api/.env, names only): `CAMPAIGN_ENABLED` (default off → "campaign dark, nothing to
 award", exit 0), `CAMPAIGN_STARTS_AT` (REQUIRED, fail-closed when unset; only witnesses that
-closed at or after it earn points), `CAMPAIGN_ENDS_AT` (optional). Prereq: `stellar_v6_campaign.sql` and
-`stellar_v7_social_claim_delete.sql` applied, in that order.
+closed at or after it earn points), `CAMPAIGN_ENDS_AT` (optional). Prereq: `stellar_v6_campaign.sql`, `stellar_v7_social_claim_delete.sql`
+and `stellar_v8_campaign_perks.sql` applied, in that order.
 
 **Retroactive awards:** witnesses that closed at or after `CAMPAIGN_STARTS_AT` earn points once
 the wallet enrols, even if the enrolment comes later — the job selects by window and enrolment at
@@ -200,14 +200,95 @@ when `CAMPAIGN_X_REPOST_URL` (https URL of the post, apps/api/.env, name only he
 is served as `available: false` ("coming soon" in the UI) and refused with `task-unavailable`. Handles
 are never logged and never in a public payload (`docs/security-invariants.md` §11).
 
-**DRAFT cron line — not installed yet (EP3 deploy step).** Same shape as the two live lines
-(AC2 capture): offset minutes so the three jobs never collide, its own `flock` and log.
-```cron
-# m         h  dom mon dow  command
-3,18,33,48 * * * * cd /root/dig-stellar && /usr/bin/flock -n /tmp/dig-stellar-campaign.lock bash -lc 'export PATH=/root/.nvm/versions/node/v24.19.0/bin:$PATH && pnpm --dir apps/indexer job:campaign' >> /var/log/dig-stellar-campaign.log 2>&1
-```
-The AD1 deploy script must take this third lock blocking (`flock -w`) next to the refresh and
-alert locks (see `docs/deployment.md`, cron locks) before it stops the API.
+**Perks (EP3):** non-monetary tiers granted by the job's step 4 from the live balance
+(`PERK_TIERS` in `campaign-rules.ts`: early-access at 100 points, beta-features at 500,
+priority-rwa at 1500) into `wallet_perks`, `on conflict do nothing`. A perk once granted STAYS
+granted even if a later negative adjust drops the balance under the threshold; the job only
+inserts. `GET /v1/campaign/me` lists them (`perks`, `nextPerk`, `flags.beta`); nothing in the
+product is gated on a perk yet. Revocation is a founder-only manual SQL ("Revoke a perk" below).
+
+#### Install the campaign cron line (EP3, VPS, founder)
+
+Same shape as the two live lines (refresh, alert): minutes offset so the three jobs never
+collide, its own `flock` and its own log. Install it BEFORE activating the campaign: while the
+campaign is dark the job exits 0 with "campaign dark, nothing to award" every tick, which is
+the cheapest possible proof that the line, the PATH and the lock work.
+
+1. Check the two existing lines and the Node tree they export (the campaign line must use the
+   same one):
+   ```bash
+   crontab -l | grep dig-stellar
+   ls /root/.nvm/versions/node/
+   ```
+2. Open the crontab (`crontab -e`) and add this line, verbatim (adjust ONLY the Node version
+   if step 1 shows a different tree):
+   ```cron
+   # m         h  dom mon dow  command
+   3,18,33,48 * * * * cd /root/dig-stellar && /usr/bin/flock -n /tmp/dig-stellar-campaign.lock bash -lc 'export PATH=/root/.nvm/versions/node/v24.19.0/bin:$PATH && pnpm --dir apps/indexer job:campaign' >> /var/log/dig-stellar-campaign.log 2>&1
+   ```
+   - lock: `/tmp/dig-stellar-campaign.lock` (`flock -n`: an overlapping tick exits immediately;
+     the award script is idempotent regardless, so a lost tick costs nothing);
+   - log: `/var/log/dig-stellar-campaign.log`, one line per step, counts only;
+   - log rotation: the two existing logs are NOT rotated either (known gap, Lot AD backlog). The
+     dark line writes ~2 lines per tick (~200 KB/month); once active ~5 lines per tick. Add a
+     `/etc/logrotate.d/dig-stellar` stanza for the three logs (`weekly`, `rotate 8`,
+     `compress`, `missingok`, `notifempty`) when the AD1 deploy script lands — not before, so the
+     deploy script and the rotation are tested together.
+3. Confirm it is installed and wait for the next tick (at most 15 min):
+   ```bash
+   crontab -l | grep -c dig-stellar          # expect 3
+   tail -n 5 /var/log/dig-stellar-campaign.log
+   ```
+   Expected while dark: `=== Starting campaign award job ===`, `[campaign-award] campaign dark,
+   nothing to award (campaign=1)`, `=== Campaign award job completed successfully ===`.
+4. The AD1 deploy script must take this third lock blocking (`flock -w`) next to the refresh and
+   alert locks (see `docs/deployment.md`, cron locks) before it stops the API.
+
+#### Activate the campaign (founder, one-time)
+
+Pre-activation checklist — every box BEFORE the flag flip:
+
+- [ ] `CAMPAIGN_STARTS_AT` chosen as a UTC instant (ISO, `Z` suffix, e.g. `2026-11-03T09:00:00Z`).
+      Only witnesses that closed at or after it earn points, and every metric counter starts
+      there; it cannot be moved backwards later without re-stating the metrics.
+- [ ] Paul's X post is published and its URL is at hand for `CAMPAIGN_X_REPOST_URL` (https);
+      without it the repost task shows "coming soon" on day one.
+- [ ] `stellar_v8_campaign_perks.sql` applied (`\d wallet_perks` lists the table).
+- [ ] The cron line is installed (above) and ONE manual run shows the dark path end to end:
+      ```bash
+      cd /root/dig-stellar && pnpm --dir apps/indexer job:campaign
+      # expect: [campaign-award] campaign dark, nothing to award (campaign=1)
+      ```
+- [ ] `GET /v1/campaign` answers `active: false, reason: campaign-disabled` (the baseline to
+      compare against after the flip).
+
+Then, in this order:
+
+1. In `apps/api/.env` set the three names (values never pasted anywhere else):
+   `CAMPAIGN_STARTS_AT=<the UTC instant>`, `CAMPAIGN_ENABLED=true`,
+   `CAMPAIGN_X_REPOST_URL=<the post URL>`. Leave `CAMPAIGN_ENDS_AT` unset unless a deadline is
+   decided (unset = no deadline shown, no fake urgency).
+2. `pm2 restart dig-stellar-api --update-env && pm2 save` (env is read lazily, but pm2 only
+   hands a new env to the process on `--update-env`).
+3. Verify the flip:
+   ```bash
+   curl -s https://stellar-api.getdig.ai/v1/campaign | jq '{active, reason, startsAt, repost: .rules.socialTasks["x-repost"]}'
+   # expect active:true, startsAt = the instant, repost.available = true with the URL
+   curl -s https://stellar-api.getdig.ai/v1/campaign/metrics | jq '{active, dark, window, walletsEnrolled}'
+   # expect active:true, dark:false, the window, every count 0 on day one
+   ```
+4. Run the job by hand once more and read the summary line (now the live path):
+   ```bash
+   cd /root/dig-stellar && pnpm --dir apps/indexer job:campaign
+   # expect: window … / actions candidates=0 awarded=0 … / referrals … / perks wallets=0 granted=0 / summary …
+   ```
+5. No web redeploy is needed: the web polls `GET /v1/campaign` (60 s), so the Earn nav entry,
+   the `#earn` view, the "+N pts" chips and the `#status` "Campaign metrics" section appear on
+   every open tab at its next refresh. Open https://stellar.getdig.ai in a fresh tab and check
+   the sidebar shows "Earn".
+
+To pause: set `CAMPAIGN_ENABLED=false`, restart with `--update-env`; every surface hides within
+a minute, the proof routes stay on, the ledger and the perks are untouched.
 
 **How to read the summary line** (`/var/log/dig-stellar-campaign.log`, one line per step, counts
 only — never an address or a hash):
@@ -215,15 +296,17 @@ only — never an address or a hash):
 [campaign-award] window campaign=1 starts=2026-11-01T00:00:00.000Z ends=none
 [campaign-award] actions candidates=7 awarded=6 skipped={"outside-window":0,"kind-not-awarded":0,"below-min-notional":1,"daily-cap-reached":0}
 [campaign-award] referrals uncredited=1 credited=1 pending=0
-[campaign-award] summary awarded_actions=6 skipped_by_reason={…} referrals_credited=1 duration_ms=41
+[campaign-award] perks wallets=12 granted=2
+[campaign-award] summary awarded_actions=6 skipped_by_reason={…} referrals_credited=1 perks_granted=2 duration_ms=41
 ```
 `candidates` = awardable witnesses (swap / Blend deposit) of enrolled wallets inside the window
 with no ledger row yet; `awarded` = rows inserted this run; `skipped` = candidates refused by the
 pure rules (`below-min-notional`: the witness's stored `meets_min_notional` is false;
 `daily-cap-reached`: 5 swaps / 3 deposits per wallet per UTC day; the other two reasons are
 structurally 0 here because the selection is already window- and kind-bounded). `pending` =
-referral links whose referee has no qualifying witness yet. A non-zero exit means a thrown
-error: the wrapper relays it and the next tick retries from the same state.
+referral links whose referee has no qualifying witness yet. `perks wallets` = enrolled wallets
+scanned, `granted` = `wallet_perks` rows inserted this run (0 on every re-run). A non-zero exit
+means a thrown error: the wrapper relays it and the next tick retries from the same state.
 
 **Stuck "pending verification"** (`GET /v1/campaign/me` shows `pendingVerification > 0` for a
 witness that never earns): the witness exists, the ledger row does not. Check, in order:
@@ -248,7 +331,23 @@ select campaign, address, user_id, 'adjust:founder-review-2026-11-05', 0, 1, -po
   from points_ledger where id = <ledger id>;
 ```
 (`points_ledger_points_check` only allows negative points on `adjust:*` rows; the `reason`
-regex requires a non-empty note.)
+regex requires a non-empty note.) Revoking points never revokes a perk (next paragraph).
+
+**Revoke a perk** (founder-only, manual): no code path deletes from `wallet_perks`, so a
+revocation is a deliberate SQL after a founder review, with the reason kept in the evidence
+folder. The job will NOT re-grant it while the balance stays under the threshold; if the
+balance is at or above it, the next tick re-grants (so revoke the points first, see above):
+```sql
+delete from wallet_perks
+ where campaign = 1 and address = '<G…>' and perk_key = 'early-access';   -- or 'beta-features' / 'priority-rwa'
+```
+
+**Galxe import (later, not built):** campaign points earned on Galxe are NOT imported by any
+job or route in this lot. When the founder decides to import them, the ONLY mechanism is a
+founder-written `adjust:galxe-import-<date>` ledger row per wallet (positive points, `base_points`
+= the points, `multiplier` 1, no reference columns), inserted by hand from the Galxe export; the
+next job tick then grants any perk tier the new balance reaches. Nothing in `apps/api` reads
+Galxe. Procedure, numbers and the export file belong in `docs/evidence/lot-ep/` when it happens.
 
 ---
 
@@ -278,6 +377,7 @@ psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stella
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v5_faucet_campaign2.sql   # Lot R2: campaign 2, campaign/action_family columns + per-family uniqueness (apply BEFORE the campaign-2 api build)
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v6_campaign.sql   # Lot EP (EP1): Earn & Points — proofs, enrollments, points_ledger, check-ins, referrals (points only, no key; depends on v2 + action_witnesses); deploys dark (CAMPAIGN_ENABLED unset)
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v7_social_claim_delete.sql   # Lot EP (EP2): soft delete of social task claims (deleted_at + partial unique indexes); depends on v6, apply after it
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v8_campaign_perks.sql   # Lot EP (EP3): wallet_perks, non-monetary perks granted by the award job (depends on v6; apply BEFORE the EP3 api build)
 ```
 Manually-applied schemas (local AND VPS): `stellar_v1.sql`, `stellar_v1_metrics.sql`,
 `stellar_v1_bridge.sql` (Allbridge bridge flows, T2-D3), `stellar_v2_multiwallet.sql`,
@@ -289,7 +389,8 @@ fire-and-forget adoption inserts start failing silently),
 `stellar_v1_action_witness.sql` (R1 execution witnesses, T3-D2, Lot R),
 `stellar_v4_faucet.sql` + `stellar_v5_faucet_campaign2.sql` (Lot R/R2 faucet claims),
 `stellar_v6_campaign.sql` (Lot EP Earn & Points: points only, no key, deploys dark),
-`stellar_v7_social_claim_delete.sql` (Lot EP EP2: soft delete of social task claims, after v6).
+`stellar_v7_social_claim_delete.sql` (Lot EP EP2: soft delete of social task claims, after v6),
+`stellar_v8_campaign_perks.sql` (Lot EP EP3: `wallet_perks`, non-monetary perks, after v6).
 Note: when a new table **or column** is added to one of these files (e.g. `network_stats_latest`
 in `stellar_v1_metrics.sql`, `bridge_flows` in `stellar_v1_bridge.sql`, or the T2-D1
 `is_active_signer` column + `user_wallets_one_signer_per_user` index, or the T2-D1 Gap B
