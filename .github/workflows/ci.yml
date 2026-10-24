@@ -36,3 +36,7 @@ jobs:
       # vue-tsc typecheck runs inside the web build.
       - run: pnpm -C apps/web build
       - run: pnpm -C apps/web test
+
+      # Indexer unit tests (node:test via tsx). Pure functions only: no DB or
+      # network needed. Every metric shown in the app comes from the indexer.
+      - run: pnpm -C apps/indexer test
