@@ -157,6 +157,25 @@ same pattern (`*/15`, its own lock and log). An earlier version of this example 
 Prereq: `stellar_v3_alerting.sql` applied. A non-zero exit from the health refresh (81) aborts the
 evaluator (83) for that run and logs; stale/half-written health rows are never evaluated.
 
+**RPC budget (Lot RP, RP1 — 2026-10-27).** Script 81 loads each Blend pool + its oracle ONCE per
+run and reads the wallets' `Positions` ledger entries in batches of 100 keys per `getLedgerEntries`
+(`BLEND_POSITIONS_BATCH_SIZE`, max 200 = the RPC cap). Cost per run = 4 pools × (2 getLedgerEntries
++ reserves+1 `lastprice` simulations) + ceil(wallets / 100) × 4 getLedgerEntries: **36 calls for
+92 wallets, 120 for 2,100** (was 36 calls PER WALLET — 3,312 for 92). A pool whose load fails is
+skipped for that run (its wallets keep their previous rows; the other pools are persisted) and
+**81 exits 1, so 82 aborts the evaluator** — no alert evaluation on partial data; alerts resume on
+the next sweep. Both children append their RPC samples to `OPS_METRICS_FILE`
+(81 via `lib/ops-capture`, 83 via `apps/api/src/scripts/ops-capture-lite.ts`); 82 persists them as
+`rpc_metrics_runs` rows with `job = 'wallet-alert'` and a `methods` JSON (calls per RPC method).
+Prereq: `stellar_v1_ops_metrics_job.sql` applied (adds `job` + `methods`). Query the sweep's cost:
+```sql
+select run_at, calls, errors, p50_ms, methods from rpc_metrics_runs
+where job = 'wallet-alert' order by run_at desc limit 8;
+```
+Evidence and before/after numbers: `docs/evidence/lot-rp/rp1-sweep-fix.md`. The cadence was
+moved to hourly (`7 * * * *`) as a stopgap on 2026-10-26; restore `7,22,37,52` once the RP1
+drop is visible on the provider dashboard (`docs/deployment.md`, "RP1 deploy").
+
 ### Campaign award job (Lot EP, Earn & Points): periodic points award
 
 Points only: the job pays nothing, signs nothing and holds no key. It is the ONLY writer of
@@ -381,6 +400,7 @@ psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stella
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_logos.sql   # F3: venue/asset logo_url columns (bootstrap:logos fills them)
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_network_tvl.sql   # G0 (T3-D3): network_tvl_snapshots, one TVL point per refresh cycle
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_ops_metrics.sql   # E2 (Lot E, T3-D3): rpc_metrics_runs + refresh_step_runs + action_events; R1 adds action_events.metadata (re-run once)
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_ops_metrics_job.sql   # Lot RP (RP1): rpc_metrics_runs.job ('refresh' | 'wallet-alert') + methods jsonb (apply BEFORE the RP1 indexer + api deploy)
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_bridge.sql   # T2-D3: Allbridge bridge_flows (then run the allbridge bootstrap once, below)
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_action_witness.sql   # R1 (Lot R, T3-D2): action_witnesses, verified execution witnesses (apply BEFORE deploying the R1 api)
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v2_multiwallet.sql   # v2 wallets: user_wallets (+ T2-D1 is_active_signer + singleton index), snapshots, wallet_pool_health

@@ -29,6 +29,7 @@ psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_metrics.sql   # v1 latest rol
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_logos.sql   # F3: venue/asset logo_url columns (bootstrap:logos fills them)
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_network_tvl.sql   # G0 (T3-D3): network_tvl_snapshots, one TVL point per refresh cycle
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_ops_metrics.sql   # E2 (Lot E, T3-D3): rpc_metrics_runs + refresh_step_runs + action_events; R1 adds action_events.metadata (re-run once)
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_ops_metrics_job.sql   # Lot RP (RP1): rpc_metrics_runs.job + methods — per-job, per-method RPC cost (apply BEFORE the RP1 indexer + api deploy)
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_bridge.sql   # T2-D3: Allbridge bridge_flows (then run the allbridge bootstrap once, below)
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_action_witness.sql   # R1 (Lot R, T3-D2): action_witnesses, verified execution witnesses (apply BEFORE deploying the R1 api)
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v2_multiwallet.sql   # v2 wallets: user_wallets (+ T2-D1 is_active_signer + singleton index), snapshots, wallet_pool_health
@@ -224,6 +225,31 @@ Strict variant (only worth it when a web change would break on the old API): pus
 `<api-commit>:main` first, deploy the VPS from it, then push the rest and pull again.
 
 ---
+
+## RP1 deploy — wallet-sweep RPC fix (Lot RP, 2026-10-27)
+
+Indexer + API scripts + one SQL column; no web change, no new cron line, no env change. Order:
+
+```bash
+cd /root/dig-stellar
+# 0. between two refresh ticks, locks free:
+ls /tmp/dig-stellar-refresh.lock /tmp/dig-stellar-alert.lock; pgrep -af '81-stellar|71-refresh' | grep -v pgrep
+git pull origin main && git log -1 --oneline
+# 1. SQL first (idempotent): rpc_metrics_runs.job + methods
+docker exec -i dig_stellar_postgres psql -U dig -d dig_stellar < apps/api/src/db/stellar_v1_ops_metrics_job.sql
+# 2. deps + API build (ops.service now reads job = 'refresh'; 83 gets ops-capture-lite)
+pnpm install --frozen-lockfile && pnpm -C apps/api build
+GIT_SHA=$(git rev-parse --short HEAD) pm2 restart dig-stellar-api --update-env && pm2 save
+# 3. one manual sweep, then read its cost row
+pnpm -C apps/indexer job:wallet-alert 2>&1 | grep -E 'processedWallets|rpcBatches|\[ops\]'
+docker exec -i dig_stellar_postgres psql -U dig -d dig_stellar -Atc "select run_at, calls, methods from rpc_metrics_runs where job='wallet-alert' order by run_at desc limit 1"
+```
+
+Expected: `calls` ≈ 44 for ~92 wallets (36 from 81 + 8 from 83), `methods` ≈
+`{"getLedgerEntries": 20, "simulateTransaction": 24}`. The crontab stays on the hourly stopgap
+(`7 * * * *`) until the provider's hourly chart shows the drop (next full hour after the deploy:
+the sweep's share should fall from ~0.25M CU to a few thousand CU per run); only then restore
+`7,22,37,52 * * * *` — four sweeps an hour now cost less than one did.
 
 ## Campaign cron line (Lot EP, EP3)
 

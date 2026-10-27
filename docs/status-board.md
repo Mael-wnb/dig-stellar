@@ -432,6 +432,9 @@ T1-D3 criteria.
 3. **SCF 46 application prep** (deadline 8 November 2026)
 4. **Lot EP activation**: EP3 dark deploy (v8 before build), cron line installed, then the
    founder's activation sequence — the campaign is the adoption lever for the SCF 46 narrative
+5. **Lot RP — RPC cost** (RP1 built 2026-10-27, deploy pending): wallet sweep 3,312 → 36 RPC
+   calls per run at 92 wallets; per-job/per-method cost rows in `rpc_metrics_runs`. RP2 = shared
+   RPC client + free-provider pool (`docs/evidence/lot-rp/`)
 
 ---
 

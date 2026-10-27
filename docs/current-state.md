@@ -495,6 +495,13 @@ stream from the architecture doc:
   broker, no in-process scheduler — evaluating rules against the wallet/pool snapshot DB (first rule
   family: health-factor risk, consuming T2-D1's `wallet_pool_health`) and writing a `notifications`
   row on each fire/resolve edge.
+- **RPC budget (Lot RP, RP1 — 2026-10-27, built, deploy pending):** the sweep's health refresh (81)
+  used to reload each Blend pool + oracle for every wallet × pool (36 RPC calls per wallet, 24 of
+  them `lastprice` simulations), which is what drove the provider bill from ~5M to ~35M CU/day once
+  the provider's effective per-call price rose on 2026-10-17/18 (reconciliation in
+  `docs/evidence/lot-rp/00-rpc-cost-recon.md`). It now loads pool + oracle once per run and reads
+  positions in batched `getLedgerEntries` (36 calls per run for 92 wallets, 120 for 2,100), and
+  its calls land in `rpc_metrics_runs` (`job = 'wallet-alert'`, per-method `methods`).
 - **In-app delivery:** `GET /v1/notifications` → a web notification **bell** + **Alerts page** via
   HTTP polling. The Alerts page is now the approved design (`AlertsView.vue` — Activity feed + Your
   alert rules — with the 4-step `AlertRuleModal.vue` builder), reconciled to the real contract in
