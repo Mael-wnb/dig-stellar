@@ -38,6 +38,9 @@ const {
   totalPortfolioUsd,
   overviewLoading,
   isBusy,
+  // Lot SEC (G1): the store's last wallet-operation error (e.g. the refresh
+  // cooldown's "try again shortly") — rendered under the wallet cards.
+  error: walletsError,
   refreshOneWallet,
   selectWallet,
   // Active-signer model management (T2-D1) — ported from WalletSection so the
@@ -430,6 +433,7 @@ const assetsView = computed(() => {
           <span class="text-[13px] font-semibold">Add wallet</span>
         </button>
       </div>
+      <p v-if="walletsError" class="text-[12px] mt-[-4px]" style="color: var(--dig-amber)">{{ walletsError }}</p>
 
       <!-- Get-started card: wallet connected, no positions yet. Disappears as
            soon as a position exists (positions.length > 0). -->

@@ -15,6 +15,7 @@
 // so watch-only is presented FIRST as the primary mobile entry, and the signer
 // path carries the caveat instead of a silently failing flow.
 import { ref } from 'vue'
+import { ApiError } from '../../api/client'
 import { useConnectFlow } from '../../composables/useConnectFlow'
 import { useSharedWallets } from '../../composables/useSharedWallets'
 import { useMediaQuery } from '../../composables/useMediaQuery'
@@ -35,6 +36,12 @@ const signerLabel = ref('')
 const adding = ref(false)
 const error = ref<string | null>(null)
 
+// Lot SEC (G1): a tracked address must be a Stellar account public key (G…).
+// Checked here before the request so a typo gets an immediate, specific
+// message; the API enforces the same rule (400) regardless.
+const STELLAR_PUBKEY_RE = /^G[A-Z2-7]{55}$/
+const MAX_LABEL_CHARS = 64
+
 async function onConnect() {
   await connect({ label: signerLabel.value })
   emit('close')
@@ -43,16 +50,33 @@ async function onConnect() {
 async function onTrack() {
   const address = watchInput.value.trim()
   if (!address) return
-  adding.value = true
   error.value = null
+  if (!STELLAR_PUBKEY_RE.test(address)) {
+    error.value = 'That is not a Stellar address. It should start with G and be 56 characters long.'
+    return
+  }
+  if (label.value.trim().length > MAX_LABEL_CHARS) {
+    error.value = `Labels are limited to ${MAX_LABEL_CHARS} characters.`
+    return
+  }
+  adding.value = true
   try {
     await addWallet({ address, label: label.value.trim() || undefined })
     emit('close')
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Failed to add address.'
+    error.value = friendlyError(e)
   } finally {
     adding.value = false
   }
+}
+
+// 429 comes from the edge rate limiter or the per-wallet refresh cooldown: the
+// address was accepted or will be — the user only has to wait, not fix input.
+function friendlyError(e: unknown): string {
+  if (e instanceof ApiError && e.status === 429) {
+    return 'Too many requests right now. Wait a moment, then try again.'
+  }
+  return e instanceof Error ? e.message : 'Failed to add address.'
 }
 </script>
 

@@ -15,6 +15,7 @@ import {
 import type { WalletDefiSummary, WalletItem } from "../types/wallet";
 import { useActiveSigner } from "./useActiveSigner";
 import { useAppUser } from "./useAppUser";
+import { ApiError } from "../api/client";
 
 const EMPTY_DEFI: WalletDefiSummary = {
   totalSuppliedUsd: 0,
@@ -224,8 +225,14 @@ export function useWallets(userIdRef: { value: string | null }) {
         selectedWallet.value = updatedWallet;
       }
     } catch (err) {
+      // Lot SEC (G1): a 429 is the per-wallet refresh cooldown (one refresh a
+      // minute) or the edge rate limiter — not a failure to report as one.
       error.value =
-        err instanceof Error ? err.message : "Failed to refresh wallet.";
+        err instanceof ApiError && err.status === 429
+          ? "This wallet was refreshed less than a minute ago. Try again shortly."
+          : err instanceof Error
+            ? err.message
+            : "Failed to refresh wallet.";
     } finally {
       actionLoadingWalletId.value = null;
     }
