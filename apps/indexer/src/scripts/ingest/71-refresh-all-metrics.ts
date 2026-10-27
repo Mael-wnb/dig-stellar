@@ -187,11 +187,11 @@ async function persistOpsObservability(
     for (const s of summaries) {
       await client.query(
         `
-        insert into rpc_metrics_runs (run_at, target, calls, errors, p50_ms, p95_ms, p99_ms)
-        values ($1, $2, $3, $4, $5, $6, $7)
+        insert into rpc_metrics_runs (run_at, target, calls, errors, p50_ms, p95_ms, p99_ms, job, methods)
+        values ($1, $2, $3, $4, $5, $6, $7, 'refresh', $8::jsonb)
         on conflict (run_at, target) do nothing
         `,
-        [runAt, s.target, s.calls, s.errors, s.p50Ms, s.p95Ms, s.p99Ms]
+        [runAt, s.target, s.calls, s.errors, s.p50Ms, s.p95Ms, s.p99Ms, JSON.stringify(s.methods)]
       );
     }
 

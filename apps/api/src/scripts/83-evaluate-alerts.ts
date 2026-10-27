@@ -12,7 +12,11 @@
 // next state, and append a notification on every fire/resolve edge. Per-rule
 // try/catch so one bad rule can't abort the sweep. No clock magic — a single
 // `now` is injected into every evaluate() call.
+//
+// Lot RP (RP1): ops-capture-lite is the FIRST import so the PoolV2.load calls of
+// the pool-status family are sampled into OPS_METRICS_FILE (set by script 82).
 
+import './ops-capture-lite';
 import 'dotenv/config';
 import { PoolV2 } from '@blend-capital/blend-sdk';
 import { PrismaService } from '../db/prisma.service';

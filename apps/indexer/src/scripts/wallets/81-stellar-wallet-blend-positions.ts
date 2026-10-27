@@ -9,13 +9,41 @@
 // 71-refresh pipeline for Blend-pool discovery. Blend-specific logic stays in
 // the adapter (lib/protocols/blend/fetch-user-positions + resolve-user-health).
 //
+// Lot RP (RP1) — RPC budget. The sweep used to load the pool AND its oracle
+// again for every wallet × pool (12 RPC calls each, 9 of them `lastprice`
+// simulations), i.e. 12 × wallets × pools calls per run. It now loads each pool
+// + oracle ONCE per run and reads the wallets' `Positions` ledger entries in
+// batches (one getLedgerEntries call per POSITIONS_BATCH_SIZE wallets), so a run
+// costs (pools × one pool/oracle load) + ceil(wallets / batch) × pools calls. The
+// rows written are the same (same builder, same SDK estimate, same SQL); the
+// only semantic change is that every wallet of a pool is now valued against ONE
+// pool/oracle view instead of a view re-read seconds apart per wallet.
+//
+// Failure contract: a pool whose load fails is skipped for the run (its wallets
+// keep their previous rows; the other pools are still persisted) and the run
+// EXITS 1, so 82 does not evaluate alerts on partial data. Before RP1 a failing
+// (wallet, pool) read was skipped silently and the run exited 0; with one load
+// serving every wallet the blast radius is a whole pool, hence the abort.
+//
+// Observability: `lib/ops-capture` is the FIRST import so every RPC call is
+// sampled (target + method) and flushed to OPS_METRICS_FILE when the parent
+// (82-run-wallet-alert-job.ts) sets it; 82 persists the summary as
+// rpc_metrics_runs rows with job = 'wallet-alert'.
+//
 // Scope: Blend only. No Soroswap/Aquarius LP positions (post-beta). No alerting
 // (that's D2). This script just produces the data.
 
+import '../../lib/ops-capture';
 import 'dotenv/config';
+import type { Client as PgClient } from 'pg';
 import { createPgClient } from '../shared/db';
 import { nowIso } from '../discovery/00-common';
-import { fetchBlendUserPositions } from '../../lib/protocols/blend/fetch-user-positions';
+import {
+  POSITIONS_BATCH_SIZE,
+  fetchBlendUsersPositionsBatch,
+  loadBlendPoolContext,
+  type BlendUserPositions,
+} from '../../lib/protocols/blend/fetch-user-positions';
 import { resolveBlendUserHealth } from '../../lib/protocols/blend/resolve-user-health';
 
 type ActiveWalletRow = {
@@ -41,14 +69,155 @@ function getTargetWalletId(): string | null {
   return value && value.length ? value : null;
 }
 
+/** Wallets per getLedgerEntries request (RP1). Env override for experiments only. */
+function getPositionsBatchSize(): number {
+  const raw = Number(process.env.BLEND_POSITIONS_BATCH_SIZE ?? POSITIONS_BATCH_SIZE);
+  return Number.isFinite(raw) && raw >= 1 ? Math.min(200, Math.floor(raw)) : POSITIONS_BATCH_SIZE;
+}
+
 function toRawAmount(scaled: number, decimals: number): string | null {
   if (!Number.isFinite(scaled) || !Number.isFinite(decimals)) return null;
   // BigInt-safe enough for our magnitudes; positions are small relative to 2^53.
   return BigInt(Math.round(scaled * 10 ** decimals)).toString();
 }
 
+/**
+ * Persist one wallet's positions in one pool: per-asset supply/borrow rows plus
+ * the pool-level health row. Unchanged SQL and metadata from the per-wallet
+ * version — only the call site moved. Returns the row counts written.
+ */
+async function persistWalletPoolPositions(params: {
+  client: PgClient;
+  wallet: ActiveWalletRow;
+  pool: BlendPoolRow;
+  blendVenueId: string | null;
+  positions: BlendUserPositions;
+  assetByContract: Map<string, AssetRow>;
+  snapshotAt: string;
+}): Promise<{ positionRows: number; healthRows: number }> {
+  const { client, wallet, pool, blendVenueId, positions, assetByContract, snapshotAt } = params;
+  let positionRows = 0;
+
+  const health = resolveBlendUserHealth(positions);
+
+  // --- per-asset supply/borrow rows ---
+  for (const r of positions.reserves) {
+    const asset = assetByContract.get(r.assetId) ?? null;
+
+    const suppliedScaled = r.collateral + r.supply;
+    const suppliedUsd =
+      r.collateralUsd !== null || r.supplyUsd !== null
+        ? (r.collateralUsd ?? 0) + (r.supplyUsd ?? 0)
+        : null;
+
+    if (suppliedScaled > 0) {
+      await client.query(
+        `insert into wallet_protocol_positions (
+           user_wallet_id, venue_id, entity_id, position_type,
+           asset_id, asset_contract_id, asset_symbol,
+           amount_raw, amount_scaled, amount_usd, snapshot_at, metadata
+         ) values (
+           $1::uuid, $2::uuid, $3::uuid, 'supply',
+           $4::uuid, $5, $6,
+           $7, $8, $9, $10::timestamptz, $11::jsonb
+         )`,
+        [
+          wallet.id,
+          blendVenueId,
+          pool.entity_id,
+          asset?.id ?? null,
+          r.assetId,
+          asset?.symbol ?? null,
+          toRawAmount(suppliedScaled, r.decimals),
+          suppliedScaled,
+          suppliedUsd,
+          snapshotAt,
+          JSON.stringify({
+            source: 'blend-sdk',
+            poolId: pool.contract_address,
+            poolSlug: pool.slug,
+            collateralEnabled: r.collateral > 0,
+            collateral: r.collateral,
+            supply: r.supply,
+            priceUsd: r.priceUsd,
+          }),
+        ]
+      );
+      positionRows += 1;
+    }
+
+    if (r.liabilities > 0) {
+      await client.query(
+        `insert into wallet_protocol_positions (
+           user_wallet_id, venue_id, entity_id, position_type,
+           asset_id, asset_contract_id, asset_symbol,
+           amount_raw, amount_scaled, amount_usd, snapshot_at, metadata
+         ) values (
+           $1::uuid, $2::uuid, $3::uuid, 'borrow',
+           $4::uuid, $5, $6,
+           $7, $8, $9, $10::timestamptz, $11::jsonb
+         )`,
+        [
+          wallet.id,
+          blendVenueId,
+          pool.entity_id,
+          asset?.id ?? null,
+          r.assetId,
+          asset?.symbol ?? null,
+          toRawAmount(r.liabilities, r.decimals),
+          r.liabilities,
+          r.liabilitiesUsd,
+          snapshotAt,
+          JSON.stringify({
+            source: 'blend-sdk',
+            poolId: pool.contract_address,
+            poolSlug: pool.slug,
+            priceUsd: r.priceUsd,
+          }),
+        ]
+      );
+      positionRows += 1;
+    }
+  }
+
+  // --- one pool-level health row ---
+  await client.query(
+    `insert into wallet_pool_health (
+       user_wallet_id, venue_id, entity_id,
+       health_factor, total_collateral_usd, total_debt_usd,
+       borrow_limit_usd, net_apy, positions_count, snapshot_at, metadata
+     ) values (
+       $1::uuid, $2::uuid, $3::uuid,
+       $4, $5, $6, $7, $8, $9, $10::timestamptz, $11::jsonb
+     )`,
+    [
+      wallet.id,
+      blendVenueId,
+      pool.entity_id,
+      health.healthFactor,
+      health.totalCollateralUsd,
+      health.totalDebtUsd,
+      health.borrowCapUsd,
+      health.netApy,
+      positions.reserves.length,
+      snapshotAt,
+      JSON.stringify({
+        source: 'blend-sdk',
+        poolId: pool.contract_address,
+        poolSlug: pool.slug,
+        totalSuppliedUsd: health.totalSuppliedUsd,
+        totalBorrowedUsd: health.totalBorrowedUsd,
+        borrowLimit: health.borrowLimit,
+      }),
+    ]
+  );
+
+  return { positionRows, healthRows: 1 };
+}
+
 async function main() {
   const targetWalletId = getTargetWalletId();
+  const batchSize = getPositionsBatchSize();
   const client = createPgClient();
   await client.connect();
 
@@ -94,139 +263,53 @@ async function main() {
     }
 
     const snapshotAt = nowIso();
-    let processedWallets = 0;
+    const wallets = walletsRes.rows;
+    const processedWallets = wallets.length;
+    const addresses = wallets.map((w) => w.address);
     let positionRows = 0;
     let healthRows = 0;
+    let rpcBatches = 0;
+    let poolsSkipped = 0;
 
-    for (const wallet of walletsRes.rows) {
-      processedWallets += 1;
+    // Pool-major order (RP1): one pool/oracle load per pool, then every wallet
+    // of that pool in batched ledger-entry reads. One pool/RPC hiccup must not
+    // abort the other pools — skip the pool for this run, keep its previous rows.
+    for (const pool of poolsRes.rows) {
+      let positionsByAddress: Map<string, BlendUserPositions>;
+      try {
+        const context = await loadBlendPoolContext({ poolId: pool.contract_address });
+        positionsByAddress = await fetchBlendUsersPositionsBatch({
+          context,
+          userAddresses: addresses,
+          batchSize,
+        });
+        rpcBatches += Math.ceil(new Set(addresses).size / batchSize);
+      } catch (error) {
+        poolsSkipped += 1;
+        console.error(`[blend-positions] failed for pool ${pool.slug} — skipped this run`);
+        console.error(error);
+        continue;
+      }
 
-      for (const pool of poolsRes.rows) {
+      for (const wallet of wallets) {
+        const positions = positionsByAddress.get(wallet.address);
+        // No position in this pool → write nothing for this pool.
+        if (!positions || !positions.hasPosition) continue;
+
         try {
-          const positions = await fetchBlendUserPositions({
-            poolId: pool.contract_address,
-            userAddress: wallet.address,
+          const written = await persistWalletPoolPositions({
+            client,
+            wallet,
+            pool,
+            blendVenueId,
+            positions,
+            assetByContract,
+            snapshotAt,
           });
-
-          // No position in this pool → write nothing for this pool.
-          if (!positions.hasPosition) continue;
-
-          const health = resolveBlendUserHealth(positions);
-
-          // --- per-asset supply/borrow rows ---
-          for (const r of positions.reserves) {
-            const asset = assetByContract.get(r.assetId) ?? null;
-
-            const suppliedScaled = r.collateral + r.supply;
-            const suppliedUsd =
-              r.collateralUsd !== null || r.supplyUsd !== null
-                ? (r.collateralUsd ?? 0) + (r.supplyUsd ?? 0)
-                : null;
-
-            if (suppliedScaled > 0) {
-              await client.query(
-                `insert into wallet_protocol_positions (
-                   user_wallet_id, venue_id, entity_id, position_type,
-                   asset_id, asset_contract_id, asset_symbol,
-                   amount_raw, amount_scaled, amount_usd, snapshot_at, metadata
-                 ) values (
-                   $1::uuid, $2::uuid, $3::uuid, 'supply',
-                   $4::uuid, $5, $6,
-                   $7, $8, $9, $10::timestamptz, $11::jsonb
-                 )`,
-                [
-                  wallet.id,
-                  blendVenueId,
-                  pool.entity_id,
-                  asset?.id ?? null,
-                  r.assetId,
-                  asset?.symbol ?? null,
-                  toRawAmount(suppliedScaled, r.decimals),
-                  suppliedScaled,
-                  suppliedUsd,
-                  snapshotAt,
-                  JSON.stringify({
-                    source: 'blend-sdk',
-                    poolId: pool.contract_address,
-                    poolSlug: pool.slug,
-                    collateralEnabled: r.collateral > 0,
-                    collateral: r.collateral,
-                    supply: r.supply,
-                    priceUsd: r.priceUsd,
-                  }),
-                ]
-              );
-              positionRows += 1;
-            }
-
-            if (r.liabilities > 0) {
-              await client.query(
-                `insert into wallet_protocol_positions (
-                   user_wallet_id, venue_id, entity_id, position_type,
-                   asset_id, asset_contract_id, asset_symbol,
-                   amount_raw, amount_scaled, amount_usd, snapshot_at, metadata
-                 ) values (
-                   $1::uuid, $2::uuid, $3::uuid, 'borrow',
-                   $4::uuid, $5, $6,
-                   $7, $8, $9, $10::timestamptz, $11::jsonb
-                 )`,
-                [
-                  wallet.id,
-                  blendVenueId,
-                  pool.entity_id,
-                  asset?.id ?? null,
-                  r.assetId,
-                  asset?.symbol ?? null,
-                  toRawAmount(r.liabilities, r.decimals),
-                  r.liabilities,
-                  r.liabilitiesUsd,
-                  snapshotAt,
-                  JSON.stringify({
-                    source: 'blend-sdk',
-                    poolId: pool.contract_address,
-                    poolSlug: pool.slug,
-                    priceUsd: r.priceUsd,
-                  }),
-                ]
-              );
-              positionRows += 1;
-            }
-          }
-
-          // --- one pool-level health row ---
-          await client.query(
-            `insert into wallet_pool_health (
-               user_wallet_id, venue_id, entity_id,
-               health_factor, total_collateral_usd, total_debt_usd,
-               borrow_limit_usd, net_apy, positions_count, snapshot_at, metadata
-             ) values (
-               $1::uuid, $2::uuid, $3::uuid,
-               $4, $5, $6, $7, $8, $9, $10::timestamptz, $11::jsonb
-             )`,
-            [
-              wallet.id,
-              blendVenueId,
-              pool.entity_id,
-              health.healthFactor,
-              health.totalCollateralUsd,
-              health.totalDebtUsd,
-              health.borrowCapUsd,
-              health.netApy,
-              positions.reserves.length,
-              snapshotAt,
-              JSON.stringify({
-                source: 'blend-sdk',
-                poolId: pool.contract_address,
-                poolSlug: pool.slug,
-                totalSuppliedUsd: health.totalSuppliedUsd,
-                totalBorrowedUsd: health.totalBorrowedUsd,
-                borrowLimit: health.borrowLimit,
-              }),
-            ]
-          );
-          healthRows += 1;
+          positionRows += written.positionRows;
+          healthRows += written.healthRows;
         } catch (error) {
-          // One pool/RPC hiccup must not abort the whole run.
+          // One wallet's write must not abort the whole run.
           console.error(
             `[blend-positions] failed for wallet ${wallet.id} pool ${pool.slug}`
           );
@@ -241,10 +324,23 @@ async function main() {
       targetWalletId,
       processedWallets,
       blendPools: poolsRes.rows.length,
+      poolsSkipped,
+      positionsBatchSize: batchSize,
+      rpcBatches,
       positionRows,
       healthRows,
       snapshotAt,
     });
+
+    // A pool skipped for RPC reasons makes this a PARTIAL run: every wallet of
+    // that pool kept its previous health row. Exit non-zero so the 82
+    // orchestrator does NOT run the evaluator on partial data (its contract:
+    // a non-zero 81 aborts the evaluator). The rows of the pools that did load
+    // are persisted and serve the API; alerts resume on the next sweep.
+    if (poolsSkipped > 0) {
+      console.error(`[blend-positions] ${poolsSkipped} pool(s) skipped this run — partial data, exiting 1 so the evaluator is not run`);
+      process.exitCode = 1;
+    }
   } finally {
     await client.end();
   }

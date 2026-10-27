@@ -31,6 +31,8 @@ export type OpsSample = {
   target: OpsTarget;
   ok: boolean;
   durationMs: number;
+  /** RP1: JSON-RPC method (soroban-rpc) or HTTP verb + first path segment (REST). */
+  method?: string;
 };
 
 export type OpsTargetSummary = {
@@ -40,6 +42,8 @@ export type OpsTargetSummary = {
   p50Ms: number;
   p95Ms: number;
   p99Ms: number;
+  /** RP1: calls per method, e.g. { getLedgerEntries: 12, simulateTransaction: 27 }. */
+  methods: Record<string, number>;
 };
 
 const samples: OpsSample[] = [];
@@ -97,6 +101,36 @@ export function classifyOpsTarget(url: string): OpsTarget | null {
   return null;
 }
 
+// ── Method extraction (RP1) ──────────────────────────────────────────────────
+// JSON-RPC bodies carry the method; REST calls (Horizon, DeFindex, price
+// sources) are labelled by verb + first path segment. Never the full path: a
+// Horizon path can carry an account address, an RPC path the API key.
+
+function methodFromBody(body: unknown): string | null {
+  if (!body) return null;
+  try {
+    const parsed = typeof body === 'string' ? JSON.parse(body) : body;
+    const method = (parsed as { method?: unknown })?.method;
+    return typeof method === 'string' ? method : null;
+  } catch {
+    return null;
+  }
+}
+
+export function labelOpsMethod(url: string, httpMethod: string | undefined, body: unknown): string {
+  const rpcMethod = methodFromBody(body);
+  if (rpcMethod) return rpcMethod;
+  let segment = '';
+  try {
+    segment = new URL(url).pathname.split('/').filter(Boolean)[0] ?? '';
+  } catch {
+    segment = '';
+  }
+  // RPC URLs embed the key as the first path segment — never label with it.
+  if (classifyOpsTarget(url) === 'soroban-rpc') segment = '';
+  return `${(httpMethod ?? 'GET').toUpperCase()}${segment ? ` /${segment}` : ''}`;
+}
+
 // ── Capture installation ─────────────────────────────────────────────────────
 
 let installed = false;
@@ -133,15 +167,16 @@ function patchGlobalFetch(): void {
     const target = classifyOpsTarget(url);
     if (!target) return originalFetch(input as RequestInfo, init);
 
+    const method = labelOpsMethod(url, init?.method, init?.body);
     const start = Date.now();
     try {
       const res = await originalFetch(input as RequestInfo, init);
       // Non-2xx counts as an error: fetchJson treats it as a failure (only 429
       // is retried) and the grant criterion is error RATE, not exception rate.
-      recordOpsSample({ target, ok: res.ok, durationMs: Date.now() - start });
+      recordOpsSample({ target, ok: res.ok, durationMs: Date.now() - start, method });
       return res;
     } catch (err) {
-      recordOpsSample({ target, ok: false, durationMs: Date.now() - start });
+      recordOpsSample({ target, ok: false, durationMs: Date.now() - start, method });
       throw err;
     }
   }) as typeof globalThis.fetch;
@@ -185,7 +220,7 @@ function patchSdkAxios(): void {
   }
 }
 
-type AxiosLikeConfig = { url?: string; baseURL?: string };
+type AxiosLikeConfig = { url?: string; baseURL?: string; method?: string; data?: unknown };
 
 function fullAxiosUrl(config: AxiosLikeConfig, instance: unknown): string | null {
   const url = config.url ?? '';
@@ -223,6 +258,7 @@ function patchAxiosModule(axiosMod: unknown): void {
       return (original as (...args: unknown[]) => unknown).call(this, configOrUrl, maybeConfig);
     }
 
+    const method = labelOpsMethod(fullUrl ?? '', config.method, config.data);
     const start = Date.now();
     try {
       // axios resolves only on 2xx by default, so resolved == ok here.
@@ -231,10 +267,10 @@ function patchAxiosModule(axiosMod: unknown): void {
         configOrUrl,
         maybeConfig
       );
-      recordOpsSample({ target, ok: true, durationMs: Date.now() - start });
+      recordOpsSample({ target, ok: true, durationMs: Date.now() - start, method });
       return res;
     } catch (err) {
-      recordOpsSample({ target, ok: false, durationMs: Date.now() - start });
+      recordOpsSample({ target, ok: false, durationMs: Date.now() - start, method });
       throw err;
     }
   };
@@ -250,7 +286,7 @@ function flushSamplesToFile(): void {
 
   try {
     const lines = samples
-      .map((s) => JSON.stringify({ t: s.target, ok: s.ok, ms: s.durationMs }))
+      .map((s) => JSON.stringify({ t: s.target, ok: s.ok, ms: s.durationMs, m: s.method }))
       .join('\n');
     appendFileSync(file, `${lines}\n`, 'utf-8');
   } catch (err) {
@@ -267,14 +303,19 @@ export function parseSamplesFile(content: string): OpsSample[] {
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
-      const row = JSON.parse(trimmed) as { t?: unknown; ok?: unknown; ms?: unknown };
+      const row = JSON.parse(trimmed) as { t?: unknown; ok?: unknown; ms?: unknown; m?: unknown };
       if (
         typeof row.t === 'string' &&
         typeof row.ok === 'boolean' &&
         typeof row.ms === 'number' &&
         Number.isFinite(row.ms)
       ) {
-        parsed.push({ target: row.t as OpsTarget, ok: row.ok, durationMs: Math.round(row.ms) });
+        parsed.push({
+          target: row.t as OpsTarget,
+          ok: row.ok,
+          durationMs: Math.round(row.ms),
+          method: typeof row.m === 'string' ? row.m : undefined,
+        });
       }
     } catch {
       // Skip torn/partial lines (e.g. a killed writer) rather than losing the run.
@@ -306,6 +347,11 @@ export function summarizeOpsSamples(all: OpsSample[]): OpsTargetSummary[] {
   return Array.from(byTarget.entries())
     .map(([target, targetSamples]) => {
       const durations = targetSamples.map((s) => s.durationMs).sort((a, b) => a - b);
+      const methods: Record<string, number> = {};
+      for (const s of targetSamples) {
+        const key = s.method ?? 'unknown';
+        methods[key] = (methods[key] ?? 0) + 1;
+      }
       return {
         target,
         calls: targetSamples.length,
@@ -313,6 +359,7 @@ export function summarizeOpsSamples(all: OpsSample[]): OpsTargetSummary[] {
         p50Ms: percentile(durations, 0.5),
         p95Ms: percentile(durations, 0.95),
         p99Ms: percentile(durations, 0.99),
+        methods,
       };
     })
     .sort((a, b) => a.target.localeCompare(b.target));

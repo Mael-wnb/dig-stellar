@@ -83,6 +83,7 @@ services:
       - ./apps/api/src/db/stellar_v1_logos.sql:/docker-entrypoint-initdb.d/12-stellar_v1_logos.sql:ro
       - ./apps/api/src/db/stellar_v1_network_tvl.sql:/docker-entrypoint-initdb.d/13-stellar_v1_network_tvl.sql:ro
       - ./apps/api/src/db/stellar_v1_ops_metrics.sql:/docker-entrypoint-initdb.d/14-stellar_v1_ops_metrics.sql:ro
+      - ./apps/api/src/db/stellar_v1_ops_metrics_job.sql:/docker-entrypoint-initdb.d/14b-stellar_v1_ops_metrics_job.sql:ro
       - ./apps/api/src/db/stellar_v1_bridge.sql:/docker-entrypoint-initdb.d/15-stellar_v1_bridge.sql:ro
       - ./apps/api/src/db/stellar_v1_action_witness.sql:/docker-entrypoint-initdb.d/16-stellar_v1_action_witness.sql:ro
       - ./apps/api/src/db/stellar_v2_multiwallet.sql:/docker-entrypoint-initdb.d/20-stellar_v2_multiwallet.sql:ro

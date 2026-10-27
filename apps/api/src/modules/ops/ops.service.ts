@@ -92,6 +92,7 @@ export class OpsService {
       select run_at, target, calls, errors, p50_ms, p95_ms, p99_ms
       from rpc_metrics_runs
       where run_at > now() - interval '${WINDOW_INTERVAL}'
+        and job = 'refresh'
       order by target asc, run_at desc
       `,
     )) as RpcRunRow[];
@@ -207,6 +208,7 @@ export class OpsService {
       select run_at, target, calls, errors, p50_ms, p95_ms, p99_ms
       from rpc_metrics_runs
       where run_at >= now() - interval '${WINDOW_INTERVAL}'
+        and job = 'refresh'
       order by run_at asc
       `,
     )) as RpcRunRow[];
