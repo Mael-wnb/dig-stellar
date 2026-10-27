@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -13,6 +15,26 @@ import { PrismaService } from '../../db/prisma.service';
 // Nothing from the campaign service or controllers; see wallets.module.ts.
 import { CampaignRepository } from '../campaign/campaign.repository';
 import { RECOVERY_PROOF_MAX_AGE_SECONDS } from '../campaign/campaign-config';
+// Lot SEC (G1): shared syntactic validators (type-checked BEFORE any trim) and
+// the refresh admission control.
+import {
+  optionalKeyword,
+  optionalText,
+  optionalUserId,
+  requireAddress,
+  requireUserId,
+  requireUuid,
+} from '../../common/request-validation';
+import { RefreshLimiter } from './refresh-limiter';
+
+// STANDING DEBT (W1): the shared demo account that an ABSENT userId falls back
+// to on the non-connect routes. Removal is a later gate; G1 only hardens the
+// type handling around it.
+const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
+const MAX_LABEL_CHARS = 64;
+// Client-facing refresh failure text. The child process output (which can carry
+// script paths, SQL and upstream URLs) is logged server-side only.
+const REFRESH_FAILED_MESSAGE = 'Wallet refresh failed. Retry in a minute.';
 
 function toNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
@@ -32,12 +54,6 @@ function toNumber(value: unknown): number | null {
   }
 
   return null;
-}
-
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value
-  );
 }
 
 type WalletRow = {
@@ -199,89 +215,60 @@ const POSITION_ASSET_JOIN = `
 
 @Injectable()
 export class WalletsService {
+  // One limiter per API process (the service is a Nest singleton).
+  private readonly refreshLimiter = new RefreshLimiter();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly campaignRepository: CampaignRepository,
   ) {}
 
   // STANDING DEBT (flagged in W1, fix out of scope): an ABSENT userId silently
-  // falls back to the shared demo account below instead of being rejected —
-  // several read routes depend on that default today. Do NOT use this helper on
-  // any path where "no userId" must mean something else (connectWallet uses
-  // normalizeOptionalUserId instead).
-  private normalizeUserId(userId?: string): string {
-    const value = (userId ?? '00000000-0000-0000-0000-000000000001').trim();
-
-    if (!value) {
-      throw new BadRequestException('userId is required');
-    }
-
-    if (!isUuid(value)) {
-      throw new BadRequestException(
-        'userId must be a valid UUID, for example 00000000-0000-0000-0000-000000000001'
-      );
-    }
-
-    return value;
+  // falls back to the shared demo account instead of being rejected — several
+  // read routes depend on that default today. Do NOT use this helper on any
+  // path where "no userId" must mean something else (connectWallet and
+  // createWallet use normalizeOptionalUserId instead).
+  // Lot SEC (G1): a PRESENT value that is not a string (repeated query key →
+  // array, nested object) is a 400, never a TypeError.
+  private normalizeUserId(userId?: unknown): string {
+    if (userId === undefined || userId === null) return DEMO_USER_ID;
+    return requireUserId(userId);
   }
 
-  // Strict optional variant for connect: absent/empty → null (recovery path),
-  // present → must be a valid UUID. Never defaults to the demo account.
-  private normalizeOptionalUserId(userId?: string | null): string | null {
-    const value = (userId ?? '').trim();
-    if (!value) return null;
-
-    if (!isUuid(value)) {
-      throw new BadRequestException('userId must be a valid UUID');
-    }
-
-    return value;
+  // Strict optional variant for connect/create: absent/empty → null (recovery
+  // or mint path), present → must be a UUID. Never defaults to the demo account.
+  private normalizeOptionalUserId(userId?: unknown): string | null {
+    return optionalUserId(userId);
   }
 
-  private normalizeWalletId(walletId?: string): string {
-    const value = (walletId ?? '').trim();
-
-    if (!value) {
-      throw new BadRequestException('walletId is required');
-    }
-
-    if (!isUuid(value)) {
-      throw new BadRequestException('walletId must be a valid UUID');
-    }
-
-    return value;
+  private normalizeWalletId(walletId?: unknown): string {
+    return requireUuid(walletId, 'walletId');
   }
 
-  private normalizeChain(chain?: string): string {
-    const value = (chain ?? 'stellar').trim().toLowerCase();
+  private normalizeChain(chain?: unknown): string {
+    const value = optionalKeyword(chain, 'chain', 'stellar');
 
     const allowedChains = new Set(['stellar']);
     if (!allowedChains.has(value)) {
-      throw new BadRequestException(`Unsupported chain: ${chain}`);
+      throw new BadRequestException(`Unsupported chain: ${value}`);
     }
 
     return value;
   }
 
-  private normalizeAddress(address?: string): string {
-    const value = (address ?? '').trim();
-
-    if (!value) {
-      throw new BadRequestException('address is required');
-    }
-
-    if (value.length < 10) {
-      throw new BadRequestException('address looks invalid');
-    }
-
-    return value;
+  // Lot SEC (G1): a tracked address must be a Stellar account public key (G…,
+  // StrKey). Anything else — including a contract address (C…), which is a
+  // later product decision — is a 400 and is never persisted. The column is
+  // varchar(128); a valid key is always 56 characters, so no length check is
+  // needed beyond the shape.
+  private normalizeAddress(address?: unknown): string {
+    return requireAddress(address, 'address');
   }
 
-  private normalizeLabel(label?: string | null): string | null {
-    if (label === undefined || label === null) return null;
-
-    const value = label.trim();
-    return value.length ? value : null;
+  // Optional label: blank clears to null; non-string or over MAX_LABEL_CHARS
+  // is a 400 (the column is varchar(128); 64 keeps labels readable in the UI).
+  private normalizeLabel(label?: unknown): string | null {
+    return optionalText(label, 'label', MAX_LABEL_CHARS);
   }
 
   private mapWallet(row: WalletRow) {
@@ -409,7 +396,7 @@ export class WalletsService {
     userId: string;
     chain: string;
     address: string;
-    label?: string | null;
+    label?: unknown;
   }) {
     const label = this.normalizeLabel(params.label);
 
@@ -518,17 +505,15 @@ export class WalletsService {
           return;
         }
 
-        reject(
-          new Error(
-            [
-              `${label} script failed with exit code ${code}.`,
-              stdout ? `stdout:\n${stdout}` : '',
-              stderr ? `stderr:\n${stderr}` : '',
-            ]
-              .filter(Boolean)
-              .join('\n\n')
-          )
+        // Lot SEC (G1): the child's output stays in the server log. The
+        // rejection carries only the label + exit code; the client never sees
+        // either stream (see refreshWallet).
+        console.error(
+          `[wallets] ${label} script failed with exit code ${code}.`,
+          stdout ? `\nstdout:\n${stdout.slice(-4000)}` : '',
+          stderr ? `\nstderr:\n${stderr.slice(-4000)}` : ''
         );
+        reject(new Error(`${label} script failed with exit code ${code}`));
       });
     });
   }
@@ -557,10 +542,10 @@ export class WalletsService {
   //     lookup may recover the address's own account; a watch-only match
   //     elsewhere never does. No match → fork a fresh account (old behavior).
   async connectWallet(params: {
-    userId?: string;
-    chain?: string;
-    address?: string;
-    label?: string | null;
+    userId?: unknown;
+    chain?: unknown;
+    address?: unknown;
+    label?: unknown;
   }) {
     const sessionUserId = this.normalizeOptionalUserId(params.userId);
     const chain = this.normalizeChain(params.chain);
@@ -693,10 +678,10 @@ export class WalletsService {
   // Present userId → prior behavior, unchanged. Read routes keep the demo
   // default (they depend on it; out of AB's scope).
   async createWallet(params: {
-    userId?: string;
-    chain?: string;
-    address?: string;
-    label?: string | null;
+    userId?: unknown;
+    chain?: unknown;
+    address?: unknown;
+    label?: unknown;
   }) {
     const sessionUserId = this.normalizeOptionalUserId(params.userId);
     const chain = this.normalizeChain(params.chain);
@@ -797,7 +782,7 @@ export class WalletsService {
     };
   }
 
-  async getWallets(userId?: string) {
+  async getWallets(userId?: unknown) {
     const normalizedUserId = this.normalizeUserId(userId);
 
     const rows = (await this.prisma.$queryRawUnsafe(
@@ -828,7 +813,7 @@ export class WalletsService {
     };
   }
 
-  async getWalletsOverview(userId?: string) {
+  async getWalletsOverview(userId?: unknown) {
     const normalizedUserId = this.normalizeUserId(userId);
 
     const overviewRows = (await this.prisma.$queryRawUnsafe(
@@ -1068,7 +1053,7 @@ export class WalletsService {
     };
   }
 
-  async getWalletBalances(params: { userId?: string; walletId?: string }) {
+  async getWalletBalances(params: { userId?: unknown; walletId?: unknown }) {
     const userId = this.normalizeUserId(params.userId);
     const walletId = this.normalizeWalletId(params.walletId);
 
@@ -1130,7 +1115,7 @@ export class WalletsService {
   // Per-wallet DeFi (Blend) positions + pool health. Reads ONLY the wallet's
   // most recent refresh (latest snapshot_at) so repaid/exited positions don't
   // linger — each refresh is a complete snapshot of the wallet's current state.
-  async getWalletPositions(params: { userId?: string; walletId?: string }) {
+  async getWalletPositions(params: { userId?: unknown; walletId?: unknown }) {
     const userId = this.normalizeUserId(params.userId);
     const walletId = this.normalizeWalletId(params.walletId);
 
@@ -1266,30 +1251,56 @@ export class WalletsService {
     };
   }
 
-  async refreshWallet(params: { userId?: string; walletId?: string }) {
+  async refreshWallet(params: { userId?: unknown; walletId?: unknown }) {
     const userId = this.normalizeUserId(params.userId);
     const walletId = this.normalizeWalletId(params.walletId);
 
+    // Ownership first (404 for a wallet the caller does not own), then
+    // admission: single-flight per wallet, 60 s cooldown (first refresh exempt),
+    // process-wide concurrency cap — each denial is a 429 (Lot SEC G1).
     const wallet = await this.getWalletOrThrow(walletId, userId);
 
-    try {
-      await this.runWalletBalanceRefreshScript(walletId);
-    } catch (error) {
-      throw new InternalServerErrorException(
-        error instanceof Error ? error.message : 'Wallet refresh failed'
+    const admission = this.refreshLimiter.tryAcquire(walletId);
+    if (!admission.ok) {
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          error: 'Too Many Requests',
+          message:
+            admission.reason === 'capacity'
+              ? 'Too many wallet refreshes are running right now. Retry in a few seconds.'
+              : 'This wallet was refreshed recently. Retry in a minute.',
+          reason: admission.reason,
+          retryAfterSeconds: admission.retryAfterSeconds,
+        },
+        HttpStatus.TOO_MANY_REQUESTS
       );
     }
 
-    // Blend positions + health factor refresh — NON-FATAL. A Blend/RPC hiccup
-    // must not break the balance refresh; one "refresh" updates balances and,
-    // best-effort, DeFi positions. (T2-D1 Gap B.)
     try {
-      await this.runWalletBlendPositionsScript(walletId);
-    } catch (error) {
-      console.error(
-        '[wallets] Blend positions refresh failed (non-fatal):',
-        error instanceof Error ? error.message : error
-      );
+      try {
+        await this.runWalletBalanceRefreshScript(walletId);
+      } catch (error) {
+        console.error(
+          '[wallets] balance refresh failed:',
+          error instanceof Error ? error.message : error
+        );
+        throw new InternalServerErrorException(REFRESH_FAILED_MESSAGE);
+      }
+
+      // Blend positions + health factor refresh — NON-FATAL. A Blend/RPC hiccup
+      // must not break the balance refresh; one "refresh" updates balances and,
+      // best-effort, DeFi positions. (T2-D1 Gap B.)
+      try {
+        await this.runWalletBlendPositionsScript(walletId);
+      } catch (error) {
+        console.error(
+          '[wallets] Blend positions refresh failed (non-fatal):',
+          error instanceof Error ? error.message : error
+        );
+      }
+    } finally {
+      admission.release();
     }
 
     const refreshedBalances = await this.getWalletBalances({
@@ -1306,7 +1317,7 @@ export class WalletsService {
     };
   }
 
-  async setPrimaryWallet(params: { userId?: string; walletId?: string }) {
+  async setPrimaryWallet(params: { userId?: unknown; walletId?: unknown }) {
     const userId = this.normalizeUserId(params.userId);
     const walletId = this.normalizeWalletId(params.walletId);
 
@@ -1408,7 +1419,7 @@ export class WalletsService {
     return updated[0];
   }
 
-  async setActiveSigner(params: { userId?: string; walletId?: string }) {
+  async setActiveSigner(params: { userId?: unknown; walletId?: unknown }) {
     const userId = this.normalizeUserId(params.userId);
     const walletId = this.normalizeWalletId(params.walletId);
 
@@ -1425,9 +1436,9 @@ export class WalletsService {
   // W2 — label-only rename. Empty/blank label clears back to the short-address
   // fallback (label = null); everything else about the row is untouched.
   async updateWalletLabel(params: {
-    userId?: string;
-    walletId?: string;
-    label?: string | null;
+    userId?: unknown;
+    walletId?: unknown;
+    label?: unknown;
   }) {
     const userId = this.normalizeUserId(params.userId);
     const walletId = this.normalizeWalletId(params.walletId);
@@ -1468,9 +1479,9 @@ export class WalletsService {
   }
 
   async setWalletActive(params: {
-    userId?: string;
-    walletId?: string;
-    isActive?: boolean;
+    userId?: unknown;
+    walletId?: unknown;
+    isActive?: unknown;
   }) {
     const userId = this.normalizeUserId(params.userId);
     const walletId = this.normalizeWalletId(params.walletId);
@@ -1548,7 +1559,7 @@ export class WalletsService {
     };
   }
 
-  async deleteWallet(params: { userId?: string; walletId?: string }) {
+  async deleteWallet(params: { userId?: unknown; walletId?: unknown }) {
     const userId = this.normalizeUserId(params.userId);
     const walletId = this.normalizeWalletId(params.walletId);
 

@@ -18,7 +18,7 @@ function walletRow(overrides: Partial<Record<string, unknown>> = {}) {
     id: WALLET_ID,
     user_id: OWNER,
     chain: 'stellar',
-    address: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWALLET',
+    address: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWLT',
     label: null,
     is_primary: false,
     is_active: true,

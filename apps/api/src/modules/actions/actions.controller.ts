@@ -18,6 +18,10 @@ import {
   resolveBlendPool,
   MAINNET_ASSET_WHITELIST,
 } from './network-registry';
+// Lot SEC (G1): the body `address` of every builder is validated as a Stellar
+// public key (G…) BEFORE any RPC/Horizon call — a malformed one is a 400, not
+// an upstream error turned 500.
+import { STELLAR_PUBKEY_RE, requireAddress } from '../../common/request-validation';
 
 /** Codes a user can be told are allowed on Mainnet (native XLM + every whitelist code). */
 const MAINNET_ALLOWED_CODES = [
@@ -72,7 +76,6 @@ interface SdexQuoteBody {
   network?: string;
 }
 
-const STELLAR_PUBKEY_RE = /^G[A-Z2-7]{55}$/;
 const ASSET_CODE_RE = /^[A-Za-z0-9]{1,12}$/;
 
 /**
@@ -184,14 +187,12 @@ export class ActionsController {
   @Post('blend/deposit')
   @HttpCode(HttpStatus.OK)
   async blendDeposit(@Body() body: BlendDepositBody) {
-    const { address, asset, amount, network, pool } = body;
+    const { asset, amount, network, pool } = body;
 
     // Lot A2 gating regime: mainnet requires the deposit's own kill-switch (403
     // otherwise); absent/'testnet' keeps today's behavior byte-for-byte.
     const resolvedNetwork = resolveBlendNetwork(network);
-    if (!address || typeof address !== 'string') {
-      throw new BadRequestException('address is required');
-    }
+    const address = requireAddress(body.address);
     // Mainnet asset whitelist for the deposit = XLM | USDC only. The USDC/XLM guard
     // below already rejects anything else (e.g. EURC) with a 400 on both networks.
     if (!asset || !['USDC', 'XLM'].includes(asset)) {
@@ -266,12 +267,10 @@ export class ActionsController {
   @Post('blend/withdraw')
   @HttpCode(HttpStatus.OK)
   async blendWithdraw(@Body() body: BlendWithdrawBody) {
-    const { address, asset, amount, network, pool } = body;
+    const { asset, amount, network, pool } = body;
 
     const resolvedNetwork = resolveBlendNetwork(network);
-    if (!address || typeof address !== 'string') {
-      throw new BadRequestException('address is required');
-    }
+    const address = requireAddress(body.address);
     // Same asset whitelist as the deposit: you can only withdraw what this app can
     // supply. EURC and anything else is a 400 on both networks.
     if (!asset || !['USDC', 'XLM'].includes(asset)) {
@@ -321,12 +320,10 @@ export class ActionsController {
   @Post('blend/position')
   @HttpCode(HttpStatus.OK)
   async blendPosition(@Body() body: BlendPositionBody) {
-    const { address, network, pool } = body;
+    const { network, pool } = body;
 
     const resolvedNetwork = resolveBlendNetwork(network);
-    if (!address || typeof address !== 'string') {
-      throw new BadRequestException('address is required');
-    }
+    const address = requireAddress(body.address);
 
     return this.actionsService.getBlendPosition({
       address,
@@ -374,12 +371,10 @@ export class ActionsController {
   @Post('sdex/swap')
   @HttpCode(HttpStatus.OK)
   async sdexSwap(@Body() body: SdexSwapBody) {
-    const { address, fromAsset, toAsset, amount, minReceive, network } = body;
+    const { fromAsset, toAsset, amount, minReceive, network } = body;
 
     const resolvedNetwork = resolveSwapNetwork(network);
-    if (!address || typeof address !== 'string') {
-      throw new BadRequestException('address is required');
-    }
+    const address = requireAddress(body.address);
     const from = normalizeAssetField(fromAsset, 'fromAsset');
     const to = normalizeAssetField(toAsset, 'toAsset');
     assertMainnetAsset(resolvedNetwork, from, 'fromAsset');

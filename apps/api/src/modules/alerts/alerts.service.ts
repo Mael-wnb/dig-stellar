@@ -18,6 +18,7 @@ import {
   type CreateRuleInput,
   type UpdateRuleInput,
 } from './alerts.repository';
+import { requireUserId } from '../../common/request-validation';
 
 // Request bodies — plain camelCase types, like wallets.controller.ts (there is no
 // ValidationPipe whitelist in this app, so unknown extra fields are simply ignored).
@@ -53,6 +54,7 @@ type SupportedMetric =
   | 'borrow_apy';
 const OPERATORS = new Set(['lt', 'lte', 'gt', 'gte']);
 const DEFAULT_COOLDOWN_SECONDS = 3600;
+const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -68,17 +70,12 @@ function has<T extends object>(obj: T, key: keyof T): boolean {
 export class AlertsService {
   constructor(private readonly alerts: AlertsRepository) {}
 
-  private normalizeUserId(userId?: string): string {
-    const value = (userId ?? '00000000-0000-0000-0000-000000000001').trim();
-    if (!value) {
-      throw new BadRequestException('userId is required');
-    }
-    if (!isUuid(value)) {
-      throw new BadRequestException(
-        'userId must be a valid UUID, for example 00000000-0000-0000-0000-000000000001',
-      );
-    }
-    return value;
+  // Lot SEC (G1): a PRESENT userId that is not a string (repeated query key →
+  // array, nested object) is a 400 before any trim; an ABSENT one still falls
+  // back to the shared demo account (W1 standing debt, removal is a later gate).
+  private normalizeUserId(userId?: unknown): string {
+    if (userId === undefined || userId === null) return DEMO_USER_ID;
+    return requireUserId(userId);
   }
 
   private normalizeRuleId(id?: string): string {
