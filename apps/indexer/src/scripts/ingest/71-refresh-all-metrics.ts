@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { createPgClient } from '../shared/db';
 import { runTsxWithRetry } from '../shared/retry';
+import { redactSecrets } from '../../lib/redact';
 import {
   parseSamplesFile,
   summarizeOpsSamples,
@@ -52,8 +53,12 @@ type StepResult = { name: string; status: StepStatus; message?: string; duration
 
 const stepResults: StepResult[] = [];
 
+// Lot SEC (G1): step messages are persisted to refresh_step_runs and served by
+// the PUBLIC ops endpoints, so any URL (which may carry an operator API key)
+// or key-like token is redacted here, before the message exists anywhere but
+// the local console. The full error object still goes to the cron log.
 function toMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return redactSecrets(error instanceof Error ? error.message : String(error));
 }
 
 // Elapsed seconds, one decimal (e.g. "42.3s") from a Date.now() delta.

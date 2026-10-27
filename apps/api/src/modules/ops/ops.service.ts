@@ -15,6 +15,10 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../db/prisma.service';
 import { FaucetService } from '../faucet/faucet.service';
 import { freshPriceSql, staleAfterSeconds } from '../../common/freshness';
+// Lot SEC (G1): step messages are redacted at read time too (URLs → host only,
+// key-like tokens → [redacted]) so rows persisted before the indexer-side
+// redaction never surface an operator URL on a public endpoint.
+import { redactSecrets } from '../../common/redact';
 import {
   computeOpsStatus,
   summarizePriceSources,
@@ -165,7 +169,7 @@ export class OpsService {
       lastRunAt: row.last_run_at,
       lastStatus: row.last_status,
       lastDurationMs: toInt(row.last_duration_ms),
-      lastMessage: row.last_message ?? null,
+      lastMessage: redactSecrets(row.last_message ?? null),
       failures24h: toInt(row.failures_24h),
     }));
 
@@ -230,7 +234,7 @@ export class OpsService {
       step: row.step,
       status: row.status,
       durationMs: toInt(row.duration_ms),
-      message: row.message ?? null,
+      message: redactSecrets(row.message ?? null),
     }));
 
     const statusRpcRows: StatusRpcRow[] = rpcRows.map((row) => ({
