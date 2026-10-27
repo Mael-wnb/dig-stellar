@@ -410,3 +410,45 @@ the diff for `handle_normalized` in log statements and in payload types/returns 
 only in SQL and in the in-transaction decision inputs); grep for `update points_ledger` /
 `delete from points_ledger` outside specs and cleanup helpers; grep for `Keypair` outside the
 two allowed files; grep the web copy for "reward", "airdrop", "token" and "earn XLM".
+
+## 12. Request validation, refresh admission, ops redaction (Lot SEC, Gate 1, 2026-10-27)
+
+Hardening of the public, unauthenticated API surface after a routine review of production
+traffic. Three invariants; each one is unit-tested and the deploy evidence is in
+`docs/evidence/lot-sec/g1.md`.
+
+- **INV-12.1 Every request field is type-checked before it is used, and a tracked address is a
+  Stellar public key.** The shared validators in `apps/api/src/common/request-validation.ts` are
+  the only way a body field or query parameter reaches a service: a value that is not a string
+  (a repeated query key arrives as an array; a nested object; a number) is a `400`, never a
+  `TypeError` turned `500`. `POST /v1/wallets` and `/v1/wallets/connect` accept an address only
+  in StrKey account form (`G` + 55 base32 characters); anything else is refused and never
+  persisted, so a wallet row can no longer carry an arbitrary string. Contract addresses (`C…`)
+  are deliberately not accepted yet (a later product decision; the balance reader only knows
+  accounts). Labels are capped at 64 characters. The action builders validate their body
+  `address` the same way before any RPC/Horizon call. Column sizes can no longer be exceeded
+  from the outside: a Postgres length error on user input is a defect, not an expected `500`.
+- **INV-12.2 A wallet refresh is admission-controlled.** `POST /v1/wallets/:id/refresh` spawns
+  indexer child processes and makes outbound Horizon/RPC calls, so it is the most expensive
+  request the API serves. After the ownership check it must pass `RefreshLimiter`
+  (`modules/wallets/refresh-limiter.ts`): one refresh per wallet at a time, one per wallet per
+  60 s (the first refresh of a freshly added wallet is exempt), at most two refreshes running
+  per API process. Every denial is a `429` with `reason` and `retryAfterSeconds`; the web shows
+  it as "wait a moment", never as a failure. The limiter is in-memory and per process by design
+  (one pm2 process in the beta): a restart re-opens the window, which is acceptable for a
+  brake. The edge adds per-IP `limit_req` zones on wallet creation and refresh
+  (`deployment.md`), so neither route is free to script.
+- **INV-12.3 Child-process output and upstream URLs never reach a client.** A failed refresh
+  answers a fixed message; the child's stdout/stderr go to the server log only. Step messages
+  persisted by the refresh orchestrator (`refresh_step_runs.message`) are redacted before the
+  write (`apps/indexer/src/lib/redact.ts`: URLs reduced to scheme + host, labelled or long
+  opaque tokens replaced) and again when the public ops endpoints read them
+  (`apps/api/src/common/redact.ts`), so an operator endpoint that embeds a key in its URL can
+  never surface on `/v1/ops/metrics` or `/v1/ops/status`, including from rows written before
+  this rule. The two redaction helpers are mirrors and must be changed together.
+
+Review check (any change under `modules/wallets/`, `modules/alerts/`, `modules/actions/`,
+`modules/ops/` or the refresh orchestrator): a new body/query field must go through a
+`common/request-validation.ts` helper (grep the diff for `.trim()` on a raw request value);
+a new child-process or upstream error path must not return `error.message` to the client; a
+new free-text column read by `/v1/ops/*` must pass `redactSecrets`.

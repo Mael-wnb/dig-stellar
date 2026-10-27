@@ -905,7 +905,20 @@ curl -s -X POST $API/v1/actions/blend/position -H "Content-Type: application/jso
 - After a page reload, the kit re-selects the connected provider (`restoreWalletSession` +
   defensive `setWallet` before signing); this fixes the "xBull opens instead of Freighter" bug.
 - Refresh a wallet's balances: `POST /v1/wallets/:walletId/refresh` (spawns the indexer balance
-  snapshot script).
+  snapshot script, then the Blend positions script).
+- **A `429` on refresh is admission control, not a failure (Lot SEC G1,
+  `security-invariants.md` §12).** The body says why: `reason: "cooldown"` = this wallet was
+  refreshed less than 60 s ago (`retryAfterSeconds` tells when); `reason: "in-flight"` = a
+  refresh of this wallet is still running; `reason: "capacity"` = two refreshes are already
+  running in the API process, retry in a few seconds. A `429` with the nginx JSON body (no
+  `reason` field) is the per-IP edge limit instead. Nothing to fix server-side in either case;
+  if `capacity` shows up for ordinary users, look at what is keeping refreshes slow (Horizon /
+  RPC latency in the API log) before raising the cap.
+- **A `400` on `POST /v1/wallets`** names the field: the address must be a Stellar public key
+  (`G…`, 56 characters; contract addresses are not accepted yet), labels are limited to 64
+  characters, `userId` must be a UUID. A `500` on these routes is now always a defect to report.
+- **A `500` on refresh** answers a fixed message; the detail (child exit code, its stdout and
+  stderr) is in the API log under `[wallets]`. Look there, never ask a user for the body.
 - Inspect: `user_wallets`, `wallet_balance_snapshots` (see Database checks above).
 
 ---

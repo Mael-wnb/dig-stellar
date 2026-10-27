@@ -251,6 +251,93 @@ Expected: `calls` ≈ 44 for ~92 wallets (36 from 81 + 8 from 83), `methods` ≈
 the sweep's share should fall from ~0.25M CU to a few thousand CU per run); only then restore
 `7,22,37,52 * * * *` — four sweeps an hour now cost less than one did.
 
+## Lot SEC Gate 1 deploy — request validation, refresh admission, ops redaction (2026-10-27)
+
+API + indexer + web; no SQL, no env change, no new cron line. **Order matters: edge first, then
+the API on the VPS, then the web on Vercel** — every change is backward compatible for the client,
+so the web is last and never needs to go first.
+
+### 1. nginx: two new per-IP zones (POST only)
+
+Wallet creation and wallet refresh are the two cheapest-to-abuse writes; they get their own zones
+on top of `api_general` / `api_mutations`. Rates come from the legitimate flow (add a wallet =
+one create + one immediate refresh; a user refreshes by hand a few times an hour), not from
+guesses. The map yields an empty key for anything but POST, so reads are exempt.
+
+```nginx
+# http {} level, next to the existing limit_req_zone / map lines
+map $request_method $wallet_write_key {
+    default "";
+    POST    $binary_remote_addr;
+}
+limit_req_zone $wallet_write_key zone=api_wallet_create:10m  rate=6r/m;
+limit_req_zone $wallet_write_key zone=api_wallet_refresh:10m rate=12r/m;
+
+# server {} level, BEFORE "location /v1/" — the exact-match and regex locations win
+# over the prefix location, so limit_req must be repeated inside each.
+location = /v1/wallets {
+    limit_req zone=api_general       burst=60 nodelay;
+    limit_req zone=api_mutations     burst=20 nodelay;
+    limit_req zone=api_wallet_create burst=5  nodelay;
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location ~ ^/v1/wallets/[0-9a-fA-F-]{36}/refresh$ {
+    limit_req zone=api_general        burst=60 nodelay;
+    limit_req zone=api_wallet_refresh burst=5  nodelay;
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Apply against the LIVE files, not against the evidence copy in `docs/evidence/lot-s/` (it has
+drifted). Procedure:
+
+```bash
+# read-only: where the zones live and what the site file is today
+nginx -T 2>/dev/null | grep -nE 'limit_req_zone|map \$request_method|^# configuration file'
+cp /etc/nginx/sites-available/stellar-api.getdig.ai /root/nginx-site.pre-sec-g1.$(date +%F)
+# edit, then:
+nginx -t && systemctl reload nginx
+# verify: 7th POST within a minute from one IP is a 429 with the nginx JSON body
+for i in $(seq 1 7); do curl -s -o /dev/null -w '%{http_code} ' -X POST https://stellar-api.getdig.ai/v1/wallets -H 'content-type: application/json' -d '{}'; done; echo
+# rollback
+cp /root/nginx-site.pre-sec-g1.<date> /etc/nginx/sites-available/stellar-api.getdig.ai && nginx -t && systemctl reload nginx
+```
+
+Expected with the API not yet deployed: `400 400 400 400 400 400 429` (the API's own 400 for an
+empty body, then the edge). Keep `docs/deployment.md` and the live file in sync.
+
+### 2. API on the VPS
+
+```bash
+cd /root/dig-stellar
+git pull origin main && git log -1 --oneline
+pnpm install --frozen-lockfile && pnpm -C apps/api build
+GIT_SHA=$(git rev-parse --short HEAD) pm2 restart dig-stellar-api --update-env && pm2 save
+# smoke (all from the VPS, no DB write):
+curl -s -X POST https://stellar-api.getdig.ai/v1/wallets -H 'content-type: application/json' -d '{"address":"not-an-address"}'   # 400, names the field
+curl -s https://stellar-api.getdig.ai/v1/ops/status?window=24h | grep -c 'https://[^"]*/\[redacted\]'                        # ≥ 0; no URL path anywhere
+pm2 logs dig-stellar-api --lines 20 --nostream
+```
+
+The indexer side (`71-refresh-all-metrics.ts` redaction) rides the same pull; the next cron tick
+picks it up, no restart needed.
+
+### 3. Web on Vercel
+
+Merge to the deploy branch as usual. The change is a client-side address check in the
+add-wallet modal and friendlier copy on `429`; both work against the old API too.
+
 ## Campaign cron line (Lot EP, EP3)
 
 A third OS-cron line (`job:campaign`, every 15 min at minutes 3/18/33/48, lock
