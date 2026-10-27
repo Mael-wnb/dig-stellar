@@ -19,11 +19,15 @@
 // only semantic change is that every wallet of a pool is now valued against ONE
 // pool/oracle view instead of a view re-read seconds apart per wallet.
 //
-// Failure contract: a pool whose load fails is skipped for the run (its wallets
-// keep their previous rows; the other pools are still persisted) and the run
-// EXITS 1, so 82 does not evaluate alerts on partial data. Before RP1 a failing
-// (wallet, pool) read was skipped silently and the run exited 0; with one load
-// serving every wallet the blast radius is a whole pool, hence the abort.
+// Failure contract: a pool whose load or batch read fails (RPC) is skipped for
+// the run (its wallets keep their previous rows; the other pools are still
+// persisted) and the run EXITS 1, so 82 does not evaluate alerts on partial
+// data. Before RP1 a failing (wallet, pool) read was skipped silently and the
+// run exited 0; with one load serving every wallet the blast radius is a whole
+// pool, hence the abort. RP1.1 (prod incident 2026-10-27): a wallet row whose
+// address is not a StrKey account/contract is NOT an RPC failure — it is
+// excluded before batching, counted as `invalidAddresses`, logged once with a
+// masked sample, and never sets the exit code.
 //
 // Observability: `lib/ops-capture` is the FIRST import so every RPC call is
 // sampled (target + method) and flushed to OPS_METRICS_FILE when the parent
@@ -41,6 +45,7 @@ import { nowIso } from '../discovery/00-common';
 import {
   POSITIONS_BATCH_SIZE,
   fetchBlendUsersPositionsBatch,
+  isValidBlendUserAddress,
   loadBlendPoolContext,
   type BlendUserPositions,
 } from '../../lib/protocols/blend/fetch-user-positions';
@@ -73,6 +78,18 @@ function getTargetWalletId(): string | null {
 function getPositionsBatchSize(): number {
   const raw = Number(process.env.BLEND_POSITIONS_BATCH_SIZE ?? POSITIONS_BATCH_SIZE);
   return Number.isFinite(raw) && raw >= 1 ? Math.min(200, Math.floor(raw)) : POSITIONS_BATCH_SIZE;
+}
+
+/**
+ * RP1.1: a log-safe sample of rejected addresses — truncated, non-StrKey
+ * characters masked — so a scanner payload stored as an address never lands in
+ * the cron log verbatim.
+ */
+function sanitizeAddressSample(addresses: string[], max = 3): string[] {
+  return addresses.slice(0, max).map((a) => {
+    const masked = String(a).slice(0, 12).replace(/[^A-Z0-9]/g, '?');
+    return `${masked}…(len ${String(a).length})`;
+  });
 }
 
 function toRawAmount(scaled: number, decimals: number): string | null {
@@ -263,8 +280,21 @@ async function main() {
     }
 
     const snapshotAt = nowIso();
-    const wallets = walletsRes.rows;
-    const processedWallets = wallets.length;
+    const processedWallets = walletsRes.rows.length;
+
+    // RP1.1: only StrKey-valid accounts (G…) / contracts (C…) can be read on
+    // chain. user_wallets has carried scanner junk (SQL-injection strings as
+    // addresses, 2026-10-15); one such row must never take down a pool's batch,
+    // so they are excluded here, counted, and logged ONCE with a masked sample.
+    // They do not fail the run — they are not on-chain data.
+    const wallets = walletsRes.rows.filter((w) => isValidBlendUserAddress(w.address));
+    const rejected = walletsRes.rows.filter((w) => !isValidBlendUserAddress(w.address));
+    let invalidAddresses = rejected.length;
+    if (rejected.length > 0) {
+      console.warn(
+        `[blend-positions] ${rejected.length} wallet(s) with an invalid Stellar address excluded from the sweep (sample: ${sanitizeAddressSample(rejected.map((w) => w.address)).join(', ')})`
+      );
+    }
     const addresses = wallets.map((w) => w.address);
     let positionRows = 0;
     let healthRows = 0;
@@ -278,12 +308,21 @@ async function main() {
       let positionsByAddress: Map<string, BlendUserPositions>;
       try {
         const context = await loadBlendPoolContext({ poolId: pool.contract_address });
-        positionsByAddress = await fetchBlendUsersPositionsBatch({
+        const batchResult = await fetchBlendUsersPositionsBatch({
           context,
           userAddresses: addresses,
           batchSize,
         });
+        positionsByAddress = batchResult.positions;
         rpcBatches += Math.ceil(new Set(addresses).size / batchSize);
+        // Defense in depth: the batch reader skips (never throws on) an address
+        // whose ledger key cannot be built. Count it; it is not an RPC failure.
+        if (batchResult.invalidAddresses.length > 0) {
+          invalidAddresses += batchResult.invalidAddresses.length;
+          console.warn(
+            `[blend-positions] pool ${pool.slug}: ${batchResult.invalidAddresses.length} address(es) rejected at key build (sample: ${sanitizeAddressSample(batchResult.invalidAddresses).join(', ')})`
+          );
+        }
       } catch (error) {
         poolsSkipped += 1;
         console.error(`[blend-positions] failed for pool ${pool.slug} — skipped this run`);
@@ -325,6 +364,7 @@ async function main() {
       processedWallets,
       blendPools: poolsRes.rows.length,
       poolsSkipped,
+      invalidAddresses,
       positionsBatchSize: batchSize,
       rpcBatches,
       positionRows,

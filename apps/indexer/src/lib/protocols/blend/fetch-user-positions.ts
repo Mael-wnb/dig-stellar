@@ -34,7 +34,7 @@
 
 import 'dotenv/config';
 
-import { Networks, rpc } from '@stellar/stellar-sdk';
+import { Networks, StrKey, rpc } from '@stellar/stellar-sdk';
 import { PoolOracle, PoolUser, PoolV2, Positions } from '@blend-capital/blend-sdk';
 import { resolveRpcUrl } from '../../rpc-config';
 
@@ -151,37 +151,80 @@ export async function loadBlendPoolContext(params: {
 }
 
 /**
+ * RP1.1: a Blend user is a Stellar account (G…) or a contract (C…). Anything
+ * else (user_wallets has carried scanner junk such as SQL-injection strings)
+ * cannot become a ledger key — `Address.fromString` throws — and must be kept
+ * out of a batch so one bad row never takes down a whole pool's read.
+ */
+export function isValidBlendUserAddress(address: string): boolean {
+  return (
+    typeof address === 'string' &&
+    (StrKey.isValidEd25519PublicKey(address) || StrKey.isValidContract(address))
+  );
+}
+
+export type BlendUsersPositionsBatchResult = {
+  positions: Map<string, BlendUserPositions>;
+  /** Addresses for which no ledger key could be built (skipped, never thrown). */
+  invalidAddresses: string[];
+};
+
+/** The one RPC call the batch path makes; injectable so the batching logic is unit-testable. */
+export type LedgerEntriesReader = (
+  keys: ReturnType<typeof Positions.ledgerKey>[]
+) => Promise<{ entries: Array<{ key: { toXDR(format: 'base64'): string }; val: Parameters<typeof Positions.fromLedgerEntryData>[0] }> }>;
+
+/**
  * Read MANY users' positions in one pool with batched getLedgerEntries calls
  * (one `Positions` key per user). Users without a `Positions` entry get an
  * empty position (hasPosition=false) — the same outcome PoolUser.load produces
- * for an unknown user. Throws only on an RPC failure for a batch; the caller
- * decides whether to skip the pool for this run.
+ * for an unknown user. An address whose key cannot be built is skipped and
+ * reported in `invalidAddresses` (RP1.1 — defense in depth; 81 validates
+ * upstream). Throws only on an RPC failure for a batch; the caller decides
+ * whether to skip the pool for this run.
  */
 export async function fetchBlendUsersPositionsBatch(params: {
   context: BlendPoolContext;
   userAddresses: string[];
   batchSize?: number;
-}): Promise<Map<string, BlendUserPositions>> {
+  /** Test seam; defaults to rpc.Server(context.rpcUrl).getLedgerEntries. */
+  readLedgerEntries?: LedgerEntriesReader;
+}): Promise<BlendUsersPositionsBatchResult> {
   const { context } = params;
   const batchSize = Math.max(1, Math.min(200, params.batchSize ?? POSITIONS_BATCH_SIZE));
-  const server = new rpc.Server(context.rpcUrl, { allowHttp: false });
+  const readLedgerEntries: LedgerEntriesReader =
+    params.readLedgerEntries ??
+    (() => {
+      const server = new rpc.Server(context.rpcUrl, { allowHttp: false });
+      return (keys) => server.getLedgerEntries(...keys);
+    })();
   const results = new Map<string, BlendUserPositions>();
+  const invalidAddresses: string[] = [];
 
   // De-duplicate so one address tracked by several users costs one key.
   const addresses = Array.from(new Set(params.userAddresses));
 
   for (let start = 0; start < addresses.length; start += batchSize) {
-    const batch = addresses.slice(start, start + batchSize);
+    const batch: string[] = [];
 
     // key XDR (base64) -> address, to map returned entries back to their user.
+    // Built per address inside try/catch: a malformed address is reported and
+    // skipped, it never aborts the batch (RP1.1).
     const keyToAddress = new Map<string, string>();
-    const keys = batch.map((address) => {
-      const key = Positions.ledgerKey(context.poolId, address);
-      keyToAddress.set(key.toXDR('base64'), address);
-      return key;
-    });
+    const keys: ReturnType<typeof Positions.ledgerKey>[] = [];
+    for (const address of addresses.slice(start, start + batchSize)) {
+      try {
+        const key = Positions.ledgerKey(context.poolId, address);
+        keyToAddress.set(key.toXDR('base64'), address);
+        keys.push(key);
+        batch.push(address);
+      } catch {
+        invalidAddresses.push(address);
+      }
+    }
+    if (keys.length === 0) continue;
 
-    const response = await server.getLedgerEntries(...keys);
+    const response = await readLedgerEntries(keys);
 
     const positionsByAddress = new Map<string, Positions>();
     for (const entry of response.entries) {
@@ -207,7 +250,7 @@ export async function fetchBlendUsersPositionsBatch(params: {
     }
   }
 
-  return results;
+  return { positions: results, invalidAddresses };
 }
 
 /** One user, one pool — loads pool + oracle + user (12 RPC calls on a pool with 8 reserves). */
