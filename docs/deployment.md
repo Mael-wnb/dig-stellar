@@ -264,21 +264,27 @@ on top of `api_general` / `api_mutations`. Rates come from the legitimate flow (
 one create + one immediate refresh; a user refreshes by hand a few times an hour), not from
 guesses. The map yields an empty key for anything but POST, so reads are exempt.
 
+The full patched site file and the unified diff against the live file (dumped from the VPS on
+2026-10-27) are in `docs/evidence/lot-sec/nginx-site-config-g1.conf` / `.diff`. The hunks:
+
 ```nginx
-# http {} level, next to the existing limit_req_zone / map lines
+# http {} level (this site file holds every zone), right after the api_mutations zone
+# Lot SEC G1 (2026-10-27): per-IP zones for the two cheapest-to-abuse writes, POST only.
 map $request_method $wallet_write_key {
     default "";
     POST    $binary_remote_addr;
 }
-limit_req_zone $wallet_write_key zone=api_wallet_create:10m  rate=6r/m;
+limit_req_zone $wallet_write_key zone=api_wallet_create:10m rate=6r/m;
 limit_req_zone $wallet_write_key zone=api_wallet_refresh:10m rate=12r/m;
 
-# server {} level, BEFORE "location /v1/" — the exact-match and regex locations win
-# over the prefix location, so limit_req must be repeated inside each.
+# server {} level, right BEFORE "location /v1/". The exact-match and regex locations win over
+# the prefix location, so every directive of that block is repeated, plus the wallet zone.
+# The regex MUST be quoted: an unquoted "{36}" is parsed by nginx as a block opener and
+# nginx -t fails with 'unknown directive "36}/refresh$"'.
 location = /v1/wallets {
-    limit_req zone=api_general       burst=60 nodelay;
-    limit_req zone=api_mutations     burst=20 nodelay;
-    limit_req zone=api_wallet_create burst=5  nodelay;
+    limit_req zone=api_general burst=60 nodelay;
+    limit_req zone=api_mutations burst=20 nodelay;
+    limit_req zone=api_wallet_create burst=5 nodelay;
     proxy_pass http://127.0.0.1:3000;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
@@ -287,9 +293,10 @@ location = /v1/wallets {
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 
-location ~ ^/v1/wallets/[0-9a-fA-F-]{36}/refresh$ {
-    limit_req zone=api_general        burst=60 nodelay;
-    limit_req zone=api_wallet_refresh burst=5  nodelay;
+location ~ "^/v1/wallets/[0-9a-fA-F-]{36}/refresh$" {
+    limit_req zone=api_general burst=60 nodelay;
+    limit_req zone=api_mutations burst=20 nodelay;
+    limit_req zone=api_wallet_refresh burst=5 nodelay;
     proxy_pass http://127.0.0.1:3000;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
@@ -298,24 +305,51 @@ location ~ ^/v1/wallets/[0-9a-fA-F-]{36}/refresh$ {
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 ```
+
+Nothing else changes in this gate (headers, CSP, timeouts and the `@rate_limited` CORS echo are
+Gate 3). Arithmetic: `rate=6r/m` + `burst=5` lets 6 POSTs through in the same instant and refuses
+the 7th; the bucket drains one slot every 10 s (5 s for the refresh zone). The 429 is the nginx
+JSON body without a `reason` field, which is how it is told apart from the API's own admission
+429 (`docs/runbooks.md`). Proven locally on 2026-10-27 in a throwaway `nginx:stable` container
+with no upstream (`502` = reached the proxy): `POST /v1/wallets` x7 → `502 x6, 429`;
+`POST …/refresh` x7 → `502 x6, 429`; `GET /v1/wallets`, `POST /v1/wallets/<id>` and
+`GET /v1/protocols` never 429 (`docs/evidence/lot-sec/g1.md` §5).
 
 Apply against the LIVE files, not against the evidence copy in `docs/evidence/lot-s/` (it has
-drifted). Procedure:
+drifted). `sites-enabled/stellar-api.getdig.ai` is normally a symlink to `sites-available/`;
+the first line resolves which file is real and patches that one. Procedure (as root):
 
 ```bash
-# read-only: where the zones live and what the site file is today
-nginx -T 2>/dev/null | grep -nE 'limit_req_zone|map \$request_method|^# configuration file'
-cp /etc/nginx/sites-available/stellar-api.getdig.ai /root/nginx-site.pre-sec-g1.$(date +%F)
-# edit, then:
-nginx -t && systemctl reload nginx
-# verify: 7th POST within a minute from one IP is a 429 with the nginx JSON body
-for i in $(seq 1 7); do curl -s -o /dev/null -w '%{http_code} ' -X POST https://stellar-api.getdig.ai/v1/wallets -H 'content-type: application/json' -d '{}'; done; echo
-# rollback
-cp /root/nginx-site.pre-sec-g1.<date> /etc/nginx/sites-available/stellar-api.getdig.ai && nginx -t && systemctl reload nginx
+# 0. which file is real
+SITE=/etc/nginx/sites-enabled/stellar-api.getdig.ai
+[ -L "$SITE" ] && SITE=$(readlink -f "$SITE"); echo "patching $SITE"
+# 1. dated backup
+cp -p "$SITE" /root/nginx-site.pre-sec-g1.$(date +%F) && ls -l /root/nginx-site.pre-sec-g1.*
+# 2. write the new file next to it (paste docs/evidence/lot-sec/nginx-site-config-g1.conf
+#    into the heredoc), then check that the diff is exactly the two hunks above
+cat > /root/stellar-api.getdig.ai.sec-g1 <<'EOF'
+…full content of docs/evidence/lot-sec/nginx-site-config-g1.conf…
+EOF
+diff -u "$SITE" /root/stellar-api.getdig.ai.sec-g1
+# 3. install, test, reload (nginx -t fails -> nothing is reloaded, the old config keeps serving)
+cp /root/stellar-api.getdig.ai.sec-g1 "$SITE" && nginx -t && systemctl reload nginx
+# if sites-enabled was a plain file (not a symlink), keep sites-available identical:
+[ -L /etc/nginx/sites-enabled/stellar-api.getdig.ai ] || cp "$SITE" /etc/nginx/sites-available/stellar-api.getdig.ai
+# 4. verify (from any one IP; the API is already deployed, so it answers 400 for the bad address)
+for i in $(seq 1 7); do curl -s -o /dev/null -w '%{http_code} ' -X POST https://stellar-api.getdig.ai/v1/wallets -H 'content-type: application/json' -d '{"address":"not-an-address"}'; done; echo
+#   expected: 400 400 400 400 400 400 429
+curl -s -o /dev/null -w '%{http_code}\n' https://stellar-api.getdig.ai/v1/wallets             # 400 (userId required), never 429
+for i in $(seq 1 7); do curl -s -o /dev/null -w '%{http_code} ' -X POST https://stellar-api.getdig.ai/v1/wallets/0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b/refresh; done; echo
+#   expected: six 400/404 (unknown wallet, no DB write) then 429
+curl -s -X POST https://stellar-api.getdig.ai/v1/wallets -d '{}' | head -c 120; echo       # nginx JSON body, no "reason"
+curl -s -o /dev/null -w '%{http_code}\n' https://stellar-api.getdig.ai/v1/protocols         # 200
+#   then load https://stellar.getdig.ai in a browser: dashboard + portfolio render, no 429 in the network tab
+# rollback (one line)
+cp /root/nginx-site.pre-sec-g1.$(date +%F) "$SITE" && nginx -t && systemctl reload nginx
 ```
 
-Expected with the API not yet deployed: `400 400 400 400 400 400 429` (the API's own 400 for an
-empty body, then the edge). Keep `docs/deployment.md` and the live file in sync.
+The 429 from the verification burst clears by itself (one slot per 10 s). Keep this section, the
+evidence copy and the live file in sync.
 
 ### 2. API on the VPS
 
