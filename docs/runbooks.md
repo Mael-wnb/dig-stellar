@@ -132,6 +132,52 @@ oracle) and must never be seeded as active. After seeding, confirm any new reser
 but the health factor stays correct (it comes from Blend's on-chain Reflector oracle, not the price
 pipeline). `BLEND_POOL_ID` in `.env` is only a default for the discovery/probe scripts (75/76).
 
+### XOXNO Lending (Lot XO): seeding, new markets, app-version check, params cache
+
+The `xoxno` venue (`venue_type = 'lending'`) has one entity per hub (`xoxno-core-hub`,
+`xoxno-rwa-hub`, `xoxno-amm-hub`; `entity_type = 'lending_pool'`, `contract_address` = the single
+pool contract) and one `reserve_snapshots` row per market. The hub id and market list live in the
+entity metadata (`hubId`, `markets[]`), seeded by `xoxno-upsert-core.ts` (idempotent, no RPC) and
+replayed by `bootstrap:core` from `registries/core-registry.json`. `71-refresh-all-metrics` discovers
+the hubs by DB query (`v.slug = 'xoxno' and is_active`) and refreshes each per cycle (step 6c, before
+the protocol rollup). Decision note: `docs/decisions/2026-10-27-xoxno-tvl-and-pricing.md`.
+
+```bash
+# Seed / re-seed the venue + 3 hubs + 25 markets (idempotent; merges entity metadata)
+pnpm -C apps/indexer exec tsx src/scripts/bootstrap/xoxno-upsert-core.ts
+# Refresh one hub directly (reads on-chain; STELLAR_SOURCE_ACCOUNT needed for simulations)
+ENTITY_SLUG=xoxno-core-hub XOXNO_POOL_ID=CBXRNDQMAJFG4VUKMKFEMFS75UUXE2SPSNV4LEEFCSNBCN66PYRWBKXO \
+  pnpm -C apps/indexer exec tsx src/scripts/ingest/run-xoxno-hub-refresh.ts
+```
+
+- **Detecting a new market.** There is no on-chain list view; XOXNO adds markets through
+  `market|batch_params_update` pool events / new `("Params", HubAssetKey)` ledger entries. Check the
+  pool's contract data on stellar.expert (count of `Params` keys vs 25) or the venue UI. To add one:
+  append it to the right hub in `XOXNO_HUBS` (`xoxno-upsert-core.ts`: asset contract id, SEP-41
+  symbol / name / decimals — never rename an existing assets row), run the script, add a pricing
+  rule or an `external` marker in `scripts/shared/pricing-config.ts` (a symbol with neither warns in
+  step 62), then `pnpm -C apps/indexer bootstrap:export` and commit the registry. The next refresh
+  reads the new market's params from chain automatically (it is not in the params cache).
+- **App-version check.** Every hub refresh starts with `controller.get_app_version()` and FAILS the
+  xoxno step loudly when it differs from `XOXNO_EXPECTED_APP_VERSION` (1; env override of the same
+  name). An upgraded controller may have changed the view semantics the adapter relies on:
+  re-verify the spec (`docs/evidence/lot-xo/00-recon-verification.md`), then bump the constant.
+  Step isolation keeps the rest of `job:refresh` alive meanwhile; `/v1/ops/status` shows the step
+  FAILED and `/health` turns the venue stale.
+- **Params cache.** Static market params (`get_sync_data`: decimals, interest-rate model, reserve
+  factor) are cached in the entity metadata (`paramsCache.fetchedAt`) and re-read at most every
+  24 h, or when the app version changed or a seeded market is missing from the cache.
+  `XOXNO_PARAMS_REFRESH=1` on a hub run forces a full re-read. `pool_snapshots.metadata.callPlan`
+  shows what a run read (`paramsFromCache / paramsFromChain / priceFallbackKeys / priceChunks`);
+  steady state is 162 RPC calls per refresh for the three hubs.
+- **Pricing.** Own-priced markets (XLM, USDC, EURC, USDT0, PYUSD, SolvBTC, xSolvBTC, CETES,
+  USTRY, USDY, AQUA) never use the XOXNO aggregator and are unpriced when their own price is
+  stale (pool flagged stale, like Blend). Fallback-covered markets (`external` markers) take the
+  aggregator price when it is `valid`, not `stale`, error-free and ≤ 24 h old. Step order
+  (reference prices before the Aquarius refresh) leaves USDY unpriced on a run that follows an
+  idle longer than the 45-minute price window (RWA hub 6/7 priced); the next run prices it. Never
+  on the `*/15` cadence; pre-existing, not XOXNO-specific.
+
 ### Wallet alert sweep (D2): periodic evaluator
 
 The alerting engine runs as a periodic sweep (no broker, no in-process scheduler): one OS-cron

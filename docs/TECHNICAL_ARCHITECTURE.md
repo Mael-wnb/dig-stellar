@@ -68,6 +68,7 @@ flowchart TB
     Soroswap[Soroswap - AMM]
     Aquarius[Aquarius - AMM + rewards]
     DeFindex[DeFindex - vaults]
+    XOXNO[XOXNO - lending hubs]
     SDEX[SDEX - native DEX]
     Allbridge[Allbridge - bridge]
   end
@@ -433,6 +434,12 @@ Reflector is consumed by Blend and (optionally) by our own USD conversions. We r
 ### 7.7 Bridge Flows: Allbridge (T2 scope)
 
 Bridge inflow/outflow to Stellar is tracked via Allbridge's attribution data. Axelar and Near Intents remain out of scope for the grant period; we will reassess once Allbridge integration proves the dashboard pattern.
+
+### 7.8 XOXNO Lending (post-grant, Lot XO — read-only analytics)
+
+- **Contracts**: one pool (custody + per-market accounting), a controller (accounts / risk / price views), a Position NFT (one NFT = one account) and a price aggregator. A market is `HubAssetKey { hub_id, asset }`; three hubs (Core, RWA, AMM), 25 markets. Modelled as one entity per hub, one reserve row per market.
+- **State reads** (read-only simulations, 4 req/s): per market the accrued views `get_reserves` (cash, the TVL leg), `get_supplied_amount`, `get_borrowed_amount`, `get_utilisation`, `get_deposit_rate`, `get_borrow_rate`; `get_sync_data` (static params) cached 24 h in the entity metadata; `controller.get_app_version` smoke check per hub; `controller.get_market_indexes_detailed` (3 keys per call) only for markets our own pricing cannot cover. No XOXNO HTTP API, no event ingestion, no vendored code (PolyForm Noncommercial upstream).
+- **Derived metrics**: hub TVL = Σ cash × price over priced markets; supplied / borrowed; APR → `exp(apr) − 1` APY; utilisation. Wallet positions (XO-2), actions and alerts are out of scope.
 
 ---
 

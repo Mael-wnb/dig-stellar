@@ -51,6 +51,13 @@ with; the tables and notes below are kept as the historical record of how each c
   boundary string on `#status`. Prod answers `campaign-disabled` until the founder activates it
   (`docs/runbooks.md`); EP3 + the cron line await the dark deploy (`docs/evidence/lot-ep/ep3-deploy.md`).
   Honesty rule: adoption numbers earned under the campaign will be stated with the campaign context.
+- **Lot XO — XOXNO Lending (XO-1, read-only analytics): BUILT + locally validated 2026-10-30 on
+  `feat/lot-xo`, VPS deploy pending** (`docs/deployment.md` "Lot XO deploy"). Sixth protocol: 3
+  hubs / 25 markets, TVL = pool cash (≈ $145k, folded into the network sum), scoped aggregator
+  price fallback for 14 structurally unpriced markets, 162 RPC calls per refresh on the normal
+  `*/15` cadence (params cached 24 h, own-priced markets never sent to the aggregator). API
+  series fix + web cosmetics ride the same lot. XO-2 (wallet positions) not started.
+  `docs/decisions/2026-10-27-xoxno-tvl-and-pricing.md`, `docs/evidence/lot-xo/`.
 - **Lot EP4 — Earn v1.1 (2026-10-21): built on `feat/lot-ep4`, not deployed.** Daily streak ramp
   (+0.05/day, cap ×1.35 at 7 days), hero card, 7-day strip, "Earn more" and activity cards, neutral
   copy, perks hidden in the UI; `docs/evidence/lot-ep/ep4-implementation.md`.
@@ -435,6 +442,9 @@ T1-D3 criteria.
 5. **Lot RP — RPC cost** (RP1 built 2026-10-27, deploy pending): wallet sweep 3,312 → 36 RPC
    calls per run at 92 wallets; per-job/per-method cost rows in `rpc_metrics_runs`. RP2 = shared
    RPC client + free-provider pool (`docs/evidence/lot-rp/`)
+6. **Lot XO deploy — XOXNO Lending** (built 2026-10-30): seed + API build + one refresh on the
+   VPS, then the web (`docs/deployment.md` "Lot XO deploy"); the sixth protocol for the SCF 46
+   narrative
 
 ---
 

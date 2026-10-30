@@ -158,7 +158,7 @@ Per-protocol ingestion: logic lives in `apps/indexer/src/lib/protocols/<protocol
 entry points are the per-protocol `run-*-refresh.ts` called by `71-refresh-all-metrics.ts`
 (Blend `run-blend-pool-refresh.ts`, Soroswap `run-soroswap-pair-refresh.ts`, Aquarius
 `run-aquarius-pool-refresh.ts`, native `run-stellar-native-refresh.ts`, DeFindex
-`run-defindex-refresh.ts`). `src/scripts/ingest/`
+`run-defindex-refresh.ts`, XOXNO Lending `run-xoxno-hub-refresh.ts`). `src/scripts/ingest/`
 **also contains superseded legacy** (numbered `*-v1.ts`, `*-insert-*.ts`, and duplicate
 `run-*-refresh.ts`) — confirm a file is on the live `job:refresh` path before relying on or editing it.
 
@@ -229,6 +229,14 @@ implementation — treat it as first-class, not "later."
   DEX) and is **excluded from the canonical network-TVL sum** (`network_tvl_snapshots`) — its vault
   funds sit inside Blend pools, so counting both would double-count (founder ruling 2026-08-17,
   `docs/decisions/2026-08-17-network-tvl-definition.md`).
+- **XOXNO Lending** (post-grant Lot XO, XO-1, 2026-10-30) is on the `job:refresh` path (step 6c,
+  `run-xoxno-hub-refresh.ts`, adapter `lib/protocols/xoxno/`): venue `xoxno`, one entity per hub
+  (3), one reserve row per market (25), read-only, on-chain views only (no XOXNO HTTP API; the
+  protocol's repository is PolyForm Noncommercial — never vendor its code). TVL = pool cash; a
+  scoped price fallback (`xoxno-aggregator`, 24 h max age) covers only structurally unpriced
+  markets; XOXNO IS in the network-TVL sum. Static params cached 24 h in the entity metadata.
+  Wallet positions (XO-2), actions and alerts are out of scope.
+  `docs/decisions/2026-10-27-xoxno-tvl-and-pricing.md`, `docs/evidence/lot-xo/`.
 - **Tests / CI** are **largely deferred (likely T3).** The one exception: the T2-D2 alerting evaluator
   has unit specs (`modules/alerts/evaluate.spec.ts`, `alerts.ownership.spec.ts`). Beyond those there
   are no broad suites and no CI pipeline. Do not add a test/CI build-out as a side effect of an

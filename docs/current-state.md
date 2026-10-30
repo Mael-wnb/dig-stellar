@@ -64,7 +64,9 @@ Three table families coexist in the same Postgres DB. This is the single most im
   `pool_snapshots`, `reserve_snapshots`, `normalized_events`, `pool_metrics_latest`,
   `protocol_metrics_latest`, `asset_prices`, `sync_cursors` (defined in `apps/api/src/db/stellar_v1*.sql`).
   Written by `job:refresh` (`72-run-refresh-job.ts` → `71-refresh-all-metrics.ts` → per-protocol steps).
-  Read by the `/v1/*` routes (`StellarController`).
+  Read by the `/v1/*` routes (`StellarController`). Since Lot XO (2026-10-30) the XOXNO Lending
+  hubs live in the same family (venue `xoxno`, 3 `lending_pool` entities, 25 reserve rows per
+  refresh; static params cached 24 h in `entities.metadata.paramsCache`).
 - **raw SQL v2 — wallet layer.** `user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions`
   (`stellar_v2_multiwallet.sql`). Read by `/v1/wallets/*` (`WalletsController`).
 - **raw SQL v3 — alerting.** `alert_rules`, `alert_rule_state`, `notifications`
@@ -403,6 +405,7 @@ cross-check vs mainnet.blend.capital is matched — **T2-D1 is complete** (v2 sc
 | Stellar native DEX | Horizon | 60 | ≈ $5.4M | operational (now aggregated at protocol level) |
 | Soroswap | Soroban RPC | 4 active | ≈ $1.18M | operational — **+2 pairs Aug 16 (Lot P)**; native/EURC pair revived on-chain and re-enabled |
 | DeFindex | DeFindex API (SDK) | 3 vaults | ≈ $19.3M | operational — **live in prod since Aug 4** (T3-D1); **excluded from the canonical network-TVL sum** (2026-08-17 ruling — vault funds sit inside Blend pools) |
+| XOXNO Lending | Soroban RPC (read-only views) | 3 hubs / 25 markets | ≈ $145k (pool cash) | **built + locally validated 2026-10-30 (Lot XO, XO-1), VPS deploy pending** — TVL = pool cash; scoped `xoxno-aggregator` price fallback for the 14 structurally unpriced markets; included in the network sum (≈ $2k Aquarius LP overlap kept); 162 RPC calls per refresh |
 
 (TVL column refreshed 2026-08-17 from the canonical-TVL validation itemization —
 `docs/decisions/2026-08-17-network-tvl-definition.md`; network sum: gross $230.1M / net $186.5M
@@ -445,6 +448,20 @@ Remaining gaps: none for T3-D1 — the Lot B changes (DeFindex + freshness + ret
 to prod** (VPS bootstrap + full `job:refresh` clean on Aug 4, ~3 min end-to-end; `/v1/protocols`
 serves 5 protocols with `isStale=false`; Vercel front live). DeFindex user positions stay out of
 scope (portfolio is Blend-only by design).
+
+**XOXNO Lending (post-grant Lot XO, XO-1 — built 2026-10-26→30, VPS deploy pending).** Sixth
+protocol, read-only: venue `xoxno`, one entity per hub (Core / RWA / AMM), one reserve row per
+market (25), refreshed as step 6c of `job:refresh` through `run-xoxno-hub-refresh.ts` (adapter
+`lib/protocols/xoxno/`, on-chain views only, no XOXNO HTTP API, nothing vendored from the
+PolyForm Noncommercial upstream). TVL = pool cash × price over priced markets (DefiLlama-consistent;
+supplied / borrowed served separately); a scoped exception to the "our data only" rule lets the
+XOXNO price aggregator price ONLY the 14 structurally uncovered markets (XAUM, USST, deJTRSY,
+deJAAA, 10 Aquarius LP tokens; 24 h max age; own-priced markets never fall back and are never
+sent to the aggregator). Static params cached 24 h; 162 Soroban calls per refresh steady state
+(191 before the cache / scope work). `GET /v1/pools/:slug/series` uses the cash leg for this
+venue (Blend keeps supplied). Web: monogram chip, pool-detail copy, lending action Blend-only.
+Out of scope: wallet positions (XO-2 — one wallet holds many Position NFTs), actions, alerts.
+`docs/decisions/2026-10-27-xoxno-tvl-and-pricing.md`, `docs/evidence/lot-xo/`.
 
 ---
 

@@ -372,6 +372,53 @@ picks it up, no restart needed.
 Merge to the deploy branch as usual. The change is a client-side address check in the
 add-wallet modal and friendlier copy on `429`; both work against the old API too.
 
+## Lot XO deploy — XOXNO Lending (XO-1), 2026-10-30
+
+Indexer + API + web; **no SQL schema change, no env change, no new cron line** (the xoxno step
+rides the existing `*/15` `job:refresh`). Order: VPS (seed → pull → API build → one manual refresh
+→ verify), then the web on Vercel last. Cost: +162 Soroban RPC calls per refresh (steady state;
+187 on the first run while the params cache fills), ≈ +45 s per refresh.
+
+```bash
+cd /root/dig-stellar
+# 0. between two refresh ticks, locks free:
+ls /tmp/dig-stellar-refresh.lock /tmp/dig-stellar-alert.lock /tmp/dig-stellar-campaign.lock; pgrep -af '71-refresh|81-stellar|85-run' | grep -v pgrep
+git pull origin main && git log -1 --oneline
+pnpm install --frozen-lockfile
+# 1. seed the venue + 3 hub entities + 25 market assets on the PROD DB (idempotent, no RPC, ~1 s)
+pnpm -C apps/indexer exec tsx src/scripts/bootstrap/xoxno-upsert-core.ts
+docker exec -i dig_stellar_postgres psql -U dig -d dig_stellar -Atc "select v.slug, v.name, count(e.id) hubs from venues v left join entities e on e.venue_id = v.id where v.slug = 'xoxno' group by 1,2"
+#    expect: xoxno|XOXNO|3
+# 2. API build (series endpoint per-venue amount, step label) + restart
+pnpm -C apps/api build
+GIT_SHA=$(git rev-parse --short HEAD) pm2 restart dig-stellar-api --update-env && pm2 save
+# 3. one manual refresh (or wait for the next tick) and read the xoxno step + cost row
+pnpm -C apps/indexer job:refresh 2>&1 | grep -E '^\[xoxno\]|step [0-9]+ xoxno|\[ops\] persisted|Total job duration'
+docker exec -i dig_stellar_postgres psql -U dig -d dig_stellar -Atc "select run_at, calls, methods from rpc_metrics_runs where job='refresh' and target='soroban-rpc' order by run_at desc limit 1"
+# 4. verify (from the VPS)
+curl -s https://stellar-api.getdig.ai/v1/protocols | jq '.[] | select(.id=="xoxno") | {name, type, tvlUsd, assetCount, isStale}'
+curl -s 'https://stellar-api.getdig.ai/v1/pools?protocol=xoxno' | jq '[.[] | {id, tvl: .metrics.tvlUsd, isStale}]'
+curl -s https://stellar-api.getdig.ai/v1/pools/xoxno-core-hub | jq '{tvl: .metrics.tvlUsd, supplied: .metrics.totalSuppliedUsd, reserves: (.reserves | length)}'
+curl -s https://stellar-api.getdig.ai/v1/pools/xoxno-core-hub/series | jq '{covered, last, lastPoint: .points[-1]}'
+curl -s 'https://stellar-api.getdig.ai/v1/ops/status?window=24h' | jq '.steps[] | select(.step=="xoxno")'
+curl -s https://stellar-api.getdig.ai/health | jq '.protocols[] | select(.id=="xoxno")'
+```
+
+Expected: `/v1/protocols` has `xoxno` (name `XOXNO`, type `lending`, 25 assets, TVL ≈ $145k,
+`isStale: false` after the first refresh); 3 pools (Core ≈ $140k, RWA ≈ $2.5k, AMM ≈ $2k); the
+series last point equals the Core hub TVL (cash × price); the xoxno step SUCCESS in ≈ 45 s; the
+network TVL hero rises by ≈ $145k (XOXNO folded into `network_tvl_snapshots`; ≈ $2k of it is
+Aquarius LP collateral also counted in the Aquarius pools — kept by decision). The first refresh
+after the seed reads every market's params from chain (187 calls), later ones 162.
+
+**Web on Vercel (last).** Merge the web commit to the deploy branch as usual: theme / meta
+entries, pool-detail copy and the Blend-only lending action all work against the old API too,
+but the chart only matches the hub TVL once the API above is live.
+
+Rollback: `update entities set is_active = false where slug like 'xoxno-%'` removes the hubs
+from the refresh and the API on the next tick (the venue row and snapshots stay); the API and
+web changes are backward compatible.
+
 ## Campaign cron line (Lot EP, EP3)
 
 A third OS-cron line (`job:campaign`, every 15 min at minutes 3/18/33/48, lock
