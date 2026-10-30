@@ -84,6 +84,7 @@ export const STEP_LABELS: Record<string, string> = {
   aquarius: 'Aquarius refresh',
   'stellar-native': 'Stellar-native DEX refresh',
   defindex: 'DeFindex refresh',
+  xoxno: 'XOXNO Lending refresh',
   'protocol-metrics': 'Protocol rollup',
   allbridge: 'Allbridge bridge flows',
   'network-stats': 'Network stats',

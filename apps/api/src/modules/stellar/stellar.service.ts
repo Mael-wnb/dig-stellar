@@ -884,27 +884,30 @@ export class StellarService {
   }
 
   // ── TVL history series (Lot C) ────────────────────────────────────────────
-  // Blend-only, honest reconstruction. No stored USD time-series exists in the
-  // DB (pool_metrics_latest is a single-row upsert), but Blend lending pools
-  // retain per-asset reserve history in reserve_snapshots. We reconstruct TVL
-  // per snapshot as sum(supplied × latest asset price), where supplied is
-  // b_supply_scaled (indexer convention: b = supplied, d = borrowed) — a degraded,
-  // irregular-cadence, latest-price approximation (asset_prices is only ~18 days
-  // deep). AMM/native/vault pools have no usable reserve history → covered=false
-  // so the UI keeps the honest "building history" note rather than a fake curve.
+  // Lending-only, honest reconstruction. No stored USD time-series exists in the
+  // DB (pool_metrics_latest is a single-row upsert), but lending pools retain
+  // per-asset reserve history in reserve_snapshots. We reconstruct TVL per
+  // snapshot as sum(amount × latest asset price), where the amount follows each
+  // venue's TVL definition: Blend = supplied (b_supply_scaled; indexer convention
+  // b = supplied, d = borrowed); XOXNO (Lot XO) = pool cash (reserve_snapshots
+  // .metadata.cash, what pool.get_reserves returns), so the chart matches the
+  // hub TVL in pool_metrics_latest. A degraded, irregular-cadence, latest-price
+  // approximation (asset_prices is only ~18 days deep). AMM/native/vault pools
+  // have no usable reserve history → covered=false so the UI keeps the honest
+  // "building history" note rather than a fake curve.
   //
   // Volume history does not exist for any pool, so this series is TVL-only.
   async getPoolSeries(poolSlug: string) {
     const poolRows = (await this.prisma.$queryRawUnsafe(
       `
-      select e.id as entity_id, e.entity_type, v.venue_type
+      select e.id as entity_id, e.entity_type, v.venue_type, v.slug as venue_slug
       from entities e
       join venues v on v.id = e.venue_id
       where e.slug = $1 and e.is_active = true
       limit 1
       `,
       poolSlug
-    )) as Array<{ entity_id: string; entity_type: string; venue_type: string }>;
+    )) as Array<{ entity_id: string; entity_type: string; venue_type: string; venue_slug: string }>;
     const pool = poolRows[0];
     if (!pool) {
       throw new NotFoundException(`Pool not found: ${poolSlug}`);
@@ -924,6 +927,12 @@ export class StellarService {
       };
     }
 
+    // The per-reserve amount that defines TVL for this venue (see header).
+    const amountSql =
+      pool.venue_slug === 'xoxno'
+        ? `coalesce((rs.metadata->>'cash')::numeric, 0)`
+        : `coalesce(rs.b_supply_scaled, 0)`;
+
     // One TVL value per distinct snapshot; keep the last snapshot per UTC day in
     // JS for a clean daily line. Latest-price per asset (documented approximation).
     const rows = (await this.prisma.$queryRawUnsafe(
@@ -934,7 +943,7 @@ export class StellarService {
         -- phase A2: fresh prices only; a snapshot with NO priced reserve yields NULL
         -- (the reducer skips it — a gap, never a $0 point)
         case when count(p.price_usd) = 0 then null
-             else sum(coalesce(rs.b_supply_scaled, 0) * coalesce(p.price_usd, 0)) end as tvl_usd
+             else sum(${amountSql} * coalesce(p.price_usd, 0)) end as tvl_usd
       from reserve_snapshots rs
       left join lateral (
         select ap.price_usd from asset_prices ap
