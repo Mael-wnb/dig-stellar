@@ -283,6 +283,7 @@ async function main(): Promise<boolean> {
     const blendPools = await safeDiscover('discover:blend', client, 'blend', 'lending_pool');
     const aquariusPools = await safeDiscover('discover:aquarius', client, 'aquarius', 'amm_pool');
     const defindexVaults = await safeDiscover('discover:defindex', client, 'defindex', 'yield_vault');
+    const xoxnoHubs = await safeDiscover('discover:xoxno', client, 'xoxno', 'lending_pool');
 
     console.log('\n=== 1. Refresh reference prices ===');
 
@@ -372,6 +373,25 @@ async function main(): Promise<boolean> {
         return runStep(`defindex:${vault.entitySlug}`, 'src/scripts/ingest/run-defindex-refresh.ts', {
           ENTITY_SLUG: vault.entitySlug,
           DEFINDEX_VAULT_ADDRESS: vault.contractAddress,
+        });
+      }
+    );
+
+    console.log('\n=== 6c. Refresh XOXNO Lending hubs + metrics ===');
+
+    // Lot XO: after the price steps (own prices first; the scoped aggregator
+    // fallback only fills structurally uncovered assets) and before step 7 so the
+    // protocol rollup folds the three hubs in. One runner per hub entity; the hub
+    // id and market list come from the entity metadata (xoxno-upsert-core.ts).
+    await trackEach(
+      'xoxno',
+      xoxnoHubs,
+      (hub) => hub.entitySlug,
+      (hub) => {
+        console.log(`\n--- XOXNO: ${hub.entitySlug} (${hub.contractAddress}) ---`);
+        return runStep(`xoxno:${hub.entitySlug}`, 'src/scripts/ingest/run-xoxno-hub-refresh.ts', {
+          ENTITY_SLUG: hub.entitySlug,
+          XOXNO_POOL_ID: hub.contractAddress,
         });
       }
     );

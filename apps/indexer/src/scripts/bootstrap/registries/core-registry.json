@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-16T10:50:59.683Z",
+  "generatedAt": "2026-10-26T18:59:55.845Z",
   "source": "registry-export.ts (live DB snapshot of the vetted perimeter)",
   "venues": [
     {
@@ -66,6 +66,28 @@
       "logo_url": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/stellar/info/logo.png",
       "metadata": {
         "source": "horizon-liquidity-pools"
+      }
+    },
+    {
+      "slug": "xoxno",
+      "name": "XOXNO",
+      "chain": "stellar-mainnet",
+      "venue_type": "lending",
+      "logo_url": null,
+      "metadata": {
+        "pool": "CBXRNDQMAJFG4VUKMKFEMFS75UUXE2SPSNV4LEEFCSNBCN66PYRWBKXO",
+        "source": "xoxno_bootstrap",
+        "category": "lending",
+        "controller": "CAUCMIN5KSXEVZ7NMXR3LZATGD5EFIEUI5XWTFLYRO2R5OTXI22WE5JX",
+        "provenance": {
+          "recon": "docs/evidence/lot-xo/ (step-0 recon 2026-10-26, read-only simulations)",
+          "licence": "XOXNO/rs-lending-xlm is PolyForm Noncommercial \u2014 contracts read on-chain only, no code copied",
+          "hubNames": "hand-seeded (no on-chain hub-name view): Core / RWA / AMM",
+          "marketList": "pool ledger entries (\"Params\"/\"State\", HubAssetKey) = 25, cross-checked vs pool market|batch_params_update events and XOXNO public registry (0 diff)",
+          "tokenLabels": "SEP-41 symbol()/name()/decimals(); Aquarius LP tokens labelled by pair (they all answer POOL)"
+        },
+        "positionNft": "CAWCSG77AY2W24QZ6ZXLHZU4UXEFHZBM6EI4A4IF7JB5CTY4XND3TI6C",
+        "priceAggregator": "CBGUF2G2Q7HCVCWYISDXBHPVBGMYNXA7PG2VET66YBZX6IKOOV27NSMV"
       }
     }
   ],
@@ -649,6 +671,246 @@
         "token1": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
         "reserveCount": 2
       }
+    },
+    {
+      "venue_slug": "xoxno",
+      "slug": "xoxno-amm-hub",
+      "name": "AMM hub",
+      "entity_type": "lending_pool",
+      "contract_address": "CBXRNDQMAJFG4VUKMKFEMFS75UUXE2SPSNV4LEEFCSNBCN66PYRWBKXO",
+      "is_active": true,
+      "metadata": {
+        "pool": "CBXRNDQMAJFG4VUKMKFEMFS75UUXE2SPSNV4LEEFCSNBCN66PYRWBKXO",
+        "hubId": 3,
+        "source": "xoxno_bootstrap",
+        "hubName": "AMM",
+        "markets": [
+          {
+            "name": "AQUA:GBNZILSTVQZ4R7IKQDGHYGY2QXL5QOFJYQMXPKWRRM5PAV7Y4M67AQUA",
+            "asset": "CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK",
+            "symbol": "AQUA",
+            "decimals": 7
+          },
+          {
+            "name": "Aquarius LP XLM/USDC",
+            "asset": "CAVKLYY4RWFQBRA2YI5GTGGXKUKJQI3JLAHDGXMS7L5RDH6X6A47NMOZ",
+            "symbol": "XLM-USDC-LP",
+            "decimals": 7
+          },
+          {
+            "name": "Aquarius LP XLM/AQUA",
+            "asset": "CBOHAVUYKQD4C7FIVXEDJCVLUZYUO6RN3VIKEDOTIJGDDV3QN33Y4T4D",
+            "symbol": "XLM-AQUA-LP",
+            "decimals": 7
+          },
+          {
+            "name": "Aquarius LP XLM/SolvBTC",
+            "asset": "CAPPL34NF6X7M3EQFIPDXZHQX2PT3EOE2LYCDORH3PF2LTRDSFGWV6NL",
+            "symbol": "XLM-SolvBTC-LP",
+            "decimals": 7
+          },
+          {
+            "name": "Aquarius LP AQUA/USDC",
+            "asset": "CDOY7ILRR7PDGLBXZUPSENB6XOET77PR2JY3HXDGQS3TS4T764OYBUGO",
+            "symbol": "AQUA-USDC-LP",
+            "decimals": 7
+          },
+          {
+            "name": "Aquarius LP CETES/USDC",
+            "asset": "CB2WUVUP2SKZVFZFNU33EZCISH65DKHQP4WBEHJ4WE3BF7QOABYGCQMS",
+            "symbol": "CETES-USDC-LP",
+            "decimals": 7
+          },
+          {
+            "name": "Aquarius LP USTRY/USDC",
+            "asset": "CCLJBNY2KMUOSAW7URIZHREO5ORQREDX7NIHLFRAT6KAZ5GO7652OA4I",
+            "symbol": "USTRY-USDC-LP",
+            "decimals": 7
+          },
+          {
+            "name": "Aquarius LP USDY/USDC",
+            "asset": "CCYD4C2WFWIIDF235SCDXEWL5RT6S53WQWLDHUTQ5USZ5VNF5NHJGVW7",
+            "symbol": "USDY-USDC-LP",
+            "decimals": 7
+          },
+          {
+            "name": "Aquarius LP PYUSD/USDC",
+            "asset": "CD3EQXQGRYUKM7LZ6MZVTXSW74ROXU6YI2SXHJ6KTB5BQ425E5KXRDBC",
+            "symbol": "PYUSD-USDC-LP",
+            "decimals": 7
+          },
+          {
+            "name": "Aquarius LP USDC/XAUM",
+            "asset": "CACO4IS27ANIDC45UN5LWTYZYEELSJWA3WVWGI6QAF6Q2ZY4ZMZFSJRW",
+            "symbol": "USDC-XAUM-LP",
+            "decimals": 7
+          },
+          {
+            "name": "Aquarius LP xSolvBTC/SolvBTC",
+            "asset": "CDZ4QRNY63YKJY7FLBTJUVPX3Z3U56JY5KHNHQEYI5F5MYLMC5YNRIXE",
+            "symbol": "xSolvBTC-SolvBTC-LP",
+            "decimals": 7
+          }
+        ],
+        "appVersion": 1,
+        "controller": "CAUCMIN5KSXEVZ7NMXR3LZATGD5EFIEUI5XWTFLYRO2R5OTXI22WE5JX",
+        "provenance": {
+          "recon": "docs/evidence/lot-xo/ (step-0 recon 2026-10-26, read-only simulations)",
+          "licence": "XOXNO/rs-lending-xlm is PolyForm Noncommercial \u2014 contracts read on-chain only, no code copied",
+          "hubNames": "hand-seeded (no on-chain hub-name view): Core / RWA / AMM",
+          "marketList": "pool ledger entries (\"Params\"/\"State\", HubAssetKey) = 25, cross-checked vs pool market|batch_params_update events and XOXNO public registry (0 diff)",
+          "tokenLabels": "SEP-41 symbol()/name()/decimals(); Aquarius LP tokens labelled by pair (they all answer POOL)"
+        },
+        "positionNft": "CAWCSG77AY2W24QZ6ZXLHZU4UXEFHZBM6EI4A4IF7JB5CTY4XND3TI6C",
+        "latestLedger": 65151068,
+        "reserveCount": 11,
+        "lastRefreshAt": "2026-10-26T18:58:45.952Z",
+        "priceAggregator": "CBGUF2G2Q7HCVCWYISDXBHPVBGMYNXA7PG2VET66YBZX6IKOOV27NSMV"
+      }
+    },
+    {
+      "venue_slug": "xoxno",
+      "slug": "xoxno-core-hub",
+      "name": "Core hub",
+      "entity_type": "lending_pool",
+      "contract_address": "CBXRNDQMAJFG4VUKMKFEMFS75UUXE2SPSNV4LEEFCSNBCN66PYRWBKXO",
+      "is_active": true,
+      "metadata": {
+        "pool": "CBXRNDQMAJFG4VUKMKFEMFS75UUXE2SPSNV4LEEFCSNBCN66PYRWBKXO",
+        "hubId": 1,
+        "source": "xoxno_bootstrap",
+        "hubName": "Core",
+        "markets": [
+          {
+            "name": "native",
+            "asset": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+            "symbol": "native",
+            "decimals": 7
+          },
+          {
+            "name": "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+            "asset": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+            "symbol": "USDC",
+            "decimals": 7
+          },
+          {
+            "name": "EURC:GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2",
+            "asset": "CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV",
+            "symbol": "EURC",
+            "decimals": 7
+          },
+          {
+            "name": "USDT0:GATISXX6BZ6NC7IKQBY37CJD4SOZL3CYZJWXEDG6JVIY4WBS6KXJHN6Q",
+            "asset": "CBSJZEIO5C7KC2SF3MKSNXXJSW5G3VTNBX4ATMKUI3B2MR4JKM4R26YF",
+            "symbol": "USDT0",
+            "decimals": 7
+          },
+          {
+            "name": "PYUSD:GDQE7IXJ4HUHV6RQHIUPRJSEZE4DRS5WY577O2FY6YQ5LVWZ7JZTU2V5",
+            "asset": "CCCRWH6Q3FNP3I2I57BDLM5AFAT7O6OF6GKQOC6SSJNDAVRZ57SPHGU2",
+            "symbol": "PYUSD",
+            "decimals": 7
+          },
+          {
+            "name": "Solv BTC",
+            "asset": "CBIJBDNZNF4X35BJ4FFZWCDBSCKOP5NB4PLG4SNENRMLAPYG4P5FM6VN",
+            "symbol": "SolvBTC",
+            "decimals": 8
+          },
+          {
+            "name": "xSolvBTC",
+            "asset": "CAUP7NFABXE5TJRL3FKTPMWRLC7IAXYDCTHQRFSCLR5TMGKHOOQO772J",
+            "symbol": "xSolvBTC",
+            "decimals": 8
+          }
+        ],
+        "appVersion": 1,
+        "controller": "CAUCMIN5KSXEVZ7NMXR3LZATGD5EFIEUI5XWTFLYRO2R5OTXI22WE5JX",
+        "provenance": {
+          "recon": "docs/evidence/lot-xo/ (step-0 recon 2026-10-26, read-only simulations)",
+          "licence": "XOXNO/rs-lending-xlm is PolyForm Noncommercial \u2014 contracts read on-chain only, no code copied",
+          "hubNames": "hand-seeded (no on-chain hub-name view): Core / RWA / AMM",
+          "marketList": "pool ledger entries (\"Params\"/\"State\", HubAssetKey) = 25, cross-checked vs pool market|batch_params_update events and XOXNO public registry (0 diff)",
+          "tokenLabels": "SEP-41 symbol()/name()/decimals(); Aquarius LP tokens labelled by pair (they all answer POOL)"
+        },
+        "positionNft": "CAWCSG77AY2W24QZ6ZXLHZU4UXEFHZBM6EI4A4IF7JB5CTY4XND3TI6C",
+        "latestLedger": 65151064,
+        "reserveCount": 7,
+        "lastRefreshAt": "2026-10-26T18:58:26.857Z",
+        "priceAggregator": "CBGUF2G2Q7HCVCWYISDXBHPVBGMYNXA7PG2VET66YBZX6IKOOV27NSMV"
+      }
+    },
+    {
+      "venue_slug": "xoxno",
+      "slug": "xoxno-rwa-hub",
+      "name": "RWA hub",
+      "entity_type": "lending_pool",
+      "contract_address": "CBXRNDQMAJFG4VUKMKFEMFS75UUXE2SPSNV4LEEFCSNBCN66PYRWBKXO",
+      "is_active": true,
+      "metadata": {
+        "pool": "CBXRNDQMAJFG4VUKMKFEMFS75UUXE2SPSNV4LEEFCSNBCN66PYRWBKXO",
+        "hubId": 2,
+        "source": "xoxno_bootstrap",
+        "hubName": "RWA",
+        "markets": [
+          {
+            "name": "CETES:GCRYUGD5NVARGXT56XEZI5CIFCQETYHAPQQTHO2O3IQZTHDH4LATMYWC",
+            "asset": "CAL6ER2TI6CTRAY6BFXWNWA7WTYXUXTQCHUBCIBU5O6KM3HJFG6Z6VXV",
+            "symbol": "CETES",
+            "decimals": 7
+          },
+          {
+            "name": "USTRY:GCRYUGD5NVARGXT56XEZI5CIFCQETYHAPQQTHO2O3IQZTHDH4LATMYWC",
+            "asset": "CBLV4ATSIWU67CFSQU2NVRKINQIKUZ2ODSZBUJTJ43VJVRSBTZYOPNUR",
+            "symbol": "USTRY",
+            "decimals": 7
+          },
+          {
+            "name": "USDY:GAJMPX5NBOG6TQFPQGRABJEEB2YE7RFRLUKJDZAZGAD5GFX4J7TADAZ6",
+            "asset": "CB3YA656OYIHU57657I5KGSBRHE5I3OZU4VFC22PYAOANFZHEWNYGAGP",
+            "symbol": "USDY",
+            "decimals": 7
+          },
+          {
+            "name": "STBL_USST - USST Token",
+            "asset": "CBZ4DCE7PYMUTOAKKUTRSUPT3FJFVOWCSKWUM5A72D6SAVMUJE5JN2PJ",
+            "symbol": "USST",
+            "decimals": 18
+          },
+          {
+            "name": "Matrixdock Gold",
+            "asset": "CC2RBGYNCFBCVENIDL5BFBWPH4OUZM2UA3OD2K2N54GLMWCC4KWPVAGO",
+            "symbol": "XAUM",
+            "decimals": 9
+          },
+          {
+            "name": "deJTRSY",
+            "asset": "CBI7UCH5KGSVQRO5H4SUCZUTZABCITZLRHQQZTWL2TK4RZ72TAR6IHRV",
+            "symbol": "deJTRSY",
+            "decimals": 18
+          },
+          {
+            "name": "deJAAA",
+            "asset": "CC64WBDGS6QQP22QTTIACYIXT3WF7BBQEYOQPLTP7GTKYY7PZ74QYGSL",
+            "symbol": "deJAAA",
+            "decimals": 18
+          }
+        ],
+        "appVersion": 1,
+        "controller": "CAUCMIN5KSXEVZ7NMXR3LZATGD5EFIEUI5XWTFLYRO2R5OTXI22WE5JX",
+        "provenance": {
+          "recon": "docs/evidence/lot-xo/ (step-0 recon 2026-10-26, read-only simulations)",
+          "licence": "XOXNO/rs-lending-xlm is PolyForm Noncommercial \u2014 contracts read on-chain only, no code copied",
+          "hubNames": "hand-seeded (no on-chain hub-name view): Core / RWA / AMM",
+          "marketList": "pool ledger entries (\"Params\"/\"State\", HubAssetKey) = 25, cross-checked vs pool market|batch_params_update events and XOXNO public registry (0 diff)",
+          "tokenLabels": "SEP-41 symbol()/name()/decimals(); Aquarius LP tokens labelled by pair (they all answer POOL)"
+        },
+        "positionNft": "CAWCSG77AY2W24QZ6ZXLHZU4UXEFHZBM6EI4A4IF7JB5CTY4XND3TI6C",
+        "latestLedger": 65151065,
+        "reserveCount": 7,
+        "lastRefreshAt": "2026-10-26T18:58:34.334Z",
+        "priceAggregator": "CBGUF2G2Q7HCVCWYISDXBHPVBGMYNXA7PG2VET66YBZX6IKOOV27NSMV"
+      }
     }
   ],
   "assets": [
@@ -662,6 +924,19 @@
       "logo_url": null,
       "metadata": {
         "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CDOY7ILRR7PDGLBXZUPSENB6XOET77PR2JY3HXDGQS3TS4T764OYBUGO",
+      "asset_type": "soroban_token",
+      "symbol": "AQUA-USDC-LP",
+      "name": "Aquarius LP AQUA/USDC",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "hubId": 3,
+        "source": "xoxno_bootstrap"
       }
     },
     {
@@ -686,6 +961,45 @@
       "logo_url": null,
       "metadata": {
         "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CB2WUVUP2SKZVFZFNU33EZCISH65DKHQP4WBEHJ4WE3BF7QOABYGCQMS",
+      "asset_type": "soroban_token",
+      "symbol": "CETES-USDC-LP",
+      "name": "Aquarius LP CETES/USDC",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "hubId": 3,
+        "source": "xoxno_bootstrap"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CC64WBDGS6QQP22QTTIACYIXT3WF7BBQEYOQPLTP7GTKYY7PZ74QYGSL",
+      "asset_type": "soroban_token",
+      "symbol": "deJAAA",
+      "name": "deJAAA",
+      "decimals": 18,
+      "logo_url": null,
+      "metadata": {
+        "hubId": 2,
+        "source": "xoxno_bootstrap"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CBI7UCH5KGSVQRO5H4SUCZUTZABCITZLRHQQZTWL2TK4RZ72TAR6IHRV",
+      "asset_type": "soroban_token",
+      "symbol": "deJTRSY",
+      "name": "deJTRSY",
+      "decimals": 18,
+      "logo_url": null,
+      "metadata": {
+        "hubId": 2,
+        "source": "xoxno_bootstrap"
       }
     },
     {
@@ -753,6 +1067,19 @@
     },
     {
       "chain": "stellar-mainnet",
+      "contract_address": "CD3EQXQGRYUKM7LZ6MZVTXSW74ROXU6YI2SXHJ6KTB5BQ425E5KXRDBC",
+      "asset_type": "soroban_token",
+      "symbol": "PYUSD-USDC-LP",
+      "name": "Aquarius LP PYUSD/USDC",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "hubId": 3,
+        "source": "xoxno_bootstrap"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
       "contract_address": "CBIJBDNZNF4X35BJ4FFZWCDBSCKOP5NB4PLG4SNENRMLAPYG4P5FM6VN",
       "asset_type": "soroban_token",
       "symbol": "SolvBTC",
@@ -791,6 +1118,19 @@
     },
     {
       "chain": "stellar-mainnet",
+      "contract_address": "CACO4IS27ANIDC45UN5LWTYZYEELSJWA3WVWGI6QAF6Q2ZY4ZMZFSJRW",
+      "asset_type": "soroban_token",
+      "symbol": "USDC-XAUM-LP",
+      "name": "Aquarius LP USDC/XAUM",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "hubId": 3,
+        "source": "xoxno_bootstrap"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
       "contract_address": "CB226ZOEYXTBPD3QEGABTJYSKZVBP2PASEISLG3SBMTN5CE4QZUVZ3CE",
       "asset_type": "soroban_token",
       "symbol": "USDGLO",
@@ -799,6 +1139,19 @@
       "logo_url": null,
       "metadata": {
         "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CBSJZEIO5C7KC2SF3MKSNXXJSW5G3VTNBX4ATMKUI3B2MR4JKM4R26YF",
+      "asset_type": "soroban_token",
+      "symbol": "USDT0",
+      "name": "USDT0:GATISXX6BZ6NC7IKQBY37CJD4SOZL3CYZJWXEDG6JVIY4WBS6KXJHN6Q",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "hubId": 1,
+        "source": "xoxno_bootstrap"
       }
     },
     {
@@ -815,6 +1168,32 @@
     },
     {
       "chain": "stellar-mainnet",
+      "contract_address": "CCYD4C2WFWIIDF235SCDXEWL5RT6S53WQWLDHUTQ5USZ5VNF5NHJGVW7",
+      "asset_type": "soroban_token",
+      "symbol": "USDY-USDC-LP",
+      "name": "Aquarius LP USDY/USDC",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "hubId": 3,
+        "source": "xoxno_bootstrap"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CBZ4DCE7PYMUTOAKKUTRSUPT3FJFVOWCSKWUM5A72D6SAVMUJE5JN2PJ",
+      "asset_type": "soroban_token",
+      "symbol": "USST",
+      "name": "STBL_USST - USST Token",
+      "decimals": 18,
+      "logo_url": null,
+      "metadata": {
+        "hubId": 2,
+        "source": "xoxno_bootstrap"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
       "contract_address": "CBLV4ATSIWU67CFSQU2NVRKINQIKUZ2ODSZBUJTJ43VJVRSBTZYOPNUR",
       "asset_type": "soroban_token",
       "symbol": "USTRY",
@@ -823,6 +1202,71 @@
       "logo_url": null,
       "metadata": {
         "source": "lib/protocols/blend/persist-pool-state"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CCLJBNY2KMUOSAW7URIZHREO5ORQREDX7NIHLFRAT6KAZ5GO7652OA4I",
+      "asset_type": "soroban_token",
+      "symbol": "USTRY-USDC-LP",
+      "name": "Aquarius LP USTRY/USDC",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "hubId": 3,
+        "source": "xoxno_bootstrap"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CC2RBGYNCFBCVENIDL5BFBWPH4OUZM2UA3OD2K2N54GLMWCC4KWPVAGO",
+      "asset_type": "soroban_token",
+      "symbol": "XAUM",
+      "name": "Matrixdock Gold",
+      "decimals": 9,
+      "logo_url": null,
+      "metadata": {
+        "hubId": 2,
+        "source": "xoxno_bootstrap"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CBOHAVUYKQD4C7FIVXEDJCVLUZYUO6RN3VIKEDOTIJGDDV3QN33Y4T4D",
+      "asset_type": "soroban_token",
+      "symbol": "XLM-AQUA-LP",
+      "name": "Aquarius LP XLM/AQUA",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "hubId": 3,
+        "source": "xoxno_bootstrap"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CAPPL34NF6X7M3EQFIPDXZHQX2PT3EOE2LYCDORH3PF2LTRDSFGWV6NL",
+      "asset_type": "soroban_token",
+      "symbol": "XLM-SolvBTC-LP",
+      "name": "Aquarius LP XLM/SolvBTC",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "hubId": 3,
+        "source": "xoxno_bootstrap"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CAVKLYY4RWFQBRA2YI5GTGGXKUKJQI3JLAHDGXMS7L5RDH6X6A47NMOZ",
+      "asset_type": "soroban_token",
+      "symbol": "XLM-USDC-LP",
+      "name": "Aquarius LP XLM/USDC",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "hubId": 3,
+        "source": "xoxno_bootstrap"
       }
     },
     {
@@ -836,6 +1280,19 @@
       "metadata": {
         "source": "aquarius_active_pool_assets",
         "generatedAt": "2026-03-20T18:13:52.451Z"
+      }
+    },
+    {
+      "chain": "stellar-mainnet",
+      "contract_address": "CDZ4QRNY63YKJY7FLBTJUVPX3Z3U56JY5KHNHQEYI5F5MYLMC5YNRIXE",
+      "asset_type": "soroban_token",
+      "symbol": "xSolvBTC-SolvBTC-LP",
+      "name": "Aquarius LP xSolvBTC/SolvBTC",
+      "decimals": 7,
+      "logo_url": null,
+      "metadata": {
+        "hubId": 3,
+        "source": "xoxno_bootstrap"
       }
     },
     {
@@ -1486,6 +1943,231 @@
       "role": "token1",
       "metadata": {
         "source": "lot-p-p1"
+      }
+    },
+    {
+      "entity_slug": "xoxno-amm-hub",
+      "asset_contract_address": "CACO4IS27ANIDC45UN5LWTYZYEELSJWA3WVWGI6QAF6Q2ZY4ZMZFSJRW",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 3,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-amm-hub",
+      "asset_contract_address": "CAPPL34NF6X7M3EQFIPDXZHQX2PT3EOE2LYCDORH3PF2LTRDSFGWV6NL",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 3,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-amm-hub",
+      "asset_contract_address": "CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 3,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-amm-hub",
+      "asset_contract_address": "CAVKLYY4RWFQBRA2YI5GTGGXKUKJQI3JLAHDGXMS7L5RDH6X6A47NMOZ",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 3,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-amm-hub",
+      "asset_contract_address": "CB2WUVUP2SKZVFZFNU33EZCISH65DKHQP4WBEHJ4WE3BF7QOABYGCQMS",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 3,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-amm-hub",
+      "asset_contract_address": "CBOHAVUYKQD4C7FIVXEDJCVLUZYUO6RN3VIKEDOTIJGDDV3QN33Y4T4D",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 3,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-amm-hub",
+      "asset_contract_address": "CCLJBNY2KMUOSAW7URIZHREO5ORQREDX7NIHLFRAT6KAZ5GO7652OA4I",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 3,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-amm-hub",
+      "asset_contract_address": "CCYD4C2WFWIIDF235SCDXEWL5RT6S53WQWLDHUTQ5USZ5VNF5NHJGVW7",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 3,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-amm-hub",
+      "asset_contract_address": "CD3EQXQGRYUKM7LZ6MZVTXSW74ROXU6YI2SXHJ6KTB5BQ425E5KXRDBC",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 3,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-amm-hub",
+      "asset_contract_address": "CDOY7ILRR7PDGLBXZUPSENB6XOET77PR2JY3HXDGQS3TS4T764OYBUGO",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 3,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-amm-hub",
+      "asset_contract_address": "CDZ4QRNY63YKJY7FLBTJUVPX3Z3U56JY5KHNHQEYI5F5MYLMC5YNRIXE",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 3,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-core-hub",
+      "asset_contract_address": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 1,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-core-hub",
+      "asset_contract_address": "CAUP7NFABXE5TJRL3FKTPMWRLC7IAXYDCTHQRFSCLR5TMGKHOOQO772J",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 1,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-core-hub",
+      "asset_contract_address": "CBIJBDNZNF4X35BJ4FFZWCDBSCKOP5NB4PLG4SNENRMLAPYG4P5FM6VN",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 1,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-core-hub",
+      "asset_contract_address": "CBSJZEIO5C7KC2SF3MKSNXXJSW5G3VTNBX4ATMKUI3B2MR4JKM4R26YF",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 1,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-core-hub",
+      "asset_contract_address": "CCCRWH6Q3FNP3I2I57BDLM5AFAT7O6OF6GKQOC6SSJNDAVRZ57SPHGU2",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 1,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-core-hub",
+      "asset_contract_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 1,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-core-hub",
+      "asset_contract_address": "CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 1,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-rwa-hub",
+      "asset_contract_address": "CAL6ER2TI6CTRAY6BFXWNWA7WTYXUXTQCHUBCIBU5O6KM3HJFG6Z6VXV",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 2,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-rwa-hub",
+      "asset_contract_address": "CB3YA656OYIHU57657I5KGSBRHE5I3OZU4VFC22PYAOANFZHEWNYGAGP",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 2,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-rwa-hub",
+      "asset_contract_address": "CBI7UCH5KGSVQRO5H4SUCZUTZABCITZLRHQQZTWL2TK4RZ72TAR6IHRV",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 2,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-rwa-hub",
+      "asset_contract_address": "CBLV4ATSIWU67CFSQU2NVRKINQIKUZ2ODSZBUJTJ43VJVRSBTZYOPNUR",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 2,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-rwa-hub",
+      "asset_contract_address": "CBZ4DCE7PYMUTOAKKUTRSUPT3FJFVOWCSKWUM5A72D6SAVMUJE5JN2PJ",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 2,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-rwa-hub",
+      "asset_contract_address": "CC2RBGYNCFBCVENIDL5BFBWPH4OUZM2UA3OD2K2N54GLMWCC4KWPVAGO",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 2,
+        "source": "lib/protocols/xoxno/persist-hub-state"
+      }
+    },
+    {
+      "entity_slug": "xoxno-rwa-hub",
+      "asset_contract_address": "CC64WBDGS6QQP22QTTIACYIXT3WF7BBQEYOQPLTP7GTKYY7PZ74QYGSL",
+      "role": "reserve",
+      "metadata": {
+        "hubId": 2,
+        "source": "lib/protocols/xoxno/persist-hub-state"
       }
     }
   ]

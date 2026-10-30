@@ -27,6 +27,12 @@ export type ReadResult =
   | { ok: true; value: unknown; latestLedger: number | null }
   | { ok: false; kind: ReadErrorKind; error: string };
 
+// Raw variant (Lot XO): the undecoded return value, for callers that decode by
+// XDR type themselves (struct-keyed maps, i128 kept as BigInt until scaled).
+export type RawReadResult =
+  | { ok: true; retval: xdr.ScVal | null; latestLedger: number | null }
+  | { ok: false; kind: ReadErrorKind; error: string };
+
 export type SorobanReaderOptions = {
   rpcUrl: string;
   sourceAccount: string;
@@ -88,7 +94,14 @@ export class SorobanReader {
   }
 
   /** Read-only simulation of `method(args)` on `contractId`; never throws. */
-  read(contractId: string, method: string, args: xdr.ScVal[] = []): Promise<ReadResult> {
+  async read(contractId: string, method: string, args: xdr.ScVal[] = []): Promise<ReadResult> {
+    const raw = await this.readRaw(contractId, method, args);
+    if (!raw.ok) return raw;
+    return { ok: true, value: raw.retval ? scValToNative(raw.retval) : null, latestLedger: raw.latestLedger };
+  }
+
+  /** Same as `read`, but returns the raw `xdr.ScVal` (no scValToNative); never throws. */
+  readRaw(contractId: string, method: string, args: xdr.ScVal[] = []): Promise<RawReadResult> {
     // Serialise every call on one chain so reads are strictly sequential.
     const run = this.queue.then(() => this.readSequential(contractId, method, args));
     this.queue = run.then(
@@ -98,7 +111,7 @@ export class SorobanReader {
     return run;
   }
 
-  private async readSequential(contractId: string, method: string, args: xdr.ScVal[]): Promise<ReadResult> {
+  private async readSequential(contractId: string, method: string, args: xdr.ScVal[]): Promise<RawReadResult> {
     let attempt = 0;
     for (;;) {
       await this.space();
@@ -132,7 +145,7 @@ export class SorobanReader {
     return this.sequence;
   }
 
-  private async simulateOnce(contractId: string, method: string, args: xdr.ScVal[]): Promise<ReadResult> {
+  private async simulateOnce(contractId: string, method: string, args: xdr.ScVal[]): Promise<RawReadResult> {
     let sequence: string;
     try {
       sequence = await this.loadSequence();
@@ -157,7 +170,7 @@ export class SorobanReader {
       const retval = success.result?.retval;
       return {
         ok: true,
-        value: retval ? scValToNative(retval) : null,
+        retval: retval ?? null,
         latestLedger: typeof success.latestLedger === 'number' ? success.latestLedger : null,
       };
     } catch (error) {

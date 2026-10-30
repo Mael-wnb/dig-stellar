@@ -171,6 +171,9 @@ async function main() {
     await persistProtocol(client, 'aquarius');
     await persistProtocol(client, 'stellar-native');
     await persistProtocol(client, 'defindex');
+    // Lot XO: without this row /v1/protocols shows null metrics and /health
+    // reports as_of = null for xoxno (silently never stale).
+    await persistProtocol(client, 'xoxno');
 
     await persistNetworkTvlSnapshot(client);
   } finally {

@@ -273,6 +273,11 @@ async function main() {
       const symbol = (asset.symbol ?? '').trim();
       const rule = PRICING_RULES_BY_SYMBOL[symbol] ?? PRICING_RULES_BY_SYMBOL[symbol.toUpperCase()];
       const ethUsd = resolved.get('ETH')?.priceUsd ?? null;
+      if (rule?.kind === 'external') {
+        // Lot XO: priced by a protocol-scoped external reader (xoxno-aggregator),
+        // not by this step — skipped silently, no row written here.
+        return { priceUsd: null, source: 'none', kind: 'none', metadata: { method: 'external_source', external: rule.source } };
+      }
       if (rule?.kind === 'derived') {
         return resolveDerived({ client, reader, rule, symbol, asset, bySymbol, resolved, now });
       }
@@ -317,6 +322,11 @@ async function main() {
       const symbol = (asset.symbol ?? '').trim();
       const out = resolved.get(symbol);
       if (!out) continue;
+
+      if (out.metadata.method === 'external_source') {
+        summary[symbol] = `external:${String(out.metadata.external)}`;
+        continue;
+      }
 
       console.log(`price source: ${symbol} ${out.kind} (${out.source}) => ${out.priceUsd ?? 'null'}${describeCrossCheck(out.metadata.crossCheck as never)}`);
       summary[symbol] = out.priceUsd === null ? 'null' : out.source;
