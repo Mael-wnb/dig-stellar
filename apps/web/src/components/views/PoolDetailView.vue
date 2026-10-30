@@ -44,6 +44,9 @@ const theme = computed(() => venueTheme(pool.value?.protocol?.id))
 const isLending = computed(() => pool.value?.type === 'lending_pool')
 const isVault = computed(() => pool.value?.type === 'yield_vault')
 const isNative = computed(() => pool.value?.protocol?.id === 'stellar-native')
+// Lot XO: the only lending action flow is the Blend deposit widget (vetted
+// Blend pool registry). Other lending protocols (XOXNO) are read-only here.
+const isBlend = computed(() => pool.value?.protocol?.id === 'blend')
 const isAmm = computed(() => !isLending.value && !isVault.value)
 
 function pct(v?: number | null): string {
@@ -131,6 +134,9 @@ const description = computed(() => {
     const u = underlyingSymbol(p)
     const asset = u ? displaySymbol(u) : 'a single asset'
     return `This DeFindex yield vault auto-compounds ${asset} into underlying Soroban strategies. Depositors earn a variable APY as the vault's share price grows. It does not swap or borrow, so it has no 24h volume or fees.`
+  }
+  if (isLending.value && p.protocol?.id === 'xoxno') {
+    return 'This XOXNO Lending hub groups isolated markets that share one pool contract. Supplied and borrowed amounts and the interest rates are read from the on-chain market views; TVL is the cash held in the pool for the hub\'s priced markets.'
   }
   if (isLending.value) {
     return "This lending pool lets users supply and borrow assets on Stellar's Soroban smart-contract platform. Interest rates adjust dynamically based on utilization."
@@ -391,12 +397,16 @@ const tvlCardTitle = computed(() =>
   tvlChart.value ? 'TVL (on-chain history)' : 'TVL & volume (30d)',
 )
 
-// The real action flow: lending → Blend deposit, AMM → SDEX swap. DeFindex
-// vaults have no swap/deposit widget yet, so their action is disabled ("soon").
+// The real action flow: Blend lending → Blend deposit, AMM → SDEX swap.
+// DeFindex vaults and non-Blend lending markets (XOXNO) have no widget yet, so
+// their action is disabled ("soon") — the Blend card would refuse the slug anyway.
 const actionKind = computed<'lending' | 'amm' | null>(() =>
-  isLending.value ? 'lending' : isVault.value ? null : 'amm',
+  isLending.value ? (isBlend.value ? 'lending' : null) : isVault.value ? null : 'amm',
 )
 const actionEnabled = computed(() => actionKind.value !== null)
+const actionDisabledTitle = computed(() =>
+  isLending.value ? 'Supply and withdraw for this protocol arrive in a later update' : 'Vault deposits arrive in a later update',
+)
 
 const actionLabel = computed(() =>
   isLending.value ? 'Supply / Withdraw' : isVault.value ? 'Deposit' : 'Swap / Provide',
@@ -483,7 +493,7 @@ function openAction() {
                   style="background: var(--dig-accent); color: #252525; border: none"
                   :style="{ opacity: actionEnabled ? 1 : 0.5 }"
                   :disabled="!actionEnabled"
-                  :title="actionEnabled ? '' : 'Vault deposits arrive in a later update'"
+                  :title="actionEnabled ? '' : actionDisabledTitle"
                   @click="openAction"
                 >
                   {{ actionLabel }}

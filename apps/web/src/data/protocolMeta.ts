@@ -31,4 +31,11 @@ export const PROTOCOL_META: Record<
     iconBg: '#221a10',
     logo: defindexLogo,
   },
+  // Lot XO: no bundled mark (monogram chip) until XOXNO provides an official one.
+  xoxno: {
+    icon: '◇',
+    iconColor: '#D04E92',
+    iconBg: '#33192a',
+    logo: '',
+  },
 }

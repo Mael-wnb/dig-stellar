@@ -19,6 +19,8 @@ const THEMES: Record<string, VenueTheme> = {
   soroswap: { tint: '#37231A', color: '#D86A3E', logo: soroswapLogo, letter: 'S' },
   'stellar-native': { tint: '#241633', color: '#7B45D6', logo: null, letter: 'N' },
   defindex: { tint: '#221A10', color: '#F59E0B', logo: defindexLogo, letter: 'D' },
+  // Lot XO: monogram chip until XOXNO provides an official mark (with permission).
+  xoxno: { tint: '#33192A', color: '#D04E92', logo: null, letter: 'X' },
 }
 
 const FALLBACK: VenueTheme = {
