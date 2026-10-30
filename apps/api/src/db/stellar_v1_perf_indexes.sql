@@ -1,0 +1,36 @@
+-- apps/api/src/db/stellar_v1_perf_indexes.sql
+--
+-- Perf (perf/pools-latency, 2026-10-30): read-path index for GET /v1/pools.
+-- Prod EXPLAIN (docs/evidence/perf-pools/) showed /v1/pools spending ~3.3 s in
+-- one parallel seq scan of normalized_events (2.87M rows, 1.7 GB heap vs
+-- 128 MB shared_buffers) on EVERY request, just to count 24h swaps per pool
+-- and decide swap-event coverage.
+--
+-- APPLY MANUALLY, OUTSIDE A TRANSACTION. `create index concurrently` refuses to
+-- run inside one, so never wrap this file in `psql -1` / `begin`:
+--
+--   docker exec -i dig_stellar_postgres psql -U dig -d dig_stellar \
+--     < apps/api/src/db/stellar_v1_perf_indexes.sql
+--
+-- Idempotent (`if not exists`). A concurrent build does two passes over the
+-- table and waits for in-flight writers, so run it right after a job:refresh
+-- run finishes (the sweep is */15, ~5-6 min) on the 1 vCPU VPS. Expected:
+-- ~1-3 min, ~45 MB (1.23M qualifying rows × 16 B uuid + 8 B timestamptz).
+--
+-- Partial index over swap/trade events only (~43% of normalized_events). The
+-- /v1/pools swap-count statement (stellar.service.ts, loadPoolsRaw) repeats
+-- this EXACT predicate text in its WHERE so the planner can prove the query
+-- implies the index predicate; the (entity_id, occurred_at desc) key then
+-- serves both the per-pool 24h count (range on occurred_at, index-only) and
+-- the coverage EXISTS (first entry for the entity, or none — a lending pool
+-- with no swap events costs one probe). Keep the predicate in sync with the
+-- service if either ever changes.
+--
+-- NB: no companion index for reserve_snapshots. The /v1/protocols latest-
+-- snapshot group-by cannot use a (entity_id, snapshot_at desc) index as
+-- written (no skip scan in Postgres 16), and a per-entity correlated rewrite
+-- falls into the planner's LIMIT-1 trap for entities without reserve rows;
+-- that endpoint is covered by the 90 s list cache instead.
+create index concurrently if not exists idx_normalized_events_swaps_entity_time
+  on normalized_events (entity_id, occurred_at desc)
+  where (event_key like '%:trade' or event_key like '%:swap');

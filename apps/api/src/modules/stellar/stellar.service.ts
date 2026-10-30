@@ -3,6 +3,16 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Asset, Networks } from '@stellar/stellar-sdk';
 import { PrismaService } from '../../db/prisma.service';
 import { freshPriceSql, computeFreshness } from '../../common/freshness';
+import { TtlCache, ttlMsFromEnv } from '../../common/ttl-cache';
+
+// perf/pools-latency (2026-10-30): the two list endpoints (/v1/pools,
+// /v1/protocols) read data that only changes on the */15 refresh sweep, yet
+// every dashboard/protocols mount (and three other web call sites) re-ran their
+// statements on a 1 vCPU box shared with the refresh job. Raw rows are cached
+// in-process for STELLAR_LIST_CACHE_TTL_MS (default 90 s; 0 disables); the
+// per-row freshness fields are still computed at read time, so `ageSeconds` /
+// `isStale` keep ticking on cache hits.
+const LIST_CACHE_TTL_MS = ttlMsFromEnv('STELLAR_LIST_CACHE_TTL_MS', 90_000);
 
 // Resolve a Horizon reserve asset ("native" or "CODE:ISSUER") to its Stellar
 // Asset Contract (SAC) id. stellar-native pools store reserves in Horizon
@@ -209,11 +219,56 @@ const FLOW_LEGACY_SOURCE_SQL = `
   coalesce(ne.metadata->>'source', '') <> '28-blend-events-scaled'
 `;
 
+type ProtocolAssetsByVenue = Map<
+  string,
+  { topAssets: Array<{ symbol: string | null; logoUrl: string | null; tvlUsd: number | null }>; assetCount: number }
+>;
+type ProtocolsRaw = { rows: ProtocolRow[]; assetsByVenue: ProtocolAssetsByVenue };
+
+type PoolTokensByEntity = Map<
+  string,
+  Array<{ assetId: string; symbol: string | null; logoUrl: string | null; role: string }>
+>;
+type PoolsRaw = {
+  rows: PoolListRow[];
+  swapsByEntity: Map<string, number>;
+  tokensByEntity: PoolTokensByEntity;
+};
+
 @Injectable()
 export class StellarService {
+  // Instance-scoped (the service is a Nest singleton, so process-wide in prod;
+  // per-instance in specs so tests never share state).
+  private readonly protocolsCache = new TtlCache<ProtocolsRaw>(LIST_CACHE_TTL_MS);
+  private readonly poolsCache = new TtlCache<PoolsRaw>(LIST_CACHE_TTL_MS);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async getProtocols() {
+    const { rows, assetsByVenue } = await this.protocolsCache.get('protocols', () =>
+      this.loadProtocolsRaw(),
+    );
+
+    return rows.map((row) => ({
+      id: row.slug,
+      name: row.name,
+      type: row.venue_type,
+      chain: row.chain,
+      logoUrl: row.logo_url ?? null,
+      tvlUsd: toNumber(row.tvl_usd),
+      volume24hUsd: toNumber(row.volume_24h_usd) ?? 0,
+      fees24hUsd: toNumber(row.fees_24h_usd) ?? 0,
+      avgSupplyApy: toNumber(row.avg_supply_apy),
+      avgBorrowApy: toNumber(row.avg_borrow_apy),
+      // Q4: top underlying assets by TVL + honest total count for "+N" chips.
+      topAssets: assetsByVenue.get(row.slug)?.topAssets ?? [],
+      assetCount: assetsByVenue.get(row.slug)?.assetCount ?? 0,
+      updatedAt: row.as_of,
+      ...freshnessFields(row.as_of),
+    }));
+  }
+
+  private async loadProtocolsRaw(): Promise<ProtocolsRaw> {
     const rows = (await this.prisma.$queryRawUnsafe(`
       select
         v.slug,
@@ -236,6 +291,15 @@ export class StellarService {
     // snapshot per entity × latest asset price). Additive — venues without
     // reserve snapshots (stellar-native keeps reserves in pool_snapshots
     // metadata) simply get an empty list, never a guessed one.
+    //
+    // perf/pools-latency: this `latest` group-by is a full scan of
+    // reserve_snapshots (~0.7 s in prod at 600k rows). Deliberately NOT
+    // rewritten to a per-entity correlated max: the planner's LIMIT-1 cost
+    // model prefers the time-ordered idx_reserve_snapshots_snapshot_at with an
+    // entity filter, and an active entity with no reserve rows (12 of 44 in
+    // prod) then walks the whole index — the same trap the /v1/pools EXISTS
+    // rewrite hit. The 90 s list cache absorbs it instead; see
+    // docs/evidence/perf-pools/ for the follow-up options.
     const assetRows = (await this.prisma.$queryRawUnsafe(`
       with latest as (
         select rs.entity_id, max(rs.snapshot_at) as snapshot_at
@@ -286,10 +350,7 @@ export class StellarService {
       order by venue_slug asc, rn asc
     `)) as ProtocolAssetRow[];
 
-    const assetsByVenue = new Map<
-      string,
-      { topAssets: Array<{ symbol: string | null; logoUrl: string | null; tvlUsd: number | null }>; assetCount: number }
-    >();
+    const assetsByVenue: ProtocolAssetsByVenue = new Map();
     for (const ar of assetRows) {
       const cur =
         assetsByVenue.get(ar.venue_slug) ??
@@ -304,26 +365,67 @@ export class StellarService {
       assetsByVenue.set(ar.venue_slug, cur);
     }
 
-    return rows.map((row) => ({
-      id: row.slug,
-      name: row.name,
-      type: row.venue_type,
-      chain: row.chain,
-      logoUrl: row.logo_url ?? null,
-      tvlUsd: toNumber(row.tvl_usd),
-      volume24hUsd: toNumber(row.volume_24h_usd) ?? 0,
-      fees24hUsd: toNumber(row.fees_24h_usd) ?? 0,
-      avgSupplyApy: toNumber(row.avg_supply_apy),
-      avgBorrowApy: toNumber(row.avg_borrow_apy),
-      // Q4: top underlying assets by TVL + honest total count for "+N" chips.
-      topAssets: assetsByVenue.get(row.slug)?.topAssets ?? [],
-      assetCount: assetsByVenue.get(row.slug)?.assetCount ?? 0,
-      updatedAt: row.as_of,
-      ...freshnessFields(row.as_of),
-    }));
+    return { rows, assetsByVenue };
   }
 
   async getPools(protocol?: string, sort?: string, order?: 'asc' | 'desc') {
+    // Cache key = the exact inputs that shape the SQL (filter + sort + order).
+    const cacheKey = `pools|${protocol ?? ''}|${sort ?? ''}|${order ?? ''}`;
+    const { rows, swapsByEntity, tokensByEntity } = await this.poolsCache.get(cacheKey, () =>
+      this.loadPoolsRaw(protocol, sort, order),
+    );
+
+    return rows.map((row) => {
+      // Honest 24h swaps: AMM pools with Soroban event coverage count from
+      // normalized_events; stellar-native (Horizon, no Soroban events) reads
+      // the indexer-computed trades24h from its metrics metadata — the same
+      // rule pool detail applies. Lending/vaults and uncovered pools stay
+      // null so the UI renders "—", never a fake zero.
+      const isAmm = row.protocol_type === 'amm' || row.entity_type === 'amm_pool';
+      let swaps24h: number | null = null;
+      if (isAmm) {
+        if (row.protocol_slug === 'stellar-native') {
+          const meta = (row.metrics_metadata ?? null) as { trades24h?: unknown } | null;
+          swaps24h = meta ? toNumber(meta.trades24h) : null;
+        } else {
+          swaps24h = swapsByEntity.get(row.entity_slug) ?? null;
+        }
+      }
+
+      return {
+        id: row.entity_slug,
+        name: row.entity_name,
+        type: row.entity_type,
+        protocol: {
+          id: row.protocol_slug,
+          name: row.protocol_name,
+          type: row.protocol_type,
+          logoUrl: row.protocol_logo_url ?? null,
+        },
+        chain: row.chain,
+        contractAddress: row.contract_address,
+        tokens: tokensByEntity.get(row.entity_slug) ?? [],
+        metrics: {
+          tvlUsd: toNumber(row.tvl_usd),
+          volume24hUsd: toNumber(row.volume_24h_usd) ?? 0,
+          fees24hUsd: toNumber(row.fees_24h_usd) ?? 0,
+          totalSuppliedUsd: toNumber(row.total_supplied_usd),
+          totalBorrowedUsd: toNumber(row.total_borrowed_usd),
+          supplyApy: toNumber(row.weighted_supply_apy),
+          borrowApy: toNumber(row.weighted_borrow_apy),
+          swaps24h,
+        },
+        updatedAt: row.as_of,
+        ...freshnessFields(row.as_of),
+      };
+    });
+  }
+
+  private async loadPoolsRaw(
+    protocol?: string,
+    sort?: string,
+    order?: 'asc' | 'desc',
+  ): Promise<PoolsRaw> {
     const params: unknown[] = [];
     // Always exclude inactive entities (e.g. archived Soroban contracts whose
     // on-chain reads 404). Pushed into conditions so it is part of the WHERE,
@@ -381,27 +483,43 @@ export class StellarService {
     )) as PoolListRow[];
 
     // 24h swap counts for the pools table (same source as pool detail / flows:
-    // normalized_events, ':trade'/':swap' keys). One grouped scan, per entity.
-    // swap_events_ever distinguishes "covered, genuinely 0 in 24h" (→ 0) from
-    // "events not ingested for this pool" (→ absent → null → UI dash).
+    // normalized_events, ':trade'/':swap' keys). swap_events_ever distinguishes
+    // "covered, genuinely 0 in 24h" (→ 0) from "events not ingested for this
+    // pool" (→ false → null → UI dash).
+    //
+    // perf/pools-latency (2026-10-30): the Lot Q version was ONE grouped scan
+    // of the whole normalized_events table (2.87M rows, ~3.3 s in prod, every
+    // request). Now driven from the ~44 active entities: per entity, a
+    // correlated 24h count and a coverage EXISTS. Both repeat the EXACT
+    // predicate text of the partial index
+    // idx_normalized_events_swaps_entity_time (stellar_v1_perf_indexes.sql)
+    // — `(ne.event_key like '%:trade' or ne.event_key like '%:swap')` — so
+    // the planner can match it; keep the two in sync. Without that index this
+    // statement degrades to 44 seq scans (60 s measured), so the index is a
+    // deploy prerequisite, not an optimisation.
     const swapRows = (await this.prisma.$queryRawUnsafe(`
       select
         e.slug as entity_slug,
-        count(*) filter (
-          where (ne.event_key like '%:trade' or ne.event_key like '%:swap')
+        (
+          select count(*)::int
+          from normalized_events ne
+          where ne.entity_id = e.id
+            and (ne.event_key like '%:trade' or ne.event_key like '%:swap')
             and ne.occurred_at >= now() - interval '24 hours'
-        )::int as swaps_24h,
-        count(*) filter (
-          where ne.event_key like '%:trade' or ne.event_key like '%:swap'
-        )::int as swap_events_ever
-      from normalized_events ne
-      join entities e on e.id = ne.entity_id
-      group by e.slug
+        ) as swaps_24h,
+        exists (
+          select 1
+          from normalized_events ne
+          where ne.entity_id = e.id
+            and (ne.event_key like '%:trade' or ne.event_key like '%:swap')
+        ) as swap_events_ever
+      from entities e
+      where e.is_active = true
     `)) as Array<{ entity_slug: string; swaps_24h: unknown; swap_events_ever: unknown }>;
 
     const swapsByEntity = new Map<string, number>();
     for (const sr of swapRows) {
-      if ((toNumber(sr.swap_events_ever) ?? 0) > 0) {
+      if (sr.swap_events_ever === true) {
         swapsByEntity.set(sr.entity_slug, toNumber(sr.swaps_24h) ?? 0);
       }
     }
@@ -425,15 +543,7 @@ export class StellarService {
       role: string;
     }>;
 
-    const tokensByEntity = new Map<
-      string,
-      Array<{
-        assetId: string;
-        symbol: string | null;
-        logoUrl: string | null;
-        role: string;
-      }>
-    >();
+    const tokensByEntity: PoolTokensByEntity = new Map();
 
     for (const row of tokenRows) {
       if (!tokensByEntity.has(row.entity_slug)) {
@@ -447,50 +557,7 @@ export class StellarService {
       });
     }
 
-    return rows.map((row) => {
-      // Honest 24h swaps: AMM pools with Soroban event coverage count from
-      // normalized_events; stellar-native (Horizon, no Soroban events) reads
-      // the indexer-computed trades24h from its metrics metadata — the same
-      // rule pool detail applies. Lending/vaults and uncovered pools stay
-      // null so the UI renders "—", never a fake zero.
-      const isAmm = row.protocol_type === 'amm' || row.entity_type === 'amm_pool';
-      let swaps24h: number | null = null;
-      if (isAmm) {
-        if (row.protocol_slug === 'stellar-native') {
-          const meta = (row.metrics_metadata ?? null) as { trades24h?: unknown } | null;
-          swaps24h = meta ? toNumber(meta.trades24h) : null;
-        } else {
-          swaps24h = swapsByEntity.get(row.entity_slug) ?? null;
-        }
-      }
-
-      return {
-        id: row.entity_slug,
-        name: row.entity_name,
-        type: row.entity_type,
-        protocol: {
-          id: row.protocol_slug,
-          name: row.protocol_name,
-          type: row.protocol_type,
-          logoUrl: row.protocol_logo_url ?? null,
-        },
-        chain: row.chain,
-        contractAddress: row.contract_address,
-        tokens: tokensByEntity.get(row.entity_slug) ?? [],
-        metrics: {
-          tvlUsd: toNumber(row.tvl_usd),
-          volume24hUsd: toNumber(row.volume_24h_usd) ?? 0,
-          fees24hUsd: toNumber(row.fees_24h_usd) ?? 0,
-          totalSuppliedUsd: toNumber(row.total_supplied_usd),
-          totalBorrowedUsd: toNumber(row.total_borrowed_usd),
-          supplyApy: toNumber(row.weighted_supply_apy),
-          borrowApy: toNumber(row.weighted_borrow_apy),
-          swaps24h,
-        },
-        updatedAt: row.as_of,
-        ...freshnessFields(row.as_of),
-      };
-    });
+    return { rows, swapsByEntity, tokensByEntity };
   }
 
   async getPoolDetail(poolSlug: string) {
