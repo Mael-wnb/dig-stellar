@@ -32,6 +32,7 @@ psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_ops_metrics.sql   # E2 (Lot E
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_ops_metrics_job.sql   # Lot RP (RP1): rpc_metrics_runs.job + methods — per-job, per-method RPC cost (apply BEFORE the RP1 indexer + api deploy)
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_bridge.sql   # T2-D3: Allbridge bridge_flows (then run the allbridge bootstrap once, below)
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_action_witness.sql   # R1 (Lot R, T3-D2): action_witnesses, verified execution witnesses (apply BEFORE deploying the R1 api)
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v1_perf_indexes.sql   # perf/pools-latency (2026-10-30): partial swap-event index for /v1/pools; concurrently → NEVER inside a transaction (no psql -1), apply BEFORE the api build
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v2_multiwallet.sql   # v2 wallets: user_wallets (+ T2-D1 is_active_signer + singleton index), snapshots, wallet_pool_health
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v3_alerting.sql   # D2 alerting (apply AFTER v1 + v2): alert_rules, alert_rule_state, notifications
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v4_faucet.sql   # R2 (Lot R, T3-D2): faucet_claims (money path, depends on action_witnesses); deploys dark (FAUCET_ENABLED unset)

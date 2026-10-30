@@ -449,6 +449,7 @@ psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stella
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_ops_metrics_job.sql   # Lot RP (RP1): rpc_metrics_runs.job ('refresh' | 'wallet-alert') + methods jsonb (apply BEFORE the RP1 indexer + api deploy)
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_bridge.sql   # T2-D3: Allbridge bridge_flows (then run the allbridge bootstrap once, below)
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_action_witness.sql   # R1 (Lot R, T3-D2): action_witnesses, verified execution witnesses (apply BEFORE deploying the R1 api)
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v1_perf_indexes.sql   # perf/pools-latency (2026-10-30): partial swap-event index for /v1/pools; `create index concurrently` → NEVER inside a transaction (no psql -1), run right after a job:refresh finishes
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v2_multiwallet.sql   # v2 wallets: user_wallets (+ T2-D1 is_active_signer + singleton index), snapshots, wallet_pool_health
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v3_alerting.sql   # D2 alerting (apply AFTER v1 + v2): alert_rules, alert_rule_state, notifications
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v4_faucet.sql   # R2 (Lot R, T3-D2): faucet_claims (money path, depends on action_witnesses); deploys dark (FAUCET_ENABLED unset)
@@ -468,7 +469,8 @@ fire-and-forget adoption inserts start failing silently),
 `stellar_v4_faucet.sql` + `stellar_v5_faucet_campaign2.sql` (Lot R/R2 faucet claims),
 `stellar_v6_campaign.sql` (Lot EP Earn & Points: points only, no key, deploys dark),
 `stellar_v7_social_claim_delete.sql` (Lot EP EP2: soft delete of social task claims, after v6),
-`stellar_v8_campaign_perks.sql` (Lot EP EP3: `wallet_perks`, non-monetary perks, after v6).
+`stellar_v8_campaign_perks.sql` (Lot EP EP3: `wallet_perks`, non-monetary perks, after v6),
+`stellar_v1_perf_indexes.sql` (perf/pools-latency: partial swap-event index; **concurrently, outside a transaction**, see below).
 Note: when a new table **or column** is added to one of these files (e.g. `network_stats_latest`
 in `stellar_v1_metrics.sql`, `bridge_flows` in `stellar_v1_bridge.sql`, or the T2-D1
 `is_active_signer` column + `user_wallets_one_signer_per_user` index, or the T2-D1 Gap B
@@ -497,6 +499,45 @@ psql "postgresql://dig:dig@localhost:5432/dig_stellar" -c "select * from user_wa
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" \
   -c "select user_wallet_id, asset_symbol, balance_usd, snapshot_at from wallet_balance_snapshots order by snapshot_at desc limit 20;"
 ```
+
+### /v1/pools latency: partial swap index + 90 s list cache (perf/pools-latency, 2026-10-30)
+Symptom: `GET /v1/pools` took 3.2 s at rest / 6.2 s during `job:refresh` on the 1 vCPU VPS;
+users saw protocol cards 2–3 s after load (both the dashboard and the protocols view derive
+their protocol list from `/v1/pools`). Cause: the Lot Q "24h swaps" statement aggregated the
+WHOLE `normalized_events` table (2.87M rows, 1.7 GB vs 128 MB `shared_buffers`) on every
+request. Evidence + plans: `docs/evidence/perf-pools/`.
+
+Fix (two parts, both required — the rewritten statement without the index is 44 seq scans):
+1. `apps/api/src/db/stellar_v1_perf_indexes.sql` — partial index
+   `idx_normalized_events_swaps_entity_time on normalized_events (entity_id, occurred_at desc)
+   where (event_key like '%:trade' or event_key like '%:swap')`. The API statement repeats that
+   exact predicate text; keep them in sync. Apply BEFORE deploying the api:
+   ```bash
+   # VPS — outside any transaction (plain psql autocommit, no -1); ~1-3 min, ~45 MB
+   docker exec -i dig_stellar_postgres psql -U dig -d dig_stellar < apps/api/src/db/stellar_v1_perf_indexes.sql
+   # If the build was interrupted it leaves an INVALID index: check, drop, re-run
+   docker exec -i dig_stellar_postgres psql -U dig -d dig_stellar -c "select indexrelid::regclass, indisvalid from pg_index where indexrelid = 'idx_normalized_events_swaps_entity_time'::regclass;"
+   # drop index concurrently idx_normalized_events_swaps_entity_time;   -- only if indisvalid = f
+   ```
+2. `/v1/pools` and `/v1/protocols` cache their raw rows in-process for
+   `STELLAR_LIST_CACHE_TTL_MS` (default 90000; `0` disables — set it in `apps/api/.env` and
+   `pm2 restart dig-stellar-api --update-env`). Freshness fields (`ageSeconds`, `isStale`) are
+   still computed per request, so a cached payload keeps ageing honestly. Concurrent misses share
+   one DB round-trip. Consequence to remember when validating a refresh: a list endpoint can lag
+   the DB by up to 90 s.
+
+Not done (deliberately): the `/v1/protocols` latest-reserve group-by (0.7 s full scan of
+`reserve_snapshots`) is left as is — a per-entity correlated `max()` rewrite falls into the
+planner's LIMIT-1 trap for active entities with no reserve rows (12 of 44 in prod), the same
+failure the first `/v1/pools` rewrite showed (60 s). It rides the cache. Follow-up options are
+listed in the evidence README.
+
+Check after deploy (from a laptop):
+```bash
+for i in 1 2 3; do curl -s -o /dev/null -w "/v1/pools %{time_starttransfer}s\n" https://stellar-api.getdig.ai/v1/pools; done
+curl -s -o /dev/null -w "/v1/protocols %{time_starttransfer}s\n" https://stellar-api.getdig.ai/v1/protocols
+```
+Expected: first call ≤ ~0.3 s (cold cache, index-driven), the next two ≤ ~0.1 s (cache hits).
 
 ---
 
