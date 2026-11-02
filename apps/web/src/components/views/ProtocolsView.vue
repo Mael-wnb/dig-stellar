@@ -8,6 +8,7 @@ import { useProtocol } from '../../composables/useProtocol'
 import { useMediaQuery } from '../../composables/useMediaQuery'
 import { useView } from '../../composables/useView'
 import { venueTheme } from '../../data/venueTheme'
+import { poolCountLabel, reserveTokenKey } from '../../data/protocolMeta'
 import { displayPoolName, displaySymbol, formatUsd, formatCount } from '../../utils/format'
 import type { PoolListItem, ProtocolAssetMark } from '../../types/protocol'
 import { fetchProtocols } from '../../api/protocols'
@@ -78,7 +79,7 @@ const KIND_LABEL: Record<PoolKind, string> = { lending: 'Lending', vault: 'Vault
 const protocolCards = computed(() => {
   interface Acc {
     id: string; name: string; kind: PoolKind; vtype: string; logoUrl: string | null; tvl: number; vol: number; fees: number
-    count: number; stale: boolean; topPool: string
+    count: number; markets: Set<string>; stale: boolean; topPool: string
     // TVL-weighted APY accumulators (only over pools where the metric applies).
     sApyW: number; sTvl: number; bApyW: number; bTvl: number
   }
@@ -89,7 +90,7 @@ const protocolCards = computed(() => {
     const tvl = p.metrics.tvlUsd ?? 0
     const cur =
       map.get(id) ??
-      { id, name: p.protocol.name, kind, vtype: p.protocol.type, logoUrl: p.protocol.logoUrl ?? null, tvl: 0, vol: 0, fees: 0, count: 0, stale: false, topPool: p.id, sApyW: 0, sTvl: 0, bApyW: 0, bTvl: 0 }
+      { id, name: p.protocol.name, kind, vtype: p.protocol.type, logoUrl: p.protocol.logoUrl ?? null, tvl: 0, vol: 0, fees: 0, count: 0, markets: new Set<string>(), stale: false, topPool: p.id, sApyW: 0, sTvl: 0, bApyW: 0, bTvl: 0 }
     cur.tvl += tvl
     if (kind === 'amm') {
       cur.vol += p.metrics.volume24hUsd ?? 0
@@ -100,6 +101,11 @@ const protocolCards = computed(() => {
     const ba = p.metrics.borrowApy
     if (ba != null && Number.isFinite(ba)) { cur.bApyW += ba * tvl; cur.bTvl += tvl }
     cur.count += 1
+    // Distinct reserve tokens across the protocol's pools (XOXNO "markets").
+    for (const t of p.tokens ?? []) {
+      const key = reserveTokenKey(t)
+      if (key) cur.markets.add(key)
+    }
     if (p.isStale === true) cur.stale = true
     // Track the highest-TVL pool as the card's click target.
     const curTop = pools.value.find((x) => x.id === cur.topPool)
@@ -140,6 +146,11 @@ const protocolCards = computed(() => {
         ...c,
         theme: venueTheme(c.id),
         typeLabel: venueTypeLabel(c.id, c.vtype, KIND_LABEL[c.kind]),
+        // "4 pools" / "3 hubs · 25 markets" per protocolMeta units. The tile
+        // beside the asset chips is too narrow for the market count, so it
+        // shows the short form ("3 hubs"); the table header uses the full one.
+        countLabel: poolCountLabel(c.id, c.count, c.markets.size),
+        tileCountLabel: poolCountLabel(c.id, c.count),
         metrics,
         assets,
         moreAssets,
@@ -216,6 +227,13 @@ function metricVal(p: PoolListItem, k: SortKey): number | null {
     case 'key': return keyMetric(p).sort
   }
 }
+
+// Table header count. On "All" it stays "N pools"; on a protocol tab it uses
+// that protocol's own unit (XOXNO: "3 hubs · 25 markets") from the same card.
+const tableCountLabel = computed(() => {
+  const card = filter.value === 'all' ? null : protocolCards.value.find((c) => c.id === filter.value)
+  return card ? card.countLabel : `${rows.value.length} pools`
+})
 
 // Fixed group order for the "All" key-metric sort — see rows() below.
 const KIND_ORDER: Record<PoolKind, number> = { lending: 0, amm: 1, vault: 2 }
@@ -387,7 +405,7 @@ function arrow(k: SortKey | null): string {
                 {{ c.name }}
                 <span v-if="c.stale" class="w-[7px] h-[7px] rounded-full" style="background: var(--dig-amber)" title="Some pools stale"></span>
               </div>
-              <div class="text-[12px]" style="color: var(--dig-faint)">{{ c.typeLabel }}, {{ c.count }} pools</div>
+              <div class="text-[12px]" style="color: var(--dig-faint)">{{ c.typeLabel }}, {{ c.tileCountLabel }}</div>
             </div>
             <!-- Q4: top underlying assets by TVL (circular, per Q1) + honest "+N" -->
             <div v-if="c.assets.length" class="flex items-center gap-[6px] flex-shrink-0">
@@ -432,7 +450,7 @@ function arrow(k: SortKey | null): string {
               {{ f.label }}
             </button>
           </div>
-          <span class="ml-auto text-[12px]" style="color: var(--dig-faint)">{{ rows.length }} pools</span>
+          <span class="ml-auto text-[12px]" style="color: var(--dig-faint)">{{ tableCountLabel }}</span>
         </div>
 
         <!-- AA2: below sm the reduced column set fits the viewport — no min

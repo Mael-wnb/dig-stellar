@@ -54,9 +54,10 @@ function pct(v?: number | null): string {
   return `${(v * 100).toFixed(2)}%`
 }
 
-function typeLabel(t?: string | null): string {
+function typeLabel(t?: string | null, protocolId?: string | null): string {
   if (t === 'amm_pool') return 'AMM'
-  if (t === 'lending_pool') return 'Lending market'
+  // Lot XO: an XOXNO Lending entity is a hub of isolated markets.
+  if (t === 'lending_pool') return protocolId === 'xoxno' ? 'Lending hub' : 'Lending market'
   if (t === 'yield_vault') return 'Yield vault'
   return t ?? '—'
 }
@@ -175,7 +176,7 @@ const onchain = computed(() => {
   if (!p) return []
   return [
     { label: 'Protocol', value: p.protocol?.name ?? '—', mono: false },
-    { label: 'Type', value: typeLabel(p.type), mono: false },
+    { label: 'Type', value: typeLabel(p.type, p.protocol?.id), mono: false },
     { label: 'Chain', value: p.chain ?? '—', mono: false },
     { label: 'Contract', value: shortAddr(p.contractAddress), mono: true },
     { label: 'Updated', value: formatDate(p.updatedAt), mono: false },
@@ -473,7 +474,7 @@ function openAction() {
               <div class="min-w-0">
                 <div class="text-[22px] font-bold tracking-[-0.02em] truncate">{{ pairName }}</div>
                 <div class="text-[13px]" style="color: var(--dig-faint)">
-                  {{ pool.protocol?.name }}, {{ typeLabel(pool.type) }}
+                  {{ pool.protocol?.name }}, {{ typeLabel(pool.type, pool.protocol?.id) }}
                 </div>
               </div>
               <div class="ml-auto flex gap-[8px]">

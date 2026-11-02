@@ -17,6 +17,7 @@ import { useBridge } from '../../composables/useBridge'
 import { useView } from '../../composables/useView'
 import { useModals } from '../../composables/useModals'
 import { venueTheme } from '../../data/venueTheme'
+import { poolCountLabel, reserveTokenKey } from '../../data/protocolMeta'
 import BrandLogo from '../common/BrandLogo.vue'
 import { formatUsd, formatPct, relativeTime } from '../../utils/format'
 
@@ -100,18 +101,25 @@ const statTiles = computed(() => [
 
 // ── protocol totals ──────────────────────────────────────────────────────────
 const protocolRows = computed(() => {
-  const map = new Map<string, { id: string; name: string; type: string; logoUrl: string | null; tvl: number; count: number; stale: boolean; topPool: string }>()
+  const map = new Map<string, { id: string; name: string; type: string; logoUrl: string | null; tvl: number; count: number; markets: Set<string>; stale: boolean; topPool: string }>()
   for (const p of pools.value) {
     const id = p.protocol.id
-    const cur = map.get(id) ?? { id, name: p.protocol.name, type: p.protocol.type, logoUrl: p.protocol.logoUrl ?? null, tvl: 0, count: 0, stale: false, topPool: p.id }
+    const cur = map.get(id) ?? { id, name: p.protocol.name, type: p.protocol.type, logoUrl: p.protocol.logoUrl ?? null, tvl: 0, count: 0, markets: new Set<string>(), stale: false, topPool: p.id }
     cur.tvl += p.metrics.tvlUsd ?? 0
     cur.count += 1
+    // Distinct reserve tokens across the protocol's pools (XOXNO "markets").
+    for (const t of p.tokens ?? []) {
+      const key = reserveTokenKey(t)
+      if (key) cur.markets.add(key)
+    }
     if (p.isStale === true) cur.stale = true
     const top = pools.value.find((x) => x.id === cur.topPool)
     if (!top || (p.metrics.tvlUsd ?? 0) > (top.metrics.tvlUsd ?? 0)) cur.topPool = p.id
     map.set(id, cur)
   }
-  return [...map.values()].sort((a, b) => b.tvl - a.tvl).map((c) => ({ ...c, theme: venueTheme(c.id) }))
+  return [...map.values()]
+    .sort((a, b) => b.tvl - a.tvl)
+    .map((c) => ({ ...c, theme: venueTheme(c.id), countLabel: poolCountLabel(c.id, c.count, c.markets.size) }))
 })
 
 // ── alerts summary (real notifications) ──────────────────────────────────────
@@ -253,7 +261,7 @@ const {
             {{ p.name }}
             <span v-if="p.stale" class="w-[7px] h-[7px] rounded-full" style="background: var(--dig-amber)" title="Some pools stale"></span>
           </div>
-          <div class="text-[12px]" style="color: var(--dig-faint)">{{ p.type }}, {{ p.count }} pools</div>
+          <div class="text-[12px]" style="color: var(--dig-faint)">{{ p.type }}, {{ p.countLabel }}</div>
         </div>
         <div class="ml-auto text-right">
           <div class="text-[14px] font-semibold tabular-nums">{{ formatUsd(p.tvl) }}</div>
