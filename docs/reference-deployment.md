@@ -70,6 +70,12 @@ Without `DEFINDEX_API_KEY` the summary shows 9/10 steps SUCCESS and `defindex` F
 the documented expected degradation (non-fatal, recorded in `refresh_step_runs`; the
 defindex card simply has no data until a key is provided).
 
+The API image also serves the public API contract: `pnpm -C apps/api run build` in the build
+stage copies `apps/api/openapi/openapi.v1.yaml` into `apps/api/dist/openapi/` (nest-cli assets),
+and the runtime stage copies `apps/api/dist` whole, so `GET /v1/openapi.json` and `GET /v1/docs`
+work in the container without any Dockerfile change (Lot API, 2026-11-03 — reasoned from the
+Dockerfile `COPY --from=build … /app/apps/api/dist`; the image was not rebuilt for this lot).
+
 Proof from a clean clone: `docs/evidence/lot-z/z1-compose-fresh-clone.md`.
 
 ---
@@ -190,6 +196,7 @@ curl -s localhost:3000/health          # status: ok, per-venue freshness, lastRe
 curl -s localhost:3000/v1/protocols    # aggregated protocol metrics
 curl -s localhost:3000/v1/ops/metrics  # E2: per-run RPC percentiles + error rates
 curl -s localhost:3000/v1/ops/adoption # E3: wallet + action-build counters
+curl -s localhost:3000/v1/openapi.json | jq .info.version   # Lot API: public contract, "1.0.0"
 ```
 
 ## Running a second stack side-by-side

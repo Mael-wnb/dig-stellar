@@ -541,6 +541,45 @@ Expected: first call ≤ ~0.3 s (cold cache, index-driven), the next two ≤ ~0.
 
 ---
 
+## Public API contract (Lot API, 2026-11-03)
+
+"Contract" = the HTTP API contract, never a smart contract. Source of truth:
+`apps/api/openapi/openapi.v1.yaml` (OpenAPI 3.1, hand-written, the only copy), served at
+`GET /v1/openapi.json` and rendered at `GET /v1/docs`. Rules and tiers:
+`docs/decisions/2026-11-03-public-api-v1-surface.md`; details: `docs/api/README.md`.
+
+**Changing the contract (any field, endpoint, description or example):**
+
+1. Edit the yaml. `stable` operations: **additive only** (new optional field, new endpoint);
+   removing or re-typing a field is breaking and goes to `/v2`. `beta` operations may change
+   shape. New keys on a `stable` response must be added to the schema, or the contract test
+   fails (strict schemas).
+2. Add one line to `docs/api/CHANGELOG.md` (every change, stable or beta). A `beta → stable`
+   move needs an update of the decision doc, not just the yaml.
+3. Run the contract test against a populated local Postgres:
+   ```bash
+   DATABASE_URL=postgresql://dig:dig@localhost:5432/dig_stellar pnpm -C apps/api test:contract
+   ```
+   Expected: every line `PASS`, final `N/N checks passed, 0 failed`. The quote checks need
+   outbound HTTPS to Horizon testnet.
+4. `pnpm -C apps/api build` and check `apps/api/dist/openapi/openapi.v1.yaml` exists (nest-cli
+   assets copy it; pm2 and the Docker image read the built copy).
+
+**Rule: `test:contract` runs before every API deploy** (it is in the pre-deploy checklist of
+`docs/deployment.md` "Lot API deploy sequence"). It is not in CI in this lot (Lot AD).
+
+**Bumping the Scalar pin** (`SCALAR_VERSION` in `apps/api/src/modules/openapi/docs-page.ts`,
+currently 1.76.4): read the CDN's current tag with
+`curl -s https://data.jsdelivr.com/v1/package/npm/@scalar/api-reference | jq -r .tags.latest`,
+set the constant, rebuild, open `/v1/docs` from the built dist and check it renders, add a
+CHANGELOG line.
+
+Both routes sit under the existing nginx `location /v1/` (zone `api_general`) and answer
+`Cache-Control: public, max-age=3600` plus a route-local `Access-Control-Allow-Origin: *`;
+no nginx change and no change to the global CORS policy.
+
+---
+
 ## Ops endpoints (Lot E, T3-D3)
 
 Public read-only observability: no auth, and they must never leak secrets, env values or

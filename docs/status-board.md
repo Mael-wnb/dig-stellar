@@ -369,7 +369,20 @@ with; the tables and notes below are kept as the historical record of how each c
   served old code (pulled, not rebuilt — caught by the `/health` version check; Lot AD input).
   Evidence: `docs/evidence/hotfix-lending-supplied-side/`. No SCF criterion involved. Surfaced
   by the Lot LM L0 recon.
-- Last updated: 2026-09-28
+- Post-grant note (2026-11-03, Lot API): **public API contract built, VPS deploy pending
+  founder-side.** The read-only data-and-signals tier of `apps/api` now has a published HTTP
+  contract: a hand-written OpenAPI 3.1 document (`apps/api/openapi/openapi.v1.yaml`, 15
+  operations — 9 `stable`, 6 `beta`) served at `GET /v1/openapi.json`, a Scalar reference
+  page at `GET /v1/docs` (CDN pinned to 1.76.4), and `pnpm -C apps/api test:contract`, which
+  boots the real app and validates every operation and the documented error paths with ajv
+  (40/40 locally). Positioning: the API is a data and signals layer for agents, bots,
+  dashboards and researchers; execution stays in the Dig app, and wallet-scoped data, action
+  builders, faucet, auth/campaign and the legacy prefix-less routes stay out of the public
+  spec. Zero edits to existing services or controllers; one runtime dependency (`yaml`).
+  Decision: `docs/decisions/2026-11-03-public-api-v1-surface.md`; evidence
+  `docs/evidence/lot-api/`; deploy per `docs/deployment.md` "Lot API deploy sequence" (API
+  first, the web sidebar link on its own branch after). No SCF criterion involved.
+- Last updated: 2026-11-03
 
 ---
 

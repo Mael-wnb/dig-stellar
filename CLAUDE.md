@@ -98,8 +98,8 @@ Bottom line: **`/v1/*` + raw SQL = the real product. Prisma `Protocol/Venue/Snap
 `docs/data-model.md` and `docs/repo-structure.md` still present the Prisma schema as canonical;
 they are being corrected — trust this block until they are.
 
-Also note: `GET /v1/network/stats` (`NetworkController`) hits external APIs live (CoinGecko,
-DefiLlama, stellar.expert, Horizon) with no DB persistence or freshness — a T1-D2 concern, not T1-D1.
+Also note: `GET /v1/network/stats` (`NetworkController`) is DB-backed: it reads `network_stats_latest`
+(written by indexer step `73-network-stats-refresh` on `job:refresh`) and makes no external call at request time.
 
 ---
 

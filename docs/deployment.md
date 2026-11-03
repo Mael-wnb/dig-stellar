@@ -420,6 +420,61 @@ Rollback: `update entities set is_active = false where slug like 'xoxno-%'` remo
 from the refresh and the API on the next tick (the venue row and snapshots stay); the API and
 web changes are backward compatible.
 
+## Lot API deploy sequence (public API contract, Nov 2026)
+
+API only. **No SQL to apply, no nginx change**: `GET /v1/openapi.json` and `GET /v1/docs` fall
+under the existing `location /v1/` (zone `api_general`), and the global CORS policy is untouched
+(the two routes add a route-local `Access-Control-Allow-Origin: *`). One new **runtime**
+dependency (`yaml`), so `pnpm install` is not optional. The web change (sidebar link to
+`/v1/docs`) comes AFTER, on its own branch, once the VPS serves the page.
+
+**(a) Pre-deploy checklist (local, on the commit to deploy):**
+
+```bash
+pnpm -C apps/api build
+pnpm -C apps/api test                                   # 387 passed / 43 skipped at the time of the lot
+DATABASE_URL=postgresql://dig:dig@localhost:5432/dig_stellar pnpm -C apps/api test:contract
+#   -> every line PASS, "N/N checks passed, 0 failed" (40/40 at the time of the lot)
+ls apps/api/dist/openapi/openapi.v1.yaml                # the built copy pm2 will read
+```
+
+**(b) Push:**
+
+```bash
+git push origin main && git push public-origin main
+```
+
+**(c) VPS — API:**
+
+```bash
+cd /root/dig-stellar
+git pull origin main            # the VPS clone's only remote is `origin` (see the Lot ST note)
+pnpm install                    # new runtime dependency: yaml
+pnpm -C apps/api build
+ls apps/api/dist/openapi/       # must list openapi.v1.yaml — if not, stop: the build did not copy the asset
+GIT_SHA=$(git -C /root/dig-stellar rev-parse --short HEAD) pm2 restart dig-stellar-api --update-env
+pm2 save
+```
+
+**(d) Verify:**
+
+```bash
+curl -s https://stellar-api.getdig.ai/v1/openapi.json | jq .info.version
+#   -> "1.0.0"
+curl -sI https://stellar-api.getdig.ai/v1/docs | egrep -i '^(HTTP|Content-Type|Cache-Control|Access-Control-Allow-Origin)'
+#   -> 200 · text/html; charset=utf-8 · public, max-age=3600 · *
+curl -s https://stellar-api.getdig.ai/health | jq .version      # = the deployed short SHA
+```
+
+Then open `https://stellar-api.getdig.ai/v1/docs` in a browser: the page must render the
+"Dig Stellar API v1.0.0" reference (Scalar 1.76.4 from the CDN). Capture it into
+`docs/evidence/lot-api/` (the local capture is `api3-docs-page.png`).
+
+**(e) Web, later and separately:** sidebar link to `/v1/docs` on its own branch; nothing in
+the web depends on this deploy.
+
+---
+
 ## Campaign cron line (Lot EP, EP3)
 
 A third OS-cron line (`job:campaign`, every 15 min at minutes 3/18/33/48, lock

@@ -60,11 +60,22 @@ apps/api/src/
     │                               wallet_pool_health)
     │                               On refresh: spawns 80-stellar-wallet-balance-snapshots.ts,
     │                               then (non-fatal) 81-stellar-wallet-blend-positions.ts
-    └── network/
-        ├── network.controller.ts   GET /v1/network/stats
-        └── network.service.ts      NO database access; fetches external APIs live:
-                                    CoinGecko, api.llama.fi, stablecoins.llama.fi,
-                                    api.stellar.expert, horizon.stellar.org/fee_stats
+    ├── network/
+    │   ├── network.controller.ts   GET /v1/network/stats  /v1/network/tvl-series
+    │   └── network.service.ts      Reads: raw SQL v1 (network_stats_latest, network_tvl_snapshots);
+    │                               no external call at request time
+    └── openapi/                    Lot API — public HTTP contract (no DB)
+        ├── openapi-document.ts     Loads apps/api/openapi/openapi.v1.yaml (dist/openapi first)
+        ├── openapi.controller.ts   GET /v1/openapi.json  /v1/docs
+        ├── docs-page.ts            Static HTML, Scalar API Reference (CDN, pinned)
+        └── openapi.module.ts
+
+apps/api/openapi/openapi.v1.yaml          Public API contract (OpenAPI 3.1), SOURCE OF TRUTH;
+                                          copied to dist/openapi/ by `nest build` (nest-cli assets)
+apps/api/test/contract/run-contract-test.ts   `pnpm -C apps/api test:contract`: boots the real
+                                          AppModule, validates every operation with ajv (needs DATABASE_URL)
+docs/api/                                 README (where the contract lives, how to validate, example
+                                          capture, Scalar pin) + CHANGELOG (one line per change)
 ```
 
 ### API controller → schema mapping
@@ -75,7 +86,8 @@ apps/api/src/
 | `/v1/protocols` | StellarController | **Raw SQL v1**: `venues`, `protocol_metrics_latest` |
 | `/v1/pools`, `/v1/pools/:slug` | StellarController | **Raw SQL v1**: `entities`, `venues`, `pool_metrics_latest`, `reserve_snapshots`, `asset_prices`, `normalized_events`, `entity_assets`, `assets` |
 | `/v1/wallets/*` | WalletsController | **Raw SQL v2**: `user_wallets`, `wallet_balance_snapshots`, `wallet_protocol_positions`, `wallet_pool_health` (the latter two via `/:id/positions` + the overview `defi` block) |
-| `/v1/network/stats` | NetworkController | **No DB**: external HTTP only |
+| `/v1/network/stats`, `/v1/network/tvl-series` | NetworkController | **Raw SQL v1**: `network_stats_latest`, `network_tvl_snapshots` |
+| `/v1/openapi.json`, `/v1/docs` | OpenApiController | **No DB**: `apps/api/openapi/openapi.v1.yaml` parsed at boot |
 
 ---
 

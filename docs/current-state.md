@@ -265,6 +265,18 @@ trusting the client) and records it in `action_witnesses` — see §8. `/v1/fauc
 `/v1/ops/metrics` gained a `faucet` drain-visibility block (claim counts, remaining, treasury
 spendable — never the treasury address).
 
+**Public API contract (Lot API, 2026-11-03 — built on `feat/lot-api`, VPS deploy pending).**
+The read-only public tier (`/health`, `/v1/protocols`, `/v1/pools*`, `/v1/network/*`, `/v1/bridge/*`,
+`/v1/ops/*`, `POST /v1/actions/sdex/quote` — 15 operations, 9 `stable` / 6 `beta`) is described by a
+hand-written OpenAPI 3.1 document, `apps/api/openapi/openapi.v1.yaml`, the single source of truth,
+copied into `dist/openapi/` at build. A new `modules/openapi/` serves it at `GET /v1/openapi.json`
+and renders it at `GET /v1/docs` (Scalar via CDN, pinned). `pnpm -C apps/api test:contract`
+(`test/contract/run-contract-test.ts`) boots the real `AppModule` against a local Postgres and
+validates every operation plus the documented 400/403/404/422 paths with ajv; stable schemas reject
+undocumented keys. Not in CI (Lot AD); it is a pre-deploy checklist step. Wallets, alerts, action
+builders, faucet, auth/campaign and the legacy prefix-less routes are deliberately outside the
+public contract (`docs/decisions/2026-11-03-public-api-v1-surface.md`, `docs/api/`).
+
 Partial / weak: on `/v1/network/stats`: two fields (`activeWallets`, `dexVolume24hUsd`) come back `null`
 because the stellar.expert summary endpoint returns 404 — a pre-existing source issue (already null in
 the old live-fetch code), not a regression; minor debt.
