@@ -1,5 +1,7 @@
 # EP3 — dark deploy to the VPS, then activation (prepared 2026-10-21) — NOT EXECUTED
 
+> **2026-11-03 (Lot PRE):** the `GET /v1/campaign/metrics` checks below now need `-H "Authorization: Bearer $OPS_METRICS_TOKEN"` (404 without it) and the `#status` "Campaign metrics" section no longer exists. See `docs/runbooks.md` "Internal campaign metrics". The text below is the state at delivery.
+
 Scope: the production deploy of Lot EP3 (perks, campaign metrics, status section, v8) — API on
 the VPS, web on Vercel — with the campaign STILL DARK, followed by a separate activation section
 the founder runs on the chosen day. Same shape as `ep2-deploy.md`. Fill every output cell from

@@ -1,5 +1,7 @@
 # EP0 — Earn & Points: read-only recon (2026-10-15)
 
+> **2026-11-03 (Lot PRE):** the recon's "public like `/v1/ops/*`" choice for `GET /v1/campaign/metrics` was reversed — the route is operator-gated (`OPS_METRICS_TOKEN`) and the `#status` block is retired. `docs/security-invariants.md` §7 amendment.
+
 Scope: establish, from the code at `6ee8721` (main), what exists today for wallet identity,
 action recording, the faucet's anti-abuse logic, the DB, the web shell, the jobs and the
 analytics, and derive the smallest credible plan for an in-app points campaign ("Earn"

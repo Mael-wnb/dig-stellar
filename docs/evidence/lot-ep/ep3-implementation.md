@@ -1,5 +1,7 @@
 # EP3 — perks, campaign metrics, cron and activation: implementation evidence (2026-10-21)
 
+> **2026-11-03 (Lot PRE):** `GET /v1/campaign/metrics` is no longer public — it is gated behind the operator token `OPS_METRICS_TOKEN` (404 otherwise) and the `#status` "Campaign metrics" section is retired. See `docs/evidence/lot-pre/pre1-fixes.md`. The text below describes the state at delivery.
+
 Scope: what EP3 delivers on `feat/lot-ep3` (uncommitted at the time of writing; the founder
 commits) and the local runs that exercised it. Points only: no payout, no token, no new key.
 Not deployed anywhere; the campaign is dark in prod (`CAMPAIGN_ENABLED` unset) and the cron line

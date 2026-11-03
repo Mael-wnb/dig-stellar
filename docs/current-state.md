@@ -13,10 +13,21 @@ clarity over optimism — this file improves decision quality, not morale.
 
 ## Overall project state
 
+**Lot PRE — pre-dossier fixes (2026-11-03, built on `feat/lot-pre`, not deployed).** Four visible
+defects fixed before the SCF 46 window: (A) the dashboard bridge section and the `allbridge`
+refresh step are retired — Allbridge Core wound down upstream; `bridge_flows`, `/v1/bridge/*` and
+the adapter stay as a historical record (last flow 2026-07-19); (B) the pool-detail TVL panel shows
+a plain "TVL history not available" state on non-lending pools and cites a "since" date only from
+the series' own first day, never the refresh tick; (C) the indexer fetches the Horizon
+source-account sequence once per step process (local run: 274 → 39 Horizon calls per refresh, one
+sequential lookup per pool process instead of parallel bursts — the cause of the amber Horizon bar
+on `#status`); (D) `GET /v1/campaign/metrics` answers 404 without the
+operator token (`OPS_METRICS_TOKEN`) and the campaign block left `#status`.
+
 Dig Stellar is a live production beta: a frontend on real Mainnet data (`stellar.getdig.ai`), a
 dedicated backend API façade, an indexer ingesting five protocols across Horizon, Soroban and the
 DeFindex API on a 15-minute cron, grouped multi-wallet portfolio with the active-signer model,
-in-app alerting, bridge-flow monitoring, and a non-custodial transaction builder with swaps and
+in-app alerting, a bridge-flow API kept as a historical record (Lot PRE), and a non-custodial transaction builder with swaps and
 Blend supply/withdraw executed and Horizon-verified on Mainnet.
 
 **SCF #43 is COMPLETE — all four tranches validated and paid.** Tranche 2 (20%, MVP): late July
@@ -34,7 +45,8 @@ ownership proof by signed message (`/v1/auth/*`, public-key verification only), 
 Horizon-verified action points through the award job (`job:campaign`), daily streaks, self-declared
 social tasks, referrals, a public leaderboard (shortened addresses), non-monetary perk tiers
 (`wallet_perks`: early access 100 / beta features 500 / priority RWA 1500), and
-`GET /v1/campaign/metrics` with an explicit boundary string shown on `#status`. Schema v6/v7/v8.
+`GET /v1/campaign/metrics` with an explicit boundary string (operator-gated since Lot PRE; the
+`#status` block is retired). Schema v6/v7/v8.
 In prod the campaign answers `campaign-disabled` until the founder sets `CAMPAIGN_STARTS_AT` +
 `CAMPAIGN_ENABLED` (`docs/runbooks.md` "Activate the campaign"); EP3 code and the cron line are
 not deployed yet (`docs/evidence/lot-ep/ep3-deploy.md`). Honesty rule for later reporting: every
@@ -291,6 +303,11 @@ two missing fields; (3) return a clean 400 instead of 500 when an action body is
 
 ## 3. Indexer / data layer — `apps/indexer`
 
+**Lot PRE (2026-11-03):** `job:refresh` no longer runs the `allbridge` step (step 8 retired;
+network stats is step 8, ops persist step 9); the adapter and bootstrap remain in the tree. The
+Horizon source-account sequence used by every Blend / Soroswap / Aquarius simulation is fetched
+once per step process (`scripts/discovery/00-common.ts`), not once per read.
+
 **Substantially advanced and already powering the product.** Runner: tsx.
 
 Working: Horizon + Soroban ingestion; protocol adapters in `lib/protocols/`; canonical refresh chain
@@ -478,6 +495,12 @@ Out of scope: wallet positions (XO-2 — one wallet holds many Position NFTs), a
 ---
 
 ## 6. Data freshness / reliability
+
+**Lot PRE (2026-11-03):** the `#status` Horizon bar had been amber on ~84 % of the 24h segments
+(0–8 errors per run at ~0.8 % error rate, availability 100 %): public Horizon throttling the
+~290 identical `GET /accounts/<source>` per refresh. Fixed at the source (sequence cached per step
+process); the amber rule itself is unchanged. Allbridge: `/health` lists the venue with `asOf:
+null` permanently; the step is gone, so no `step:allbridge` row after the 24h window.
 
 **First-class as of T3-D1 Lot B — live in prod since Aug 4.**
 
@@ -762,6 +785,11 @@ misconfig): `docs/evidence/lot-r2/testnet-e2e.md`.
 ---
 
 ## 9. Deployment / operations
+
+**Lot PRE (2026-11-03):** one new env var on the VPS, `OPS_METRICS_TOKEN` (random, `openssl rand
+-hex 32`, never in git), gating `GET /v1/campaign/metrics` (404 without it). Deploy sequence in
+`docs/deployment.md` "Lot PRE deploy sequence"; the web deploys from the same push and is
+compatible with either API version.
 
 **Real and operational, not yet fully matured.** Public beta live: `apps/web` on Vercel
 (`stellar.getdig.ai`), `apps/api` on a DigitalOcean VPS behind nginx + PM2

@@ -276,6 +276,15 @@ An honest statement of what protects the user-scoped API during the beta:
   transparency; adoption counters are citable KPI evidence. Their payloads are
   verified to contain no secrets, env values or internal URLs; they do reveal
   aggregate usage levels, which is accepted.
+- **Amendment (Lot PRE, 2026-11-03): campaign KPIs are internal.** `GET /v1/campaign/metrics`
+  (Earn & Points counts: wallets registered / proven / enrolled, verified actions, points
+  issued, perks granted) is no longer public: it answers **404** unless the request carries
+  `Authorization: Bearer <OPS_METRICS_TOKEN>` and the env var is set (`common/ops-token.guard.ts`:
+  constant-time compare, 404 never 403, `Cache-Control: no-store`, neither header nor token ever
+  logged). The token is a random operator string, not a key: it cannot sign and is not reachable
+  from any signing path (§1 and §9 unchanged); it lives only in the VPS env and the founder's
+  password manager. The `#status` campaign block that read the route is retired. `/v1/ops/status`,
+  `/v1/ops/metrics` and `/v1/ops/adoption` **stay public** as decided above.
 
 ## 8. Review process
 

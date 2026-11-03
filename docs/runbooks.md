@@ -351,8 +351,8 @@ Then, in this order:
    ```bash
    curl -s https://stellar-api.getdig.ai/v1/campaign | jq '{active, reason, startsAt, repost: .rules.socialTasks["x-repost"]}'
    # expect active:true, startsAt = the instant, repost.available = true with the URL
-   curl -s https://stellar-api.getdig.ai/v1/campaign/metrics | jq '{active, dark, window, walletsEnrolled}'
-   # expect active:true, dark:false, the window, every count 0 on day one
+   curl -s -H "Authorization: Bearer $OPS_METRICS_TOKEN" https://stellar-api.getdig.ai/v1/campaign/metrics | jq '{active, dark, window, walletsEnrolled}'
+   # expect active:true, dark:false, the window, every count 0 on day one (operator token, Lot PRE)
    ```
 4. Run the job by hand once more and read the summary line (now the live path):
    ```bash
@@ -360,8 +360,9 @@ Then, in this order:
    # expect: window … / actions candidates=0 awarded=0 … / referrals … / perks wallets=0 granted=0 / summary …
    ```
 5. No web redeploy is needed: the web polls `GET /v1/campaign` (60 s), so the Earn nav entry,
-   the `#earn` view, the "+N pts" chips and the `#status` "Campaign metrics" section appear on
-   every open tab at its next refresh. Open https://stellar.getdig.ai in a fresh tab and check
+   the `#earn` view and the "+N pts" chips appear on every open tab at its next refresh (the
+   former `#status` "Campaign metrics" section was retired in Lot PRE; read the KPIs with the
+   operator token, see "Internal campaign metrics"). Open https://stellar.getdig.ai in a fresh tab and check
    the sidebar shows "Earn".
 
 To pause: set `CAMPAIGN_ENABLED=false`, restart with `--update-env`; every surface hides within
@@ -590,14 +591,40 @@ internal URLs (targets/steps are fixed internal labels; `version` is the short G
   the product reads), `lastRefreshAt` (max `as_of` in `network_tvl_snapshots`). Always HTTP 200
   with a readable `status`: `degraded` when the DB errors or any venue is stale; HTTP 503 only
   when the DB itself is unreachable.
-  **Known expected-dormant venue: `allbridge` (`asOf: null` / stale is NOT an indexer bug).**
-  Allbridge Core has been paused since the 2026-07-20 Solana flash-loan exploit (~$1.65M, their
-  second since 2023; LPs urged to withdraw; no relaunch announced as of 2026-08-20) — there are
-  simply no bridge events to ingest. The dashboard bridge card frames this honestly as an
-  upstream pause (self-clearing banner). If Allbridge relaunches, this note is the trigger to
-  re-enable freshness expectations for the venue.
+  **Known retired venue: `allbridge` (`asOf: null` is permanent and by design, not an indexer bug).**
+  Allbridge Core wound down upstream after 2026-07-20 (the operator announced that Core and
+  Classic stop operating in their current form, with a successor product, "Allbridge Next"); the
+  adapter listens to the Core contracts, so no new flow can arrive. Since Lot PRE (2026-11-03)
+  the `allbridge` step is no longer in `job:refresh` and the dashboard bridge section is retired.
+  What stays: the venue row (so `/health` and `/v1/protocols` list it, TVL null), `bridge_flows`
+  (last recorded flow 2026-07-19), `/v1/bridge/*` serving that data as a historical record, the
+  adapter under `apps/indexer/src/lib/protocols/allbridge/` and its bootstrap. Reintegration is a
+  new adapter for Allbridge Next, only if it ships Stellar contracts that emit events; nothing
+  here is "re-enabled" by flipping a flag.
 - `GET /v1/ops/metrics`: refresh-pipeline RPC latency + error rates over a 24h window, from
   `rpc_metrics_runs` / `refresh_step_runs` (written by 71 at end of each `job:refresh`).
+
+### Internal campaign metrics (`OPS_METRICS_TOKEN`, Lot PRE 2026-11-03)
+
+`GET /v1/campaign/metrics` (Earn & Points KPIs: wallets registered / proven / enrolled, verified
+actions, points issued, perks granted) is **internal**: it answers **404** unless the request
+carries `Authorization: Bearer <OPS_METRICS_TOKEN>` and the API has that env var set
+(`apps/api/src/common/ops-token.guard.ts`: constant-time compare, 404 never 403, `no-store`,
+nothing logged). The token is a random string, not a key: it signs nothing and is never in the
+repo (`apps/api/.env.example` lists the name only).
+
+```bash
+# read (from anywhere; the token lives in the VPS apps/api/.env and in the founder's password manager)
+curl -s -H "Authorization: Bearer $OPS_METRICS_TOKEN" https://stellar-api.getdig.ai/v1/campaign/metrics | jq
+# rotate (VPS): new value, restart with the new env, old token dead immediately
+cd /root/dig-stellar && NEW=$(openssl rand -hex 32) && sed -i "s/^OPS_METRICS_TOKEN=.*/OPS_METRICS_TOKEN=$NEW/" apps/api/.env && pm2 restart dig-stellar-api --update-env && pm2 save
+# prove the gate
+curl -s -o /dev/null -w '%{http_code}\n' https://stellar-api.getdig.ai/v1/campaign/metrics            # 404
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $OPS_METRICS_TOKEN" https://stellar-api.getdig.ai/v1/campaign/metrics   # 200
+```
+
+`/v1/ops/status`, `/v1/ops/metrics` and `/v1/ops/adoption` stay public (founder decision S0,
+reaffirmed in Lot PRE — `docs/security-invariants.md` §7).
   Error rate is aggregated (`sum(errors)/sum(calls)`, sound to aggregate); latency percentiles
   are strictly per-run (never averaged). Known boundary: captures the INDEXER's outbound calls;
   the API process's own Horizon calls (actions preflight) are not captured.
@@ -662,7 +689,7 @@ from runs r
 cross join (values
   ('prices:reference'), ('prices:soroswap-derived'), ('blend'), ('soroswap'),
   ('aquarius'), ('stellar-native'), ('defindex'), ('protocol-metrics'),
-  ('allbridge'), ('network-stats')
+  ('network-stats')
 ) s(step)
 on conflict (run_at, step) do nothing;
 
@@ -720,8 +747,20 @@ tabs, and the chip on `PoolDetail` when a pool is stale (`FreshnessChip.vue`).
 `runTsxWithRetry` (`scripts/shared/retry.ts`): 3 attempts, exponential backoff **5s → 20s** + jitter,
 each retry logged with the step label (`[retry] <label> attempt N/3 failed; backing off Nms`).
 Per-protocol-entity steps retry per entity. Steps that must stay non-fatal (Aquarius / DeFindex /
-Allbridge / network-stats) keep their `try/catch`: retries happen INSIDE first, catch-and-log is
-the last resort.
+network-stats) keep their `try/catch`: retries happen INSIDE first, catch-and-log is the last
+resort.
+
+**Horizon source-account sequence (Lot PRE, 2026-11-03):** every contract simulation in the
+Blend / Soroswap / Aquarius steps needs the `STELLAR_SOURCE_ACCOUNT` sequence; it is now fetched
+**once per step process** and reused (`scripts/discovery/00-common.ts` `getAccountSequence`,
+in-flight promise shared, evicted on failure). Simulations are never submitted, so a stale
+sequence is fine. Before: ~290 `GET /accounts/<source>` per refresh in parallel bursts, throttled
+by public Horizon (2–8 errors per run, the amber Horizon bar on `#status`). After: one sequence
+lookup per step **process** — the Blend / Soroswap / Aquarius steps spawn one tsx process per pool,
+so 29 lookups on the local perimeter (4 + 4 + 21), sequential, never in parallel bursts; 39 Horizon
+calls per refresh in total with `fee_stats` and the 9 `liquidity_pools` (local run 2026-11-03:
+274 → 39, 0 errors). Check:
+`select run_at, calls, errors, methods from rpc_metrics_runs where target='horizon' and job='refresh' order by run_at desc limit 3;`
 
 ### Forced-stale drill (evidence)
 

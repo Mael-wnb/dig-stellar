@@ -475,6 +475,46 @@ the web depends on this deploy.
 
 ---
 
+## Lot PRE deploy sequence (pre-dossier fixes, 2026-11-03) — VPS first, web rides the push
+
+Indexer + API + web; **no SQL change, no new cron line, one new env var** (`OPS_METRICS_TOKEN`).
+What lands: (A) the Allbridge step leaves `job:refresh` and the dashboard bridge section is
+retired (`/v1/bridge/*`, `bridge_flows`, adapter kept); (B) pool-detail TVL panel: plain
+"TVL history not available" on non-lending pools, "since" only from the series; (C) the Horizon
+source-account sequence is fetched once per step process (local run: 274 → 39 Horizon calls per
+refresh, one sequential lookup per pool process instead of parallel bursts); (D) `GET /v1/campaign/metrics` gated behind the operator token, status block removed.
+Order: record the Horizon onset query once BEFORE the indexer change is picked up, then VPS, then
+the two curls; the web deploys from the same push and is compatible with the old and the new API.
+
+```bash
+cd /root/dig-stellar
+# 0. between two refresh ticks, locks free:
+ls /tmp/dig-stellar-refresh.lock /tmp/dig-stellar-alert.lock /tmp/dig-stellar-campaign.lock; pgrep -af '71-refresh|81-stellar|85-run' | grep -v pgrep
+# 1. founder check (1): date the Horizon error onset ONCE, before the fix (read-only; paste into docs/evidence/lot-pre/pre1-fixes.md)
+docker exec -i dig_stellar_postgres psql -U dig -d dig_stellar -Atc "select date_trunc('day', run_at) d, count(*) runs, count(*) filter (where errors>0) err_runs, sum(errors) errs, sum(calls) calls from rpc_metrics_runs where target='horizon' and job='refresh' group by 1 order by 1;"
+# 2. pull + install + API build
+git pull origin main && git log -1 --oneline
+pnpm install --frozen-lockfile
+pnpm -C apps/api build
+# 3. operator token (new env var; keep the value in the password manager, never in git)
+echo "OPS_METRICS_TOKEN=$(openssl rand -hex 32)" >> apps/api/.env
+GIT_SHA=$(git rev-parse --short HEAD) pm2 restart dig-stellar-api --update-env && pm2 save
+# 4. founder check (2): the gate
+curl -s -o /dev/null -w '%{http_code}\n' https://stellar-api.getdig.ai/v1/campaign/metrics                                   # expect 404
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $(grep ^OPS_METRICS_TOKEN= apps/api/.env | cut -d= -f2)" https://stellar-api.getdig.ai/v1/campaign/metrics   # expect 200
+# 5. the indexer change is picked up by the next */15 tick (no restart: each run is a fresh tsx process). After one tick:
+docker exec -i dig_stellar_postgres psql -U dig -d dig_stellar -Atc "select run_at, calls, errors, methods from rpc_metrics_runs where target='horizon' and job='refresh' order by run_at desc limit 2;"
+#    expect calls ≈ 40 (GET /accounts ≈ 29 = one per Blend/Soroswap/Aquarius pool process, /fee_stats 1, /liquidity_pools 9), errors 0
+curl -s 'https://stellar-api.getdig.ai/v1/ops/status?window=24h' | jq '[.components[] | select(.id=="step:allbridge" or .id=="rpc:horizon") | {id, state, availability24h}]'
+#    the allbridge step row ages out of the 24h window by itself; rpc:horizon turns green segment by segment
+curl -s https://stellar-api.getdig.ai/health | jq '.freshness[] | select(.venue=="allbridge")'   # still listed, asOf null
+```
+
+**Web (Vercel, same push).** The dashboard no longer mounts the bridge section, the pool-detail
+copy is API-independent (it reads `series.covered` / `series.first`, both already served), and
+`#status` no longer calls `/v1/campaign/metrics`. The web works against the old API (the route
+was public) and the new one (gated), so the order between Vercel and the VPS does not matter.
+
 ## Campaign cron line (Lot EP, EP3)
 
 A third OS-cron line (`job:campaign`, every 15 min at minutes 3/18/33/48, lock

@@ -216,7 +216,9 @@ increments.
   2. **T2-D2 — In-App Alerting Engine** — built (backend + frontend), awaiting internal validation /
      demo + VPS deploy. As-built: periodic OS-cron sweep (`job:wallet-alert`) → in-app notifications;
      see the v3 alerting family above and `docs/runbooks.md`.
-  3. **T2-D3 — Bridge Flow Monitoring** — code-complete, VPS deploy pending.
+  3. **T2-D3 — Bridge Flow Monitoring** — delivered and paid; Allbridge Core wound down upstream,
+     so the dashboard bridge section and the `allbridge` refresh step were retired (Lot PRE,
+     2026-11-03). `/v1/bridge/*`, `bridge_flows` and the adapter stay as a historical record.
 
 Operational maturity (freshness visibility, health endpoints, deployment discipline) now lags
 implementation — treat it as first-class, not "later."
