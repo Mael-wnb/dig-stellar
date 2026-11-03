@@ -1,6 +1,7 @@
 # Decision: Public API v1 surface (2026-11-03)
 
-**Status: decided (founder ruling, 2026-11-02). Implementation pending (Lot API, steps API2–API4).**
+**Status: decided (founder ruling, 2026-11-02) and implemented on `feat/lot-api` (API2–API4,
+2026-11-03); VPS deploy pending founder-side (`docs/deployment.md` "Lot API deploy sequence").**
 
 Recon basis: `docs/evidence/lot-api/api0-recon.md` (API0, read-only, 2026-11-02). Every
 number and example body below comes from that recon or from the repo files it cites.
@@ -156,8 +157,14 @@ them to work. The CDN dependency is an open item (vendor the bundle later).
   break `apps/web`, which reads `code`/`message` and `err.status` only).
 - Contract test in CI → Lot AD.
 - Optional API keys + per-key quotas → later product lot.
-- `GET /v1/docs` loads Scalar from the jsDelivr CDN; vendoring the bundle is a later step.
+- `GET /v1/docs` loads Scalar API Reference from the jsDelivr CDN, **pinned to `1.76.4`**
+  (`apps/api/src/modules/openapi/docs-page.ts`, bump procedure in `docs/api/README.md`);
+  vendoring the bundle is a later step.
+- `GET /v1/openapi.json` and `GET /v1/docs` answer a route-local
+  `Access-Control-Allow-Origin: *` (GET only); the global CORS policy in `main.ts` is
+  unchanged and the data endpoints keep it. **CORS policy for external data consumers is
+  decided in the API-keys lot.**
 - `GET /v1/wallets` without `userId` resolves to the demo user and returns 200 locally,
   while `docs/deployment.md` §G1 states "400 (userId required)" → SEC Gate 3.
-- `CLAUDE.md` still says `GET /v1/network/stats` hits external APIs live; the recon shows it
-  reads `network_stats_latest` written by the indexer → fix in API4.
+- `CLAUDE.md` said `GET /v1/network/stats` hits external APIs live; it reads
+  `network_stats_latest` written by the indexer → **fixed in API4 (2026-11-03)**.

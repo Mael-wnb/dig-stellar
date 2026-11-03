@@ -9,8 +9,8 @@
 |---|---|
 | Source of truth (OpenAPI 3.1, hand-written) | `apps/api/openapi/openapi.v1.yaml` — the only copy |
 | Built copy read at runtime | `apps/api/dist/openapi/openapi.v1.yaml`, produced by `pnpm -C apps/api build` (`nest-cli.json` → `compilerOptions.assets`, `flat: true`) |
-| Served as JSON | `GET /v1/openapi.json` (`Cache-Control: public, max-age=3600`) |
-| Reference page | `GET /v1/docs` — single static HTML, Scalar API Reference loaded from the jsDelivr CDN, `Content-Type: text/html; charset=utf-8` |
+| Served as JSON | `GET /v1/openapi.json` (`Cache-Control: public, max-age=3600`, `Access-Control-Allow-Origin: *`) |
+| Reference page | `GET /v1/docs` — single static HTML, Scalar API Reference loaded from the jsDelivr CDN pinned to **1.76.4**, `Content-Type: text/html; charset=utf-8`, same cache and CORS headers |
 | Code | `apps/api/src/modules/openapi/` (loader, controller, page template, module) |
 
 The yaml sits under `apps/api/` (not `docs/`) so that one file is reachable by every runtime
@@ -21,6 +21,20 @@ under `docs/` is a copy of the yaml.
 
 Both routes fall under the existing nginx `location /v1/` (zone `api_general`); no nginx
 change is required for them to work (`docs/deployment.md` §Rate-limit zones).
+
+## Scalar pin
+
+The page loads `https://cdn.jsdelivr.net/npm/@scalar/api-reference@<version>/dist/browser/standalone.js`
+with the version fixed in `SCALAR_VERSION` (`apps/api/src/modules/openapi/docs-page.ts`), currently
+**1.76.4** (the CDN's `latest` on 2026-11-03). A Scalar release can therefore never change the
+page under us. To bump: read the current tag with
+`curl -s https://data.jsdelivr.com/v1/package/npm/@scalar/api-reference | jq -r .tags.latest`,
+set `SCALAR_VERSION` to it, rebuild, open `/v1/docs` locally from the built dist and check the
+page renders, add a line to `CHANGELOG.md` ("docs page: Scalar x.y.z"). Vendoring the bundle
+(no CDN at all) is an open item in the decision doc.
+
+The two documentation routes answer `Access-Control-Allow-Origin: *` (route-local, GET only) so
+any origin can fetch the contract; the data endpoints keep the global CORS policy of `main.ts`.
 
 ## Validating the contract
 

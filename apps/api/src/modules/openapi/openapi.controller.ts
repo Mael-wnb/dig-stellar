@@ -7,6 +7,10 @@
 //                          (CDN script). Explicit text/html: the API vhost sends
 //                          X-Content-Type-Options: nosniff, so the type must be right.
 // Both routes fall under the nginx `location /v1/` (api_general zone); no nginx change.
+// Both answer `Access-Control-Allow-Origin: *` (GET only, no credentials): the contract
+// and its page are public documents any origin may read. This is route-local; the
+// global CORS policy in main.ts (allow-list + credentials) is untouched, and the data
+// endpoints keep it. CORS for external data consumers is decided in the API-keys lot.
 // No edits to any existing controller or service.
 import { Controller, Get, Header, ServiceUnavailableException } from '@nestjs/common';
 import { loadOpenApiDocument, type OpenApiDocument } from './openapi-document';
@@ -31,6 +35,7 @@ export class OpenApiController {
 
   @Get('openapi.json')
   @Header('Cache-Control', 'public, max-age=3600')
+  @Header('Access-Control-Allow-Origin', '*')
   getDocument(): OpenApiDocument {
     if (!this.document) {
       throw new ServiceUnavailableException('OpenAPI document unavailable');
@@ -41,6 +46,7 @@ export class OpenApiController {
   @Get('docs')
   @Header('Content-Type', 'text/html; charset=utf-8')
   @Header('Cache-Control', 'public, max-age=3600')
+  @Header('Access-Control-Allow-Origin', '*')
   getDocsPage(): string {
     if (!this.document) {
       throw new ServiceUnavailableException('OpenAPI document unavailable');

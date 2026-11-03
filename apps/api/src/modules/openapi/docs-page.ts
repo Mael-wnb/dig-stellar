@@ -4,7 +4,11 @@
 // Reference is loaded from the jsDelivr CDN (open item: vendor the bundle later) and
 // pointed at the served document. Nothing here is user input, so no escaping concerns
 // beyond the title/version which come from our own yaml.
-const SCALAR_CDN = 'https://cdn.jsdelivr.net/npm/@scalar/api-reference';
+//
+// The CDN script is PINNED to an exact version so a Scalar release cannot change the
+// page under us. Bump procedure: docs/api/README.md ("Scalar pin").
+export const SCALAR_VERSION = '1.76.4';
+const SCALAR_CDN = `https://cdn.jsdelivr.net/npm/@scalar/api-reference@${SCALAR_VERSION}/dist/browser/standalone.js`;
 
 export type DocsPageOptions = {
   title: string;
