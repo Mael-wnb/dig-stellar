@@ -3,6 +3,14 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
-    "deleteOutDir": true
+    "deleteOutDir": true,
+    "assets": [
+      {
+        "include": "../openapi/openapi.v1.yaml",
+        "outDir": "dist/openapi",
+        "flat": true
+      }
+    ],
+    "watchAssets": true
   }
 }

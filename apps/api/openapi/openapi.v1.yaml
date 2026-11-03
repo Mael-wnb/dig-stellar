@@ -1,0 +1,1279 @@
+# Dig Stellar API — public v1 surface (OpenAPI 3.1).
+#
+# SOURCE OF TRUTH for the public HTTP contract ("contract" = HTTP API contract, never a
+# smart contract). Hand-written; no generator. Served by GET /v1/openapi.json (JSON form)
+# and rendered by GET /v1/docs. Copied into dist/openapi at build time (nest-cli assets).
+# Validated against the real API by `pnpm -C apps/api test:contract`.
+#
+# Rules (docs/decisions/2026-11-03-public-api-v1-surface.md):
+#   - x-stability: stable → additive changes only, strict schema (no undocumented keys);
+#                  beta   → shape may change, schema is open.
+#   - every change takes one line in docs/api/CHANGELOG.md.
+#   - examples are captured from production (docs/api/README.md records how).
+openapi: 3.1.0
+info:
+  title: Dig Stellar API
+  version: 1.0.0
+  description: |
+    Data and signals API for Stellar DeFi: protocol and pool analytics, network figures,
+    bridge flows and pipeline status, read-only. Execution (non-custodial actions: building
+    and signing transactions) stays in the Dig app and is not part of this API.
+
+    **Versioning.** Changes inside `/v1` are additive only (new fields, new endpoints).
+    Removing a field or changing its type is a breaking change and ships as `/v2`
+    alongside `/v1`. Every operation carries `x-stability`: `stable` operations change
+    additively only and reject undocumented keys in the contract test; `beta` operations
+    may still change shape. Every change is listed in `docs/api/CHANGELOG.md`.
+
+    **Rate limits (per client IP, enforced at the edge).** `api_general`: 10 requests/s,
+    burst 60, on every GET in this document. `api_actions`: 30 requests/min, burst 10, on
+    the SDEX quote. Over the limit the edge answers `429` with the JSON body
+    `{"statusCode":429,"error":"Too Many Requests","message":"Rate limit exceeded - please slow down."}`
+    and a `Retry-After: 1` header. No API key is required or available.
+
+    **Freshness.** Data is refreshed by a 15-minute pipeline. Payloads that carry a
+    timestamp expose `isStale` (true when the row is older than `staleAfterSeconds`,
+    2700 s = 45 min by default, i.e. two missed cycles; `null` when no row exists yet),
+    `staleAfterSeconds` (the threshold in force), and the row's own time as `updatedAt`
+    or `asOf` (plus `ageSeconds` where present). List endpoints are served from a 90-second
+    in-process cache; `ageSeconds` keeps counting on cache hits.
+  contact:
+    name: Dig
+    url: https://getdig.ai
+servers:
+  - url: https://stellar-api.getdig.ai
+    description: Production
+  - url: http://localhost:3000
+    description: Local (docker compose or `pnpm -C apps/api start:dev`)
+tags:
+  - name: Health
+  - name: Protocols & pools
+  - name: Network
+  - name: Bridge
+  - name: Operations
+  - name: Quotes
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      x-stability: stable
+      summary: Liveness and per-venue freshness
+      description: |
+        Always `200` with a readable `status` (`ok` or `degraded`, the latter when any venue is
+        stale) so a monitor can see degradation. `503` only when the database is unreachable;
+        the `503` body is the same payload with `db.ok: false`. `version` is the deployed git
+        short hash (`unknown` when not set).
+      responses:
+        '200':
+          description: Service reachable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthPayload' }
+              examples:
+                production:
+                  value: {"status":"ok","version":"8c36d1f","uptimeSeconds":337567,"db":{"ok":true,"latencyMs":27},"staleAfterSeconds":2700,"freshness":[{"venue":"allbridge","asOf":null,"ageSeconds":null,"isStale":null},{"venue":"aquarius","asOf":"2026-11-03T18:01:05.612Z","ageSeconds":578,"isStale":false}],"lastRefreshAt":"2026-11-03T18:05:00.000Z"}
+        '503':
+          description: Database unreachable — same payload shape, `db.ok` is `false`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthPayload' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /v1/protocols:
+    get:
+      tags: [Protocols & pools]
+      operationId: listProtocols
+      x-stability: stable
+      summary: Tracked venues with aggregates
+      description: |
+        One row per tracked venue (AMM, lending, vault, bridge) with TVL, 24h volume and fees,
+        weighted APYs and the top underlying assets by TVL. Rows come from a 90-second
+        in-process cache; freshness fields are recomputed on every read. `stale` is a
+        deprecated alias of `isStale` kept for compatibility.
+      responses:
+        '200':
+          description: Venue list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ProtocolSummary' }
+              examples:
+                production:
+                  value: [{"id":"blend","name":"Blend","type":"lending","chain":"stellar-mainnet","logoUrl":null,"tvlUsd":159076371.02567783,"volume24hUsd":0,"fees24hUsd":0,"avgSupplyApy":0.017290396334900145,"avgBorrowApy":0.10221836907277516,"topAssets":[{"symbol":"native","logoUrl":"https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/stellar/info/logo.png","tvlUsd":114576914.74226947}],"assetCount":10,"updatedAt":"2026-11-03T18:05:41.417Z","stale":false,"isStale":false,"staleAfterSeconds":2700,"ageSeconds":300}]
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /v1/pools:
+    get:
+      tags: [Protocols & pools]
+      operationId: listPools
+      x-stability: stable
+      summary: Pool list
+      description: |
+        Every active pool across tracked venues with its tokens and headline metrics. Filter by
+        venue with `protocol`; order with `sort` and `order` (an unknown `sort` falls back to the
+        default venue/slug order rather than erroring). Rows come from a 90-second in-process
+        cache keyed by the three query parameters. `swaps24h` is `null` where no swap coverage
+        exists (lending, vaults); lending-only metrics are `null` on AMM rows.
+      parameters:
+        - name: protocol
+          in: query
+          required: false
+          description: Venue slug, as returned by `/v1/protocols` (`id`)
+          schema: { type: string }
+        - name: sort
+          in: query
+          required: false
+          description: Sort key; anything else falls back to the default order
+          schema:
+            type: string
+            enum: [tvlUsd, volume24hUsd, fees24hUsd, supplyApy, borrowApy, name, protocol]
+        - name: order
+          in: query
+          required: false
+          description: Sort direction; anything other than `asc` means `desc`
+          schema:
+            type: string
+            enum: [asc, desc]
+      responses:
+        '200':
+          description: Pool list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PoolSummary' }
+              examples:
+                production:
+                  value: [{"id":"aquarius-aqua-usdc-clpool","name":"AQUA/USDC Concentrated","type":"amm_pool","protocol":{"id":"aquarius","name":"Aquarius","type":"amm","logoUrl":null},"chain":"stellar-mainnet","contractAddress":"CBRUQ7I6C6OGHMDYWD6XQUZFB6KJ3LLPNE34EPKSPFZ2YMBJ2GIWYYZ7","tokens":[{"assetId":"39800383-10a3-4de0-b897-a0c3da49c768","symbol":"AQUA","logoUrl":null,"role":"token0"},{"assetId":"82334608-a549-4972-8e70-223893af80d0","symbol":"USDC","logoUrl":"https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png","role":"token1"}],"metrics":{"tvlUsd":67878.21347931665,"volume24hUsd":16939.532101210887,"fees24hUsd":50.6854847789704,"totalSuppliedUsd":null,"totalBorrowedUsd":null,"supplyApy":null,"borrowApy":null,"swaps24h":194},"updatedAt":"2026-11-03T18:01:05.612Z","stale":false,"isStale":false,"staleAfterSeconds":2700,"ageSeconds":578}]
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /v1/pools/{slug}:
+    get:
+      tags: [Protocols & pools]
+      operationId: getPool
+      x-stability: stable
+      summary: Pool detail
+      description: |
+        Detail for one pool. The shape depends on the pool `type`: AMM pools (`amm_pool`) carry
+        `tokens[]` with reserves and prices; lending pools and vaults (`lending_pool`,
+        `yield_vault`) carry `reserves[]` with supplied/borrowed amounts and per-reserve rates.
+        Prices older than the freshness threshold count as absent (`priceUsd: null`, and the
+        USD figures derived from them are `null`). Unknown or inactive slug → `404`.
+      parameters:
+        - $ref: '#/components/parameters/PoolSlug'
+      responses:
+        '200':
+          description: Pool detail (AMM or lending variant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PoolDetail' }
+              examples:
+                lending:
+                  summary: Lending pool (reserves[])
+                  value: {"id":"blend-etherfuse-pool","name":"Etherfuse","protocol":{"id":"blend","name":"Blend","type":"lending","logoUrl":null},"chain":"stellar-mainnet","type":"lending_pool","contractAddress":"CDMAVJPFXPADND3YRL4BSM3AKZWCTFMX27GLLXCML3PD62HEQS5FPVAI","metrics":{"tvlUsd":14973.901571648352,"totalSuppliedUsd":14973.901571648352,"totalBorrowedUsd":1350.7696147558152,"totalBackstopCreditUsd":243.19518501281144,"netLiquidityUsd":13623.131956892537,"supplyApy":0.00028705646305273954,"borrowApy":0.0039616269049756,"volume24hUsd":0,"fees24hUsd":0,"events24h":0},"reserves":[{"assetId":"5e0f35b5-6076-483c-a4f6-9911a3fb82e0","symbol":"CETES","name":"CETES:GCRYUGD5NVARGXT56XEZI5CIFCQETYHAPQQTHO2O3IQZTHDH4LATMYWC","logoUrl":null,"decimals":7,"priceUsd":0.06330712954575,"supplied":108481.7579948,"borrowed":23.389052,"backstopCredit":6.0609785,"supplyCap":160000000,"supplyApr":1.0e-7,"supplyApy":1.0000001049448315e-7,"borrowApr":0.0010009,"borrowApy":0.0010013996938389447}],"updatedAt":"2026-11-03T18:00:35.357Z","stale":false,"isStale":false,"staleAfterSeconds":2700,"ageSeconds":628}
+                amm:
+                  summary: AMM pool (tokens[])
+                  value: {"id":"aquarius-aqua-usdc-clpool","name":"AQUA/USDC Concentrated","protocol":{"id":"aquarius","name":"Aquarius","type":"amm","logoUrl":null},"chain":"stellar-mainnet","type":"amm_pool","contractAddress":"CBRUQ7I6C6OGHMDYWD6XQUZFB6KJ3LLPNE34EPKSPFZ2YMBJ2GIWYYZ7","metrics":{"tvlUsd":67878.21347931665,"volume24hUsd":16939.532101210887,"fees24hUsd":50.6854847789704,"events24h":672,"swaps24h":194,"trades24h":null},"tokens":[{"assetId":"39800383-10a3-4de0-b897-a0c3da49c768","symbol":"AQUA","name":"AQUA:GBNZILSTVQZ4R7IKQDGHYGY2QXL5QOFJYQMXPKWRRM5PAV7Y4M67AQUA","logoUrl":null,"decimals":7,"priceUsd":0.00027369915164,"reserve":190910049.8047735,"reserveUsd":52251.918671116655}],"updatedAt":"2026-11-03T18:01:05.612Z","stale":false,"isStale":false,"staleAfterSeconds":2700,"ageSeconds":600}
+        '404': { $ref: '#/components/responses/PoolNotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /v1/pools/{slug}/flows:
+    get:
+      tags: [Protocols & pools]
+      operationId: getPoolFlows
+      x-stability: beta
+      summary: Deposit and withdrawal flows per UTC day
+      description: |
+        Liquidity in (deposits) and out (withdrawals) for one pool, bucketed by UTC day over a
+        whitelisted window; an unknown `window` falls back to `7d`. Coverage is data-driven:
+        pools without measurable deposit/withdraw events return `covered: false` with an empty
+        `series` and zero totals, same keys. `coverageSince` is the first day with measurable
+        data. `updatedAt` is the request time, not a data timestamp. Unknown slug → `404`.
+      parameters:
+        - $ref: '#/components/parameters/PoolSlug'
+        - $ref: '#/components/parameters/FlowWindow'
+      responses:
+        '200':
+          description: Flow series
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PoolFlows' }
+              examples:
+                production:
+                  value: {"slug":"aquarius-aqua-usdc-clpool","covered":true,"window":"7d","days":7,"coverageSince":"2026-08-16","series":[{"day":"2026-10-28","inflowUsd":407098.38,"outflowUsd":511173.62,"netUsd":-104075.24,"cumulativeNetUsd":-104075.24}],"totals":{"inflowUsd":472539327.62,"outflowUsd":510652262.25,"netUsd":-38112934.63,"depositCount":68,"withdrawCount":83},"updatedAt":"2026-11-03T18:11:10.768Z"}
+        '404': { $ref: '#/components/responses/PoolNotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /v1/pools/{slug}/series:
+    get:
+      tags: [Protocols & pools]
+      operationId: getPoolSeries
+      x-stability: beta
+      summary: TVL history (lending pools)
+      description: |
+        Daily TVL points reconstructed from reserve snapshots and the latest fresh asset
+        prices — a documented approximation, not a stored USD time series. Lending pools only:
+        AMM, native and vault pools return `covered: false` with an empty `points` array, and so
+        does any lending pool with fewer than two points. `updatedAt` is the request time.
+        Unknown slug → `404`.
+      parameters:
+        - $ref: '#/components/parameters/PoolSlug'
+      responses:
+        '200':
+          description: TVL series
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PoolSeries' }
+              examples:
+                production:
+                  value: {"slug":"blend-etherfuse-pool","covered":true,"kind":"tvl","points":[{"day":"2026-03-31","tvlUsd":232940.43},{"day":"2026-11-03","tvlUsd":14973.9}],"first":"2026-03-31","last":"2026-11-03","updatedAt":"2026-11-03T18:11:13.199Z"}
+        '404': { $ref: '#/components/responses/PoolNotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /v1/network/stats:
+    get:
+      tags: [Network]
+      operationId: getNetworkStats
+      x-stability: stable
+      summary: Network headline figures
+      description: |
+        Latest network-level figures as written by the indexer (no external call at request
+        time): XLM price and 24h change, tracked network TVL (same source as the TVL series),
+        stablecoin market cap, USDC supply, average fee, tracked protocol count. Any figure the
+        pipeline could not source is `null`. Before the first indexer run every figure is `null`
+        and `updatedAt` is `null`.
+      responses:
+        '200':
+          description: Network stats
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NetworkStats' }
+              examples:
+                production:
+                  value: {"xlmPriceUsd":0.16351991805112,"xlmPriceChange24hPct":-1.1399063594316934,"stellarTvlUsd":210678892.52847493,"activeWallets":null,"stableMcapUsd":335563250.54296863,"dexVolume24hUsd":null,"protocolCount":6,"usdcSupplyUsd":320762412.37934,"avgTxFeeXlm":0.00001,"updatedAt":"2026-11-03T18:05:45.724Z","isStale":false,"staleAfterSeconds":2700}
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /v1/network/tvl-series:
+    get:
+      tags: [Network]
+      operationId: getNetworkTvlSeries
+      x-stability: stable
+      summary: Tracked network TVL, hourly, last 7 days
+      description: |
+        Hourly points of the tracked-network TVL (gross, "total value tracked") and the net
+        figure (supplied minus borrowed) over a fixed 7-day window; the latest snapshot in each
+        hour represents that hour, missing hours are absent (never interpolated). `meta.partial`
+        is `true` while history is younger than the window. `meta.methodologyChangeAt` marks the
+        definitional change of 2026-08-17; points before it carry `tvlNetUsd: null` and history
+        is never rewritten.
+      responses:
+        '200':
+          description: TVL series
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NetworkTvlSeries' }
+              examples:
+                production:
+                  value: {"series":[{"t":"2026-10-27T18:00:00.000Z","tvlUsd":217769225.00007063,"tvlNetUsd":186056513.0074597,"protocolCount":4}],"meta":{"source":"snapshots","from":"2026-10-27T18:10:47.312Z","to":"2026-11-03T18:10:47.312Z","firstSnapshotAt":"2026-08-12T15:03:00.000Z","partial":false,"bucket":"hour","methodologyChangeAt":"2026-08-18T07:19:00.000Z"}}
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /v1/bridge/summary:
+    get:
+      tags: [Bridge]
+      operationId: getBridgeSummary
+      x-stability: stable
+      summary: Bridge inflow/outflow totals by source chain
+      description: |
+        Allbridge Core USDC flows into and out of Stellar, aggregated over a whitelisted window
+        (unknown `window` falls back to `7d`), with a per-counterparty-chain breakdown and the net.
+        **Upstream pause:** the Allbridge Core bridge has been paused by its operator since
+        2026-07-20; until it relaunches, recent windows legitimately contain zero flows and
+        `lastFlowAt` reflects the last flow before the pause. `updatedAt` is the request time.
+      parameters:
+        - $ref: '#/components/parameters/FlowWindow'
+      responses:
+        '200':
+          description: Bridge summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BridgeSummary' }
+              examples:
+                production:
+                  value: {"window":"7d","token":"USDC","inflow":{"totalUsd":0,"count":0,"byChain":[]},"outflow":{"totalUsd":0,"count":0,"byChain":[]},"netUsd":0,"lastFlowAt":null,"updatedAt":"2026-11-03T18:10:49.117Z"}
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /v1/bridge/flows:
+    get:
+      tags: [Bridge]
+      operationId: listBridgeFlows
+      x-stability: stable
+      summary: Most recent bridge flows
+      description: |
+        Latest flows, newest first, independent of any window. `direction` filters to one side;
+        any other value means no filter. `limit` is clamped to 1..200 (default 50; a non-numeric
+        value means the default). Same upstream pause as `/v1/bridge/summary`: the feed shows
+        the last flows recorded before 2026-07-20 until the bridge relaunches.
+      parameters:
+        - name: direction
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [inflow, outflow]
+        - name: limit
+          in: query
+          required: false
+          description: 1..200, default 50
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Flow feed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BridgeFlows' }
+              examples:
+                production:
+                  value: {"count":2,"limit":2,"flows":[{"direction":"inflow","chainId":15,"chain":"ALG","token":"USDC","amountScaled":8063.716255,"amountUsd":8063.716255,"txHash":"cb4551f761ec5974ca64242b71165908116ea05cf171ce974755149cca1cff57","recipient":null,"occurredAt":"2026-07-19T18:33:09.000Z"}]}
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /v1/bridge/series:
+    get:
+      tags: [Bridge]
+      operationId: getBridgeSeries
+      x-stability: stable
+      summary: Daily bridge net flow
+      description: |
+        One entry per UTC day for the last `days` days (clamped to 1..30, default 7), oldest
+        first, gap-filled with zeros. Sums are in USD. Same upstream pause as
+        `/v1/bridge/summary`. `updatedAt` is the request time.
+      parameters:
+        - name: days
+          in: query
+          required: false
+          description: 1..30, default 7
+          schema: { type: integer, minimum: 1, maximum: 30, default: 7 }
+      responses:
+        '200':
+          description: Daily series
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BridgeSeries' }
+              examples:
+                production:
+                  value: {"days":7,"series":[{"day":"2026-10-28","inflowUsd":0,"outflowUsd":0,"netUsd":0}],"updatedAt":"2026-11-03T18:10:52.645Z"}
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /v1/ops/status:
+    get:
+      tags: [Operations]
+      operationId: getOpsStatus
+      x-stability: beta
+      summary: Refresh-pipeline status (status page payload)
+      description: |
+        Status of our own refresh pipeline over the last 24 hours: runs, gaps (missed cycles),
+        per-component state with 24h availability and per-run segments, and the price-source
+        summary. This is pipeline visibility, not an external uptime probe. Only `window=24h`
+        is served; any other value is a `400`. Sent with `Cache-Control: no-store` because the
+        payload embeds `generatedAt`.
+      parameters:
+        - name: window
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ['24h']
+            default: '24h'
+      responses:
+        '200':
+          description: Status payload
+          headers:
+            Cache-Control:
+              schema: { type: string }
+              description: Always `no-store`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpsStatus' }
+              examples:
+                production:
+                  value: {"window":"24h","generatedAt":"2026-11-03T18:10:54.391Z","cadenceMinutes":15,"staleAfterSeconds":2700,"historySince":"2026-08-13T09:30:06.046Z","noDataBefore":null,"runs":[{"runAt":"2026-11-02T18:15:06.251Z"}],"gaps":[],"overall":{"state":"operational","lastRunAt":"2026-11-03T18:00:06.640Z","missedCycles24h":0,"failedSteps24h":0},"components":[{"id":"step:prices:reference","kind":"step","label":"Reference prices","state":"ok","availability24h":1,"segments":[{"runAt":"2026-11-02T18:15:06.251Z","state":"ok","durationMs":11670,"message":null}]}],"priceSources":{"pricedAssets":32,"totalAssets":32,"unpricedAssets":[],"referenceAssets":["USDC"],"singleSourceAssets":["USDT0"],"disagreements":[]}}
+        '400':
+          description: Unsupported window
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NestError' }
+              examples:
+                production:
+                  value: {"message":"Unsupported window '7d'. Supported: 24h","error":"Bad Request","statusCode":400}
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /v1/ops/metrics:
+    get:
+      tags: [Operations]
+      operationId: getOpsMetrics
+      x-stability: beta
+      summary: Indexer RPC metrics and refresh steps, last 24 hours
+      description: |
+        Per-target outbound RPC metrics of the indexer refresh pipeline (error rate aggregated
+        over the window; latency percentiles never averaged — the latest run plus the last 20
+        per-run rows) and the last run of each refresh step. The `faucet` block is
+        deploy-dependent (campaign configuration, network, enabled flag) and the `rpc[].target`
+        list grows as the pipeline gains targets. The API process's own outbound calls are not
+        included.
+      responses:
+        '200':
+          description: Metrics
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpsMetrics' }
+              examples:
+                production:
+                  value: {"window":"24h","scope":"indexer refresh pipeline","rpc":[{"target":"defindex-api","calls":576,"errors":0,"errorRate":0,"latest":{"runAt":"2026-11-03T18:00:06.640Z","p50Ms":161,"p95Ms":1463,"p99Ms":1463},"runs":[{"runAt":"2026-11-03T18:00:06.640Z","calls":6,"errors":0,"p50Ms":161,"p95Ms":1463,"p99Ms":1463}]}],"steps":[{"step":"allbridge","lastRunAt":"2026-11-03T18:00:06.640Z","lastStatus":"SUCCESS","lastDurationMs":2231,"lastMessage":null,"failures24h":0}],"faucet":{"enabled":true,"network":"mainnet","campaign":2,"rewardXlm":5,"claims":{"pending":0,"paid":60,"failed":0,"paid24h":0,"remainingClaims":0},"allTime":{"pending":0,"paid":100,"failed":0},"treasurySpendableXlm":5.4992155}}
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /v1/ops/adoption:
+    get:
+      tags: [Operations]
+      operationId: getOpsAdoption
+      x-stability: beta
+      summary: Adoption counters
+      description: |
+        Wallet counts and server-side action builds by kind and network. The `boundary` text
+        states what is counted: successful builds (quotes and signable transactions), not
+        on-chain executions. Counters start at deploy; there is no historical backfill. The set
+        of `kind` values is open.
+      responses:
+        '200':
+          description: Adoption counters
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpsAdoption' }
+              examples:
+                production:
+                  value: {"boundary":"Counts successful server-side BUILDS (quotes + signable XDRs). On-chain submission happens client-side (non-custodial); executed-tx evidence is the action_witnesses ledger: every row is a Horizon-verified on-chain execution (Lot R). Counters start at deploy; no historical backfill exists.","wallets":{"total":2140,"signers":97,"watchOnly":2043,"distinctUsers":2113},"actions":{"total":848,"byKind":[{"kind":"blend-deposit-build","network":"mainnet","count24h":0,"count7d":0,"total":32}],"distinctAddresses":{"count24h":0,"count7d":0,"total":78}}}
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /v1/actions/sdex/quote:
+    post:
+      tags: [Quotes]
+      operationId: quoteSdexSwap
+      x-stability: beta
+      summary: Stellar DEX strict-send quote
+      description: |
+        Price lookup for a classic Stellar DEX path payment (strict send), **direct routes only**,
+        best destination amount among them. Read-only: nothing is built or signed. The quote is
+        computed live against Horizon on every call (no cache). `network` defaults to `testnet`;
+        `mainnet` is behind a server-side kill-switch and answers `403` while it is off, and on
+        mainnet both assets must be on the server's asset whitelist (`400` otherwise). `422` when
+        no direct path exists for the pair and amount. Rate limited by the `api_actions` zone
+        (30 requests/min, burst 10 per IP).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SdexQuoteRequest' }
+            examples:
+              testnet:
+                value: {"fromAsset":"XLM","toAsset":"USDC","amount":"10","network":"testnet"}
+      responses:
+        '200':
+          description: Quote
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SdexQuote' }
+              examples:
+                testnet:
+                  value: {"sourceAmount":"10","destAmount":"8.0873303","rate":0.80873303}
+        '400':
+          description: Body validation failed (unknown or identical assets, non-positive amount, unknown network, asset off the mainnet whitelist)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NestError' }
+              examples:
+                sameAsset:
+                  value: {"message":"fromAsset and toAsset must differ","error":"Bad Request","statusCode":400}
+        '403':
+          description: '`network: "mainnet"` while mainnet quotes are disabled'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NestError' }
+              examples:
+                killSwitch:
+                  value: {"message":"Mainnet actions are not enabled.","error":"Forbidden","statusCode":403}
+        '422':
+          description: No direct liquidity for this pair and amount
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NestError' }
+              examples:
+                noPath:
+                  value: {"message":"No direct liquidity for XLM→ZZZQ at this amount on testnet","error":"Unprocessable Entity","statusCode":422}
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500':
+          description: Horizon unreachable or failed (`Failed to fetch swap quote from Horizon`), or an unexpected error
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/NestError'
+                  - $ref: '#/components/schemas/NestInternalError'
+
+components:
+  parameters:
+    PoolSlug:
+      name: slug
+      in: path
+      required: true
+      description: Pool slug as returned by `/v1/pools` (`id`)
+      schema: { type: string }
+      example: blend-etherfuse-pool
+    FlowWindow:
+      name: window
+      in: query
+      required: false
+      description: Aggregation window; anything else falls back to `7d`
+      schema:
+        type: string
+        enum: ['24h', '7d', '30d']
+        default: '7d'
+
+  responses:
+    PoolNotFound:
+      description: Unknown or inactive pool slug
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/NestError' }
+          examples:
+            production:
+              value: {"message":"Pool not found: does-not-exist","error":"Not Found","statusCode":404}
+    RateLimited:
+      description: Per-IP rate limit exceeded at the edge (nginx). Not produced by the application.
+      headers:
+        Retry-After:
+          schema: { type: string }
+          description: Always `1`
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/RateLimited' }
+          examples:
+            edge:
+              value: {"statusCode":429,"error":"Too Many Requests","message":"Rate limit exceeded - please slow down."}
+    InternalError:
+      description: Unexpected server error (framework default body)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/NestInternalError' }
+          examples:
+            framework:
+              value: {"statusCode":500,"message":"Internal server error"}
+
+  schemas:
+    # ── Shared ───────────────────────────────────────────────────────────────────
+    FreshnessMeta:
+      type: object
+      description: |
+        Freshness fields shared by every payload that carries a data timestamp. `isStale` is
+        `true` when the row is older than `staleAfterSeconds` (default 2700 s), `false` when
+        within it, `null` when no row exists yet. `ageSeconds` is the row age at read time.
+      properties:
+        updatedAt:
+          type: [string, 'null']
+          format: date-time
+          description: The row's own timestamp (`as_of`); `null` before the first write
+        isStale:
+          type: [boolean, 'null']
+        staleAfterSeconds:
+          type: integer
+          description: Threshold in force (2700 by default)
+        ageSeconds:
+          type: [integer, 'null']
+          minimum: 0
+        stale:
+          type: [boolean, 'null']
+          deprecated: true
+          description: Legacy alias of `isStale`; use `isStale`
+    NestError:
+      type: object
+      description: Standard application error body
+      required: [message, error, statusCode]
+      properties:
+        message: { type: string }
+        error: { type: string }
+        statusCode: { type: integer }
+      additionalProperties: false
+    NestInternalError:
+      type: object
+      description: Framework default body for an unexpected error
+      required: [statusCode, message]
+      properties:
+        statusCode: { type: integer, const: 500 }
+        message: { type: string }
+      additionalProperties: false
+    RateLimited:
+      type: object
+      description: Edge (nginx) rate-limit body; never produced by the application
+      required: [statusCode, error, message]
+      properties:
+        statusCode: { type: integer, const: 429 }
+        error: { type: string }
+        message: { type: string }
+      additionalProperties: false
+
+    # ── Health ───────────────────────────────────────────────────────────────────
+    HealthPayload:
+      type: object
+      required: [status, version, uptimeSeconds, db, staleAfterSeconds, freshness, lastRefreshAt]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        version:
+          type: string
+          description: Deployed git short hash, or `unknown`
+        uptimeSeconds: { type: integer, minimum: 0 }
+        db:
+          type: object
+          required: [ok, latencyMs]
+          properties:
+            ok: { type: boolean }
+            latencyMs: { type: [integer, 'null'] }
+          additionalProperties: false
+        staleAfterSeconds: { type: integer }
+        freshness:
+          type: array
+          items: { $ref: '#/components/schemas/HealthVenueFreshness' }
+        lastRefreshAt:
+          type: [string, 'null']
+          format: date-time
+      additionalProperties: false
+    HealthVenueFreshness:
+      type: object
+      required: [venue, asOf, ageSeconds, isStale]
+      properties:
+        venue: { type: string }
+        asOf: { type: [string, 'null'], format: date-time }
+        ageSeconds: { type: [integer, 'null'], minimum: 0 }
+        isStale: { type: [boolean, 'null'] }
+      additionalProperties: false
+
+    # ── Protocols & pools ────────────────────────────────────────────────────────
+    ProtocolSummary:
+      description: One tracked venue. Strict (stable).
+      allOf:
+        - $ref: '#/components/schemas/FreshnessMeta'
+        - type: object
+          required: [id, name, type, chain, logoUrl, tvlUsd, volume24hUsd, fees24hUsd, avgSupplyApy, avgBorrowApy, topAssets, assetCount, updatedAt, stale, isStale, staleAfterSeconds, ageSeconds]
+          properties:
+            id: { type: string, description: 'Venue slug' }
+            name: { type: string }
+            type:
+              type: string
+              description: Venue type; known values are `amm`, `lending`, `vault`, `bridge`
+            chain: { type: string }
+            logoUrl: { type: [string, 'null'] }
+            tvlUsd: { type: [number, 'null'] }
+            volume24hUsd: { type: number }
+            fees24hUsd: { type: number }
+            avgSupplyApy: { type: [number, 'null'], description: 'Weighted, as a fraction (0.05 = 5%)' }
+            avgBorrowApy: { type: [number, 'null'] }
+            topAssets:
+              type: array
+              description: Up to three underlying assets by TVL
+              items: { $ref: '#/components/schemas/TopAsset' }
+            assetCount: { type: integer, minimum: 0 }
+      unevaluatedProperties: false
+    TopAsset:
+      type: object
+      required: [symbol, logoUrl, tvlUsd]
+      properties:
+        symbol: { type: [string, 'null'] }
+        logoUrl: { type: [string, 'null'] }
+        tvlUsd: { type: [number, 'null'] }
+      additionalProperties: false
+    ProtocolRef:
+      type: object
+      required: [id, name, type, logoUrl]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        type: { type: string, description: 'Venue type (`amm`, `lending`, `vault`)' }
+        logoUrl: { type: [string, 'null'] }
+      additionalProperties: false
+    PoolToken:
+      type: object
+      required: [assetId, symbol, logoUrl, role]
+      properties:
+        assetId: { type: string }
+        symbol: { type: [string, 'null'] }
+        logoUrl: { type: [string, 'null'] }
+        role:
+          type: string
+          enum: [token0, token1, reserve, underlying]
+      additionalProperties: false
+    PoolSummaryMetrics:
+      type: object
+      required: [tvlUsd, volume24hUsd, fees24hUsd, totalSuppliedUsd, totalBorrowedUsd, supplyApy, borrowApy, swaps24h]
+      properties:
+        tvlUsd: { type: [number, 'null'] }
+        volume24hUsd: { type: number }
+        fees24hUsd: { type: number }
+        totalSuppliedUsd: { type: [number, 'null'], description: 'Lending/vault only, else `null`' }
+        totalBorrowedUsd: { type: [number, 'null'] }
+        supplyApy: { type: [number, 'null'] }
+        borrowApy: { type: [number, 'null'] }
+        swaps24h: { type: [integer, 'null'], description: '`null` where no swap coverage exists' }
+      additionalProperties: false
+    PoolSummary:
+      description: One pool row of `/v1/pools`. Strict (stable).
+      allOf:
+        - $ref: '#/components/schemas/FreshnessMeta'
+        - type: object
+          required: [id, name, type, protocol, chain, contractAddress, tokens, metrics, updatedAt, stale, isStale, staleAfterSeconds, ageSeconds]
+          properties:
+            id: { type: string, description: 'Pool slug' }
+            name: { type: string }
+            type:
+              type: string
+              enum: [amm_pool, lending_pool, yield_vault]
+            protocol: { $ref: '#/components/schemas/ProtocolRef' }
+            chain: { type: string }
+            contractAddress: { type: [string, 'null'] }
+            tokens:
+              type: array
+              items: { $ref: '#/components/schemas/PoolToken' }
+            metrics: { $ref: '#/components/schemas/PoolSummaryMetrics' }
+      unevaluatedProperties: false
+    PoolDetail:
+      description: |
+        Pool detail. Discriminated by `type`: `amm_pool` → AMM variant (`tokens[]`);
+        `lending_pool` and `yield_vault` → lending variant (`reserves[]`).
+      oneOf:
+        - $ref: '#/components/schemas/PoolDetailAmm'
+        - $ref: '#/components/schemas/PoolDetailLending'
+      discriminator:
+        propertyName: type
+        mapping:
+          amm_pool: '#/components/schemas/PoolDetailAmm'
+          lending_pool: '#/components/schemas/PoolDetailLending'
+          yield_vault: '#/components/schemas/PoolDetailLending'
+    PoolDetailToken:
+      type: object
+      description: AMM leg. `logoUrl` is absent for classic (Stellar-native) pools.
+      required: [assetId, symbol, name, decimals, priceUsd, reserve, reserveUsd]
+      properties:
+        assetId: { type: [string, 'null'] }
+        symbol: { type: [string, 'null'] }
+        name: { type: [string, 'null'] }
+        logoUrl: { type: [string, 'null'] }
+        decimals: { type: [integer, 'null'] }
+        priceUsd: { type: [number, 'null'], description: '`null` when no fresh price exists' }
+        reserve: { type: [number, 'null'] }
+        reserveUsd: { type: [number, 'null'] }
+      additionalProperties: false
+    PoolDetailAmm:
+      allOf:
+        - $ref: '#/components/schemas/FreshnessMeta'
+        - type: object
+          required: [id, name, protocol, chain, type, contractAddress, metrics, tokens, updatedAt, stale, isStale, staleAfterSeconds, ageSeconds]
+          properties:
+            id: { type: string }
+            name: { type: string }
+            protocol: { $ref: '#/components/schemas/ProtocolRef' }
+            chain: { type: string }
+            type:
+              type: string
+              enum: [amm_pool]
+            contractAddress: { type: [string, 'null'] }
+            metrics:
+              type: object
+              required: [tvlUsd, volume24hUsd, fees24hUsd, events24h, swaps24h, trades24h]
+              properties:
+                tvlUsd: { type: [number, 'null'] }
+                volume24hUsd: { type: number }
+                fees24hUsd: { type: number }
+                events24h: { type: integer, minimum: 0 }
+                swaps24h: { type: [integer, 'null'] }
+                trades24h: { type: [integer, 'null'], description: 'Classic (Horizon) pools only' }
+              additionalProperties: false
+            tokens:
+              type: array
+              items: { $ref: '#/components/schemas/PoolDetailToken' }
+      unevaluatedProperties: false
+    PoolReserve:
+      type: object
+      required: [assetId, symbol, name, logoUrl, decimals, priceUsd, supplied, borrowed, backstopCredit, supplyCap, supplyApr, supplyApy, borrowApr, borrowApy]
+      properties:
+        assetId: { type: string }
+        symbol: { type: [string, 'null'] }
+        name: { type: [string, 'null'] }
+        logoUrl: { type: [string, 'null'] }
+        decimals: { type: [integer, 'null'] }
+        priceUsd: { type: [number, 'null'] }
+        supplied: { type: [number, 'null'] }
+        borrowed: { type: [number, 'null'] }
+        backstopCredit: { type: [number, 'null'] }
+        supplyCap: { type: [number, 'null'] }
+        supplyApr: { type: [number, 'null'] }
+        supplyApy: { type: [number, 'null'] }
+        borrowApr: { type: [number, 'null'] }
+        borrowApy: { type: [number, 'null'] }
+      additionalProperties: false
+    PoolDetailLending:
+      allOf:
+        - $ref: '#/components/schemas/FreshnessMeta'
+        - type: object
+          required: [id, name, protocol, chain, type, contractAddress, metrics, reserves, updatedAt, stale, isStale, staleAfterSeconds, ageSeconds]
+          properties:
+            id: { type: string }
+            name: { type: string }
+            protocol: { $ref: '#/components/schemas/ProtocolRef' }
+            chain: { type: string }
+            type:
+              type: string
+              enum: [lending_pool, yield_vault]
+            contractAddress: { type: [string, 'null'] }
+            metrics:
+              type: object
+              required: [tvlUsd, totalSuppliedUsd, totalBorrowedUsd, totalBackstopCreditUsd, netLiquidityUsd, supplyApy, borrowApy, volume24hUsd, fees24hUsd, events24h]
+              properties:
+                tvlUsd: { type: [number, 'null'] }
+                totalSuppliedUsd: { type: [number, 'null'] }
+                totalBorrowedUsd: { type: [number, 'null'] }
+                totalBackstopCreditUsd: { type: [number, 'null'] }
+                netLiquidityUsd: { type: [number, 'null'] }
+                supplyApy: { type: [number, 'null'] }
+                borrowApy: { type: [number, 'null'] }
+                volume24hUsd: { type: number }
+                fees24hUsd: { type: number }
+                events24h: { type: integer, minimum: 0 }
+              additionalProperties: false
+            reserves:
+              type: array
+              items: { $ref: '#/components/schemas/PoolReserve' }
+      unevaluatedProperties: false
+    PoolFlows:
+      type: object
+      description: Beta — open schema.
+      required: [slug, covered, window, days, coverageSince, series, totals, updatedAt]
+      properties:
+        slug: { type: string }
+        covered: { type: boolean }
+        window: { type: string, enum: ['24h', '7d', '30d'] }
+        days: { type: integer }
+        coverageSince: { type: [string, 'null'], format: date }
+        series:
+          type: array
+          items:
+            type: object
+            required: [day, inflowUsd, outflowUsd, netUsd, cumulativeNetUsd]
+            properties:
+              day: { type: string, format: date }
+              inflowUsd: { type: number }
+              outflowUsd: { type: number }
+              netUsd: { type: number }
+              cumulativeNetUsd: { type: number }
+        totals:
+          type: object
+          required: [inflowUsd, outflowUsd, netUsd, depositCount, withdrawCount]
+          properties:
+            inflowUsd: { type: number }
+            outflowUsd: { type: number }
+            netUsd: { type: number }
+            depositCount: { type: integer }
+            withdrawCount: { type: integer }
+        updatedAt: { type: string, format: date-time, description: 'Request time' }
+    PoolSeries:
+      type: object
+      description: Beta — open schema.
+      required: [slug, covered, kind, points, first, last, updatedAt]
+      properties:
+        slug: { type: string }
+        covered: { type: boolean }
+        kind: { type: string, enum: [tvl] }
+        points:
+          type: array
+          items:
+            type: object
+            required: [day, tvlUsd]
+            properties:
+              day: { type: string, format: date }
+              tvlUsd: { type: number }
+        first: { type: [string, 'null'], format: date }
+        last: { type: [string, 'null'], format: date }
+        updatedAt: { type: string, format: date-time, description: 'Request time' }
+
+    # ── Network ──────────────────────────────────────────────────────────────────
+    NetworkStats:
+      description: Strict (stable).
+      allOf:
+        - $ref: '#/components/schemas/FreshnessMeta'
+        - type: object
+          required: [xlmPriceUsd, xlmPriceChange24hPct, stellarTvlUsd, activeWallets, stableMcapUsd, dexVolume24hUsd, protocolCount, usdcSupplyUsd, avgTxFeeXlm, updatedAt, isStale, staleAfterSeconds]
+          properties:
+            xlmPriceUsd: { type: [number, 'null'] }
+            xlmPriceChange24hPct: { type: [number, 'null'] }
+            stellarTvlUsd: { type: [number, 'null'], description: 'Latest tracked-network TVL point (gross)' }
+            activeWallets: { type: [integer, 'null'] }
+            stableMcapUsd: { type: [number, 'null'] }
+            dexVolume24hUsd: { type: [number, 'null'] }
+            protocolCount: { type: integer }
+            usdcSupplyUsd: { type: [number, 'null'] }
+            avgTxFeeXlm: { type: [number, 'null'] }
+      unevaluatedProperties: false
+    NetworkTvlSeries:
+      type: object
+      description: Strict (stable).
+      required: [series, meta]
+      properties:
+        series:
+          type: array
+          items: { $ref: '#/components/schemas/NetworkTvlPoint' }
+        meta:
+          type: object
+          required: [source, from, to, firstSnapshotAt, partial, bucket, methodologyChangeAt]
+          properties:
+            source: { type: string, enum: [snapshots] }
+            from: { type: string, format: date-time }
+            to: { type: string, format: date-time }
+            firstSnapshotAt: { type: [string, 'null'], format: date-time }
+            partial: { type: boolean, description: '`true` while history is younger than the window' }
+            bucket: { type: string, enum: [hour] }
+            methodologyChangeAt: { type: [string, 'null'], format: date-time }
+          additionalProperties: false
+      additionalProperties: false
+    NetworkTvlPoint:
+      type: object
+      required: [t, tvlUsd, tvlNetUsd, protocolCount]
+      properties:
+        t: { type: string, format: date-time, description: 'Hour bucket' }
+        tvlUsd: { type: number, description: 'Gross tracked TVL' }
+        tvlNetUsd: { type: [number, 'null'], description: 'Supplied minus borrowed; `null` before the methodology change' }
+        protocolCount: { type: integer }
+      additionalProperties: false
+
+    # ── Bridge ───────────────────────────────────────────────────────────────────
+    BridgeChainBreakdown:
+      type: object
+      required: [chainId, chain, amountUsd, count]
+      properties:
+        chainId: { type: [integer, 'null'] }
+        chain: { type: [string, 'null'], description: 'Counterparty chain code (e.g. `SOL`, `ALG`)' }
+        amountUsd: { type: number }
+        count: { type: integer }
+      additionalProperties: false
+    BridgeDirectionSummary:
+      type: object
+      required: [totalUsd, count, byChain]
+      properties:
+        totalUsd: { type: number }
+        count: { type: integer }
+        byChain:
+          type: array
+          items: { $ref: '#/components/schemas/BridgeChainBreakdown' }
+      additionalProperties: false
+    BridgeSummary:
+      type: object
+      description: Strict (stable).
+      required: [window, token, inflow, outflow, netUsd, lastFlowAt, updatedAt]
+      properties:
+        window: { type: string, enum: ['24h', '7d', '30d'] }
+        token: { type: string, enum: [USDC], description: 'The bridge is mono-token' }
+        inflow: { $ref: '#/components/schemas/BridgeDirectionSummary' }
+        outflow: { $ref: '#/components/schemas/BridgeDirectionSummary' }
+        netUsd: { type: number }
+        lastFlowAt: { type: [string, 'null'], format: date-time }
+        updatedAt: { type: string, format: date-time, description: 'Request time' }
+      additionalProperties: false
+    BridgeFlow:
+      type: object
+      required: [direction, chainId, chain, token, amountScaled, amountUsd, txHash, recipient, occurredAt]
+      properties:
+        direction: { type: string, enum: [inflow, outflow] }
+        chainId: { type: [integer, 'null'] }
+        chain: { type: [string, 'null'] }
+        token: { type: string }
+        amountScaled: { type: [number, 'null'], description: 'Token units; precision differs by direction, compare `amountUsd`' }
+        amountUsd: { type: [number, 'null'] }
+        txHash: { type: string }
+        recipient: { type: [string, 'null'] }
+        occurredAt: { type: [string, 'null'], format: date-time }
+      additionalProperties: false
+    BridgeFlows:
+      type: object
+      description: Strict (stable).
+      required: [count, limit, flows]
+      properties:
+        count: { type: integer }
+        limit: { type: integer }
+        flows:
+          type: array
+          items: { $ref: '#/components/schemas/BridgeFlow' }
+      additionalProperties: false
+    BridgeSeries:
+      type: object
+      description: Strict (stable).
+      required: [days, series, updatedAt]
+      properties:
+        days: { type: integer }
+        series:
+          type: array
+          items:
+            type: object
+            required: [day, inflowUsd, outflowUsd, netUsd]
+            properties:
+              day: { type: string, format: date }
+              inflowUsd: { type: number }
+              outflowUsd: { type: number }
+              netUsd: { type: number }
+            additionalProperties: false
+        updatedAt: { type: string, format: date-time, description: 'Request time' }
+      additionalProperties: false
+
+    # ── Operations (beta — open schemas) ─────────────────────────────────────────
+    OpsStatus:
+      type: object
+      required: [window, generatedAt, cadenceMinutes, staleAfterSeconds, historySince, noDataBefore, runs, gaps, overall, components]
+      properties:
+        window: { type: string }
+        generatedAt: { type: string, format: date-time }
+        cadenceMinutes: { type: integer }
+        staleAfterSeconds: { type: integer }
+        historySince: { type: [string, 'null'], format: date-time }
+        noDataBefore: { type: [string, 'null'], format: date-time }
+        runs:
+          type: array
+          items:
+            type: object
+            required: [runAt]
+            properties:
+              runAt: { type: string, format: date-time }
+        gaps:
+          type: array
+          items:
+            type: object
+            required: [after, before, missedCycles]
+            properties:
+              after: { type: string, format: date-time }
+              before: { type: [string, 'null'], format: date-time, description: '`null` = open-ended trailing gap' }
+              missedCycles: { type: integer }
+        overall:
+          type: object
+          required: [state, lastRunAt, missedCycles24h, failedSteps24h]
+          properties:
+            state: { type: string, enum: [operational, degraded, outage, unknown] }
+            lastRunAt: { type: [string, 'null'], format: date-time }
+            missedCycles24h: { type: integer }
+            failedSteps24h: { type: integer }
+        components:
+          type: array
+          items: { $ref: '#/components/schemas/OpsStatusComponent' }
+        priceSources: { $ref: '#/components/schemas/PriceSourcesSummary' }
+    OpsStatusComponent:
+      type: object
+      required: [id, kind, label, state, availability24h, segments]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [step, rpc] }
+        label: { type: string }
+        state: { type: string, enum: [ok, degraded, failed, stale] }
+        availability24h: { type: [number, 'null'], minimum: 0, maximum: 1 }
+        segments:
+          type: array
+          items:
+            type: object
+            description: Step segment (`durationMs`, `message`) or RPC segment (`calls`, `errors`, `errorRate`, percentiles)
+            required: [runAt, state]
+            properties:
+              runAt: { type: string, format: date-time }
+              state: { type: string, enum: [ok, degraded, failed] }
+              durationMs: { type: integer }
+              message: { type: [string, 'null'] }
+              calls: { type: integer }
+              errors: { type: integer }
+              errorRate: { type: number }
+              p50Ms: { type: integer }
+              p95Ms: { type: integer }
+              p99Ms: { type: integer }
+    PriceSourcesSummary:
+      type: object
+      required: [pricedAssets, totalAssets, unpricedAssets, referenceAssets, singleSourceAssets, disagreements]
+      properties:
+        pricedAssets: { type: integer }
+        totalAssets: { type: integer }
+        unpricedAssets: { type: array, items: { type: string } }
+        referenceAssets: { type: array, items: { type: string } }
+        singleSourceAssets: { type: array, items: { type: string } }
+        disagreements:
+          type: array
+          items:
+            type: object
+            required: [symbol, source, deviationPct]
+            properties:
+              symbol: { type: string }
+              source: { type: string }
+              deviationPct: { type: number }
+    OpsMetrics:
+      type: object
+      required: [window, scope, rpc, steps, faucet]
+      properties:
+        window: { type: string }
+        scope: { type: string }
+        rpc:
+          type: array
+          items:
+            type: object
+            required: [target, calls, errors, errorRate, latest, runs]
+            properties:
+              target: { type: string }
+              calls: { type: integer }
+              errors: { type: integer }
+              errorRate: { type: number }
+              latest:
+                type: object
+                required: [runAt, p50Ms, p95Ms, p99Ms]
+                properties:
+                  runAt: { type: string, format: date-time }
+                  p50Ms: { type: integer }
+                  p95Ms: { type: integer }
+                  p99Ms: { type: integer }
+              runs:
+                type: array
+                items:
+                  type: object
+                  required: [runAt, calls, errors, p50Ms, p95Ms, p99Ms]
+                  properties:
+                    runAt: { type: string, format: date-time }
+                    calls: { type: integer }
+                    errors: { type: integer }
+                    p50Ms: { type: integer }
+                    p95Ms: { type: integer }
+                    p99Ms: { type: integer }
+        steps:
+          type: array
+          items:
+            type: object
+            required: [step, lastRunAt, lastStatus, lastDurationMs, lastMessage, failures24h]
+            properties:
+              step: { type: string }
+              lastRunAt: { type: string, format: date-time }
+              lastStatus: { type: string }
+              lastDurationMs: { type: integer }
+              lastMessage: { type: [string, 'null'] }
+              failures24h: { type: integer }
+        faucet:
+          type: object
+          description: Deploy-dependent (campaign configuration)
+          required: [enabled, network, campaign, rewardXlm, claims, allTime, treasurySpendableXlm]
+          properties:
+            enabled: { type: boolean }
+            network: { type: string }
+            campaign: { type: integer }
+            rewardXlm: { type: number }
+            claims:
+              type: object
+              required: [pending, paid, failed, paid24h, remainingClaims]
+              properties:
+                pending: { type: integer }
+                paid: { type: integer }
+                failed: { type: integer }
+                paid24h: { type: integer }
+                remainingClaims: { type: integer }
+            allTime:
+              type: object
+              required: [pending, paid, failed]
+              properties:
+                pending: { type: integer }
+                paid: { type: integer }
+                failed: { type: integer }
+            treasurySpendableXlm: { type: [number, 'null'] }
+    OpsAdoption:
+      type: object
+      required: [boundary, wallets, actions]
+      properties:
+        boundary: { type: string }
+        wallets:
+          type: object
+          required: [total, signers, watchOnly, distinctUsers]
+          properties:
+            total: { type: integer }
+            signers: { type: integer }
+            watchOnly: { type: integer }
+            distinctUsers: { type: integer }
+        actions:
+          type: object
+          required: [total, byKind, distinctAddresses]
+          properties:
+            total: { type: integer }
+            byKind:
+              type: array
+              items:
+                type: object
+                required: [kind, network, count24h, count7d, total]
+                properties:
+                  kind: { type: string, description: 'Open set (e.g. `sdex-quote`, `sdex-swap-build`, `blend-deposit-build`)' }
+                  network: { type: string }
+                  count24h: { type: integer }
+                  count7d: { type: integer }
+                  total: { type: integer }
+            distinctAddresses:
+              type: object
+              required: [count24h, count7d, total]
+              properties:
+                count24h: { type: integer }
+                count7d: { type: integer }
+                total: { type: integer }
+
+    # ── Quotes ───────────────────────────────────────────────────────────────────
+    SdexAssetRef:
+      description: |
+        An asset either as a short code (`XLM`, or `USDC` resolved to the vetted issuer for the
+        network) or as an explicit `{code, issuer}` (issuer required for anything but XLM).
+      oneOf:
+        - type: string
+          enum: [XLM, USDC]
+        - type: object
+          required: [code]
+          properties:
+            code: { type: string, pattern: '^[A-Za-z0-9]{1,12}$' }
+            issuer: { type: string, pattern: '^G[A-Z2-7]{55}$', description: 'Required unless `code` is `XLM`' }
+          additionalProperties: false
+    SdexQuoteRequest:
+      type: object
+      required: [fromAsset, toAsset, amount]
+      properties:
+        fromAsset: { $ref: '#/components/schemas/SdexAssetRef' }
+        toAsset: { $ref: '#/components/schemas/SdexAssetRef' }
+        amount:
+          type: string
+          description: Positive decimal amount of `fromAsset` to send, as a string
+          pattern: '^[0-9]*\.?[0-9]+$'
+        network:
+          type: string
+          enum: [testnet, mainnet]
+          default: testnet
+          description: '`mainnet` answers `403` while the server-side kill-switch is off'
+      additionalProperties: false
+    SdexQuote:
+      type: object
+      description: Beta — open schema.
+      required: [sourceAmount, destAmount, rate]
+      properties:
+        sourceAmount: { type: string, description: 'Echo of `amount`' }
+        destAmount: { type: string, description: 'Best direct-route destination amount, 7 decimals' }
+        rate: { type: number, description: '`destAmount / sourceAmount`' }

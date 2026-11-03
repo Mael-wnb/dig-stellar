@@ -20,9 +20,13 @@ document always means the HTTP API contract, never a smart contract.
 3. **What is not public.** Everything userId-scoped (wallets, alert rules, notifications),
    every XDR builder and the witness ledger, the faucet money path, auth and campaign
    routes, and the legacy prefix-less routes. See §Exclusions.
-4. **Source of truth** is a hand-written `docs/api/openapi.v1.yaml` (OpenAPI 3.1), served by a
-   new small `openapi` module at `GET /v1/openapi.json`, with a Scalar reference page at
-   `GET /v1/docs`. **Zero edits to existing services or controllers.** No `@nestjs/swagger`,
+4. **Source of truth** is a hand-written OpenAPI 3.1 file, `apps/api/openapi/openapi.v1.yaml`
+   (the only copy; `docs/api/README.md` points to it), served by a new small `openapi` module
+   at `GET /v1/openapi.json`, with a Scalar reference page at `GET /v1/docs`. It lives under
+   `apps/api/`, not `docs/`, because one file must be reachable by every runtime: `nest build`
+   copies it to `dist/openapi/` (nest-cli assets), which is what pm2 (`dist/main.js`) and the
+   Lot Z Docker image (ships `apps/api/dist` only) read. **Zero edits to existing services or
+   controllers.** No `@nestjs/swagger`,
    no DTO classes: the recon found no response DTO on the public tier, every payload is an
    inline object literal, and a decorated class the code never instantiates would drift
    silently.
@@ -30,8 +34,9 @@ document always means the HTTP API contract, never a smart contract.
    Postgres and validates every public response (and the error schemas) against the yaml,
    exposed as `pnpm -C apps/api test:contract`. It is **not** added to the unit CI workflow in
    this lot (Lot AD owns CI); it goes into the deploy checklist.
-6. **Error shapes are documented as they are.** Five shapes exist today; all five are written
-   into the spec verbatim. No global `ExceptionFilter` and no unification in this lot.
+6. **Error shapes are documented as they are.** Five shapes exist today; the four reachable from
+   the public tier are written into the spec verbatim (the actions object is not, see §Error
+   shapes). No global `ExceptionFilter` and no unification in this lot.
 7. **No SDK, no auth, no API keys** in this lot. External callers are governed by the existing
    nginx per-IP zones (§Rate limits).
 8. **Spec examples** are captured from production public GETs in API2, not from the local
@@ -51,7 +56,7 @@ Express adds a weak `ETag` to every JSON body). Freshness = fields present in th
 | `GET /v1/pools/{slug}` | stable | `api_general` | none | same as `/v1/protocols` | Pool detail; **two shapes** by venue type: AMM (`tokens[]`) vs lending/vault (`reserves[]`) | Unknown slug → 404 (S1) |
 | `GET /v1/pools/{slug}/flows` | beta | `api_general` | none | `updatedAt` (= request time), `coverageSince` | Deposit/withdraw flows per UTC day; `window` ∈ 24h/7d/30d (unknown → 7d) | `covered:false` short form keeps the same keys; coverage is data-driven |
 | `GET /v1/pools/{slug}/series` | beta | `api_general` | none | `updatedAt` (= request time), `first`, `last` | TVL history, lending pools only; `covered:false` below 2 points | Documented as a latest-price approximation; AMM/vault pools return `covered:false` |
-| `GET /v1/network/stats` | stable | `api_general` | none | `updatedAt`, `isStale`, `staleAfterSeconds` | Network headline figures read from `network_stats_latest`; no external call at request time | Cold start returns all-null with `protocolCount: 3` |
+| `GET /v1/network/stats` | stable | `api_general` | none | `updatedAt`, `isStale`, `staleAfterSeconds` | Network headline figures read from `network_stats_latest`; no external call at request time | Values are environment-dependent (indexer-written); the spec example is captured from production |
 | `GET /v1/network/tvl-series` | stable | `api_general` | none | `meta.from/to/firstSnapshotAt/partial/methodologyChangeAt` | Hourly tracked-TVL series over a fixed 7-day window | Methodology step-down of 2026-08-17 marked in `meta`, history never rewritten |
 | `GET /v1/bridge/summary` | stable | `api_general` | none | `updatedAt` (= request time), `lastFlowAt` | Allbridge USDC inflow/outflow totals by source chain; `window` ∈ 24h/7d/30d (unknown → 7d) | **Upstream venue paused** since 2026-07-20 (`docs/runbooks.md`); totals are legitimately zero until relaunch |
 | `GET /v1/bridge/flows` | stable | `api_general` | none | none | Latest N flows; `direction` filter, `limit` clamped 1..200 (default 50) | Same upstream pause; feed shows the last flows before it |
@@ -76,13 +81,19 @@ The SDEX quote is POST-only; there is no GET form.
 
 ## Error shapes (documented, not unified)
 
-Five shapes exist today. All five go into the spec under `components.responses`, exactly as
-captured in the recon. No global `ExceptionFilter` and no unification happens in this lot.
+Five shapes exist today. The four reachable from the public tier (S1, S3, S4, S5) go into the
+spec under `components.responses`, exactly as captured in the recon; S2 is unreachable from the
+public tier and stays out. No global `ExceptionFilter` and no unification happens in this lot.
+
+The public quote (`POST /v1/actions/sdex/quote`) emits S1 only: 400 on body validation
+(unknown asset, same asset, non-positive amount, unknown `network`, off-whitelist mainnet asset),
+403 when `network: "mainnet"` and the kill-switch is off, 422 when Horizon returns no direct
+path, and an S1 500 (`Failed to fetch swap quote from Horizon`) when the Horizon call fails.
 
 | Shape | Producer | Produced by (public tier) | Example body (verbatim from the recon) |
 |---|---|---|---|
 | S1 Nest standard | every explicit `HttpException` + Nest's 404 + Express body/URI errors re-wrapped by Nest | 400 on `/v1/ops/status` (`window`), 400/403/422 on the SDEX quote, 404 on unknown pool slug or unknown route | `{"message":"Pool not found: does-not-exist","error":"Not Found","statusCode":404}` · `{"message":"Unsupported window '7d'. Supported: 24h","error":"Bad Request","statusCode":400}` · `{"message":"Mainnet actions are not enabled.","error":"Forbidden","statusCode":403}` · `{"message":"No direct liquidity for XLM→ZZZQ at this amount on testnet","error":"Unprocessable Entity","statusCode":422}` · `{"message":"Cannot GET /v1/nope","error":"Not Found","statusCode":404}` |
-| S2 actions custom object (no `statusCode`, no `error`) | `BadRequestException` given an object in `actions.service.ts` | 400 on the actions spendable preflight; reachable from `sdex/swap` and the Blend builders (excluded routes), **not** from the public quote. Documented because it is the one shape the web parses by `code` | `{"code":"INSUFFICIENT_SPENDABLE_BALANCE","message":"Insufficient spendable XLM balance: 69774.5623753 available. The rest is reserved by the Stellar network","asset":"XLM","spendable":"69774.5623753","requested":"999999999"}` |
+| S2 actions custom object (no `statusCode`, no `error`) | `BadRequestException` given an object in `actions.service.ts` | **Not emitted by any public-tier endpoint**, so it is **not in the spec**: only the spendable preflight of `sdex/swap` and the Blend builders (excluded routes) produces it. Listed here because it exists and the web parses it by `code` | `{"code":"INSUFFICIENT_SPENDABLE_BALANCE","message":"Insufficient spendable XLM balance: 69774.5623753 available. The rest is reserved by the Stellar network","asset":"XLM","spendable":"69774.5623753","requested":"999999999"}` |
 | S3 nginx 429 | `@rate_limited` named location in the vhost; never reaches Nest | any public route over its zone limit | `{"statusCode":429,"error":"Too Many Requests","message":"Rate limit exceeded - please slow down."}` with `Retry-After: 1` |
 | S4 Nest 500 (two keys) | `BaseExceptionFilter` for any non-`HttpException` throw | not reproducible from the public tier in the recon; the SDEX quote throws an S1 500 (`Failed to fetch swap quote from Horizon`) when Horizon fails | `{"statusCode":500,"message":"Internal server error"}` |
 | S5 health 503 | `/health` throws its own payload when the DB is unreachable | `GET /health` only | the full health payload (`status:"degraded"`, `db.ok:false`, …), no `statusCode`/`message` keys |
@@ -92,9 +103,12 @@ captured in the recon. No global `ExceptionFilter` and no unification happens in
 - **Additive only inside `/v1`**: new fields and new endpoints may land at any time. Removing a
   field, renaming it, or changing its type is a breaking change and ships as `/v2` alongside
   `/v1`, never in place.
-- **`x-stability`** is set per operation in the yaml: `stable` means the shape is covered by
-  the additive rule above; `beta` means keys may still be added, removed or re-typed inside
-  `/v1` with a changelog line, and callers should pin by key, not by position.
+- **`x-stability`** is set per operation in the yaml. `stable` operations change additively
+  only, and their response schemas carry `additionalProperties: false` (or its `allOf`-aware
+  JSON Schema 2020-12 form `unevaluatedProperties: false` where the shared `FreshnessMeta` is
+  composed in) so the contract test fails on any undocumented key. `beta` operations may change shape inside `/v1`; their schemas
+  do not set `additionalProperties: false`. **Every change, stable or beta, takes one line in
+  `docs/api/CHANGELOG.md`.**
 - A `beta` operation **moves to `stable` only through an update of this decision doc**, never
   by editing the yaml alone.
 - The freshness fields (`isStale`, `staleAfterSeconds`, `asOf`/`updatedAt`, `ageSeconds`, and
@@ -116,10 +130,13 @@ Over the limit the edge returns the S3 body with `Retry-After: 1` and an echoed
 
 ## Docs page
 
-`GET /v1/docs` is a single static HTML page loading Scalar from a CDN, served with an explicit
-`text/html` content type because the API vhost sets `X-Content-Type-Options: nosniff`. The
-vhost has no Content-Security-Policy (confirmed on the deployed conf and the live headers), so
-nothing blocks the CDN script. Both new routes fall under `location /v1/` → `api_general`.
+`GET /v1/docs` is a single static HTML page loading Scalar API Reference from the jsDelivr CDN
+(no build step), served with an explicit `text/html; charset=utf-8` content type because the
+API vhost sets `X-Content-Type-Options: nosniff`. The vhost has no Content-Security-Policy
+(confirmed on the deployed conf and the live headers), so nothing blocks the CDN script. Both
+`GET /v1/openapi.json` and `GET /v1/docs` answer with `Cache-Control: public, max-age=3600`
+and fall under the existing `location /v1/` → `api_general`; no nginx change is needed for
+them to work. The CDN dependency is an open item (vendor the bundle later).
 
 ## Delivery plan
 
@@ -139,6 +156,7 @@ nothing blocks the CDN script. Both new routes fall under `location /v1/` → `a
   break `apps/web`, which reads `code`/`message` and `err.status` only).
 - Contract test in CI → Lot AD.
 - Optional API keys + per-key quotas → later product lot.
+- `GET /v1/docs` loads Scalar from the jsDelivr CDN; vendoring the bundle is a later step.
 - `GET /v1/wallets` without `userId` resolves to the demo user and returns 200 locally,
   while `docs/deployment.md` §G1 states "400 (userId required)" → SEC Gate 3.
 - `CLAUDE.md` still says `GET /v1/network/stats` hits external APIs live; the recon shows it

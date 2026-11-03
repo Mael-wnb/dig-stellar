@@ -12,9 +12,10 @@ import { AlertsModule } from './modules/alerts/alerts.module';
 import { OpsModule } from './modules/ops/ops.module';
 import { FaucetModule } from './modules/faucet/faucet.module';
 import { CampaignModule } from './modules/campaign/campaign.module';
+import { OpenApiModule } from './modules/openapi/openapi.module';
 
 @Module({
-  imports: [DbModule, StellarModule, WalletsModule, NetworkModule, ActionsModule, BridgeModule, AlertsModule, OpsModule, FaucetModule, CampaignModule],
+  imports: [DbModule, StellarModule, WalletsModule, NetworkModule, ActionsModule, BridgeModule, AlertsModule, OpsModule, FaucetModule, CampaignModule, OpenApiModule],
   controllers: [AppController],
   providers: [AppService],
 })
