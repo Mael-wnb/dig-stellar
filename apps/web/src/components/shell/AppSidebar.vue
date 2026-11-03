@@ -12,6 +12,7 @@ import { useSharedWallets } from '../../composables/useSharedWallets'
 import { useModals } from '../../composables/useModals'
 import { useCampaign } from '../../composables/useCampaign'
 import { isAnalyticsConfigured, openAnalyticsBanner } from '../../lib/analytics'
+import { getApiBaseUrl } from '../../api/client'
 import digWordmark from '../../assets/design/dig-wordmark.svg'
 import { onMounted } from 'vue'
 
@@ -42,6 +43,8 @@ const ICONS: Record<string, string> = {
   wallet: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18"/><circle cx="17" cy="14" r="1.3" fill="currentColor" stroke="none"/></svg>',
   bell: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
   spark: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2z"/></svg>',
+  // External-link affordance (Lot API): same stroke style as the nav icons.
+  external: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>',
 }
 
 const navItems = computed<NavItem[]>(() => [
@@ -93,6 +96,11 @@ const networkLabel = 'Stellar mainnet'
 // Lot AN0: the consent banner can be re-opened from here (change of mind).
 // Hidden when no measurement id is configured — nothing to consent to.
 const analyticsConfigured = isAnalyticsConfigured()
+
+// Lot API: the public API reference (GET /v1/docs), served by the API itself.
+// Derived from the one API base the app already uses (…/v1), so it follows the
+// deployment: stellar-api.getdig.ai in prod, the local API in dev.
+const apiDocsUrl = `${getApiBaseUrl()}/docs`
 </script>
 
 <template>
@@ -200,6 +208,21 @@ const analyticsConfigured = isAnalyticsConfigured()
     >
       System status
     </button>
+
+    <!-- API docs (Lot API): external link to the API's own reference page, new
+         tab. Same row style as "System status"; the drawer rule gives it the
+         44 px target below lg. -->
+    <a
+      :href="apiDocsUrl"
+      target="_blank"
+      rel="noopener noreferrer"
+      title="Open the API reference (new tab)"
+      class="dig-nav flex items-center gap-[8px] px-[10px] py-[7px] rounded-[10px] cursor-pointer text-[12.5px] font-medium w-full no-underline transition-colors"
+      style="color: var(--dig-faint)"
+    >
+      <span>API docs</span>
+      <span class="ml-auto flex items-center opacity-70" aria-hidden="true" v-html="ICONS.external" />
+    </a>
 
     <!-- Footer -->
     <div class="px-[10px] pt-[14px] pb-[4px]" style="border-top: 1px solid #2C2C29">

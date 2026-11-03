@@ -4,8 +4,8 @@
 `node apps/api/dist/main.js` on `127.0.0.1:3102` against the local compose Postgres), captured
 with the local Google Chrome in headless mode (`--headless=new --window-size=1440,1100
 --virtual-time-budget=15000 --screenshot`). The repo has no Playwright or Puppeteer tooling; the
-screenshot below is the local Chrome capture, and a production capture is pending the VPS
-deploy.
+screenshot below is the local Chrome capture; the production capture, taken after the
+2026-11-03 deploy, is in `api5-prod-verification.md` (`api5-prod-docs-page.png`).
 
 ![GET /v1/docs rendered from the built dist, Scalar 1.76.4](./api3-docs-page.png)
 

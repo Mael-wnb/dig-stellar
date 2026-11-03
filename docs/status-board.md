@@ -369,8 +369,8 @@ with; the tables and notes below are kept as the historical record of how each c
   served old code (pulled, not rebuilt — caught by the `/health` version check; Lot AD input).
   Evidence: `docs/evidence/hotfix-lending-supplied-side/`. No SCF criterion involved. Surfaced
   by the Lot LM L0 recon.
-- Post-grant note (2026-11-03, Lot API): **public API contract built, VPS deploy pending
-  founder-side.** The read-only data-and-signals tier of `apps/api` now has a published HTTP
+- Post-grant note (2026-11-03, Lot API): **public API contract live in prod (deployed
+  2026-11-03, `de1b8bb`).** The read-only data-and-signals tier of `apps/api` now has a published HTTP
   contract: a hand-written OpenAPI 3.1 document (`apps/api/openapi/openapi.v1.yaml`, 15
   operations — 9 `stable`, 6 `beta`) served at `GET /v1/openapi.json`, a Scalar reference
   page at `GET /v1/docs` (CDN pinned to 1.76.4), and `pnpm -C apps/api test:contract`, which
@@ -380,9 +380,10 @@ with; the tables and notes below are kept as the historical record of how each c
   builders, faucet, auth/campaign and the legacy prefix-less routes stay out of the public
   spec. Zero edits to existing services or controllers; one runtime dependency (`yaml`).
   Decision: `docs/decisions/2026-11-03-public-api-v1-surface.md`; evidence
-  `docs/evidence/lot-api/`; deploy per `docs/deployment.md` "Lot API deploy sequence" (API
-  first, the web sidebar link on its own branch after). No SCF criterion involved.
-- Last updated: 2026-11-03
+  `docs/evidence/lot-api/` (prod verification: `api5-prod-verification.md` — version 1.0.0,
+  15 paths, `/v1/docs` text/html, `/health` version `de1b8bb`). Web: an "API docs" sidebar
+  link to `/v1/docs` on `feat/lot-api-web` (Vercel preview pending). No SCF criterion involved.
+- Last updated: 2026-11-03 (Lot API deployed)
 
 ---
 

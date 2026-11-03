@@ -1,7 +1,7 @@
 # Decision: Public API v1 surface (2026-11-03)
 
-**Status: decided (founder ruling, 2026-11-02) and implemented on `feat/lot-api` (API2–API4,
-2026-11-03); VPS deploy pending founder-side (`docs/deployment.md` "Lot API deploy sequence").**
+**Status: implemented, deployed 2026-11-03 (`de1b8bb`) — `/v1/openapi.json` 1.0.0 and `/v1/docs`
+live on the production API (`docs/evidence/lot-api/api5-prod-verification.md`).**
 
 Recon basis: `docs/evidence/lot-api/api0-recon.md` (API0, read-only, 2026-11-02). Every
 number and example body below comes from that recon or from the repo files it cites.
