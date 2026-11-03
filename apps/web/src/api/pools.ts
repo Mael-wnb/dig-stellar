@@ -29,8 +29,9 @@ export async function fetchPoolFlows(
   );
 }
 
-// TVL history (Lot C). Blend-only honest reconstruction; a covered=false
-// response means the caller keeps the "building history" note.
+// TVL history (Lot C). Covered for lending venues only today; a covered=false
+// response means the caller shows the plain "TVL history not available" state
+// (Lot PRE: no date unless `first` is set).
 export async function fetchPoolSeries(poolId: string): Promise<PoolSeries> {
   return apiFetch<PoolSeries>(`/pools/${encodeURIComponent(poolId)}/series`);
 }

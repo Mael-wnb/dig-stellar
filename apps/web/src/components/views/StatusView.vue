@@ -7,17 +7,11 @@
 // uptime probe.
 import { computed } from 'vue'
 import StatusBar from '../status/StatusBar.vue'
-import CampaignMetricsSection from '../status/CampaignMetricsSection.vue'
 import { useOpsStatus } from '../../composables/useOpsStatus'
-import { useBridgeUpstreamPaused } from '../../composables/useBridge'
 import { SEVERITY_STYLE } from '../../composables/useAlerts'
 import type { OpsComponentState, OpsOverallState } from '../../api/ops'
 
 const { data, state, error, lastRunAgeSeconds, reload } = useOpsStatus()
-
-// Allbridge suffix: the SAME condition as the bridge staleness banner
-// (useBridge single source) — UI copy only, the API stays neutral.
-const { upstreamPaused } = useBridgeUpstreamPaused()
 
 function plural(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? '' : 's'}`
@@ -112,11 +106,8 @@ const rpcComponents = computed(
 )
 
 function rowLabel(c: { id: string; label: string }): string {
-  // "(upstream paused)" is UI copy on the Allbridge row only, from the shared
-  // bridge condition — never invented here, never sent by the API.
-  if (c.id === 'step:allbridge' && upstreamPaused.value === true) {
-    return `${c.label} (upstream paused)`
-  }
+  // Labels come from the API verbatim (Lot PRE removed the Allbridge suffix
+  // together with the retired bridge step).
   return c.label
 }
 
@@ -311,9 +302,5 @@ const LEGEND = [
         an external uptime probe of the API or the dashboard.
       </p>
     </template>
-
-    <!-- Lot EP (EP3): public campaign counts, independent of the pipeline state above.
-         Renders nothing while the campaign is dark. -->
-    <CampaignMetricsSection />
   </div>
 </template>

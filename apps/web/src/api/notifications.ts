@@ -1,6 +1,6 @@
 // apps/web/src/api/notifications.ts
 //
-// Thin typed client over the D2 notifications read API, mirroring api/bridge.ts +
+// Thin typed client over the D2 notifications read API, mirroring api/pools.ts +
 // api/wallets.ts (userId injected explicitly and serialized into the query).
 // The back end is frozen & validated:
 //   GET  /v1/notifications?userId=&limit=&before=   -> { count, notifications[] }

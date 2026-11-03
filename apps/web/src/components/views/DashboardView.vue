@@ -4,8 +4,9 @@
 //  • hero + stat strip from /v1/network/stats (with Lot B freshness),
 //  • protocol totals (aggregated from /v1/pools),
 //  • alerts summary (real notifications),
-//  • a compact Swap/Deposit entry point → the shared ActionModal (G2, Lot G),
-//  • the bridge section (existing useBridge data), restyled.
+//  • a compact Swap/Deposit entry point → the shared ActionModal (G2, Lot G).
+// Lot PRE (2026-11): the bridge section was retired (Allbridge Core wound down
+// upstream); `/v1/bridge/*` keeps serving the historical record.
 // G2 removed the inline Testnet/Mainnet actions section; the actions themselves
 // (SdexSwapWidget / BlendDepositCard) are unchanged and now reached only through
 // ActionModal, which self-gates + hosts the NetworkToggle. Flags regime untouched.
@@ -13,7 +14,6 @@ import { computed, onMounted } from 'vue'
 import { useNetworkStats } from '../../composables/useNetworkStats'
 import { useProtocol } from '../../composables/useProtocol'
 import { useNotifications } from '../../composables/useNotifications'
-import { useBridge } from '../../composables/useBridge'
 import { useView } from '../../composables/useView'
 import { useModals } from '../../composables/useModals'
 import { venueTheme } from '../../data/venueTheme'
@@ -22,7 +22,6 @@ import BrandLogo from '../common/BrandLogo.vue'
 import { formatUsd, formatPct, relativeTime } from '../../utils/format'
 
 import FreshnessChip from '../FreshnessChip.vue'
-import BridgeSection from '../bridge/BridgeSection.vue'
 import YourPositionsPanel from '../common/YourPositionsPanel.vue'
 import NetworkTvlChart from '../NetworkTvlChart.vue'
 // R3 (Lot R): upfront reward-campaign card — renders only while live.
@@ -124,27 +123,6 @@ const protocolRows = computed(() => {
 
 // ── alerts summary (real notifications) ──────────────────────────────────────
 const recentAlerts = computed(() => notifications.value.slice(0, 3))
-
-// ── bridge (existing data) ───────────────────────────────────────────────────
-const {
-  window: bridgeWindow,
-  totals: bridgeTotals,
-  buckets: bridgeBuckets,
-  routes: bridgeRoutes,
-  flows: bridgeFlows,
-  chainScope: bridgeChainScope,
-  daysSinceLastFlow: bridgeDaysSinceLastFlow,
-  routeSort: bridgeRouteSort,
-  flowSort: bridgeFlowSort,
-  loading: bridgeLoading,
-  error: bridgeError,
-  setWindow: setBridgeWindow,
-  setChainScope: setBridgeChainScope,
-  clearScope: clearBridgeScope,
-  sortRoutes: sortBridgeRoutes,
-  sortFlows: sortBridgeFlows,
-  load: loadBridge,
-} = useBridge()
 </script>
 
 <template>
@@ -272,26 +250,5 @@ const {
 
     <YourPositionsPanel />
     </div>
-
-    <!-- Bridge -->
-    <BridgeSection
-      :window="bridgeWindow"
-      :totals="bridgeTotals"
-      :buckets="bridgeBuckets"
-      :routes="bridgeRoutes"
-      :flows="bridgeFlows"
-      :chain-scope="bridgeChainScope"
-      :days-since-last-flow="bridgeDaysSinceLastFlow"
-      :route-sort="bridgeRouteSort"
-      :flow-sort="bridgeFlowSort"
-      :loading="bridgeLoading"
-      :error="bridgeError"
-      @update:window="setBridgeWindow"
-      @scope="setBridgeChainScope"
-      @clearScope="clearBridgeScope"
-      @sortRoutes="sortBridgeRoutes"
-      @sortFlows="sortBridgeFlows"
-      @retry="loadBridge"
-    />
   </div>
 </template>

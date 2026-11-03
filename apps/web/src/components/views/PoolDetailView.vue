@@ -3,8 +3,9 @@
 // The richest view. Everything here is REAL or an honest empty/stale state:
 //  • type-variant stat strip (lending / AMM / native / vault) — carries over the
 //    existing honest per-type logic, no AMM boilerplate on Blend/DeFindex;
-//  • TVL & volume 30d: no real USD time-series exists in the DB (see Lot C DB
-//    check) → honest "building history" note, never a synthesized curve;
+//  • TVL history: real daily series from /v1/pools/:slug/series when the API
+//    covers the pool (lending venues today); otherwise a plain "not available"
+//    state with no date (Lot PRE) — never a synthesized curve;
 //  • Inflows & outflows: real /v1/pools/:slug/flows aggregation, section hidden
 //    when the pool has no deposit/withdraw event coverage;
 //  • On-chain info + reserves + reserves-&-rates table: real;
@@ -351,15 +352,17 @@ function signedUsd(v: number): string {
   return `${v >= 0 ? '+' : '−'}${s}`
 }
 
-// History-since date for the honest note (earliest we can cite).
+// Lot PRE (B): the only "since" date the card may cite is the series' own
+// first day (`series.first`); never `pool.updatedAt` (that is the refresh
+// tick and reset every 15 min). Null → no date at all.
 const historySince = computed(() => {
-  const p = pool.value
-  if (!p?.updatedAt) return null
-  return formatDate(p.updatedAt)
+  const first = series.value?.first
+  if (!first) return null
+  return dayLabel(first)
 })
 
-// TVL history chart (Blend-only, real reserve-snapshot reconstruction). null →
-// the card falls back to the honest "building history" note.
+// TVL history chart (lending venues: real reserve-snapshot reconstruction).
+// null → the card shows the plain "not available" state.
 function dayLabel(d?: string | null): string {
   if (!d) return ''
   const dt = new Date(d)
@@ -395,7 +398,7 @@ const tvlChart = computed(() => {
 })
 
 const tvlCardTitle = computed(() =>
-  tvlChart.value ? 'TVL (on-chain history)' : 'TVL & volume (30d)',
+  tvlChart.value ? 'TVL (on-chain history)' : 'TVL history',
 )
 
 // The real action flow: Blend lending → Blend deposit, AMM → SDEX swap.
@@ -516,8 +519,8 @@ function openAction() {
             <div class="text-[13px] leading-[1.55] mt-[18px] max-w-[640px]" style="color: var(--dig-muted)">{{ description }}</div>
           </div>
 
-          <!-- TVL history — real Blend reconstruction when available, else the
-               honest "building history" note (never a synthesized curve). -->
+          <!-- TVL history — real reconstruction when the API covers the pool, else
+               a plain "not available" state (Lot PRE; never a synthesized curve). -->
           <div class="rounded-[18px] p-[22px]" style="background: var(--dig-surface); border: 1px solid var(--dig-line)">
             <div class="flex items-center justify-between mb-[6px]">
               <div class="text-[14px] font-semibold">{{ tvlCardTitle }}</div>
@@ -525,13 +528,9 @@ function openAction() {
                 <span class="flex items-center gap-[6px]"><span class="w-[10px] h-[3px] rounded-[2px]" style="background: var(--dig-text)"></span>TVL</span>
                 <span class="tabular-nums">{{ tvlChart.count }} snapshots</span>
               </div>
-              <div v-else class="flex gap-[16px] text-[12px]">
-                <span class="flex items-center gap-[6px]" style="color: var(--dig-faint)"><span class="w-[10px] h-[3px] rounded-[2px]" style="background: var(--dig-text)"></span>TVL</span>
-                <span class="flex items-center gap-[6px]" style="color: var(--dig-faint)"><span class="w-[10px] h-[10px] rounded-[3px]" style="background: #37372F"></span>Volume</span>
-              </div>
             </div>
 
-            <!-- Real TVL series (Blend) -->
+            <!-- Real TVL series (lending venues) -->
             <template v-if="tvlChart">
               <div class="relative">
                 <div class="absolute top-0 left-0 text-[11px] tabular-nums" style="color: var(--dig-faint)">{{ tvlChart.maxLabel }}</div>
@@ -540,24 +539,23 @@ function openAction() {
               </div>
               <div class="flex items-center justify-between mt-[8px] text-[11px]" style="color: var(--dig-faint)">
                 <span>{{ tvlChart.first }}</span>
-                <span>Supplied × latest price, reconstructed from reserve snapshots</span>
+                <span>Supplied × latest price, reconstructed from reserve snapshots<span v-if="historySince">, history since {{ historySince }}</span></span>
                 <span>{{ tvlChart.last }}</span>
               </div>
             </template>
 
-            <!-- Honest empty state (non-Blend / no derivable series) -->
+            <!-- Plain state (Lot PRE): the API has no daily series for this pool
+                 (AMM / vault / classic DEX today). No date, no pulse. -->
             <div
               v-else
               class="rounded-[12px] h-[190px] flex flex-col items-center justify-center gap-[8px] text-center px-[24px]"
               style="background: var(--dig-surface-2); border: 1px dashed var(--dig-line)"
             >
-              <div class="flex items-center gap-[8px] text-[13px] font-semibold" style="color: var(--dig-muted)">
-                <span class="w-[6px] h-[6px] rounded-full" style="background: var(--dig-accent); animation: digPulse 1.6s ease-in-out infinite"></span>
-                Building history
+              <div class="text-[13px] font-semibold" style="color: var(--dig-muted)">
+                TVL history not available
               </div>
               <div class="text-[12px] max-w-[420px]" style="color: var(--dig-faint)">
-                We snapshot on-chain state each refresh; a 30-day TVL/volume series
-                will render here as history accumulates<span v-if="historySince"> (since {{ historySince }})</span>.
+                Daily TVL history is currently available for lending pools only.
               </div>
             </div>
           </div>

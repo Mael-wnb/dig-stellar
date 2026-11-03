@@ -143,8 +143,10 @@ export interface ProtocolSummary {
     updatedAt: string
   }
 
-  // TVL history (Lot C) — GET /v1/pools/:slug/series. Blend-only honest
-  // reconstruction; covered=false → the UI keeps the "building history" note.
+  // TVL history (Lot C) — GET /v1/pools/:slug/series. Covered for lending venues
+  // (reserve-snapshot reconstruction); covered=false → the UI shows the plain
+  // "TVL history not available" state. `first` is the only date the UI may cite
+  // as "history since" (Lot PRE); `updatedAt` is the request time, never shown.
   export interface PoolSeriesPoint {
     day: string
     tvlUsd: number

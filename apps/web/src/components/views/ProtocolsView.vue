@@ -38,7 +38,6 @@ const VENUE_TYPE_LABEL: Record<string, string> = {
   lending: 'Lending',
   amm: 'AMM',
   vault: 'Yield vaults',
-  bridge: 'Bridge',
 }
 function venueTypeLabel(venueId: string, venueType: string, fallback: string): string {
   if (venueId === 'stellar-native') return 'DEX (orderbook)'

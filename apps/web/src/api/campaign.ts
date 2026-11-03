@@ -197,28 +197,6 @@ export interface CampaignActivity {
   disclaimer: string;
 }
 
-/** EP3: GET /campaign/metrics — public counts with the API's boundary string. */
-export interface CampaignMetrics {
-  campaign: number;
-  active: boolean;
-  reason?: CampaignInactiveReason;
-  /** Disabled or no start date: every count is 0 and the status section hides. */
-  dark: boolean;
-  window: { startsAt: string | null; endsAt: string | null };
-  asOf: string;
-  walletsRegisteredInWindow: number;
-  walletsProvenInWindow: number;
-  walletsEnrolled: number;
-  walletsWithVerifiedActionInWindow: number;
-  verifiedActionsByKind: Record<ActionKind, number>;
-  referralsCredited: number;
-  socialClaimsActive: number;
-  pointsIssued: number;
-  perksGranted: Record<PerkKey, number>;
-  boundary: string;
-  disclaimer: string;
-}
-
 export interface CampaignLeaderboard {
   campaign: number;
   asOf: string;
@@ -257,10 +235,6 @@ export function fetchCampaignMe(address: string, userId: string): Promise<Campai
 export function fetchCampaignActivity(address: string, userId: string): Promise<CampaignActivity> {
   const qs = `?address=${encodeURIComponent(address)}&userId=${encodeURIComponent(userId)}`;
   return apiFetch<CampaignActivity>(`/campaign/me/activity${qs}`, { cache: "no-store" });
-}
-
-export function fetchCampaignMetrics(): Promise<CampaignMetrics> {
-  return apiFetch<CampaignMetrics>("/campaign/metrics");
 }
 
 export function fetchCampaignLeaderboard(address?: string | null): Promise<CampaignLeaderboard> {

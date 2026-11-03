@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // NetworkTvlChart — G4 (Lot G / T3-D3). The hero's network-TVL 7-day curve, drawn
 // from GET /v1/network/tvl-series (G0 snapshots). Same reactive-SVG + hover-tooltip
-// pattern as BridgeChart. Honest by construction:
+// pattern as the former bridge chart (retired in Lot PRE). Honest by construction:
 //   • x is real time across the 7d window, so a missing hour shows as a gap;
 //   • the line BREAKS across gaps > ~1 bucket — never interpolated/smoothed;
 //   • while history is younger than 7d, an honest "building history since <date>"
