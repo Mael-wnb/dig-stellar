@@ -21,7 +21,7 @@ type PoolRow = {
 // Standardized exponential-backoff retry for every step (T3-D1). One mechanism:
 // 3 attempts, 5s → 20s backoff + jitter, each retry logged with the step label.
 // Per-protocol-entity steps retry per entity. Steps that must stay non-fatal
-// (Aquarius / DeFindex / Allbridge / network-stats) keep their try/catch — the
+// (Aquarius / DeFindex / network-stats) keep their try/catch — the
 // retries happen INSIDE, catch-and-log is the last resort.
 function runStep(
   label: string,
@@ -46,7 +46,7 @@ function sleep(ms: number): Promise<void> {
 // Every step is non-fatal: retries happen INSIDE runStep, and a residual failure
 // is caught, logged and recorded here instead of propagating — so one flaky
 // protocol can no longer skip the steps after it (protocol metrics, native,
-// defindex, allbridge, network-stats). The job still exits 1 when ANY step
+// defindex, network-stats). The job still exits 1 when ANY step
 // failed, so the cron log stays red on real problems.
 type StepStatus = 'SUCCESS' | 'FAILED';
 type StepResult = { name: string; status: StepStatus; message?: string; durationMs: number };
@@ -404,19 +404,18 @@ async function main(): Promise<boolean> {
       runStep('protocol-metrics', 'src/scripts/ingest/70-protocol-persist-metrics.ts')
     );
 
-    console.log('\n=== 8. Refresh Allbridge bridge flows ===');
+    // Lot PRE (2026-11): the Allbridge bridge-flow step is retired — Allbridge Core
+    // wound down upstream and the adapter listens to the Core contracts, so no new
+    // flow can arrive. The adapter (`lib/protocols/allbridge/`), the bootstrap and
+    // `/v1/bridge/*` stay; `bridge_flows` is served as a historical record.
 
-    await track('allbridge', () =>
-      runStep('allbridge', 'src/scripts/ingest/run-allbridge-bridge-refresh.ts')
-    );
-
-    console.log('\n=== 9. Refresh network stats ===');
+    console.log('\n=== 8. Refresh network stats ===');
 
     await track('network-stats', () =>
       runStep('network-stats', 'src/scripts/ingest/73-network-stats-refresh.ts')
     );
 
-    console.log('\n=== 10. Persist ops observability (E2) ===');
+    console.log('\n=== 9. Persist ops observability (E2) ===');
 
     await persistOpsObservability(client, runAt, opsFile);
   } finally {

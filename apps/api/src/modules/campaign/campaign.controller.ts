@@ -8,11 +8,13 @@
 // The leaderboard never carries a full address or a handle.
 // EP2: POST /social and DELETE /social/:id (self-declared tasks). The handle
 // is normalised here and never echoed back.
-// EP3: GET /metrics — public counts only (never an address), cacheable 60 s.
+// EP3: GET /metrics — counts only (never an address). Lot PRE: operator-gated
+// (OPS_METRICS_TOKEN bearer, 404 otherwise), no-store.
 // EP4: GET /me/activity — the wallet's last ledger rows, same access rule as
 // /me (address + userId, no proof for reads), no-store.
 
-import { Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { OpsTokenGuard } from '../../common/ops-token.guard';
 import { CampaignService } from './campaign.service';
 import { CampaignSocialService } from './campaign-social.service';
 import {
@@ -112,8 +114,11 @@ export class CampaignController {
     return this.campaign.leaderboard(caller);
   }
 
+  // Lot PRE (D): internal KPIs — operator token only (OpsTokenGuard: 404 when
+  // OPS_METRICS_TOKEN is unset or the bearer is wrong), never cached.
   @Get('metrics')
-  @Header('Cache-Control', 'public, max-age=60')
+  @UseGuards(OpsTokenGuard)
+  @Header('Cache-Control', 'no-store')
   metrics() {
     return this.campaign.metrics();
   }

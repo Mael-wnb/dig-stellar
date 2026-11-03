@@ -3,6 +3,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import { CampaignController } from './campaign.controller';
+import { OpsTokenGuard } from '../../common/ops-token.guard';
 import type { CampaignService } from './campaign.service';
 import type { CampaignSocialService } from './campaign-social.service';
 
@@ -140,6 +141,13 @@ describe('CampaignController', () => {
 });
 
 describe('CampaignController (EP3)', () => {
+  it('metrics: guarded by OpsTokenGuard (Lot PRE), no public cache', () => {
+    const guards = Reflect.getMetadata('__guards__', CampaignController.prototype.metrics) as unknown[];
+    expect(guards).toEqual([OpsTokenGuard]);
+    const headers = Reflect.getMetadata('__headers__', CampaignController.prototype.metrics) as Array<{ name: string; value: string }>;
+    expect(headers).toEqual([{ name: 'Cache-Control', value: 'no-store' }]);
+  });
+
   it('metrics: no input, pass-through to the service', async () => {
     const s = stub();
     const c = campaignController(s);

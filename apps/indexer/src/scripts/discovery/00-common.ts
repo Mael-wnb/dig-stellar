@@ -250,13 +250,33 @@ export function joinUrl(baseUrl: string, path: string): string {
   return `${baseUrl.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
 }
 
+// Lot PRE (C): the source-account sequence is fetched ONCE per step process and
+// reused by every simulation in that process. Simulations are never submitted,
+// so a stale sequence is fine; before this cache every contract read issued its
+// own `GET /accounts/{source}` (≈290 Horizon calls per refresh, bursts of 3–9 in
+// Promise.all, throttled by public Horizon). Keyed by (horizonUrl, address); the
+// in-flight promise is shared so concurrent reads coalesce into one request. A
+// failed fetch is evicted so the next read retries through fetchJson as before.
+const accountSequenceCache = new Map<string, Promise<string>>();
+
 export async function getAccountSequence(
     horizonUrl: string,
     address: string
   ): Promise<string> {
-    const url = joinUrl(horizonUrl, `accounts/${address}`);
-    const account = await fetchJson<any>(url);
-    return account.sequence;
+    const key = `${horizonUrl}|${address}`;
+    let pending = accountSequenceCache.get(key);
+    if (!pending) {
+      pending = (async () => {
+        const url = joinUrl(horizonUrl, `accounts/${address}`);
+        const account = await fetchJson<any>(url);
+        return String(account.sequence);
+      })();
+      pending.catch(() => {
+        accountSequenceCache.delete(key);
+      });
+      accountSequenceCache.set(key, pending);
+    }
+    return pending;
   }
   
   export async function simulateContractRead(params: {

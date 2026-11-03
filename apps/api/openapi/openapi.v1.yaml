@@ -297,9 +297,10 @@ paths:
       description: |
         Allbridge Core USDC flows into and out of Stellar, aggregated over a whitelisted window
         (unknown `window` falls back to `7d`), with a per-counterparty-chain breakdown and the net.
-        **Upstream pause:** the Allbridge Core bridge has been paused by its operator since
-        2026-07-20; until it relaunches, recent windows legitimately contain zero flows and
-        `lastFlowAt` reflects the last flow before the pause. `updatedAt` is the request time.
+        **Historical record:** Allbridge Core wound down after 2026-07-20 and no new flows are
+        expected; the last recorded flow is dated 2026-07-19. Windows after that date legitimately
+        contain zero flows and `lastFlowAt` is the last recorded flow. The endpoint and its shape
+        are unchanged. `updatedAt` is the request time.
       parameters:
         - $ref: '#/components/parameters/FlowWindow'
       responses:
@@ -323,8 +324,8 @@ paths:
       description: |
         Latest flows, newest first, independent of any window. `direction` filters to one side;
         any other value means no filter. `limit` is clamped to 1..200 (default 50; a non-numeric
-        value means the default). Same upstream pause as `/v1/bridge/summary`: the feed shows
-        the last flows recorded before 2026-07-20 until the bridge relaunches.
+        value means the default). Same historical record as `/v1/bridge/summary`: the feed is
+        the flows recorded up to 2026-07-19; no new flows are expected.
       parameters:
         - name: direction
           in: query
@@ -357,8 +358,9 @@ paths:
       summary: Daily bridge net flow
       description: |
         One entry per UTC day for the last `days` days (clamped to 1..30, default 7), oldest
-        first, gap-filled with zeros. Sums are in USD. Same upstream pause as
-        `/v1/bridge/summary`. `updatedAt` is the request time.
+        first, gap-filled with zeros. Sums are in USD. Same historical record as
+        `/v1/bridge/summary` (no new flows expected after 2026-07-19). `updatedAt` is the
+        request time.
       parameters:
         - name: days
           in: query
