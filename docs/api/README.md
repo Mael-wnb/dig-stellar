@@ -36,6 +36,17 @@ page renders, add a line to `CHANGELOG.md` ("docs page: Scalar x.y.z"). Vendorin
 The two documentation routes answer `Access-Control-Allow-Origin: *` (route-local, GET only) so
 any origin can fetch the contract; the data endpoints keep the global CORS policy of `main.ts`.
 
+## SDK
+
+`packages/sdk` (`@getdig/stellar-api`, v0, **not yet published**) is a TypeScript client
+generated from the yaml: `pnpm -C packages/sdk generate` runs openapi-typescript over
+`openapi.v1.yaml` into `src/generated/openapi.d.ts` (committed, so consumers need no build
+step), and `DigStellarClient` exposes one typed method per `operationId` (15). The CI job `sdk`
+regenerates the file and fails on any drift from the yaml, so a contract change lands with its
+types in the same commit and takes an SDK version bump (additive API change → SDK minor).
+Usage, errors, the freshness helper and what v0 does not do (retries, keys, pagination):
+`packages/sdk/README.md`.
+
 ## Validating the contract
 
 ```bash

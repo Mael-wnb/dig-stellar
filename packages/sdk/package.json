@@ -1,0 +1,66 @@
+{
+  "name": "@getdig/stellar-api",
+  "version": "0.1.0",
+  "description": "TypeScript client for the Dig Stellar public read API (generated from the OpenAPI v1 contract)",
+  "license": "MIT",
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Digbot-ai/dig-stellar.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://stellar-api.getdig.ai/v1/docs",
+  "keywords": [
+    "stellar",
+    "defi",
+    "soroban",
+    "blend",
+    "api-client",
+    "openapi"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "generate": "openapi-typescript ../../apps/api/openapi/openapi.v1.yaml -o src/generated/openapi.d.ts",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --import tsx --test 'test/**/*.test.ts'",
+    "example": "tsx examples/list-pools.ts",
+    "prepack": "pnpm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.15",
+    "openapi-typescript": "^7.13.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

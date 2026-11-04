@@ -36,3 +36,28 @@ jobs:
       # vue-tsc typecheck runs inside the web build.
       - run: pnpm -C apps/web build
       - run: pnpm -C apps/web test
+
+  # Lot SDK0: the SDK's committed types must match the yaml. Regenerate and fail on drift,
+  # then typecheck (includes the type-level test), unit tests and the ESM/CJS build.
+  sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm -C packages/sdk generate
+      - run: git diff --exit-code packages/sdk/src/generated
+
+      - run: pnpm -C packages/sdk typecheck
+      - run: pnpm -C packages/sdk test
+      - run: pnpm -C packages/sdk build

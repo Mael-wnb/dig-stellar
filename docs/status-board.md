@@ -407,8 +407,18 @@ with; the tables and notes below are kept as the historical record of how each c
   D6 `docs/post-grant-summary.md` (what shipped 2026-08-20 → 11-05, by theme, evidence per item,
   no adoption numbers) for the grant advisor review of 2026-11-05 and the SCF 46 reviewers.
   Recon + DOC2 follow-ups: `docs/evidence/lot-doc1/doc1-recon.md`. No SCF criterion involved.
-- Last updated: 2026-11-04 (Lot DOC1 drafted; Lot PRE deployed — prod `/health` version
-  `8e6dd18` on 2026-11-04 — PRE2 `98e0267` not yet deployed)
+- **Lot SDK0 — Vercel-preview CORS + TypeScript SDK v0 (2026-11-04): BUILT on `feat/lot-sdk0`,
+  not committed, not deployed.** (1) The API accepts Vercel preview origins of the web project by
+  pattern (`apps/api/src/cors-origin.ts`, 9 unit tests; `docs/deployment.md` "CORS: allowed
+  origins"), so UI work on a preview can be validated against production data; API-only deploy,
+  no env or nginx change. (2) `packages/sdk` (`@getdig/stellar-api` 0.1.0, **not published**):
+  types generated from `openapi.v1.yaml` and committed, `DigStellarClient` with one typed method
+  per operationId (15), `DigApiError` / `DigTimeoutError`, freshness helpers, ESM + CJS build,
+  20 unit tests + a type-level test, one production example; CI job `sdk` fails on drift between
+  the yaml and the committed types. Evidence: `docs/evidence/lot-sdk/sdk0-build.md`. No SCF
+  criterion involved.
+- Last updated: 2026-11-04 (Lot SDK0 built; Lot DOC1 merged to `main` (`438971f`); Lot PRE
+  deployed — prod `/health` version `8e6dd18` on 2026-11-04 — PRE2 `98e0267` not yet deployed)
 
 ---
 

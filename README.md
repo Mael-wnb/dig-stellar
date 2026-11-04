@@ -35,7 +35,8 @@ call against the production API.
   whitelist, client-side XDR validation before the wallet is invoked, in-wallet signing only
   (`docs/security-invariants.md`).
 - **Public read API**: a versioned HTTP contract, 15 operations (OpenAPI 3.1, `v1`), validated
-  by a contract test that boots the real application (`docs/api/README.md`).
+  by a contract test that boots the real application (`docs/api/README.md`). TypeScript SDK in
+  `packages/sdk` (v0, generated from the contract).
 
 ## Architecture in ten lines
 
@@ -97,7 +98,7 @@ that context. `docs/status-board.md` carries the current state and its "Last upd
 `docs/evidence/` holds the proofs. Known limits are listed there rather than here: among them,
 deployment to the VPS is still manual (CI builds and tests, it does not deploy), the beta API
 access model is a rate-limited grouping key rather than authentication, and the public API has
-no auth or SDK yet.
+no auth yet; SDK v0 not yet published.
 
 Tests: unit suites in each app (Jest for the API, Vitest for the web, `node --test` for the
 indexer) and an API contract test; CI runs build and unit tests on every push.
