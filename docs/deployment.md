@@ -99,6 +99,28 @@ JSON action payload; XDR travels in responses), and headers on every response:
 HSTS (`max-age=31536000`), `X-Content-Type-Options: nosniff`,
 `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`.
 
+### CORS: allowed origins (API process, Lot SDK0, 2026-11-04)
+CORS is enforced by the API process, not nginx (`apps/api/src/main.ts` →
+`cors-origin.ts`). Allowed origins are the exact entries of `CORS_ORIGINS` on the VPS
+(`localhost:5173`, `127.0.0.1:5173`, `https://dig-stellar-web.vercel.app`,
+`https://stellar.getdig.ai`) **plus**, since Lot SDK0, any Vercel preview deployment of
+the web project, matched by the pattern
+`^https://dig-stellar-web-[a-z0-9-]+-dig-7a565626\.vercel\.app$` (branch previews
+`…-git-<branch>-…` and per-deployment URLs). The team suffix is part of the pattern on
+purpose: a same-named project under another Vercel team does not match; `http://` and
+lookalike hosts (`…vercel.app.attacker.com`) are rejected (`cors-origin.spec.ts`). Purpose:
+validate UI work on a preview against production data without editing the VPS env per
+branch (the Lot AA workaround, `docs/evidence/lot-aa/aa4-cleanup-notes.md`). Nothing else
+in the CORS config changed: `credentials: true`, `maxAge: 3600`, a disallowed origin still
+gets a clean denial (no ACAO header, no 500). Deploy: API only, no env change, no nginx
+change. Verify after the restart:
+```bash
+curl -sI -H 'Origin: https://dig-stellar-web-git-x-dig-7a565626.vercel.app' \
+  https://stellar-api.getdig.ai/v1/protocols | grep -i access-control-allow-origin   # echoes the origin
+curl -sI -H 'Origin: https://example.com' \
+  https://stellar-api.getdig.ai/v1/protocols | grep -ic access-control-allow-origin  # 0
+```
+
 ### API process: pm2 supervised (Lot S follow-up, 2026-08-17)
 The API runs under **pm2** (name `dig-stellar-api`, direct `dist/main.js` definition,
 cwd `apps/api` so dotenv finds `.env`). The pm2 daemon is boot-persistent via the

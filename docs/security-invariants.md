@@ -285,6 +285,15 @@ An honest statement of what protects the user-scoped API during the beta:
   from any signing path (§1 and §9 unchanged); it lives only in the VPS env and the founder's
   password manager. The `#status` campaign block that read the route is retired. `/v1/ops/status`,
   `/v1/ops/metrics` and `/v1/ops/adoption` **stay public** as decided above.
+- **Amendment (Lot SDK0, 2026-11-04): Vercel preview origins are allowed by pattern.** Besides
+  the exact `CORS_ORIGINS` list, the API accepts any origin matching
+  `^https://dig-stellar-web-[a-z0-9-]+-dig-7a565626\.vercel\.app$` (our Vercel team's previews
+  of the web project; `apps/api/src/cors-origin.ts`, rejections unit-tested). This widens which
+  pages may read the API from a browser, not who may act as a user: the beta grouping key
+  (`userId`) travels as a query parameter or header set by the page's own code, never as a
+  cookie (the API sets none), so an allowed origin cannot borrow a visitor's identity through
+  the browser. Previews are allowed for UI validation against production data only; the
+  production web origins stay the exact list.
 
 ## 8. Review process
 
