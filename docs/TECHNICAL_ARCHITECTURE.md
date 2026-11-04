@@ -1,5 +1,41 @@
 # Dig Stellar: Technical Architecture (Revised)
 
+> **Design document (June 2026, SCF #43 application).** Not all of it was built as described;
+> see the "Design vs as-built" table below and `docs/repo-structure.md` /
+> `docs/current-state.md` for the as-built system. Nothing below the table was rewritten: the
+> §6 and §9 as-built notes already present are kept, the rest reads as the original design.
+
+## Design vs as-built (2026-11)
+
+Verified against the code and the production API on 2026-11-04 (recon:
+`docs/evidence/lot-doc1/doc1-recon.md` §R2, with the grep commands and file lines).
+"Doc" = where the as-built behaviour is documented.
+
+| Design claim (section) | As-built (2026-11) | Doc |
+|---|---|---|
+| Alerts pushed over WebSocket + in-app queue (§1, §5, §9.2) | No WebSocket or SSE. The web polls the unread count over HTTP (45 s); rules are evaluated by an OS-cron sweep every 15 min (`job:wallet-alert`, scripts 82→81→83) writing `notifications` rows | `docs/runbooks.md` (crontab), `docs/current-state.md` T2-D2 |
+| SEP-10 web auth / session tokens (§3, §11.1) | No SEP-10, no JWT, no session token. Beta access = rate-limited `userId` grouping key; wallet ownership for campaign writes = SEP-53 signed message verified with the public key only | `docs/security-invariants.md` §7, §11 |
+| Historical backfill from Stellar Data Lake / Hubble, 30-day seed (§4, §5.3) | None. History is what our own snapshot tables have accumulated since creation (network TVL series since 2026-08-12); event reads stay inside the RPC retention window (~7 days) | `docs/decisions/2026-08-17-network-tvl-definition.md` |
+| Layer 1 sub-minute event stream, alerts within one ledger close (§5.1, §9.1) | No long-running subscriber. `getEvents` is pulled in batch inside the 15-min refresh; alert latency = cron cadence (≤ 15 min) | `docs/repo-structure.md` (pipeline), `docs/alerting/probe-02-trigger.md` |
+| Monthly-partitioned `Snapshot` table, TimescaleDB path (§5.2, §6) | Plain Postgres tables, no partitioning, no Timescale; one partial index for `/v1/pools` | `docs/data-model.md`, `docs/evidence/perf-pools/README.md` |
+| Prisma data store and Prisma-style schema (§1, §6) | Raw SQL table families `stellar_v1…v8.sql`; the Prisma client is a raw-SQL connection only, Prisma models serve only the legacy prefix-less routes | `docs/data-model.md`, `docs/repo-structure.md` |
+| OpenTelemetry logs/traces, Prometheus metrics, `/ready` (§10.3) | None. `rpc_metrics_runs` + `refresh_step_runs` per run, `GET /health` (status, version, per-venue freshness), `GET /v1/ops/{metrics,status,adoption}`, public `#status` page. No `/ready` | `docs/evidence/lot-e/README.md`, `docs/evidence/status-page/` |
+| Fly.io / Railway / Cloud Run, managed Postgres with read replicas, managed Redis cache + rate-limit counters, leader election (§1, §10.1) | One DigitalOcean VPS: nginx (rate-limit zones) → API under pm2, indexer from the OS crontab with `flock`; Postgres 16 and Redis 7 as Docker containers on the same host; web on Vercel. Redis is provisioned but no application code uses it | `docs/deployment.md`, `docs/evidence/lot-s/` |
+| CI/CD: lint → typecheck → unit → Testnet integration → preview → staging → manual promote (§10.5) | GitHub Actions `ci.yml`: build + unit tests on push/PR. No deploy step, no staging. VPS deploy is manual (pull, build, pm2 restart, SQL by hand); Vercel builds the web | `docs/deployment.md`, `docs/evidence/lot-ad/ad0-recon.md` |
+| Allbridge bridge-flow adapter, active (§1, §5, §7.7, §14) | Built and live for T2-D3; the venue wound down upstream after 2026-07-20. Refresh step retired 2026-11-03; `bridge_flows` and `/v1/bridge/*` serve the historical record; dashboard section removed | `docs/status-board.md` T2-D3, `docs/api/CHANGELOG.md` |
+| Vitest unit, Testnet integration on CI, e2e wallet tests, chaos tests (§10.4) | api: Jest unit specs + an ajv contract test that boots the real app (deploy-checklist step); web: Vitest; indexer: `node --test`. No Testnet integration suite on CI, no e2e wallet tests, no chaos tests | `docs/api/README.md`, `.github/workflows/ci.yml` |
+| SEP-7 URI/QR handoff, SEP-11 txrep summary, multisig detection, fee-bump sponsorship, `restore_footprint` bundling (§3, §8) | Two action families: SDEX swap (classic) and Blend supply/withdraw (Soroban, `simulateTransaction` preflight). XDR built server-side, decoded and validated client-side before signing, signed in-wallet via Stellar Wallets Kit. SEP-7, txrep, multisig detection, fee bump and restore-footprint are not implemented | `docs/security-invariants.md` §2–§4, `docs/evidence/t3-d2-mainnet-actions.md` |
+| Freshness tri-state Fresh/Stale/Broken, 10-min alert buffer, ops-channel alert (§5.4) | Binary `isStale` + `staleAfterSeconds` (45 min) on every `/v1/*` payload and per venue on `/health`; the alert sweep skips stale snapshots; `#status` shows missed cycles and failed steps; per-step exponential backoff. No ops-channel notifier | `docs/evidence/lot-b/README.md`, `docs/evidence/status-page/` |
+| Rule catalogue: health factor and netflow < 30 s, APY shift, utilization spike, staleness; `Notifier` abstraction for email/webhook (§9) | Five families on the 15-min sweep: wallet health factor, asset price, pool TVL drop, pool supply/borrow APY, automatic pool-status protection. No netflow, utilization or staleness rules; in-app only | `docs/evidence/lot-n/`, `docs/current-state.md` (Lot N) |
+| Reference implementation §13: `prisma:migrate`, `run:once`, `GET /protocols` | Legacy path. The proven quickstart is `docker compose --profile app up -d --build` (raw SQL init, `bootstrap:core`, `job:refresh`, then `/health` and `/v1/protocols`) | `docs/reference-deployment.md`, `docs/evidence/lot-z/` |
+| Adapter list and per-adapter 5/15-min cadence (§1, §5.2, §7) | Six live protocols on one 15-min run: Blend, Soroswap, Aquarius, Stellar native DEX, DeFindex, XOXNO Lending; Allbridge dormant | `docs/status-board.md`, `docs/current-state.md` |
+| Reflector read directly for all USD conversions (§6, §7.6) | Partially built: Reflector is one price source among several (reference prices, Soroswap-derived, Blend pool oracles, XOXNO aggregator fallback), selected per asset | `docs/evidence/price-sources-v2/` |
+
+Still as designed: Stellar RPC primary / Horizon complement (§2, §4), the non-custodial
+invariants (§11.2), client-side XDR validation before signing (§8.1).
+
+---
+
 This document is the single source of truth for the technical architecture of Dig's Stellar module. It explains how we collect data, compute analytics, support multi-wallet portfolio monitoring, generate alerts, and enable optional non-custodial actions.
 
 ---

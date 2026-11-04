@@ -1,207 +1,110 @@
-# Dig Stellar: Unified DeFi Analytics and Multi-Wallet Monitoring on Stellar
+# Dig Stellar
 
-**Dig Stellar** is a Stellar-focused analytics and portfolio monitoring module designed to make DeFi activity across the ecosystem easier to understand, follow, and eventually act on.
+Dig Stellar is DeFi analytics, multi-wallet portfolio monitoring and non-custodial actions on the
+Stellar network: one place to read protocol and pool metrics, follow several wallets, receive
+in-app alerts, and swap or lend from the same screen while every transaction is signed in the
+user's own wallet. It is built by the Dig team (getdig.ai). The work was funded by Stellar
+Community Fund award #43, completed and fully paid in August 2026; everything since is
+post-grant product hardening ahead of the SCF #46 application.
 
-The project combines:
-- **protocol analytics**
-- **pool-level monitoring**
-- **multi-wallet portfolio tracking**
-- **normalized on-chain data pipelines**
-- the foundation for future **alerts** and **non-custodial action flows**
+## Live
 
-The current repository contains the technical implementation of the Dig Stellar beta, including the data layer, API layer, and frontend application already connected to live Stellar data.
+- App: https://stellar.getdig.ai
+- Status page: https://stellar.getdig.ai/#status
+- API docs: https://stellar-api.getdig.ai/v1/docs
+- OpenAPI document: https://stellar-api.getdig.ai/v1/openapi.json
 
----
+## What it does today
 
-## Live beta
+Facts as of 2026-11-04, each traceable to `docs/status-board.md`, `docs/current-state.md` or a
+call against the production API.
 
-- **Frontend:** https://stellar.getdig.ai/
-- **API:** https://stellar-api.getdig.ai/
+- **Protocol analytics** for six Stellar DeFi protocols on real mainnet data: Blend (lending),
+  Soroswap (AMM), Aquarius (AMM), the Stellar native DEX, DeFindex (yield vaults) and XOXNO
+  Lending. Pool-level pages with TVL, reserves, volume, APY and 7-day series. The Allbridge
+  bridge-flow venue is kept as a historical record only (the venue wound down upstream in
+  July 2026).
+- **Multi-wallet portfolio**: several wallets grouped under one account, one designated active
+  signer, watch-only addresses that can never sign, per-asset balances and Blend positions with
+  health factor.
+- **In-app alerting**: rules on wallet health factor, asset price, pool TVL drop and pool
+  supply/borrow APY, plus an automatic pool-status protection. Rules are evaluated on a periodic
+  sweep against the indexed snapshots; notifications are in-app only.
+- **Mainnet actions**: SDEX swaps and Blend supply/withdraw, executed and Horizon-verified on
+  mainnet. Security regime: kill-switch flags, a per-transaction cap, an issuer-verified asset
+  whitelist, client-side XDR validation before the wallet is invoked, in-wallet signing only
+  (`docs/security-invariants.md`).
+- **Public read API**: a versioned HTTP contract, 15 operations (OpenAPI 3.1, `v1`), validated
+  by a contract test that boots the real application (`docs/api/README.md`).
 
----
+## Architecture in ten lines
 
-## Why Dig Stellar
+- `apps/web`: Vue 3 + Vite, wallet UX via Stellar Wallets Kit; no business logic, no direct
+  provider calls for product data.
+- `apps/api`: NestJS, the single UI-facing façade; raw SQL over Postgres, freshness metadata on
+  every `/v1/*` payload.
+- `apps/indexer`: ingestion jobs; Soroban RPC is the primary data plane, Horizon the complement,
+  DeFindex and XOXNO through their SDK or on-chain views.
+- Storage: Postgres 16. A Redis container ships in the compose stack but no application path
+  uses it today.
+- Cadence: one refresh run every 15 minutes writes snapshots and latest metrics; the alert sweep
+  runs on its own 15-minute line; staleness is computed at read time and shown in the UI.
+- Operations: one VPS (nginx, pm2, cron), web on Vercel; health and run metrics at `/health`,
+  `/v1/ops/*` and the status page.
+- Design document: `docs/TECHNICAL_ARCHITECTURE.md` (June 2026). Not all of it was built as
+  described; read its banner and "Design vs as-built" table first.
 
-As the Stellar ecosystem grows with Soroban-based DeFi protocols, users increasingly need a clearer way to:
+## Run it
 
-- understand protocol activity
-- compare pools across venues
-- monitor wallet balances across multiple wallets
-- track exposure over time
-- eventually receive relevant alerts and execute guided actions safely
+The proven reference stack, from a fresh clone to real mainnet data, with no secrets
+(`docs/reference-deployment.md` has the details and the host-pnpm developer path):
 
-Today, this information is fragmented across protocols, explorers, wallets, and raw on-chain data sources.
+```bash
+git clone <repo-url> dig-stellar && cd dig-stellar
+cp .env.example .env
+GIT_SHA=$(git rev-parse --short HEAD) docker compose --profile app up -d --build
+curl -s localhost:3000/health          # status, version = GIT_SHA, per-venue freshness
+curl -s localhost:3000/v1/protocols    # protocols with live TVL after the first refresh (~3-6 min)
+```
 
-**Dig Stellar** aims to provide a unified monitoring and analytics layer for Stellar DeFi.
+Requirements: Docker with compose v2. For the developer path: Node 24 (`.nvmrc`) and pnpm 10.
+Without `DEFINDEX_API_KEY` the DeFindex step fails non-fatally; everything else runs on public
+endpoints.
 
----
+## Docs map
 
-## Current beta scope
+Full map with source-of-truth ranks and a reviewer reading order: `docs/README.md`.
 
-The current beta focuses on shipping a credible and usable first version of that vision.
+| Doc | What it is |
+|---|---|
+| `docs/post-grant-summary.md` | What shipped after the grant closed (Aug → Nov 2026), with evidence per item |
+| `docs/status-board.md` | Where things stand, lot by lot; first read |
+| `docs/current-state.md` | Detailed as-built reality |
+| `docs/decisions/` | Founder rulings with their rationale |
+| `docs/runbooks.md` | Operating procedures (cron, schema, campaign, API contract) |
+| `docs/deployment.md` | VPS shape, hardening, deploy sequences |
+| `docs/evidence/README.md` | Index of the proof corpus (captures, command outputs, incidents) |
+| `docs/api/README.md` | Public API contract, docs page, contract test |
+| `docs/security-invariants.md` | Security contract for the action path and the money path |
+| `docs/TECHNICAL_ARCHITECTURE.md` | Design document, with a design-vs-as-built banner |
 
-### Already implemented
-- **Protocol analytics**
-  - live protocol list
-  - normalized protocol metrics
-  - pool-level detail pages
-  - support for multiple Stellar DeFi venues
+## Status and honesty
 
-- **Integrated protocols**
-  - **Blend**
-  - **Aquarius**
-  - **Soroswap**
+The product is a production beta. Rules this repository follows when describing itself:
+every number traces to a command, a capture or a transaction hash; design intentions are never
+stated as built; adoption figures earned under an incentive campaign are always stated with
+that context. `docs/status-board.md` carries the current state and its "Last updated" line;
+`docs/evidence/` holds the proofs. Known limits are listed there rather than here: among them,
+deployment to the VPS is still manual (CI builds and tests, it does not deploy), the beta API
+access model is a rate-limited grouping key rather than authentication, and the public API has
+no auth or SDK yet.
 
-- **Multi-wallet monitoring**
-  - wallet connection flow
-  - backend-resolved user grouping
-  - multi-wallet account structure
-  - wallet overview
-  - on-demand wallet balance refresh
+Tests: unit suites in each app (Jest for the API, Vitest for the web, `node --test` for the
+indexer) and an API contract test; CI runs build and unit tests on every push.
 
-- **Live data pipeline**
-  - scheduled refresh jobs
-  - protocol metrics refresh
-  - pool snapshots
-  - asset price references
-  - derived pricing for selected assets
+## Contact
 
-- **Production-ready beta deployment**
-  - public frontend deployment
-  - live API
-  - background refresh jobs
-  - persistent Postgres database
+- X: https://x.com/Dig_Agentic
+- Discord: https://discord.gg/sDpqGfmDgF
 
-### Intentionally not fully in scope yet
-These are part of the product direction, but not required for the current beta release:
-- advanced alerting workflows
-- persistent user-defined monitoring rules
-- fully production-grade ownership verification / signed wallet auth
-- direct in-app execution of non-custodial actions
-- advanced protocol position decomposition for all strategies
-
----
-
-## Product direction
-
-Dig Stellar is not intended to be only a protocol integration showcase.
-
-The broader goal is to build a **unified DeFi intelligence and monitoring layer** for Stellar composed of four pillars:
-
-### 1. Unified analytics
-A common view over protocol- and pool-level metrics, regardless of venue-specific data structures.
-
-### 2. Multi-wallet portfolio monitoring
-A user can monitor multiple wallets under one backend identity and inspect balances across them without relying on a hardcoded frontend profile model.
-
-### 3. Monitoring and alerts
-The normalized data model is designed to support future alerting use cases such as:
-- unusual liquidity movements
-- volume spikes
-- wallet balance changes
-- protocol-level risk signals
-- meaningful changes in pool state
-
-### 4. Non-custodial action layer
-The long-term product direction includes guided, non-custodial actions such as:
-- rebalance suggestions
-- deposit / withdraw proposals
-- swap proposals
-- action previews driven by protocol-aware logic
-
-The current beta does not yet expose the full action layer, but the architecture is intentionally moving in that direction.
-
----
-
-## Architecture overview
-
-The repository is structured as a monorepo with three main applications:
-
-### `apps/web`
-Vue / Vite frontend for:
-- protocol browsing
-- pool detail views
-- dashboard surfaces
-- wallet connection and multi-wallet monitoring
-
-### `apps/api`
-NestJS backend acting as the single application-facing API for the frontend.
-
-Responsibilities include:
-- protocol and pool endpoints
-- wallet endpoints
-- network stats endpoint
-- wallet refresh orchestration
-- normalized data serving from Postgres
-
-### `apps/indexer`
-Batch jobs and ingestion scripts responsible for:
-- protocol refresh
-- pool snapshots
-- reserve snapshots
-- price ingestion / derived pricing
-- protocol metrics refresh
-- wallet balance snapshots
-
-### Database
-Postgres is used as the main storage layer for:
-- venues
-- entities / pools
-- assets
-- normalized events
-- reserve snapshots
-- asset prices
-- latest protocol / pool metrics
-- wallet balances
-- wallet protocol positions
-
----
-
-## Data model philosophy
-
-Different Stellar DeFi protocols expose very different raw structures.
-
-Dig Stellar uses a **normalized internal model** so the frontend and monitoring layer can work with a unified shape.
-
-Main concepts:
-- **venues** → protocols / execution venues
-- **entities** → pools / markets / tracked protocol objects
-- **assets** → underlying tokens
-- **entity_assets** → relationships between pools and assets
-- **normalized_events** → protocol events mapped to a common format
-- **reserve_snapshots** → point-in-time reserve state
-- **pool_metrics_latest** → latest computed pool metrics
-- **protocol_metrics_latest** → latest computed venue/protocol metrics
-- **wallet_balance_snapshots** → tracked wallet balances over time
-- **wallet_protocol_positions** → future foundation for wallet-level protocol exposure
-
-This normalization is a key part of the project value: it enables monitoring, analytics, and later alerts/actions without rewriting each product surface protocol by protocol.
-
----
-
-## Current protocol coverage
-
-### Blend
-Used for lending pool state, reserves, and lending metrics.
-
-### Aquarius
-Used for AMM pool state, reserve tracking, event-derived activity, and metrics.
-
-### Soroswap
-Used for AMM pair state, event normalization, and pool-level metrics.
-
----
-
-## Repository structure
-
-```text
-apps/
-  api/        NestJS API
-  indexer/    Stellar data ingestion / refresh jobs
-  web/        Vue / Vite frontend
-
-packages/
-  db/         Prisma schema and database-related package remnants
-
-docs/
-  TECHNICAL_ARCHITECTURE.md
+License: MIT (`LICENSE`).

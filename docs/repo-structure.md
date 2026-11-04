@@ -187,7 +187,8 @@ job:refresh
               │           Aggregates pool_metrics_latest → protocol_metrics_latest
               │           Covers: blend, soroswap, aquarius
               │
-              ├── Step 8  run-allbridge-bridge-refresh.ts  (single bridge contract; non-fatal)
+              ├── Step 8  run-allbridge-bridge-refresh.ts  RETIRED from job:refresh (Lot PRE, 2026-11-03;
+              │           Allbridge Core wound down after 2026-07-20). Adapter kept as a historical record:
               │           → lib/protocols/allbridge/{fetch-bridge-events, normalize-bridge-events,
               │                                       persist-bridge-flows}
               │           Source: Soroban RPC getEvents on the Allbridge Core bridge contract
@@ -218,7 +219,7 @@ Three distinct categories of files exist in `apps/indexer/src/scripts/ingest/`.
 | `run-aquarius-pool-refresh.ts` | Step 5 |
 | `run-stellar-native-refresh.ts` | Step 6 |
 | `70-protocol-persist-metrics.ts` | Step 7 |
-| `run-allbridge-bridge-refresh.ts` | Step 8 (Allbridge bridge flows; non-fatal) |
+| `run-allbridge-bridge-refresh.ts` | Step 8 — retired from `job:refresh` (Lot PRE, 2026-11-03); adapter kept as a historical record |
 | `73-network-stats-refresh.ts` | Step 9 (non-fatal) |
 
 ### (b) Active onboarding: referenced in the Soroswap pair onboarding checklist

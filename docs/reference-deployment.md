@@ -63,7 +63,7 @@ Expected outcome (first refresh takes ~3-6 min after `up`):
 docker compose --profile app ps               # postgres + api healthy, indexer running
 docker compose logs -f indexer                # bootstrap, then the per-step refresh summary
 curl -s localhost:3000/health                 # status ok, version = GIT_SHA, freshness
-curl -s localhost:3000/v1/protocols           # 5 protocols with real mainnet data
+curl -s localhost:3000/v1/protocols           # 6 live protocols with real mainnet data (5 at the 2026-08-13 proof; XOXNO since Lot XO) + the dormant allbridge row
 ```
 
 Without `DEFINDEX_API_KEY` the summary shows 9/10 steps SUCCESS and `defindex` FAILED:

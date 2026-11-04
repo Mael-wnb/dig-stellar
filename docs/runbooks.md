@@ -96,7 +96,7 @@ comment. After seeding, `71-refresh-all-metrics` discovers them by DB query
 `run-defindex-refresh.ts` (SDK `getVaultInfo` → TVL from `totalManagedFunds`, priced through the
 `asset_prices` pipeline; `getVaultAPY` → stored as a **fraction** in `weighted_supply_apy`). The step
 is **non-fatal** and runs before step 7 so `70-protocol-persist-metrics` folds DeFindex into
-`protocol_metrics_latest` (→ `/v1/protocols`, `protocolCount = 5`). Env: `DEFINDEX_API_KEY`,
+`protocol_metrics_latest` (→ `/v1/protocols`, `protocolCount` = live count, 6 since Lot XO). Env: `DEFINDEX_API_KEY`,
 `DEFINDEX_API_URL` (default `https://api.defindex.io`). `DEFINDEX_VAULTS` in `.env` is only for the
 legacy Prisma `run:defindex` script; the live v1 path is DB-driven, not that var.
 

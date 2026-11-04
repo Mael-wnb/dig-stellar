@@ -25,8 +25,8 @@ on `#status`); (D) `GET /v1/campaign/metrics` answers 404 without the
 operator token (`OPS_METRICS_TOKEN`) and the campaign block left `#status`.
 
 Dig Stellar is a live production beta: a frontend on real Mainnet data (`stellar.getdig.ai`), a
-dedicated backend API façade, an indexer ingesting five protocols across Horizon, Soroban and the
-DeFindex API on a 15-minute cron, grouped multi-wallet portfolio with the active-signer model,
+dedicated backend API façade, an indexer ingesting six protocols across Horizon, Soroban and the
+DeFindex API on a 15-minute cron (XOXNO Lending live in prod since Lot XO, `/health` 2026-11-04), grouped multi-wallet portfolio with the active-signer model,
 in-app alerting, a bridge-flow API kept as a historical record (Lot PRE), and a non-custodial transaction builder with swaps and
 Blend supply/withdraw executed and Horizon-verified on Mainnet.
 
@@ -478,7 +478,8 @@ to prod** (VPS bootstrap + full `job:refresh` clean on Aug 4, ~3 min end-to-end;
 serves 5 protocols with `isStale=false`; Vercel front live). DeFindex user positions stay out of
 scope (portfolio is Blend-only by design).
 
-**XOXNO Lending (post-grant Lot XO, XO-1 — built 2026-10-26→30, VPS deploy pending).** Sixth
+**XOXNO Lending (post-grant Lot XO, XO-1 — built 2026-10-26→30, deployed: `xoxno` refreshing in
+prod on 2026-11-04, `/health` fresh + `/v1/protocols` ≈ $146.8k, Lot DOC1 recon).** Sixth
 protocol, read-only: venue `xoxno`, one entity per hub (Core / RWA / AMM), one reserve row per
 market (25), refreshed as step 6c of `job:refresh` through `run-xoxno-hub-refresh.ts` (adapter
 `lib/protocols/xoxno/`, on-chain views only, no XOXNO HTTP API, nothing vendored from the

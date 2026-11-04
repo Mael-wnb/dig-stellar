@@ -26,6 +26,7 @@ post-grant hardening, as the status board does.
 | `lot-api/` | Public API contract: recon, contract-test run, docs-page capture | `lot-api/api0-recon.md` | post-grant |
 | `lot-b/` | T3-D1 freshness system + DeFindex onboarding | `lot-b/README.md` | grant |
 | `lot-c/` | T3-D3 final UI polish: design-handoff port (shell, views, modals) | `lot-c/README.md` | grant |
+| `lot-doc1/` | Reviewer-facing docs before SCF 46: README rewrite, architecture design-vs-as-built table, docs map, drift fixes | `lot-doc1/doc1-recon.md` | post-grant |
 | `lot-e/` | T3-D3 observability: `/health`, RPC metrics, adoption counters, reference quickstart; frozen-AMM-reserves hotfix | `lot-e/README.md` | grant |
 | `lot-ep/` | Earn & Points campaign (EP0 recon, EP1–EP4 implementation, deploy notes, wallet matrix) | `lot-ep/00-recon.md` | post-grant |
 | `lot-f/` | T3-D3 advisor-feedback polish (F1–F5): empty states, pair logos, underfunded-swap copy | `lot-f/advisor-feedback-2026-08-10.md` | grant |

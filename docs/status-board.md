@@ -52,7 +52,8 @@ with; the tables and notes below are kept as the historical record of how each c
   (`docs/runbooks.md`); EP3 + the cron line await the dark deploy (`docs/evidence/lot-ep/ep3-deploy.md`).
   Honesty rule: adoption numbers earned under the campaign will be stated with the campaign context.
 - **Lot XO — XOXNO Lending (XO-1, read-only analytics): BUILT + locally validated 2026-10-30 on
-  `feat/lot-xo`, VPS deploy pending** (`docs/deployment.md` "Lot XO deploy"). Sixth protocol: 3
+  `feat/lot-xo`, DEPLOYED** (`xoxno` fresh on prod `/health` and ≈ $146.8k on `/v1/protocols`,
+  2026-11-04, Lot DOC1 recon; sequence in `docs/deployment.md` "Lot XO deploy"). Sixth protocol: 3
   hubs / 25 markets, TVL = pool cash (≈ $145k, folded into the network sum), scoped aggregator
   price fallback for 14 structurally unpriced markets, 162 RPC calls per refresh on the normal
   `*/15` cadence (params cached 24 h, own-priced markets never sent to the aggregator). API
@@ -398,7 +399,16 @@ with; the tables and notes below are kept as the historical record of how each c
   page), not a pool scan; trades pages moved to the provider endpoint (`HORIZON_TRADES_URL`,
   VPS env), provider key masked in every log line, capture classifies Horizon by path, and a failed
   page leaves the pool's 24 h volume null instead of a partial sum (`docs/evidence/lot-pre/pre2-recon.md`).
-- Last updated: 2026-11-04 (Lot PRE + PRE2 built, not deployed)
+- **Lot DOC1 — reviewer-facing docs (2026-11-04): drafted on `docs/lot-doc1`, not committed.**
+  README rewritten (live links, six protocols, alert families, mainnet actions, public API, proven
+  quickstart, docs map), `docs/TECHNICAL_ARCHITECTURE.md` gets a design-document banner + a
+  17-row "Design vs as-built (2026-11)" table (no other change), new `docs/README.md` (reading
+  order, source-of-truth rank, update owners), one-line count/deploy drifts fixed in place;
+  D6 `docs/post-grant-summary.md` (what shipped 2026-08-20 → 11-05, by theme, evidence per item,
+  no adoption numbers) for the grant advisor review of 2026-11-05 and the SCF 46 reviewers.
+  Recon + DOC2 follow-ups: `docs/evidence/lot-doc1/doc1-recon.md`. No SCF criterion involved.
+- Last updated: 2026-11-04 (Lot DOC1 drafted; Lot PRE deployed — prod `/health` version
+  `8e6dd18` on 2026-11-04 — PRE2 `98e0267` not yet deployed)
 
 ---
 
