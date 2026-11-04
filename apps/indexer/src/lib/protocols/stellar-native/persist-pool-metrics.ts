@@ -90,22 +90,30 @@ export async function persistStellarNativePoolMetrics(
       [venue.id]
     );
 
-  // Fetch trade metrics for the active pools CONCURRENTLY (each call paginates
-  // internally with its own 429 retry). Doing this sequentially per pool was the
-  // refresh bottleneck; in parallel the wall time collapses to the slowest pool.
-  const tradeMetricsByEntity = new Map<string, PoolTradeMetrics>();
+  // Fetch trade metrics for the active pools with BOUNDED concurrency (each
+  // call paginates internally with its own 429 retry). Fully sequential was the
+  // refresh bottleneck; all 9 at once makes the provider queue the heavy pages
+  // (PRE2 measurement: 9 concurrent deep pages = 3 at ~1.5 s + 6 at 6–8 s,
+  // sequential ≈ 1.1 s each), so 3 workers keep pages fast and the wall short.
+  // A null entry = the walk failed on a page (PRE2 A3): that pool's 24h volume
+  // is persisted as null for this run, never as a partial sum.
+  const TRADES_CONCURRENCY = 3;
+  const tradeMetricsByEntity = new Map<string, PoolTradeMetrics | null>();
+  const activeRows = snapshots.rows.filter((row) => row.pool_id && row.is_active);
+  let nextIndex = 0;
 
   await Promise.all(
-    snapshots.rows
-      .filter((row) => row.pool_id && row.is_active)
-      .map(async (row) => {
+    Array.from({ length: Math.min(TRADES_CONCURRENCY, activeRows.length) }, async () => {
+      while (nextIndex < activeRows.length) {
+        const row = activeRows[nextIndex++];
         const metrics = await fetchPoolTrades({
           poolId: row.pool_id as string,
           feeBp: row.metadata?.feeBp ?? 0,
           xlmUsd,
         });
         tradeMetricsByEntity.set(row.entity_id, metrics);
-      })
+      }
+    })
   );
 
   let processed = 0;
@@ -150,16 +158,23 @@ export async function persistStellarNativePoolMetrics(
 
     // 24h volume / fees / trade count, from the concurrent trade fetch above.
     // Only active pools were fetched (legacy entities are skipped to keep the
-    // refresh fast). Pools with no trades in 24h legitimately yield 0.
-    let volume24hUsd = 0;
-    let fees24hUsd = 0;
-    let trades24h = 0;
+    // refresh fast). Pools with no trades in 24h legitimately yield 0; a failed
+    // walk yields null (unknown), which the column accepts (nullable numeric).
+    let volume24hUsd: number | null = 0;
+    let fees24hUsd: number | null = 0;
+    let trades24h: number | null = 0;
 
-    const tradeMetrics = tradeMetricsByEntity.get(row.entity_id);
-    if (tradeMetrics) {
-      volume24hUsd = tradeMetrics.volume24hUsd;
-      fees24hUsd = tradeMetrics.fees24hUsd;
-      trades24h = tradeMetrics.trades24h;
+    if (tradeMetricsByEntity.has(row.entity_id)) {
+      const tradeMetrics = tradeMetricsByEntity.get(row.entity_id) ?? null;
+      if (tradeMetrics === null) {
+        volume24hUsd = null;
+        fees24hUsd = null;
+        trades24h = null;
+      } else {
+        volume24hUsd = tradeMetrics.volume24hUsd;
+        fees24hUsd = tradeMetrics.fees24hUsd;
+        trades24h = tradeMetrics.trades24h;
+      }
     }
 
     await client.query(

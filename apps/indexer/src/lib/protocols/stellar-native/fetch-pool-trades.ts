@@ -2,6 +2,7 @@
 
 import "dotenv/config";
 import { fetchJson, getEnv } from "../../../scripts/discovery/00-common";
+import { maskHorizonUrl, maskRpcUrl } from "../../rpc-config";
 
 export type PoolTradeMetrics = {
   volume24hUsd: number;
@@ -25,6 +26,9 @@ type HorizonTradesResponse = {
   _embedded?: { records?: HorizonTrade[] };
   _links?: { next?: { href?: string } };
 };
+
+/** Same shape as `fetchJson` — injectable so the walk is unit-testable. */
+export type TradesPageFetcher = (url: string) => Promise<HorizonTradesResponse>;
 
 const STABLE_USD: Record<string, number> = {
   USDC: 1,
@@ -78,11 +82,26 @@ function tradeUsd(
   return null;
 }
 
-export async function fetchPoolTrades(params: {
-  poolId: string;
-  feeBp: number;
-  xlmUsd: number | null;
-}): Promise<PoolTradeMetrics> {
+/**
+ * Walk a pool's trades back over the last 24 h and sum them in USD.
+ *
+ * Pages go through HORIZON_TRADES_URL (the operator provider, Lot PRE PRE2) and
+ * fall back to HORIZON_URL / public Horizon when it is unset. The provider URL
+ * carries a key in its path: every log line here goes through maskRpcUrl /
+ * maskHorizonUrl (host, or host + Horizon path) — never the raw URL.
+ *
+ * Returns null when a page ultimately fails (fetchJson's retries exhausted, or
+ * a non-429 HTTP error): a partial sum is not a 24 h volume, and the caller
+ * persists "unknown" rather than an understated figure (PRE2 A3).
+ */
+export async function fetchPoolTrades(
+  params: {
+    poolId: string;
+    feeBp: number;
+    xlmUsd: number | null;
+  },
+  fetchPage: TradesPageFetcher = (url) => fetchJson<HorizonTradesResponse>(url)
+): Promise<PoolTradeMetrics | null> {
   const { poolId, feeBp, xlmUsd } = params;
 
   const tradesBaseUrl = getEnv(
@@ -91,7 +110,7 @@ export async function fetchPoolTrades(params: {
   );
 
   console.log(
-    `[stellar-native] pool=${poolId} HORIZON_TRADES_URL=${tradesBaseUrl}`
+    `[stellar-native] pool=${poolId} trades via ${maskRpcUrl(tradesBaseUrl)}`
   );
 
   const cutoff = Date.now() - WINDOW_MS;
@@ -99,16 +118,8 @@ export async function fetchPoolTrades(params: {
   let volume24hUsd = 0;
   let trades24h = 0;
 
-  // IMPORTANT:
-  // Validation Cloud uses:
-  // https://host/v1/API_KEY/...
-  //
-  // Using:
-  //   new URL("/liquidity_pools/...", tradesBaseUrl)
-  // would DROP the /v1/API_KEY prefix.
-  //
-  // Build the URL explicitly instead.
-
+  // `new URL("/liquidity_pools/...", base)` would drop the provider's
+  // `/v1/<key>` prefix — build the URL by concatenation instead.
   const first = new URL(
     `${tradesBaseUrl.replace(/\/$/, "")}/liquidity_pools/${poolId}/trades`
   );
@@ -118,30 +129,23 @@ export async function fetchPoolTrades(params: {
 
   let nextUrl: string | null = first.toString();
 
-  console.log(
-    `[stellar-native] first trades url = ${nextUrl}`
-  );
-
-  console.log(
-    `[stellar-native] fetching trades for pool ${poolId} via ${tradesBaseUrl}`
-  );
-
   for (let page = 0; page < MAX_PAGES && nextUrl; page++) {
     let json: HorizonTradesResponse;
 
     console.log(
-      `[stellar-native] page=${page} url=${nextUrl}`
+      `[stellar-native] page=${page} url=${maskHorizonUrl(nextUrl)}`
     );
 
     try {
-      json = await fetchJson<HorizonTradesResponse>(nextUrl);
+      json = await fetchPage(nextUrl);
     } catch (err) {
+      // One warning, pool + page named; the partial sum is dropped.
       console.warn(
-        `[stellar-native] trades fetch failed for pool ${poolId}: ${
+        `[stellar-native] trades page ${page} failed for pool ${poolId}: ${
           err instanceof Error ? err.message : String(err)
-        } — using partial (volume so far=${volume24hUsd})`
+        } — volume24h unknown for this run (partial sum ${volume24hUsd.toFixed(2)} discarded)`
       );
-      break;
+      return null;
     }
 
     const records = json?._embedded?.records ?? [];
@@ -178,10 +182,6 @@ export async function fetchPoolTrades(params: {
     }
 
     nextUrl = json?._links?.next?.href ?? null;
-
-    console.log(
-      `[stellar-native] next=${nextUrl}`
-    );
   }
 
   const fees24hUsd = volume24hUsd * (feeBp / 10000);

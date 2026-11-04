@@ -477,12 +477,14 @@ the web depends on this deploy.
 
 ## Lot PRE deploy sequence (pre-dossier fixes, 2026-11-03) — VPS first, web rides the push
 
-Indexer + API + web; **no SQL change, no new cron line, one new env var** (`OPS_METRICS_TOKEN`).
+Indexer + API + web; **no SQL change, no new cron line, two new env vars** (`OPS_METRICS_TOKEN` on the API, `HORIZON_TRADES_URL` on the indexer — PRE2).
 What lands: (A) the Allbridge step leaves `job:refresh` and the dashboard bridge section is
 retired (`/v1/bridge/*`, `bridge_flows`, adapter kept); (B) pool-detail TVL panel: plain
 "TVL history not available" on non-lending pools, "since" only from the series; (C) the Horizon
 source-account sequence is fetched once per step process (local run: 274 → 39 Horizon calls per
-refresh, one sequential lookup per pool process instead of parallel bursts); (D) `GET /v1/campaign/metrics` gated behind the operator token, status block removed.
+refresh, one sequential lookup per pool process instead of parallel bursts); (D) `GET /v1/campaign/metrics` gated behind the operator token, status block removed; (C2, PRE2) the
+stellar-native trades pages move to the provider endpoint (`HORIZON_TRADES_URL`), key masked in
+logs, partial 24 h volume never persisted.
 Order: record the Horizon onset query once BEFORE the indexer change is picked up, then VPS, then
 the two curls; the web deploys from the same push and is compatible with the old and the new API.
 
@@ -504,7 +506,14 @@ curl -s -o /dev/null -w '%{http_code}\n' https://stellar-api.getdig.ai/v1/campai
 curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $(grep ^OPS_METRICS_TOKEN= apps/api/.env | cut -d= -f2)" https://stellar-api.getdig.ai/v1/campaign/metrics   # expect 200
 # 5. the indexer change is picked up by the next */15 tick (no restart: each run is a fresh tsx process). After one tick:
 docker exec -i dig_stellar_postgres psql -U dig -d dig_stellar -Atc "select run_at, calls, errors, methods from rpc_metrics_runs where target='horizon' and job='refresh' order by run_at desc limit 2;"
-#    expect calls ≈ 40 (GET /accounts ≈ 29 = one per Blend/Soroswap/Aquarius pool process, /fee_stats 1, /liquidity_pools 9), errors 0
+#    expect GET /accounts ≈ 29 (one per Blend/Soroswap/Aquarius pool process), /fee_stats 1, /liquidity_pools = 9 pool reads + the 24h trades pages (30–60)
+# 6. PRE2 (C2): point the trades pages at the provider's Horizon URL (the RPC provider URL, same key; value from the password manager, never in git)
+printf '\nHORIZON_TRADES_URL=%s\n' '<url>' >> apps/indexer/.env
+grep '^HORIZON_TRADES_URL=' apps/indexer/.env | cut -d= -f1          # expect HORIZON_TRADES_URL — never print the value
+#    picked up by the next */15 tick; no API restart. After one tick:
+docker exec -i dig_stellar_postgres psql -U dig -d dig_stellar -Atc "select run_at, calls, errors, p50_ms, p95_ms, p99_ms, methods from rpc_metrics_runs where target='horizon' and job='refresh' order by run_at desc limit 2;"
+#    expect the trades pages still under horizon / GET /liquidity_pools (the capture classifies by path), p50 ≈ 1 s, p95 ≈ 4 s, p99 under 5 s, errors 0
+grep -c 'trades page .* failed' /var/log/dig-stellar-refresh.log        # the A3 guard: should stay at 0 on the provider
 curl -s 'https://stellar-api.getdig.ai/v1/ops/status?window=24h' | jq '[.components[] | select(.id=="step:allbridge" or .id=="rpc:horizon") | {id, state, availability24h}]'
 #    the allbridge step row ages out of the 24h window by itself; rpc:horizon turns green segment by segment
 curl -s https://stellar-api.getdig.ai/health | jq '.freshness[] | select(.venue=="allbridge")'   # still listed, asOf null

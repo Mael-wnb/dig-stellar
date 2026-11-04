@@ -393,8 +393,12 @@ with; the tables and notes below are kept as the historical record of how each c
   Horizon calls per refresh, no more parallel bursts; expected to clear the amber Horizon bar on
   `#status`); (D)
   `GET /v1/campaign/metrics` gated behind `OPS_METRICS_TOKEN` (404 otherwise) and the campaign
-  block removed from `#status`.
-- Last updated: 2026-11-03 (Lot PRE built, not deployed)
+  block removed from `#status`. **C2 (PRE2, 2026-11-04):** the amber survived C — the
+  `GET /liquidity_pools` count was the 24 h trades walk (30–60 pages on public Horizon, 7–10 s a
+  page), not a pool scan; trades pages moved to the provider endpoint (`HORIZON_TRADES_URL`,
+  VPS env), provider key masked in every log line, capture classifies Horizon by path, and a failed
+  page leaves the pool's 24 h volume null instead of a partial sum (`docs/evidence/lot-pre/pre2-recon.md`).
+- Last updated: 2026-11-04 (Lot PRE + PRE2 built, not deployed)
 
 ---
 

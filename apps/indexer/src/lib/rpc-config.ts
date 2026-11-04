@@ -45,3 +45,56 @@ export function maskRpcUrl(url: string | undefined | null): string {
     return '***';
   }
 }
+
+// ── Horizon-shaped URLs (Lot PRE, PRE2) ──────────────────────────────────────
+// Horizon REST is recognised by its PATH, not its host: the operator provider
+// (Validation Cloud) serves Horizon under `/v1/<key>/...` on the same host as
+// Soroban RPC, so a host-based rule would file trades pages under the RPC row.
+export const HORIZON_RESOURCE_SEGMENTS: ReadonlySet<string> = new Set([
+  'liquidity_pools',
+  'accounts',
+  'fee_stats',
+  'trades',
+  'order_book',
+  'paths',
+  'ledgers',
+  'transactions',
+  'operations',
+  'effects',
+  'offers',
+]);
+
+/** Index of the first Horizon resource in `pathname.split('/')` segments, or -1. */
+export function horizonResourceIndex(segments: string[]): number {
+  return segments.findIndex((segment) => HORIZON_RESOURCE_SEGMENTS.has(segment));
+}
+
+/**
+ * The Horizon part of a URL's path (`/liquidity_pools/<id>/trades`), dropping
+ * anything before the resource (the provider key segment) and the query string.
+ * null when the path carries no Horizon resource.
+ */
+export function horizonPathOf(url: string): string | null {
+  try {
+    const segments = new URL(url).pathname.split('/').filter(Boolean);
+    const index = horizonResourceIndex(segments);
+    return index < 0 ? null : `/${segments.slice(index).join('/')}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Mask a Horizon-shaped URL for logging: host + Horizon path, never the query
+ * (paging cursors) nor the key segment. Falls back to the host only.
+ */
+export function maskHorizonUrl(url: string | undefined | null): string {
+  if (!url) return '(unset)';
+  try {
+    const host = new URL(url).host;
+    const path = horizonPathOf(url);
+    return path ? `${host}${path}` : host;
+  } catch {
+    return '***';
+  }
+}

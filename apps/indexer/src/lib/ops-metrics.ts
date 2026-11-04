@@ -20,7 +20,7 @@
 
 import { appendFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { resolveRpcUrl } from './rpc-config';
+import { horizonPathOf, horizonResourceIndex, resolveRpcUrl } from './rpc-config';
 
 // price-oracle (phase B): the Reflector `lastprice` simulations of step 1, recorded
 // explicitly by the SorobanReader hook (they also transit the RPC host, so the
@@ -89,6 +89,9 @@ export function classifyOpsTarget(url: string): OpsTarget | null {
   const host = hostOf(url);
   if (!host) return null;
 
+  // PRE2: Horizon REST is recognised by its path first — the operator provider
+  // serves it under /v1/<key>/... on the RPC host (HORIZON_TRADES_URL).
+  if (horizonPathOf(url)) return 'horizon';
   if (rpcHosts().has(host)) return 'soroban-rpc';
   if (host === hostOf(process.env.HORIZON_URL) || host.includes('horizon')) {
     return 'horizon';
@@ -120,14 +123,22 @@ function methodFromBody(body: unknown): string | null {
 export function labelOpsMethod(url: string, httpMethod: string | undefined, body: unknown): string {
   const rpcMethod = methodFromBody(body);
   if (rpcMethod) return rpcMethod;
-  let segment = '';
+  let segments: string[] = [];
   try {
-    segment = new URL(url).pathname.split('/').filter(Boolean)[0] ?? '';
+    segments = new URL(url).pathname.split('/').filter(Boolean);
   } catch {
-    segment = '';
+    segments = [];
+  }
+  let segment = segments[0] ?? '';
+  const target = classifyOpsTarget(url);
+  // PRE2: a Horizon resource behind a provider key segment is labelled by the
+  // resource (`GET /liquidity_pools`), never by the key.
+  if (target === 'horizon') {
+    const index = horizonResourceIndex(segments);
+    if (index >= 0) segment = segments[index];
   }
   // RPC URLs embed the key as the first path segment — never label with it.
-  if (classifyOpsTarget(url) === 'soroban-rpc') segment = '';
+  if (target === 'soroban-rpc') segment = '';
   return `${(httpMethod ?? 'GET').toUpperCase()}${segment ? ` /${segment}` : ''}`;
 }
 
