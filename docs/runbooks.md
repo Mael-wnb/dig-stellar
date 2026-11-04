@@ -764,14 +764,19 @@ calls per refresh in total with `fee_stats` and the 9 `liquidity_pools` (local r
 
 **Stellar-native trades pages (Lot PRE PRE2, 2026-11-04):** the 24 h volume of the 9 native pools
 is a walk over `GET /liquidity_pools/{id}/trades` (200 trades per page, 30–60 pages per refresh;
-the capture files them under `GET /liquidity_pools`, verb + resource). Those pages go through
+the capture files them under that label — verb + Horizon path template, ids replaced, PRE3 —
+next to the 9 pair reads `GET /liquidity_pools`). Those pages go through
 **`HORIZON_TRADES_URL`** (`lib/protocols/stellar-native/fetch-pool-trades.ts`) and fall back to
 `HORIZON_URL` / public Horizon when it is unset — where a deep page takes 7–10 s and fails now and
 then (the amber Horizon bar after fix C). In prod it points at the operator's Horizon provider
 (same key as the RPC URL; path-carried key, masked in every log line — `maskHorizonUrl`). The
-capture classifies Horizon traffic by **path**, so the pages stay under the `horizon` row whatever
-the host. Guards: a page that ultimately fails leaves that pool's `volume_24h_usd` / `fees_24h_usd`
-**null** for the run (one `trades page N failed for pool …` warning) instead of a partial sum. Watch
+capture classifies Horizon traffic by **path**, host-agnostic (`/v1/<key>/liquidity_pools/…` on the
+provider and `/liquidity_pools/…` on public Horizon get the same target and label). Guards: a page that ultimately fails leaves that pool's `volume_24h_usd` / `fees_24h_usd`
+**null** for the run (one `trades page N failed for pool …` warning) instead of a partial sum; a
+`HORIZON_TRADES_URL` that is not an absolute `https://` URL (or blank → falls back to `HORIZON_URL`)
+leaves every pool's volume null with a `… is not an absolute URL` warning, the step still writes TVL
+and snapshots, and any other failure of the step exits non-zero (PRE3 — before it was a silent
+SUCCESS with no metric row, `docs/evidence/lot-pre/pre3-recon.md`). Watch
 after enabling: the provider's usage dashboard (+30–60 requests per refresh, ~250/h, on the RPC
 key's quota — see the Lot RP budget), and
 `select run_at, calls, errors, p95_ms, methods from rpc_metrics_runs where target='horizon' and job='refresh' order by run_at desc limit 3;`

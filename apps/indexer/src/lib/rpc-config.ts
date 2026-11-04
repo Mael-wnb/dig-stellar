@@ -85,6 +85,27 @@ export function horizonPathOf(url: string): string | null {
 }
 
 /**
+ * The Horizon path with every identifier replaced by `{id}`
+ * (`/liquidity_pools/{id}/trades`, `/accounts/{id}`, `/fee_stats`), dropping
+ * anything before the resource (the provider key segment) and the query string.
+ * Horizon paths alternate resource / id / sub-resource, so the segments at odd
+ * offsets from the resource are ids. null when the path carries no Horizon
+ * resource. Used by the ops capture as the method label (Lot PRE, PRE3): it
+ * never carries an account address, a pool id or a key.
+ */
+export function horizonPathTemplateOf(url: string): string | null {
+  try {
+    const segments = new URL(url).pathname.split('/').filter(Boolean);
+    const index = horizonResourceIndex(segments);
+    if (index < 0) return null;
+    const shaped = segments.slice(index).map((segment, offset) => (offset % 2 === 1 ? '{id}' : segment));
+    return `/${shaped.join('/')}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Mask a Horizon-shaped URL for logging: host + Horizon path, never the query
  * (paging cursors) nor the key segment. Falls back to the host only.
  */

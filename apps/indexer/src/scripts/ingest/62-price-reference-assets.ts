@@ -245,7 +245,7 @@ async function main() {
       ? new SorobanReader({
           rpcUrl: resolveRpcUrl(),
           sourceAccount,
-          onSample: (s) => recordOpsSample({ target: 'price-oracle', ok: s.ok, durationMs: s.durationMs }),
+          onSample: (s) => recordOpsSample({ target: 'price-oracle', ok: s.ok, durationMs: s.durationMs, method: 'simulateTransaction' }),
         })
       : null;
     if (!reader) console.warn('reflector: STELLAR_SOURCE_ACCOUNT unset — oracle reads disabled this run');

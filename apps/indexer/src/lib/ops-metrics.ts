@@ -20,7 +20,7 @@
 
 import { appendFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { horizonPathOf, horizonResourceIndex, resolveRpcUrl } from './rpc-config';
+import { horizonPathOf, horizonPathTemplateOf, resolveRpcUrl } from './rpc-config';
 
 // price-oracle (phase B): the Reflector `lastprice` simulations of step 1, recorded
 // explicitly by the SorobanReader hook (they also transit the RPC host, so the
@@ -31,7 +31,12 @@ export type OpsSample = {
   target: OpsTarget;
   ok: boolean;
   durationMs: number;
-  /** RP1: JSON-RPC method (soroban-rpc) or HTTP verb + first path segment (REST). */
+  /**
+   * RP1: JSON-RPC method (soroban-rpc) or HTTP verb + first path segment (REST).
+   * PRE3: Horizon calls carry the verb + path template instead
+   * (`GET /liquidity_pools/{id}/trades`), so a trades page is told apart from a
+   * pool read whatever host serves it.
+   */
   method?: string;
 };
 
@@ -104,10 +109,11 @@ export function classifyOpsTarget(url: string): OpsTarget | null {
   return null;
 }
 
-// ── Method extraction (RP1) ──────────────────────────────────────────────────
-// JSON-RPC bodies carry the method; REST calls (Horizon, DeFindex, price
-// sources) are labelled by verb + first path segment. Never the full path: a
-// Horizon path can carry an account address, an RPC path the API key.
+// ── Method extraction (RP1, PRE3) ────────────────────────────────────────────
+// JSON-RPC bodies carry the method; REST calls (DeFindex, price sources) are
+// labelled by verb + first path segment; Horizon calls by verb + path template
+// (ids replaced by `{id}`). Never the full path: a Horizon path can carry an
+// account address or a pool id, an RPC path the API key.
 
 function methodFromBody(body: unknown): string | null {
   if (!body) return null;
@@ -131,11 +137,12 @@ export function labelOpsMethod(url: string, httpMethod: string | undefined, body
   }
   let segment = segments[0] ?? '';
   const target = classifyOpsTarget(url);
-  // PRE2: a Horizon resource behind a provider key segment is labelled by the
-  // resource (`GET /liquidity_pools`), never by the key.
+  // PRE2/PRE3: a Horizon resource, behind a provider key segment or not, is
+  // labelled by its path template (`/liquidity_pools/{id}/trades`), never by
+  // the key, an address or a pool id.
   if (target === 'horizon') {
-    const index = horizonResourceIndex(segments);
-    if (index >= 0) segment = segments[index];
+    const template = horizonPathTemplateOf(url);
+    if (template) segment = template.slice(1);
   }
   // RPC URLs embed the key as the first path segment — never label with it.
   if (target === 'soroban-rpc') segment = '';

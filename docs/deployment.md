@@ -531,10 +531,11 @@ docker exec -i dig_stellar_postgres psql -U dig -d dig_stellar -Atc "select run_
 #    expect GET /accounts ≈ 29 (one per Blend/Soroswap/Aquarius pool process), /fee_stats 1, /liquidity_pools = 9 pool reads + the 24h trades pages (30–60)
 # 6. PRE2 (C2): point the trades pages at the provider's Horizon URL (the RPC provider URL, same key; value from the password manager, never in git)
 printf '\nHORIZON_TRADES_URL=%s\n' '<url>' >> apps/indexer/.env
-grep '^HORIZON_TRADES_URL=' apps/indexer/.env | cut -d= -f1          # expect HORIZON_TRADES_URL — never print the value
+grep -c '^HORIZON_TRADES_URL=https://' apps/indexer/.env             # expect 1 — an absolute https:// URL, nothing else on the line; never print the value
 #    picked up by the next */15 tick; no API restart. After one tick:
 docker exec -i dig_stellar_postgres psql -U dig -d dig_stellar -Atc "select run_at, calls, errors, p50_ms, p95_ms, p99_ms, methods from rpc_metrics_runs where target='horizon' and job='refresh' order by run_at desc limit 2;"
-#    expect the trades pages still under horizon / GET /liquidity_pools (the capture classifies by path), p50 ≈ 1 s, p95 ≈ 4 s, p99 under 5 s, errors 0
+#    expect the trades pages under horizon / GET /liquidity_pools/{id}/trades (PRE3 label; GET /liquidity_pools before it — the capture classifies by path), p50 ≈ 1 s, p95 ≈ 4 s, p99 under 5 s, errors 0
+#    PRE3: if the trades label is missing and the stellar-native step took ≈ 4 s, the value is not an absolute URL — fix it; the step now exits 1 on any other failure
 grep -c 'trades page .* failed' /var/log/dig-stellar-refresh.log        # the A3 guard: should stay at 0 on the provider
 curl -s 'https://stellar-api.getdig.ai/v1/ops/status?window=24h' | jq '[.components[] | select(.id=="step:allbridge" or .id=="rpc:horizon") | {id, state, availability24h}]'
 #    the allbridge step row ages out of the 24h window by itself; rpc:horizon turns green segment by segment

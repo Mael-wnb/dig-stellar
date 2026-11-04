@@ -399,6 +399,13 @@ with; the tables and notes below are kept as the historical record of how each c
   page), not a pool scan; trades pages moved to the provider endpoint (`HORIZON_TRADES_URL`,
   VPS env), provider key masked in every log line, capture classifies Horizon by path, and a failed
   page leaves the pool's 24 h volume null instead of a partial sum (`docs/evidence/lot-pre/pre2-recon.md`).
+  **C3 (PRE3, 2026-11-04):** after the PRE2 deploy the trades pages vanished from the Horizon row
+  because the native step was dying before its first page and reporting SUCCESS (`main().catch(console.error)`
+  exited 0; the likely throw is a `HORIZON_TRADES_URL` value that is not an absolute URL — founder
+  VPS check in the recon). Fixed: the step exits non-zero on failure, a bad trades base URL degrades
+  to null volumes with a masked warning, and Horizon calls are labelled by path template
+  (`GET /liquidity_pools/{id}/trades` next to the 9 `GET /liquidity_pools` pair reads, host-agnostic);
+  `price-oracle` samples labelled `simulateTransaction` (`docs/evidence/lot-pre/pre3-recon.md`).
 - **Lot DOC1 — reviewer-facing docs (2026-11-04): drafted on `docs/lot-doc1`, not committed.**
   README rewritten (live links, six protocols, alert families, mainnet actions, public API, proven
   quickstart, docs map), `docs/TECHNICAL_ARCHITECTURE.md` gets a design-document banner + a
@@ -418,7 +425,8 @@ with; the tables and notes below are kept as the historical record of how each c
   the yaml and the committed types. Evidence: `docs/evidence/lot-sdk/sdk0-build.md`. No SCF
   criterion involved.
 - Last updated: 2026-11-04 (Lot SDK0 built; Lot DOC1 merged to `main` (`438971f`); Lot PRE
-  deployed — prod `/health` version `8e6dd18` on 2026-11-04 — PRE2 `98e0267` not yet deployed)
+  deployed — prod `/health` version `8e6dd18` on 2026-11-04, PRE2 `98e0267` on the VPS since
+  ≈ 17:25 UTC per the founder, `/health` not restarted; PRE3 built, deploy pending)
 
 ---
 

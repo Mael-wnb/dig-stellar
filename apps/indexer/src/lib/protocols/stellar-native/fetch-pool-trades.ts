@@ -1,7 +1,7 @@
 // apps/indexer/src/lib/protocols/stellar-native/fetch-pool-trades.ts
 
 import "dotenv/config";
-import { fetchJson, getEnv } from "../../../scripts/discovery/00-common";
+import { fetchJson } from "../../../scripts/discovery/00-common";
 import { maskHorizonUrl, maskRpcUrl } from "../../rpc-config";
 
 export type PoolTradeMetrics = {
@@ -82,6 +82,15 @@ function tradeUsd(
   return null;
 }
 
+/** HORIZON_TRADES_URL, else HORIZON_URL, else public Horizon; blank = unset. */
+function resolveTradesBaseUrl(): string {
+  return (
+    process.env.HORIZON_TRADES_URL?.trim() ||
+    process.env.HORIZON_URL?.trim() ||
+    "https://horizon.stellar.org"
+  );
+}
+
 /**
  * Walk a pool's trades back over the last 24 h and sum them in USD.
  *
@@ -93,6 +102,11 @@ function tradeUsd(
  * Returns null when a page ultimately fails (fetchJson's retries exhausted, or
  * a non-429 HTTP error): a partial sum is not a 24 h volume, and the caller
  * persists "unknown" rather than an understated figure (PRE2 A3).
+ *
+ * Also returns null, with one warning naming the variable, when the configured
+ * base is not an absolute URL (PRE3): before, `new URL` threw out of the walk,
+ * the step died before writing any metric row, and Node's error carried the
+ * raw URL — key included — into the cron log. An empty value counts as unset.
  */
 export async function fetchPoolTrades(
   params: {
@@ -104,28 +118,36 @@ export async function fetchPoolTrades(
 ): Promise<PoolTradeMetrics | null> {
   const { poolId, feeBp, xlmUsd } = params;
 
-  const tradesBaseUrl = getEnv(
-    "HORIZON_TRADES_URL",
-    getEnv("HORIZON_URL", "https://horizon.stellar.org")
-  );
+  const tradesBaseUrl = resolveTradesBaseUrl();
 
   console.log(
     `[stellar-native] pool=${poolId} trades via ${maskRpcUrl(tradesBaseUrl)}`
   );
 
+  // `new URL("/liquidity_pools/...", base)` would drop the provider's
+  // `/v1/<key>` prefix — build the URL by concatenation instead.
+  let first: URL;
+
+  try {
+    first = new URL(
+      `${tradesBaseUrl.replace(/\/$/, "")}/liquidity_pools/${poolId}/trades`
+    );
+  } catch {
+    console.warn(
+      `[stellar-native] HORIZON_TRADES_URL / HORIZON_URL is not an absolute URL (host ${maskRpcUrl(
+        tradesBaseUrl
+      )}) — volume24h unknown for pool ${poolId} this run`
+    );
+    return null;
+  }
+
+  first.searchParams.set("order", "desc");
+  first.searchParams.set("limit", String(PAGE_LIMIT));
+
   const cutoff = Date.now() - WINDOW_MS;
 
   let volume24hUsd = 0;
   let trades24h = 0;
-
-  // `new URL("/liquidity_pools/...", base)` would drop the provider's
-  // `/v1/<key>` prefix — build the URL by concatenation instead.
-  const first = new URL(
-    `${tradesBaseUrl.replace(/\/$/, "")}/liquidity_pools/${poolId}/trades`
-  );
-
-  first.searchParams.set("order", "desc");
-  first.searchParams.set("limit", String(PAGE_LIMIT));
 
   let nextUrl: string | null = first.toString();
 

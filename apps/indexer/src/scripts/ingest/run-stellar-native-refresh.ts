@@ -54,4 +54,9 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+// PRE3: a rejected main() must exit non-zero — `.catch(console.error)` exited 0,
+// so the orchestrator recorded SUCCESS while no metric row had been written.
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
