@@ -6,27 +6,17 @@ Stellar DeFi, read-only. Generated from the API's OpenAPI 3.1 contract
 (`apps/api/openapi/openapi.v1.yaml`, rendered at <https://stellar-api.getdig.ai/v1/docs>).
 "Contract" means the HTTP API contract, never a smart contract.
 
-Status: **v0 (0.1.0), not yet published to npm.** Zero runtime dependencies; needs a global
-`fetch` (Node 18+, browsers, workers) or one passed in.
+Status: **v0 (0.1.0).** Zero runtime dependencies; needs a global `fetch` (Node 18+,
+browsers, workers) or one passed in.
 
 ## Install
 
-From this repository (workspace package):
-
-```jsonc
-// your package.json, inside the monorepo
-"dependencies": { "@getdig/stellar-api": "workspace:*" }
-```
-
 ```bash
-pnpm install
+npm i @getdig/stellar-api
 ```
 
-From npm: soon.
-
-```bash
-# npm install @getdig/stellar-api   # soon
-```
+ESM and CommonJS builds with type declarations are shipped; `import` and `require` both work.
+Inside this monorepo, depend on it as `"@getdig/stellar-api": "workspace:^"` instead.
 
 ## Example
 
@@ -131,6 +121,8 @@ asOfDate(pool);  // Date | null, from `updatedAt`
 
 ## Versioning policy
 
+- Versioning: `0.x` follows the API contract `1.0.0` additively; the generated types are the
+  contract.
 - The generated types **are** the contract. `pnpm generate` rewrites
   `src/generated/openapi.d.ts` from the yaml; the file is committed so consumers need no build
   step, and CI fails on any drift between the yaml and the committed file.
@@ -144,7 +136,6 @@ asOfDate(pool);  // Date | null, from `updatedAt`
 - No automatic retries or backoff (a `429` is thrown with `retryAfterSeconds`).
 - No API keys: the API has none; access is rate-limited per IP.
 - No pagination: list operations return the full set (`listBridgeFlows` caps at `limit`).
-- Not published to npm.
 
 ## Development
 
