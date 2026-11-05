@@ -38,14 +38,32 @@ any origin can fetch the contract; the data endpoints keep the global CORS polic
 
 ## SDK
 
-`packages/sdk` (`@getdig/stellar-api`, v0, **not yet published**) is a TypeScript client
-generated from the yaml: `pnpm -C packages/sdk generate` runs openapi-typescript over
-`openapi.v1.yaml` into `src/generated/openapi.d.ts` (committed, so consumers need no build
-step), and `DigStellarClient` exposes one typed method per `operationId` (15). The CI job `sdk`
-regenerates the file and fails on any drift from the yaml, so a contract change lands with its
-types in the same commit and takes an SDK version bump (additive API change → SDK minor).
-Usage, errors, the freshness helper and what v0 does not do (retries, keys, pagination):
-`packages/sdk/README.md`.
+`packages/sdk` (`@getdig/stellar-api`, `0.1.0`, npm: `npm i @getdig/stellar-api`) is a
+TypeScript client generated from the yaml: `pnpm -C packages/sdk generate` runs
+openapi-typescript over `openapi.v1.yaml` into `src/generated/openapi.d.ts` (committed, so
+consumers need no build step), and `DigStellarClient` exposes one typed method per
+`operationId` (15). ESM and CommonJS builds, zero runtime dependencies, Node 18+. The CI job
+`sdk` regenerates the file and fails on any drift from the yaml, so a contract change lands
+with its types in the same commit and takes an SDK version bump (additive API change → SDK
+minor; `0.x` follows contract `1.0.0`). Usage, errors, the freshness helper and what v0 does
+not do (retries, keys, pagination): `packages/sdk/README.md`. Publishing is a founder action
+(`npm publish` from `packages/sdk`, 2FA); Lot SDK1 evidence:
+`../internal/evidence/lot-sdk/sdk1-build.md`.
+
+## MCP server
+
+`packages/mcp` (`@getdig/stellar-mcp`, `0.1.0`, `npx -y @getdig/stellar-mcp`) is an MCP server
+over stdio built on the SDK, for AI agents (Claude Desktop, Claude Code, any MCP client). Six
+read-only tools: `list_protocols`, `list_pools` (`protocol`, `sort`, `order`), `get_pool`
+(`slug`), `get_pool_series` (`slug`), `get_network_stats`, `get_pipeline_status`. Every answer
+is a one-line summary ending with the data's freshness (`isStale`, `asOf`) followed by the API
+payload as JSON; `get_pipeline_status` condenses the 150 KB `/v1/ops/status` payload (per-run
+arrays replaced by counts). No wallet, no transaction, no key, no write. Env:
+`DIG_API_BASE_URL`, `DIG_USER_AGENT`. Tests cover registration, every handler on a mocked API
+and the 404 path; CI builds and tests it in the `sdk` job after the SDK build. Depends on
+`@getdig/stellar-api` with the `workspace:^` protocol, which `pnpm publish` rewrites to the
+published range (`npm publish` does not: publish this package with pnpm). Client config and
+example questions: `packages/mcp/README.md`.
 
 ## Validating the contract
 

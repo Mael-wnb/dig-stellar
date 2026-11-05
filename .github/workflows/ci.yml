@@ -41,6 +41,7 @@ jobs:
 
   # Lot SDK0: the SDK's committed types must match the yaml. Regenerate and fail on drift,
   # then typecheck (includes the type-level test), unit tests and the ESM/CJS build.
+  # Lot SDK1: the MCP server (packages/mcp) imports the built SDK, so it follows in the same job.
   sdk:
     runs-on: ubuntu-latest
     steps:
@@ -63,3 +64,7 @@ jobs:
       - run: pnpm -C packages/sdk typecheck
       - run: pnpm -C packages/sdk test
       - run: pnpm -C packages/sdk build
+
+      - run: pnpm -C packages/mcp typecheck
+      - run: pnpm -C packages/mcp test
+      - run: pnpm -C packages/mcp build

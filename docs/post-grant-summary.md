@@ -79,7 +79,8 @@ data, the action builders, the witness ledger, the faucet, auth and campaign rou
 deliberately outside the public contract. A contract test boots the real application against a
 local Postgres and validates every operation and every documented error path with a JSON Schema
 validator (40 checks). Versioning rule: additive changes only inside `/v1`; a breaking change
-ships as `/v2`; every change takes a line in the changelog. An SDK is in progress.
+ships as `/v2`; every change takes a line in the changelog. A TypeScript SDK and an MCP server
+are built from it (npm publication pending).
 Evidence: `docs/decisions/2026-11-03-public-api-v1-surface.md`, `docs/internal/evidence/lot-api/api0-recon.md`,
 `docs/internal/evidence/lot-api/api2-contract-test.md`, `docs/internal/evidence/lot-api/api5-prod-verification.md`, `docs/api/README.md`.
 
@@ -232,7 +233,7 @@ Evidence: `docs/reference-deployment.md`, `docs/internal/evidence/lot-z/z1-compo
 
 - The product is a beta. The API access model for wallet-scoped data is a rate-limited grouping
   key, not authentication (`docs/security-invariants.md` §7).
-- Not built: the API SDK (in progress), API keys or any auth on the public API, a CI deploy gate
+- Not built: API keys or any auth on the public API, a CI deploy gate
   (deployment to the VPS is manual and founder-executed, with the sequences above), daily TVL
   history for AMM and vault pools (available for lending pools only), XOXNO wallet positions,
   the alert latency of the design document (alerts run on a 15-minute sweep, not an event stream).
