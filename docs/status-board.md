@@ -384,7 +384,7 @@ with; the tables and notes below are kept as the historical record of how each c
   `docs/evidence/lot-api/` (prod verification: `api5-prod-verification.md` — version 1.0.0,
   15 paths, `/v1/docs` text/html, `/health` version `de1b8bb`). Web: an "API docs" sidebar
   link to `/v1/docs` on `feat/lot-api-web` (Vercel preview pending). No SCF criterion involved.
-- **Lot PRE — pre-dossier fixes (2026-11-03): BUILT on `feat/lot-pre`, not deployed**
+- **Lot PRE — pre-dossier fixes (2026-11-03): closed 2026-11-05 (C, C2, C3 in prod, `14c8bb8`)**
   (`docs/deployment.md` "Lot PRE deploy sequence", evidence `docs/evidence/lot-pre/`). Four
   founder-observed defects before the SCF 46 window: (A) bridge section retired from the dashboard
   and the Allbridge step from `job:refresh` — Allbridge Core wound down upstream; data, API and
@@ -415,7 +415,7 @@ with; the tables and notes below are kept as the historical record of how each c
   no adoption numbers) for the grant advisor review of 2026-11-05 and the SCF 46 reviewers.
   Recon + DOC2 follow-ups: `docs/evidence/lot-doc1/doc1-recon.md`. No SCF criterion involved.
 - **Lot SDK0 — Vercel-preview CORS + TypeScript SDK v0 (2026-11-04): BUILT on `feat/lot-sdk0`,
-  not committed, not deployed.** (1) The API accepts Vercel preview origins of the web project by
+  merged and deployed (`b34f07d`).** (1) The API accepts Vercel preview origins of the web project by
   pattern (`apps/api/src/cors-origin.ts`, 9 unit tests; `docs/deployment.md` "CORS: allowed
   origins"), so UI work on a preview can be validated against production data; API-only deploy,
   no env or nginx change. (2) `packages/sdk` (`@getdig/stellar-api` 0.1.0, **not published**):
@@ -424,9 +424,8 @@ with; the tables and notes below are kept as the historical record of how each c
   20 unit tests + a type-level test, one production example; CI job `sdk` fails on drift between
   the yaml and the committed types. Evidence: `docs/evidence/lot-sdk/sdk0-build.md`. No SCF
   criterion involved.
-- Last updated: 2026-11-04 (Lot SDK0 built; Lot DOC1 merged to `main` (`438971f`); Lot PRE
-  deployed — prod `/health` version `8e6dd18` on 2026-11-04, PRE2 `98e0267` on the VPS since
-  ≈ 17:25 UTC per the founder, `/health` not restarted; PRE3 built, deploy pending)
+- Last updated: 2026-11-05 (Lot PRE closed — C, C2, C3 in prod, `14c8bb8`; Lot SDK0 merged and
+  deployed, `b34f07d`; Lot DOC1 merged to `main`, `438971f`)
 
 ---
 

@@ -122,3 +122,15 @@ Not changed: `OPS_STATUS_RULES`, retries, timeouts, `TRADES_CONCURRENCY`, the SQ
 `horizon ≈ {"GET /accounts/{id}": 29, "GET /fee_stats": 1, "GET /liquidity_pools": 9,
 "GET /liquidity_pools/{id}/trades": 30–60}`, errors 0, p95 ≈ 4 s; `stellar-native` step ≈ 45–60 s;
 the 9 native pools' `updatedAt` moving every tick; `price-oracle {"simulateTransaction": N}`.
+
+## Production, 2026-11-04 19:30/19:45 UTC (14c8bb8)
+
+`rpc_metrics_runs`, target `horizon`, the two first ticks on this code:
+
+```
+ 2026-11-04 19:45:06.571+00 |   104 |      0 | {"GET /fee_stats": 1, "GET /accounts/{id}": 29, "GET /liquidity_pools": 9, "GET /liquidity_pools/{id}/trades": 65}
+ 2026-11-04 19:30:06.163+00 |   102 |      0 | {"GET /fee_stats": 1, "GET /accounts/{id}": 29, "GET /liquidity_pools": 9, "GET /liquidity_pools/{id}/trades": 63}
+```
+
+The 9 stellar-native pools answered `isStale=false` on `/v1/pools` at 19:54 UTC; `#status` shows
+Horizon green on every segment since 19:30 UTC (founder check 2026-11-05 10:30 local).
