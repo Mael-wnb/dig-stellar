@@ -165,7 +165,7 @@ async function main() {
     }
 
     // reserve_snapshots are no longer seeded: since the frozen-TVL hotfix
-    // (docs/hotfix-frozen-amm-reserves.md) every venue writes them on the live
+    // (docs/internal/briefs/hotfix-frozen-amm-reserves.md) every venue writes them on the live
     // refresh path, so the first `job:refresh` produces current rows itself.
 
     await client.query('commit');

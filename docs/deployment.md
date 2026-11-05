@@ -50,7 +50,7 @@ pnpm -C apps/indexer tsx src/scripts/bootstrap/allbridge-upsert-core.ts
 
 The public entry is nginx (`/etc/nginx/sites-available/stellar-api.getdig.ai`,
 symlinked into `sites-enabled`). **This config is ops state that must survive a VPS
-rebuild; recreate it from this section.** Evidence: `docs/evidence/lot-s/`.
+rebuild; recreate it from this section.** Evidence: `docs/internal/evidence/lot-s/`.
 
 ### Network posture
 - The API binds **`127.0.0.1:3000`** (`main.ts`; override with `HOST=0.0.0.0` only
@@ -67,7 +67,7 @@ rebuild; recreate it from this section.** Evidence: `docs/evidence/lot-s/`.
   `0.0.0.0` by mistake is therefore unreachable from the internet whatever the compose file
   says; container outbound traffic and host services (nginx, ssh) are unaffected. **This block is
   ops state that must survive a VPS rebuild; recreate it from
-  `docs/evidence/lot-ad/s1-remediation-execution.md` §Phase 7.** Verify: `iptables -L DOCKER-USER -n -v
+  `docs/internal/evidence/lot-ad/s1-remediation-execution.md` §Phase 7.** Verify: `iptables -L DOCKER-USER -n -v
   --line-numbers` → two `DROP … ctstate NEW` (eth0, eth1) + `RETURN`; from outside, `nc -zv -G 5
   <vps-ip> 5432` times out while `curl -sI https://stellar-api.getdig.ai/health` is 200. Rollback:
   `cp /root/after.rules.pre-s1 /etc/ufw/after.rules && ufw reload` (backup kept on the VPS).
@@ -110,7 +110,7 @@ the web project, matched by the pattern
 purpose: a same-named project under another Vercel team does not match; `http://` and
 lookalike hosts (`…vercel.app.attacker.com`) are rejected (`cors-origin.spec.ts`). Purpose:
 validate UI work on a preview against production data without editing the VPS env per
-branch (the Lot AA workaround, `docs/evidence/lot-aa/aa4-cleanup-notes.md`). Nothing else
+branch (the Lot AA workaround, `docs/internal/evidence/lot-aa/aa4-cleanup-notes.md`). Nothing else
 in the CORS config changed: `credentials: true`, `maxAge: 3600`, a disallowed origin still
 gets a clean denial (no ACAO header, no 500). Deploy: API only, no env change, no nginx
 change. Verify after the restart:
@@ -288,7 +288,7 @@ one create + one immediate refresh; a user refreshes by hand a few times an hour
 guesses. The map yields an empty key for anything but POST, so reads are exempt.
 
 The full patched site file and the unified diff against the live file (dumped from the VPS on
-2026-10-27) are in `docs/evidence/lot-sec/nginx-site-config-g1.conf` / `.diff`. The hunks:
+2026-10-27) are in `docs/internal/evidence/lot-sec/nginx-site-config-g1.conf` / `.diff`. The hunks:
 
 ```nginx
 # http {} level (this site file holds every zone), right after the api_mutations zone
@@ -336,9 +336,9 @@ JSON body without a `reason` field, which is how it is told apart from the API's
 429 (`docs/runbooks.md`). Proven locally on 2026-10-27 in a throwaway `nginx:stable` container
 with no upstream (`502` = reached the proxy): `POST /v1/wallets` x7 → `502 x6, 429`;
 `POST …/refresh` x7 → `502 x6, 429`; `GET /v1/wallets`, `POST /v1/wallets/<id>` and
-`GET /v1/protocols` never 429 (`docs/evidence/lot-sec/g1.md` §5).
+`GET /v1/protocols` never 429 (`docs/internal/evidence/lot-sec/g1.md` §5).
 
-Apply against the LIVE files, not against the evidence copy in `docs/evidence/lot-s/` (it has
+Apply against the LIVE files, not against the evidence copy in `docs/internal/evidence/lot-s/` (it has
 drifted). `sites-enabled/stellar-api.getdig.ai` is normally a symlink to `sites-available/`;
 the first line resolves which file is real and patches that one. Procedure (as root):
 
@@ -348,10 +348,10 @@ SITE=/etc/nginx/sites-enabled/stellar-api.getdig.ai
 [ -L "$SITE" ] && SITE=$(readlink -f "$SITE"); echo "patching $SITE"
 # 1. dated backup
 cp -p "$SITE" /root/nginx-site.pre-sec-g1.$(date +%F) && ls -l /root/nginx-site.pre-sec-g1.*
-# 2. write the new file next to it (paste docs/evidence/lot-sec/nginx-site-config-g1.conf
+# 2. write the new file next to it (paste docs/internal/evidence/lot-sec/nginx-site-config-g1.conf
 #    into the heredoc), then check that the diff is exactly the two hunks above
 cat > /root/stellar-api.getdig.ai.sec-g1 <<'EOF'
-…full content of docs/evidence/lot-sec/nginx-site-config-g1.conf…
+…full content of docs/internal/evidence/lot-sec/nginx-site-config-g1.conf…
 EOF
 diff -u "$SITE" /root/stellar-api.getdig.ai.sec-g1
 # 3. install, test, reload (nginx -t fails -> nothing is reloaded, the old config keeps serving)
@@ -490,7 +490,7 @@ curl -s https://stellar-api.getdig.ai/health | jq .version      # = the deployed
 
 Then open `https://stellar-api.getdig.ai/v1/docs` in a browser: the page must render the
 "Dig Stellar API v1.0.0" reference (Scalar 1.76.4 from the CDN). Capture it into
-`docs/evidence/lot-api/` (the local capture is `api3-docs-page.png`).
+`docs/internal/evidence/lot-api/` (the local capture is `api3-docs-page.png`).
 
 **(e) Web, later and separately:** sidebar link to `/v1/docs` on its own branch; nothing in
 the web depends on this deploy.
@@ -514,7 +514,7 @@ the two curls; the web deploys from the same push and is compatible with the old
 cd /root/dig-stellar
 # 0. between two refresh ticks, locks free:
 ls /tmp/dig-stellar-refresh.lock /tmp/dig-stellar-alert.lock /tmp/dig-stellar-campaign.lock; pgrep -af '71-refresh|81-stellar|85-run' | grep -v pgrep
-# 1. founder check (1): date the Horizon error onset ONCE, before the fix (read-only; paste into docs/evidence/lot-pre/pre1-fixes.md)
+# 1. founder check (1): date the Horizon error onset ONCE, before the fix (read-only; paste into docs/internal/evidence/lot-pre/pre1-fixes.md)
 docker exec -i dig_stellar_postgres psql -U dig -d dig_stellar -Atc "select date_trunc('day', run_at) d, count(*) runs, count(*) filter (where errors>0) err_runs, sum(errors) errs, sum(calls) calls from rpc_metrics_runs where target='horizon' and job='refresh' group by 1 order by 1;"
 # 2. pull + install + API build
 git pull origin main && git log -1 --oneline
@@ -556,7 +556,7 @@ job. The exact line, the install steps and the founder's activation sequence are
 while the campaign is dark (the job exits 0 with "campaign dark") and stays as is after
 activation; activation itself is an env change (`CAMPAIGN_STARTS_AT`, `CAMPAIGN_ENABLED`,
 `CAMPAIGN_X_REPOST_URL` in `apps/api/.env`) + `pm2 restart --update-env`, no build, no web
-redeploy. Deploy checklist for the EP3 code itself: `docs/evidence/lot-ep/ep3-deploy.md`
+redeploy. Deploy checklist for the EP3 code itself: `docs/internal/evidence/lot-ep/ep3-deploy.md`
 (`stellar_v8_campaign_perks.sql` BEFORE the API build).
 
 ## Package changes on the VPS (S1 lesson, 2026-09-29)
@@ -566,7 +566,7 @@ cron, ssh, redis-server and more when `docker-compose-v2` was installed). Any `a
 runs with `NEEDRESTART_MODE=l` (list only) and never inside a maintenance window that holds the
 cron locks (three since Lot EP: `/tmp/dig-stellar-refresh.lock`, `/tmp/dig-stellar-alert.lock`
 and `/tmp/dig-stellar-campaign.lock` — the AD1 deploy script must take all three blocking with
-`flock -w`; `docs/evidence/lot-ad/s1-remediation-runbook.md` shows the first two, add the third
+`flock -w`; `docs/internal/evidence/lot-ad/s1-remediation-runbook.md` shows the first two, add the third
 when the campaign cron line is installed, see `docs/runbooks.md` "Campaign award job"):
 ```bash
 NEEDRESTART_MODE=l apt-get install -y <package>

@@ -49,11 +49,11 @@ cp .env.example .env
 docker compose --profile app up
 ```
 
-This brings up PostgreSQL (with the full schema applied automatically in dependency order at first boot), Redis, the API (multi-stage image, non-root, deployed commit SHA surfaced in /health), and the indexer (a sequential refresh loop, self-excluding by construction, replacing the production cron). The run was validated end-to-end from a clean clone against public RPC endpoints: all ten refresh steps green, /health responding with the build SHA, /v1/protocols serving live mainnet TVL, and a down/up cycle proving idempotent initialization. The capture is committed at docs/evidence/lot-z/z1-compose-fresh-clone.md.
+This brings up PostgreSQL (with the full schema applied automatically in dependency order at first boot), Redis, the API (multi-stage image, non-root, deployed commit SHA surfaced in /health), and the indexer (a sequential refresh loop, self-excluding by construction, replacing the production cron). The run was validated end-to-end from a clean clone against public RPC endpoints: all ten refresh steps green, /health responding with the build SHA, /v1/protocols serving live mainnet TVL, and a down/up cycle proving idempotent initialization. The capture is committed at docs/internal/evidence/lot-z/z1-compose-fresh-clone.md.
 
 Two choices are documented rather than hidden: the frontend stays a static Vercel deployment (it is a Vite build consuming the API, so containerizing it adds nothing for a reference reader), and the reward faucet is deliberately not wired into the compose, so the reference deployment involves no server-side key of any kind.
 
-For the ecosystem, this means any Stellar builder who wants a working DeFi indexing pipeline across Blend, Soroswap, Aquarius, DeFindex and the native DEX can run one, study it, and fork it within minutes. The internal documentation corpus ships in the same repository: technical architecture, data model, security invariants, runbooks, deployment guide, and per-deliverable evidence under docs/evidence/.
+For the ecosystem, this means any Stellar builder who wants a working DeFi indexing pipeline across Blend, Soroswap, Aquarius, DeFindex and the native DEX can run one, study it, and fork it within minutes. The internal documentation corpus ships in the same repository: technical architecture, data model, security invariants, runbooks, deployment guide, and per-deliverable evidence under docs/internal/evidence/.
 
 ## 3. Deliverables and evidence
 
@@ -63,11 +63,11 @@ The full stack runs in production on Stellar Mainnet: the indexer and API on a d
 
 Freshness is first-class rather than cosmetic. Every API payload carries read-time staleness metadata computed against per-source expectations. The UI displays explicit freshness indicators and stale badges instead of silently serving old data. Every step of the refresh pipeline retries with standardized exponential backoff, and per-step outcomes are recorded and publicly visible through the observability endpoint.
 
-Evidence: the walkthrough video, the live application, and docs/evidence/lot-b-freshness-defindex.md.
+Evidence: the walkthrough video, the live application, and docs/internal/evidence/lot-b-freshness-defindex.md.
 
 ### 3.2 Deliverable 2: Non-custodial mainnet actions
 
-Real execution is delivered and publicly verifiable. Selected transaction evidence, all built by the platform, signed in the user's wallet, and independently re-verified against public Horizon (full analysis in docs/evidence/t3-d2-mainnet-actions.md):
+Real execution is delivered and publicly verifiable. Selected transaction evidence, all built by the platform, signed in the user's wallet, and independently re-verified against public Horizon (full analysis in docs/internal/evidence/t3-d2-mainnet-actions.md):
 
 | Action | Transaction hash |
 |---|---|

@@ -1,7 +1,7 @@
 -- apps/api/src/db/stellar_v1_perf_indexes.sql
 --
 -- Perf (perf/pools-latency, 2026-10-30): read-path index for GET /v1/pools.
--- Prod EXPLAIN (docs/evidence/perf-pools/) showed /v1/pools spending ~3.3 s in
+-- Prod EXPLAIN (docs/internal/evidence/perf-pools/) showed /v1/pools spending ~3.3 s in
 -- one parallel seq scan of normalized_events (2.87M rows, 1.7 GB heap vs
 -- 128 MB shared_buffers) on EVERY request, just to count 24h swaps per pool
 -- and decide swap-event coverage.

@@ -534,7 +534,7 @@ export class WalletsService {
     );
   }
 
-  // W1 rule set (docs/lot-w-wallet-management.md):
+  // W1 rule set (docs/internal/briefs/lot-w-wallet-management.md):
   //   session userId PRESENT → attach/promote inside THAT account only; the
   //     session never switches accounts, whatever other accounts hold the
   //     address (watch-only-anyone legitimately allows duplicates).

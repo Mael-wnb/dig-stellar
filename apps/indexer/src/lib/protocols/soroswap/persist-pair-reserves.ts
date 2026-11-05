@@ -1,5 +1,5 @@
 // apps/indexer/src/lib/protocols/soroswap/persist-pair-reserves.ts
-// Hotfix (frozen-TVL bug, docs/hotfix-frozen-amm-reserves.md): the pair-metrics
+// Hotfix (frozen-TVL bug, docs/internal/briefs/hotfix-frozen-amm-reserves.md): the pair-metrics
 // step READS reserve_snapshots but nothing on the live refresh path wrote them
 // since the one-shot March-2026 legacy inserts. This persists the just-fetched
 // live reserves every cycle, mirroring the Blend snapshot conventions

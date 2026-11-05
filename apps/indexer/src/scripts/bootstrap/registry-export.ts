@@ -86,7 +86,7 @@ async function main() {
     // reserve_snapshots are deliberately NOT exported: every venue that needs
     // them now writes them on the live refresh path (Blend, stellar-native,
     // defindex always did; Soroswap + Aquarius since the frozen-TVL hotfix —
-    // see docs/hotfix-frozen-amm-reserves.md), so a fresh clone's first
+    // see docs/internal/briefs/hotfix-frozen-amm-reserves.md), so a fresh clone's first
     // `job:refresh` produces current rows by itself. Seed only what the first
     // refresh cannot produce.
 

@@ -15,7 +15,7 @@
 // DIRECT routes only, XLM→asset AND asset→XLM at 10 XLM and at the 100 XLM launch cap).
 // A pair is offered ONLY if BOTH directions PASS (cap-size rate ≥95% of small-size rate,
 // matching the widget's 5% slippage tolerance) AND the issuer is verified against the
-// issuing organization. Full evidence: docs/evidence/pair-vetting-2026-08-01.md.
+// issuing organization. Full evidence: docs/internal/evidence/pair-vetting-2026-08-01.md.
 //
 //   pair        XLM→asset (deg)   asset→XLM (deg)   issuer verification
 //   XLM↔USDC    0.00%  PASS       0.00%  PASS       circle.com — Circle official doc

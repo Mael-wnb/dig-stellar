@@ -387,7 +387,7 @@ variant (TVL | Supply APY | Underlying | Strategy; no fake AMM metrics).
 plus stale badges on protocol tabs and pool detail; every step of the refresh chain runs through
 standardized exponential-backoff retries (`runTsxWithRetry`, 3 attempts, 5s→20s + jitter).
 Evidence (forced-stale drill, retry-backoff log, full `job:refresh` log, UI captures) in
-`docs/evidence/lot-b/`.
+`docs/internal/evidence/lot-b/`.
 
 **Remaining:** demo capture for the claim. Health/metrics visibility beyond this belongs to T3-D3.
 
@@ -426,7 +426,7 @@ testnet (deposit tx `a842f370…`), so A2 is a mainnet extension, not a first bu
 server-side asset whitelist (code AND issuer), client-side pre-sign XDR validation
 (`validateSwapXdr`: ops whitelist, issuer match, amounts, fee cap; fail closed), signing
 exclusively in-wallet. Contract: `docs/security-invariants.md`; evidence:
-`docs/evidence/mainnet-ungating-2026-08-02.md` + `docs/evidence/pair-vetting-2026-08-01.md`.
+`docs/internal/evidence/mainnet-ungating-2026-08-02.md` + `docs/internal/evidence/pair-vetting-2026-08-01.md`.
 
 **Criterion 3: met** for the swap (pending/success/failure states, network-aware
 stellar.expert link); the deposit inherits the same surface in A2.
@@ -435,7 +435,7 @@ stellar.expert link); the deposit inherits the same surface in A2.
 closed this deliverable — accepted with the KPI adoption evidence presented under the disclosed
 incentive-campaign context (the numbers are not restated here as "met"). The interpretation
 paragraphs above are kept as the historical record; Lot A2 and the mainnet supply↔withdraw loop
-had landed before validation (`docs/evidence/t3-d2-mainnet-actions.md`).
+had landed before validation (`docs/internal/evidence/t3-d2-mainnet-actions.md`).
 
 ---
 
@@ -457,7 +457,7 @@ Owner: all apps. Status: **Done — validated and paid (Tranche 4, around 20 Aug
 
 **Criterion 1 (observability): met (Lot E, 2026-08-13).** Enriched `/health` (per-venue
 freshness + GIT_SHA version), `GET /v1/ops/metrics` (per-run RPC latency p50/p95/p99 + error
-rates from actual samples), `GET /v1/ops/adoption`. Evidence: `docs/evidence/lot-e/`.
+rates from actual samples), `GET /v1/ops/adoption`. Evidence: `docs/internal/evidence/lot-e/`.
 
 **Criterion 2 (Reference Implementation, functional Docker compose): met (Lot Z, 2026-08-18).**
 The application is packaged: `docker compose --profile app up -d --build` from a fresh clone
@@ -465,7 +465,7 @@ runs postgres (schema auto-applied from the raw SQL files in dependency order), 
 containerized API and the containerized indexer (bootstrap + 15-min refresh loop replacing
 the cron), on real mainnet data with no secrets. Proven end-to-end from a clean clone:
 first refresh 10/10 steps green, `/v1/protocols` serving live TVL, `down && up` idempotent
-(`docs/evidence/lot-z/z1-compose-fresh-clone.md`). `apps/web` deliberately stays outside the
+(`docs/internal/evidence/lot-z/z1-compose-fresh-clone.md`). `apps/web` deliberately stays outside the
 stack (static Vite build on Vercel, a documented choice). Internal documentation:
 `docs/reference-deployment.md` (+ runbooks/deployment/architecture corpus). UI-polish scope
 for this cycle (sidebar redesign + Lots C/F/G/H/Q) landed earlier.

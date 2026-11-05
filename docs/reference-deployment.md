@@ -3,7 +3,7 @@
 E4 (Lot E, T3-D3): the SDF reference-implementation quickstart. From a fresh clone to a
 rendering dashboard backed by real mainnet data, with **no secrets required** (one optional
 key noted below). Proven end-to-end from a fresh clone on 2026-08-13; deviations found
-during that proof are folded in; the proof notes live in `docs/evidence/lot-e/`.
+during that proof are folded in; the proof notes live in `docs/internal/evidence/lot-e/`.
 
 Two supported paths, same repo, same compose file:
 
@@ -76,7 +76,7 @@ and the runtime stage copies `apps/api/dist` whole, so `GET /v1/openapi.json` an
 work in the container without any Dockerfile change (Lot API, 2026-11-03 — reasoned from the
 Dockerfile `COPY --from=build … /app/apps/api/dist`; the image was not rebuilt for this lot).
 
-Proof from a clean clone: `docs/evidence/lot-z/z1-compose-fresh-clone.md`.
+Proof from a clean clone: `docs/internal/evidence/lot-z/z1-compose-fresh-clone.md`.
 
 ---
 
@@ -178,7 +178,7 @@ unless `DEFINDEX_API_KEY` is set; the other protocols are unaffected. Everything
 should be SUCCESS from the first run, PROVIDED `bootstrap:core` ran first (it also seeds
 the Soroswap pair reserve snapshots that `prices:soroswap-derived` and the pair TVL read;
 nothing on the live refresh path writes those; see the known-issue note in
-`docs/evidence/lot-e/`).
+`docs/internal/evidence/lot-e/`).
 
 ## 8. API + web
 

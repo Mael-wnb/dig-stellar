@@ -161,7 +161,7 @@ ENTITY_SLUG=xoxno-core-hub XOXNO_POOL_ID=CBXRNDQMAJFG4VUKMKFEMFS75UUXE2SPSNV4LEE
 - **App-version check.** Every hub refresh starts with `controller.get_app_version()` and FAILS the
   xoxno step loudly when it differs from `XOXNO_EXPECTED_APP_VERSION` (1; env override of the same
   name). An upgraded controller may have changed the view semantics the adapter relies on:
-  re-verify the spec (`docs/evidence/lot-xo/00-recon-verification.md`), then bump the constant.
+  re-verify the spec (`docs/internal/evidence/lot-xo/00-recon-verification.md`), then bump the constant.
   Step isolation keeps the rest of `job:refresh` alive meanwhile; `/v1/ops/status` shows the step
   FAILED and `/health` turns the venue stale.
 - **Params cache.** Static market params (`get_sync_data`: decimals, interest-rate model, reserve
@@ -195,7 +195,7 @@ End-to-end alert latency ≈ this interval + the web's notification poll (~30-60
 7,22,37,52 * * * * cd /root/dig-stellar && /usr/bin/flock -n /tmp/dig-stellar-alert.lock bash -lc 'export PATH=/root/.nvm/versions/node/v24.19.0/bin:$PATH && pnpm --dir apps/indexer job:wallet-alert' >> /var/log/dig-stellar-alert.log 2>&1
 ```
 (The real VPS crontab line, verified in the Lot AC migration — see
-`docs/evidence/lot-ac/ac2-execution.md` step 0: repo at `/root/dig-stellar`, `flock` guard
+`docs/internal/evidence/lot-ac/ac2-execution.md` step 0: repo at `/root/dig-stellar`, `flock` guard
 against overlapping runs, Node 24 tree exported because the non-interactive cron PATH has an
 old node, log at `/var/log/dig-stellar-alert.log`. The `job:refresh` cron line follows the
 same pattern (`*/15`, its own lock and log). An earlier version of this example showed
@@ -218,7 +218,7 @@ Prereq: `stellar_v1_ops_metrics_job.sql` applied (adds `job` + `methods`). Query
 select run_at, calls, errors, p50_ms, methods from rpc_metrics_runs
 where job = 'wallet-alert' order by run_at desc limit 8;
 ```
-Evidence and before/after numbers: `docs/evidence/lot-rp/rp1-sweep-fix.md`. The cadence was
+Evidence and before/after numbers: `docs/internal/evidence/lot-rp/rp1-sweep-fix.md`. The cadence was
 moved to hourly (`7 * * * *`) as a stopgap on 2026-10-26; restore `7,22,37,52` once the RP1
 drop is visible on the provider dashboard (`docs/deployment.md`, "RP1 deploy").
 
@@ -247,7 +247,7 @@ run time, not by enrolment date (`campaign.repository.ts` `findActionCandidates`
 **Supported wallets for proofs:** Freighter ≥ 5.x and xBull (both sign SEP-53,
 `signature_variant = 'sep53'`); Lobstr is unsupported — the Kit 1.9.5 Lobstr module does not
 implement `signMessage`, so Lobstr users cannot enrol or recover an account without a session
-(`docs/evidence/lot-ep/ep1-wallet-matrix.md`).
+(`docs/internal/evidence/lot-ep/ep1-wallet-matrix.md`).
 
 **Social tasks (EP2):** self-declared — the API takes the person's word and records the handle,
 there is no X / Discord API check. Rules enforced in `modules/campaign/social-claims.ts` and the
@@ -425,7 +425,7 @@ job or route in this lot. When the founder decides to import them, the ONLY mech
 founder-written `adjust:galxe-import-<date>` ledger row per wallet (positive points, `base_points`
 = the points, `multiplier` 1, no reference columns), inserted by hand from the Galxe export; the
 next job tick then grants any perk tier the new balance reaches. Nothing in `apps/api` reads
-Galxe. Procedure, numbers and the export file belong in `docs/evidence/lot-ep/` when it happens.
+Galxe. Procedure, numbers and the export file belong in `docs/internal/evidence/lot-ep/` when it happens.
 
 ---
 
@@ -506,7 +506,7 @@ Symptom: `GET /v1/pools` took 3.2 s at rest / 6.2 s during `job:refresh` on the 
 users saw protocol cards 2–3 s after load (both the dashboard and the protocols view derive
 their protocol list from `/v1/pools`). Cause: the Lot Q "24h swaps" statement aggregated the
 WHOLE `normalized_events` table (2.87M rows, 1.7 GB vs 128 MB `shared_buffers`) on every
-request. Evidence + plans: `docs/evidence/perf-pools/`.
+request. Evidence + plans: `docs/internal/evidence/perf-pools/`.
 
 Fix (two parts, both required — the rewritten statement without the index is 44 seq scans):
 1. `apps/api/src/db/stellar_v1_perf_indexes.sql` — partial index
@@ -776,7 +776,7 @@ provider and `/liquidity_pools/…` on public Horizon get the same target and la
 `HORIZON_TRADES_URL` that is not an absolute `https://` URL (or blank → falls back to `HORIZON_URL`)
 leaves every pool's volume null with a `… is not an absolute URL` warning, the step still writes TVL
 and snapshots, and any other failure of the step exits non-zero (PRE3 — before it was a silent
-SUCCESS with no metric row, `docs/evidence/lot-pre/pre3-recon.md`). Watch
+SUCCESS with no metric row, `docs/internal/evidence/lot-pre/pre3-recon.md`). Watch
 after enabling: the provider's usage dashboard (+30–60 requests per refresh, ~250/h, on the RPC
 key's quota — see the Lot RP budget), and
 `select run_at, calls, errors, p95_ms, methods from rpc_metrics_runs where target='horizon' and job='refresh' order by run_at desc limit 3;`
@@ -793,7 +793,7 @@ curl -s http://localhost:3000/v1/protocols | jq '.[] | {id, isStale, staleAfterS
 # ...screenshot the amber "Stale" chip/badges, then restore (unset the env / pm2 restart) and re-screenshot recovery.
 ```
 Unit-level equivalent (no restart), evaluating real `as_of` rows at two thresholds: see
-`docs/evidence/lot-b/`.
+`docs/internal/evidence/lot-b/`.
 
 ---
 
@@ -872,7 +872,7 @@ step 2, the alert evaluator (price family, TVL-drop window, rule-modal asset lis
 `/v1/*` pool/top-asset/flow/series queries — accepts only rows younger than
 `PRICE_MAX_AGE_MINUTES` (default = `FRESHNESS_STALE_AFTER_MINUTES`, 45): an older row counts as
 absent, and a pool with no priced reserve gets `tvl_usd = null` (shown as `—`, never `$0`). The
-faucet witness keeps its own 24 h rule. Evidence: `docs/evidence/price-sources-v2/04-phase-a2.md`.
+faucet witness keeps its own 24 h rule. Evidence: `docs/internal/evidence/price-sources-v2/04-phase-a2.md`.
 
 The prices serve display and USD valuation only (plus the faucet witness's notional threshold,
 which reads `asset_prices` with its own 24 h max age); they never feed a transaction build.
@@ -882,7 +882,7 @@ stellar.expert) and turns red when one of them fails; the "Reflector oracle" row
 step-1 oracle simulations; the "Price sources ·" line under the groups reads
 `/v1/ops/status.priceSources` (assets priced / unpriced / single-source / cross-check
 disagreements, from the latest fresh row per asset). Evidence:
-`docs/evidence/price-sources-v2/05-phase-b-design.md`.
+`docs/internal/evidence/price-sources-v2/05-phase-b-design.md`.
 
 Verify after a refresh:
 ```bash
@@ -918,7 +918,7 @@ Notes:
 
 Ungating Mainnet actions is **not** removing the Testnet-only guard; it is replacing it with a
 controlled regime. See `docs/security-invariants.md` §4 (the review checklist) and the implementation
-briefs `docs/lot-a1-mainnet-swap.md` (swap) + `docs/lot-a2-blend-mainnet.md` (Blend deposit). The
+briefs `docs/internal/briefs/lot-a1-mainnet-swap.md` (swap) + `docs/internal/briefs/lot-a2-blend-mainnet.md` (Blend deposit). The
 **swap and the Blend deposit each have their OWN kill-switch**, so they ungate independently.
 
 **Environment flags** (all default to today's Testnet-only behavior when unset):
@@ -996,7 +996,7 @@ Its 2-step trustline-gated path is already proven E2E on testnet; this is the ma
    (`apps/web/src/lib/validateDepositXdr.ts`) validates the XDR against `config/blendPools.ts`
    before EVERY signing prompt. Verify the new position appears in the portfolio above (T2-D1
    resolver picks up the Blend position + health factor) AND on blend.capital. Record the tx hash
-   in `docs/evidence/`; it is the "vault/lending" evidence for T3-D2 criterion 1.
+   in `docs/internal/evidence/`; it is the "vault/lending" evidence for T3-D2 criterion 1.
 
 **Rollback**: unset `ACTIONS_MAINNET_BLEND_ENABLED` on the VPS and restart PM2; `blend/deposit`,
 `blend/withdraw` and `blend/position` all return to 403 on mainnet immediately, independent of the
@@ -1007,7 +1007,7 @@ swap flag and the web deploy.
 The withdraw ships behind the **same** switch as the deposit: flipping
 `ACTIONS_MAINNET_BLEND_ENABLED` ungates both, so there is nothing extra to enable. Its testnet
 money path is proven E2E (supply `b199a1d7…` + withdraw `322d760e…`, both confirmed on-chain; see
-`docs/evidence/lot-a3-blend-withdraw.md`).
+`docs/internal/evidence/lot-a3-blend-withdraw.md`).
 
 Deliberate difference from the deposit: **there is no amount cap on a withdraw** (INV-2.15): it
 returns the user's own funds to their own wallet, and a cap could strand a position larger than it.
@@ -1029,7 +1029,7 @@ curl -s -X POST $API/v1/actions/blend/position -H "Content-Type: application/jso
 Then do ONE small real pair from the dashboard: supply a few XLM, then Withdraw → Max. The client
 gate (`validateWithdrawXdr`) validates the XDR against `config/blendPools.ts` before the signing
 prompt, pinning `WithdrawCollateral`. Verify the position drops in the portfolio and on
-blend.capital, and record BOTH hashes in `docs/evidence/lot-a3-blend-withdraw.md`; they are the
+blend.capital, and record BOTH hashes in `docs/internal/evidence/lot-a3-blend-withdraw.md`; they are the
 T3-D2 bonus evidence pair.
 
 Expect a **dust remainder** after a Max withdraw (a few stroops): collateral accrues interest
@@ -1147,7 +1147,7 @@ The faucet pays 5 XLM from a DIG-owned hot wallet after a verified qualifying ac
 
 Campaign 2 pays per action FAMILY: first verified swap AND first verified Blend supply each
 earn 5 XLM (max 2 claims per wallet), budget 60 claims. Evidence:
-`docs/evidence/lot-r2/testnet-e2e.md`.
+`docs/internal/evidence/lot-r2/testnet-e2e.md`.
 
 1. Apply `stellar_v5_faucet_campaign2.sql` BEFORE deploying/restarting the campaign-2 api
    build (it relabels campaign-1 rows and swaps the unique indexes to per-(wallet, family,

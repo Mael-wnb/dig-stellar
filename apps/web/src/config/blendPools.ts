@@ -13,7 +13,7 @@
 // them is a security bug, not a config drift. Re-verify BOTH before any Mainnet
 // ungating (runbooks.md).
 //
-// Mainnet pool ids verified 2026-08-14 (evidence: docs/evidence/lot-a5-blend-multipool.md):
+// Mainnet pool ids verified 2026-08-14 (evidence: docs/internal/evidence/lot-a5-blend-multipool.md):
 // Blend's official V2 pool factory answers is_pool()=true for all four, all four are
 // in the backstop reward zone, all four share the A2-vetted Fixed pool's wasm hash
 // (a41fc53d…), PoolV2.load succeeds for each (V2 confirmed), and each label below is

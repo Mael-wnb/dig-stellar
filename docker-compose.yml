@@ -33,7 +33,7 @@
 # through its own iptables chains, which BYPASS ufw — a bare "5432:5432" is reachable
 # from the internet even with ufw default-deny. Nothing in this stack needs a public
 # port (nginx fronts the API on the host; reach Postgres remotely via an SSH tunnel).
-# See docs/security-invariants.md §10 and docs/evidence/lot-ad/ad0-security-findings.md.
+# See docs/security-invariants.md §10 and docs/internal/evidence/lot-ad/ad0-security-findings.md.
 #
 # Host ports and container-name prefix are overridable so a second stack (e.g. a
 # fresh-clone verification) can run next to this one. CRITICAL: also set a distinct

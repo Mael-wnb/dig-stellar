@@ -1,7 +1,7 @@
 // apps/api/src/modules/wallets/wallets.connect.spec.ts
 //
 // W1 — connect-signer must ATTACH to the session account, never fork or switch.
-// Red tests for the old behavior (docs/lot-w-wallet-management.md):
+// Red tests for the old behavior (docs/internal/briefs/lot-w-wallet-management.md):
 //   (a) connect with a session account present creates NO new user — the wallet
 //       row is inserted under the SESSION user id, not a fresh randomUUID.
 //   (b) connect of an address watched by ANOTHER account, with a session

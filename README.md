@@ -79,12 +79,12 @@ Full map with source-of-truth ranks and a reviewer reading order: `docs/README.m
 | Doc | What it is |
 |---|---|
 | `docs/post-grant-summary.md` | What shipped after the grant closed (Aug → Nov 2026), with evidence per item |
-| `docs/status-board.md` | Where things stand, lot by lot; first read |
+| `docs/status-board.md` | One page: grant tranches, post-grant lots, what is next |
 | `docs/current-state.md` | Detailed as-built reality |
 | `docs/decisions/` | Founder rulings with their rationale |
 | `docs/runbooks.md` | Operating procedures (cron, schema, campaign, API contract) |
 | `docs/deployment.md` | VPS shape, hardening, deploy sequences |
-| `docs/evidence/README.md` | Index of the proof corpus (captures, command outputs, incidents) |
+| `docs/internal/` | Working documents and the proof corpus (briefs, evidence, archived long-form board); not written for reviewers, kept so every claim is inspectable |
 | `docs/api/README.md` | Public API contract, docs page, contract test |
 | `docs/security-invariants.md` | Security contract for the action path and the money path |
 | `docs/TECHNICAL_ARCHITECTURE.md` | Design document, with a design-vs-as-built banner |
@@ -95,7 +95,7 @@ The product is a production beta. Rules this repository follows when describing 
 every number traces to a command, a capture or a transaction hash; design intentions are never
 stated as built; adoption figures earned under an incentive campaign are always stated with
 that context. `docs/status-board.md` carries the current state and its "Last updated" line;
-`docs/evidence/` holds the proofs. Known limits are listed there rather than here: among them,
+`docs/internal/evidence/` holds the proofs. Known limits are listed there rather than here: among them,
 deployment to the VPS is still manual (CI builds and tests, it does not deploy), the beta API
 access model is a rate-limited grouping key rather than authentication, and the public API has
 no auth yet; SDK v0 not yet published.

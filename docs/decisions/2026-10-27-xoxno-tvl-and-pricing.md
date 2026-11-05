@@ -10,7 +10,7 @@ per-market accounting), a controller (accounts / risk / price views) and a price
 (Reflector / RedStone / XOXNO feeds + Aquarius LP pricers). A market is a
 `HubAssetKey { hub_id, asset }`; the 25 markets are grouped in three hubs (Core, RWA, AMM).
 We model one entity per hub (Blend pattern: entity = pool, `reserve_snapshots` row = market).
-Addresses, market list and units are verified in `docs/evidence/lot-xo/00-recon-verification.md`.
+Addresses, market list and units are verified in `docs/internal/evidence/lot-xo/00-recon-verification.md`.
 
 ## Rulings
 
@@ -61,4 +61,4 @@ Addresses, market list and units are verified in `docs/evidence/lot-xo/00-recon-
 - API: `stellar.service.ts getPoolSeries` picks the amount leg per venue
   (`stellar.pool-series-amount.spec.ts`); ops label `STEP_LABELS.xoxno`.
 - Web: theme/meta entries (monogram), pool detail copy, lending action gated to Blend.
-- Evidence and numbers: `docs/evidence/lot-xo/`.
+- Evidence and numbers: `docs/internal/evidence/lot-xo/`.

@@ -153,14 +153,14 @@ never the API response. INV-2.8 → INV-2.12 apply to `validateWithdrawXdr` unch
   wallet, and a cap could strand a position larger than it. The exact-amount invariant (INV-2.11)
   is unchanged, so the user still signs precisely what they asked for.
 
-Suite: same file, 72 tests. Evidence + testnet tx pair: `docs/evidence/lot-a3-blend-withdraw.md`.
+Suite: same file, 72 tests. Evidence + testnet tx pair: `docs/internal/evidence/lot-a3-blend-withdraw.md`.
 
 ## 3. Simulation before signature (Soroban path)
 
 - **INV-3.1** ✅ The Blend deposit **and withdraw** are **simulated** and must succeed before any
   signing prompt; a simulation failure is surfaced, the response carries an empty `xdr`, and
   nothing is signed. (Proven for the withdraw: a withdraw against an empty position returns
-  Contract #1217 and no signable XDR; see `docs/evidence/lot-a3-blend-withdraw.md`.)
+  Contract #1217 and no signable XDR; see `docs/internal/evidence/lot-a3-blend-withdraw.md`.)
 - **INV-3.1b** ✅ **Declared Soroban resources carry headroom** (`padResources`, Lot A3). A
   simulation measures resources against the ledger at that instant and those limits are enforced
   exactly at apply time, so state drift in between fails a transaction the user already signed
@@ -180,7 +180,7 @@ Suite: same file, 72 tests. Evidence + testnet tx pair: `docs/evidence/lot-a3-bl
 ## 4. Launch controls (Mainnet gating regime), Lot A1
 
 Ungating Mainnet is **not** deleting the Testnet-only guard. It is replacing it with a controlled
-regime (see `docs/tasks/lot-a1-mainnet-swap.md` for the implementation brief):
+regime (see `docs/internal/briefs/lot-a1-mainnet-swap.md` for the implementation brief):
 
 - **INV-4.1** ✅ **Feature flag**: Mainnet execution sits behind `ACTIONS_MAINNET_ENABLED` in
   `apps/api` (kill-switch, default OFF → 403) and `VITE_ACTIONS_MAINNET_ENABLED` in `apps/web`
@@ -195,7 +195,7 @@ regime (see `docs/tasks/lot-a1-mainnet-swap.md` for the implementation brief):
   applied to `sdex/quote` + `sdex/swap`). Launch set (Lot A1b): native XLM + USDC, EURC, AQUA,
   yXLM, PYUSD, each vetted on-chain (direct book fills both directions at the 100 XLM cap within
   5% slippage) AND issuer-verified against the issuing org; evidence in
-  `docs/evidence/pair-vetting-2026-08-01.md`. Every whitelist entry mirrors one
+  `docs/internal/evidence/pair-vetting-2026-08-01.md`. Every whitelist entry mirrors one
   `MAINNET_SWAP_PAIRS` entry in `apps/web` (the two lists are cross-referenced both ways).
   Client-side vetted pairs are UX; the server whitelist is the enforcement.
 - **INV-4.4** ✅ **Slippage bound**: tolerance is fixed at 5% in the widget; min-receive is
@@ -225,7 +225,7 @@ regime (see `docs/tasks/lot-a1-mainnet-swap.md` for the implementation brief):
   pool is XLM-only, verified on-chain. The kill-switch is checked BEFORE pool resolution, so with
   the flags unset every pool returns 403 (verified for all 4 pools × 3 endpoints). Each pool's
   asset list comes from a **live SDK read**, never from `reserve_snapshots`, which retains rows for
-  reserves a pool no longer has; see `docs/evidence/lot-a5-blend-multipool.md`.
+  reserves a pool no longer has; see `docs/internal/evidence/lot-a5-blend-multipool.md`.
 
 ## 5. Known defects: status
 
@@ -356,7 +356,7 @@ tests (double claim, disabled flag, below-notional, exhausted, velocity, drained
 Found during the Lot AD audit: the Postgres container's published port (`5432:5432` in
 `docker-compose.yml`) was reachable from outside despite ufw default-deny. Docker programs
 its own iptables chains (`DOCKER`, `DOCKER-USER` in FORWARD), which ufw's INPUT rules never
-see. Evidence: `docs/evidence/lot-ad/ad0-security-findings.md`.
+see. Evidence: `docs/internal/evidence/lot-ad/ad0-security-findings.md`.
 
 - **INV-10.1** No service port is ever published on a public interface. Every `ports:` entry
   in any compose file binds an explicit `127.0.0.1:` host address; a bare `HOST_PORT:PORT`
@@ -367,7 +367,7 @@ see. Evidence: `docs/evidence/lot-ad/ad0-security-findings.md`.
   invariant is also **enforced by a persistent ufw rule**, not only by binding discipline: the
   `DOCKER-USER` chain in `/etc/ufw/after.rules` drops every NEW inbound connection from the
   public interfaces to any container (proven with a container deliberately published on
-  `0.0.0.0`: unreachable from outside — `docs/evidence/lot-ad/s1-remediation-execution.md`
+  `0.0.0.0`: unreachable from outside — `docs/internal/evidence/lot-ad/s1-remediation-execution.md`
   §Phase 7). The binding remains the first line; the rule is the wall behind it.
 - **INV-10.2** The DB role password is never the default (`dig`) on a shared host; it is
   generated on the VPS (`openssl rand -hex 24`), rotated in place (`ALTER USER`), and lives
@@ -393,7 +393,7 @@ campaign (`/v1/campaign/*`, `modules/campaign/`). Points only: the lot introduce
 payout and no token. Schema: `stellar_v6_campaign.sql` + `stellar_v7_social_claim_delete.sql` +
 `stellar_v8_campaign_perks.sql` (EP3: `wallet_perks`, non-monetary tiers written only by the award
 job, never revoked by code — `docs/decisions/2026-10-21-points-have-no-monetary-value.md`).
-Evidence: `docs/evidence/lot-ep/`.
+Evidence: `docs/internal/evidence/lot-ep/`.
 
 - **INV-11.1** Ownership proofs are verified with the PUBLIC key only. The server issues a
   nonce challenge, the wallet signs the plain text (never a transaction, no XDR exists), and
@@ -433,7 +433,7 @@ two allowed files; grep the web copy for "reward", "airdrop", "token" and "earn 
 
 Hardening of the public, unauthenticated API surface after a routine review of production
 traffic. Three invariants; each one is unit-tested and the deploy evidence is in
-`docs/evidence/lot-sec/g1.md`.
+`docs/internal/evidence/lot-sec/g1.md`.
 
 - **INV-12.1 Every request field is type-checked before it is used, and a tracked address is a
   Stellar public key.** The shared validators in `apps/api/src/common/request-validation.ts` are

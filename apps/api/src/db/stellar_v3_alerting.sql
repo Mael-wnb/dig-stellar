@@ -6,7 +6,7 @@
 -- stellar_v1.sql; the pgcrypto extension / gen_random_uuid() come from
 -- stellar_v1.sql). Read from the API via prisma.$queryRawUnsafe (no ORM).
 --
--- Design follows docs/alerting/probe-01..03:
+-- Design follows docs/internal/alerting/probe-01..03:
 --   * wallet_pool_health is append-only (PK id, no unique key); the evaluator
 --     reads latest-per-(wallet,pool) and compares against the rules below.
 --   * health_factor is numeric NULL = "no debt" → rules only fire on debt-bearing

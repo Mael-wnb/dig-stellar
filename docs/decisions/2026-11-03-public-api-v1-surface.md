@@ -1,9 +1,9 @@
 # Decision: Public API v1 surface (2026-11-03)
 
 **Status: implemented, deployed 2026-11-03 (`de1b8bb`) — `/v1/openapi.json` 1.0.0 and `/v1/docs`
-live on the production API (`docs/evidence/lot-api/api5-prod-verification.md`).**
+live on the production API (`docs/internal/evidence/lot-api/api5-prod-verification.md`).**
 
-Recon basis: `docs/evidence/lot-api/api0-recon.md` (API0, read-only, 2026-11-02). Every
+Recon basis: `docs/internal/evidence/lot-api/api0-recon.md` (API0, read-only, 2026-11-02). Every
 number and example body below comes from that recon or from the repo files it cites.
 
 ## Ruling
@@ -144,9 +144,9 @@ them to work. The CDN dependency is an open item (vendor the bundle later).
 | Step | Deliverable | Gate |
 |---|---|---|
 | API1 (this doc) | Surface frozen | **Gate 1**: founder validates the endpoint and exclusion tables |
-| API2 | `docs/api/openapi.v1.yaml` + `openapi` module (`GET /v1/openapi.json`) + `test:contract` (ajv, real app, local Postgres); examples captured from production GETs | **Gate 2**: validator output green on every public endpoint and on the five error schemas |
+| API2 | `apps/api/openapi/openapi.v1.yaml` + `openapi` module (`GET /v1/openapi.json`) + `test:contract` (ajv, real app, local Postgres); examples captured from production GETs | **Gate 2**: validator output green on every public endpoint and on the five error schemas |
 | API3 | `GET /v1/docs` Scalar page + nginx location note in `docs/deployment.md` | **Gate 3**: capture of the rendered page |
-| API4 | `docs/evidence/lot-api/`, `docs/status-board.md`, `docs/current-state.md`, deploy sequence (`test:contract` in the deploy checklist) | VPS deploy **before** any web change |
+| API4 | `docs/internal/evidence/lot-api/`, `docs/status-board.md`, `docs/current-state.md`, deploy sequence (`test:contract` in the deploy checklist) | VPS deploy **before** any web change |
 | Web (separate branch) | Sidebar link to `/v1/docs` | after the VPS serves it |
 
 ## Open items carried out of this lot

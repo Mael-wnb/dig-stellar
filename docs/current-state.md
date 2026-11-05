@@ -49,14 +49,14 @@ social tasks, referrals, a public leaderboard (shortened addresses), non-monetar
 `#status` block is retired). Schema v6/v7/v8.
 In prod the campaign answers `campaign-disabled` until the founder sets `CAMPAIGN_STARTS_AT` +
 `CAMPAIGN_ENABLED` (`docs/runbooks.md` "Activate the campaign"); EP3 code and the cron line are
-not deployed yet (`docs/evidence/lot-ep/ep3-deploy.md`). Honesty rule for later reporting: every
+not deployed yet (`docs/internal/evidence/lot-ep/ep3-deploy.md`). Honesty rule for later reporting: every
 adoption number earned during the campaign is stated WITH the campaign context (points incentive,
 window, self-declared social), never as organic adoption.
 EP4 (2026-10-21, `feat/lot-ep4`, uncommitted, not deployed): daily streak ramp (+0.05 per streak day
 on action points, cap ×1.35 at 7 days, still fixed on D-1), Earn v1.1 cards (hero, 7-day strip,
 "Earn more", activity feed), neutral user-facing copy ("Points unlock perks on Dig as the campaign
 grows.", rendered once), perks recorded by the backend but not surfaced in the UI
-(`docs/evidence/lot-ep/ep4-implementation.md`).
+(`docs/internal/evidence/lot-ep/ep4-implementation.md`).
 
 **Lot AN0 — Google Analytics 4 (2026-10-21, `apps/web` only, uncommitted):** GA4 with Consent Mode
 v2 (all signals default `denied`; gtag.js is only injected after an explicit "Accept analytics" in a
@@ -64,7 +64,7 @@ bottom banner, re-openable from the sidebar "Analytics" link; Decline sends noth
 consent only: `page_view` on view switch, `wallet_connect{provider}`, `campaign_enroll`,
 `campaign_checkin`, `swap_success{pair}`, `deposit_success{pool}` — no address, user id or handle
 ever (`lib/analytics.ts` drops them, spec-pinned). Off entirely without `VITE_GA_MEASUREMENT_ID`
-(Vercel Production only, never in the repo). Evidence: `docs/evidence/lot-an0/an0-implementation.md`.
+(Vercel Production only, never in the repo). Evidence: `docs/internal/evidence/lot-an0/an0-implementation.md`.
 
 ---
 
@@ -118,10 +118,10 @@ and `GET /v1/pools/:slug/series` (Blend-only honest TVL reconstruction from `res
 price`; non-Blend keeps a "building history" note — no synthesized curves). The action modal embeds the
 **existing** SDEX-swap / Blend-deposit widgets unmodified, so the client-side validation gates and the
 flags regime are preserved byte-for-byte; Add/Remove-liquidity tabs are present-but-disabled ("soon",
-Lot D). Legacy `DigDashboard.vue` / `DashboardHeader.vue` removed. Evidence: `docs/evidence/lot-c/`.
+Lot D). Legacy `DigDashboard.vue` / `DashboardHeader.vue` removed. Evidence: `docs/internal/evidence/lot-c/`.
 
 **T3-D3 (Lot F — advisor-feedback polish) landed on top of the Lot C port.** Traced to a 2026-08-10
-mainnet advisor review + a real failed user swap (`docs/evidence/lot-f/`): **F1** raised `--dig-faint`
+mainnet advisor review + a real failed user swap (`docs/internal/evidence/lot-f/`): **F1** raised `--dig-faint`
 to clear WCAG AA (≥4.5:1) on the dark cards and added global `--dig-*` scrollbar styling. **F2** added an
 API spendable-balance preflight (Horizon reserves + selling liabilities) on the swap build and Blend
 deposit build — an over-spend now returns a clean `400 INSUFFICIENT_SPENDABLE_BALANCE` the widget renders
@@ -133,7 +133,7 @@ URL never shows a broken image. **F4** replaced the hollow portfolio empty state
 swap / real Blend deposit with the pool's live supply APY + freshness, honest variable-not-projected copy,
 Mainnet real-funds + 100 XLM cap, non-custodial line) — plus honest failed-tx copy in both action widgets
 ("failed atomically — no funds moved", worded per classic vs Soroban fee). Validators + flags regime
-untouched throughout. Evidence: `docs/evidence/lot-f/`.
+untouched throughout. Evidence: `docs/internal/evidence/lot-f/`.
 
 **QA pass (post-port) fixes.** A headless-CDP QA sweep (all 5 views + modals, 1440/1280px, API-down, connected/disconnected) found no console errors, exceptions, or overflow. Fixes applied: (a) sidebar footer always names the data plane ("Live · Stellar mainnet") — the signing selector no longer flips it; (b) the notifications bell dropdown restyled to the design's "Activity feed"; (c) retry buttons on the protocols/pool-detail API-down states and honest empty states on the dashboard protocols summary + bridge (`—`, not `+$0`); (d) the action modal's network selector is kept for both swap and Blend deposits. **Wallet management (T2-D1: refresh / set active signer / set primary / activate-deactivate / delete) was ported from the legacy `WalletSection` into `PortfolioView`** (per-card ⋯ menu) before removing the now-orphaned legacy components (`WalletSection`, `WalletAlertsPanel`, `PoolDetail`, `PoolTabs`, `ProtocolTabs`, `PoolTable`, `StellarMetrics`, `NetworkStats`, `HeroBanner`, `Dashboard`). The SDEX-swap / Blend-deposit widgets and XDR validators were not touched.
 
@@ -145,10 +145,10 @@ DeFindex → TVL + avg APY, TVL-weighted; AMM/native → TVL + vol + fees), and 
 N/A cells as "—" (vol/fees on lending/vault rows, utilization on AMM/vault rows) while a genuinely
 measured zero on an applicable metric still shows `0`/`0%`. Sorting treats N/A as absent (sorts to the
 bottom), not as `0`. Confined to `ProtocolsView.vue`; dashboard protocol rows show only TVL so needed
-no change. Evidence: `docs/evidence/lot-c/qa-protocols-per-type-metrics.png`.
+no change. Evidence: `docs/internal/evidence/lot-c/qa-protocols-per-type-metrics.png`.
 
 **T3-D3 (Lot G — dashboard & protocols polish) landed on top of Lot F.** Traced to a 2026-08-12
-founder product review (`docs/evidence/lot-g/`). **G1** — bridge source chains render bundled brand
+founder product review (`docs/internal/evidence/lot-g/`). **G1** — bridge source chains render bundled brand
 marks through `BrandLogo` (the top-7 by flow volume: BAS/POL/ETH/SOL/ARB/BSC/CEL, with a monogram-safe
 fallback for the tail); every rendered tx hash links to stellar.expert, network-aware (`lib/explorer.ts`,
 bridge feed + swap/deposit success panels); protocol summary cards normalized to a rigid 3-slot grid.
@@ -163,12 +163,12 @@ half-dash rows**. **G4** — a 7-day network-TVL curve in the hero (`NetworkTvlC
 BridgeChart SVG + tooltip pattern) served from the new `GET /v1/network/tvl-series`; honest gaps (never
 interpolated) and a "building history since &lt;date&gt;" note while the window is partial, backed by G0
 (see §2/§3). All steps green (web build + 49 tests + api build); validators/flags untouched. Evidence:
-`docs/evidence/lot-g/`.
+`docs/internal/evidence/lot-g/`.
 
 **T3-D3 (Lot H — second polish pass) landed on top of Lot G — code-complete, VPS deploy pending
 (indexer + api touched).** Traced to a 2026-08-12 evening founder product review
-(`docs/lot-h-polish-2.md`; evidence `docs/evidence/lot-h/`). **H0** — read-only flows recon
-(`docs/evidence/lot-h/h0-flows-recon.md`): the permanent-$0 "Inflows & outflows" was root-caused to
+(`docs/internal/briefs/lot-h-polish-2.md`; evidence `docs/internal/evidence/lot-h/`). **H0** — read-only flows recon
+(`docs/internal/evidence/lot-h/h0-flows-recon.md`): the permanent-$0 "Inflows & outflows" was root-caused to
 (a) Aquarius liquidity rows persisted with NULL amounts (the normalizer only extracted
 trade/update_reserves) and (b) a stale one-day legacy Blend backfill (`28-blend-events-scaled`,
 2026-03-19) wrongly granting coverage — the Lot C hide rule itself worked; 66 of 73 pools hid
@@ -219,8 +219,8 @@ single-column, peek-strips for card rows, ≥44px touch targets); the three moda
 sheets below `sm`. On touch-mobile the connect modal is honest about the signing reality (AA0-a:
 consultation-first — desktop-extension wallets don't run in mobile browsers, xBull/Albedo bridges
 unreliable) and presents watch-only tracking as the primary entry: the first tracked address mints
-a real user server-side (Lot AB) — never the shared demo account. Evidence: `docs/evidence/lot-aa/`
-and `docs/evidence/lot-ab/`.
+a real user server-side (Lot AB) — never the shared demo account. Evidence: `docs/internal/evidence/lot-aa/`
+and `docs/internal/evidence/lot-ab/`.
 
 Network selection: the wallet network follows the Mainnet/Testnet toggle (`useNetwork`) as the single
 source of truth — the Wallets Kit follows it via `kit.setNetwork`, signing uses the current network,
@@ -342,7 +342,7 @@ injected mid-batch crash) and the readers take the latest snapshot BATCH. Isolat
 −$270,174 (Orbit −33.3% — now matching Blend's own SDK read to $2 on $190k); Aquarius/Soroswap
 byte-identical. Known remaining discrepancy, flagged not fixed: YieldBlox +63.8% vs the Blend SDK
 (exotic-asset pricing in `asset_prices` — its own lot). Evidence:
-`docs/evidence/dead-reserves-2026-08-14.md`.
+`docs/internal/evidence/dead-reserves-2026-08-14.md`.
 
 Operational protocol coverage (verified in prod DB / API, Jun 18–19, 2026):
 - Soroban — Blend, Soroswap, Aquarius
@@ -453,7 +453,7 @@ pools). Founder ruling same day: CETES switched to a manual rule ($0.069, vetted
 pool-implied price + Aqua oracle, `confidence: low`, dated note in `asset_prices.metadata`;
 `MANUAL_CETES_USD` overridable). An Aquarius-derived mid-price is the planned robust fix
 (fast-follow). USTRY/TESOURO (same issuer, own CG ids) cross-check fine and stay CG-priced as
-watch-items. Evidence: `docs/evidence/lot-p/`.
+watch-items. Evidence: `docs/internal/evidence/lot-p/`.
 
 All five protocols aggregate at the protocol level (`protocol_metrics_latest`), with a synchronous
 `as_of` within one `job:refresh` cycle, observed advancing across consecutive cycles.
@@ -491,7 +491,7 @@ sent to the aggregator). Static params cached 24 h; 162 Soroban calls per refres
 (191 before the cache / scope work). `GET /v1/pools/:slug/series` uses the cash leg for this
 venue (Blend keeps supplied). Web: monogram chip, pool-detail copy, lending action Blend-only.
 Out of scope: wallet positions (XO-2 — one wallet holds many Position NFTs), actions, alerts.
-`docs/decisions/2026-10-27-xoxno-tvl-and-pricing.md`, `docs/evidence/lot-xo/`.
+`docs/decisions/2026-10-27-xoxno-tvl-and-pricing.md`, `docs/internal/evidence/lot-xo/`.
 
 ---
 
@@ -552,7 +552,7 @@ stream from the architecture doc:
   used to reload each Blend pool + oracle for every wallet × pool (36 RPC calls per wallet, 24 of
   them `lastprice` simulations), which is what drove the provider bill from ~5M to ~35M CU/day once
   the provider's effective per-call price rose on 2026-10-17/18 (reconciliation in
-  `docs/evidence/lot-rp/00-rpc-cost-recon.md`). It now loads pool + oracle once per run and reads
+  `docs/internal/evidence/lot-rp/00-rpc-cost-recon.md`). It now loads pool + oracle once per run and reads
   positions in batched `getLedgerEntries` (36 calls per run for 92 wallets, 120 for 2,100), and
   its calls land in `rpc_metrics_runs` (`job = 'wallet-alert'`, per-method `methods`).
 - **In-app delivery:** `GET /v1/notifications` → a web notification **bell** + **Alerts page** via
@@ -580,7 +580,7 @@ UNCHANGED OS-cron sweep (82→81→83; no broker, in-app only). Honesty rules: t
 family IFF its evaluator actually runs (still "soon": utilization, netflow, wallet
 balance/exposure, protocol-scope metrics); notification copy carries the observed value + its
 `as_of`; stale snapshots are skipped with a warning, never evaluated; the modal states the sweep
-cadence. Evidence: `docs/evidence/lot-n/`.
+cadence. Evidence: `docs/internal/evidence/lot-n/`.
 
 ---
 
@@ -588,7 +588,7 @@ cadence. Evidence: `docs/evidence/lot-n/`.
 
 **Proven on Testnet AND on Mainnet (swaps + Blend supply/withdraw), narrow in scope by design.**
 The non-custodial path works end-to-end from the UI with successful on-chain transactions on both
-networks (mainnet evidence: `docs/evidence/t3-d2-mainnet-actions.md`).
+networks (mainnet evidence: `docs/internal/evidence/t3-d2-mainnet-actions.md`).
 
 Working (verified Jun 19, 2026): the `actions/` module in `apps/api` exposes `POST /v1/actions/sdex/swap`,
 `POST /v1/actions/sdex/quote`, and `POST /v1/actions/blend/deposit`. The SDEX swap builds a
@@ -680,7 +680,7 @@ controlled regime: server kill-switch `ACTIONS_MAINNET_ENABLED` (403 by default)
 100 XLM per-tx cap, issuer-verified 5-pair whitelist (XLM↔USDC/EURC/AQUA/yXLM/PYUSD), client-side
 pre-sign XDR validation (`validateSwapXdr`, fail closed, incl. fee cap), in-wallet signing only.
 First real mainnet swaps executed in both directions (1 XLM→USDC; USDC→XLM `eeeae199…`). Contract:
-`docs/security-invariants.md`; evidence: `docs/evidence/mainnet-ungating-2026-08-02.md` +
+`docs/security-invariants.md`; evidence: `docs/internal/evidence/mainnet-ungating-2026-08-02.md` +
 `pair-vetting-2026-08-01.md`. The Blend deposit remains testnet-only until Lot A2.
 
 **Blend supply ↔ withdraw is complete in-app since Aug 13 (Lot A3).** The action modal's Blend card
@@ -693,7 +693,7 @@ cap** by design (INV-2.15: it returns the user's own funds). The client gate
 (`validateWithdrawXdr`) pins Blend `WithdrawCollateral` (3) where the deposit gate pins
 `SupplyCollateral` (2), so neither can accept the other's transaction — red-tested both ways.
 Proven E2E on testnet: supply `b199a1d7…` + withdraw `322d760e…`, both confirmed on-chain
-(`docs/evidence/lot-a3-blend-withdraw.md`). **The mainnet pair executed 2026-08-14** — see the
+(`docs/internal/evidence/lot-a3-blend-withdraw.md`). **The mainnet pair executed 2026-08-14** — see the
 A5b paragraph below.
 
 **Multi-pool Blend actions since Aug 14 (Lot A5).** Supply + withdraw work on **every indexed
@@ -703,7 +703,7 @@ on-chain `metadata.name`); **Orbit is XLM-only** (its stale `reserve_snapshots` 
 offered a deposit that fails at simulation — the registry is built from live SDK reads instead).
 Server: `resolveBlendPool` (unknown slug → 400, never a fallback) + `assertPoolSupportsAsset`;
 client: per-pool registry pinned by the signing gate, cross-pool red tests over every ordered pool
-pair (mutation-tested). Evidence: `docs/evidence/lot-a5-blend-multipool.md`.
+pair (mutation-tested). Evidence: `docs/internal/evidence/lot-a5-blend-multipool.md`.
 
 **Congestion-tolerant fee bid (fix `0c296ef`).** A YieldBlox submission was rejected under surge
 pricing with the old 100-stroop inclusion bid (`txInsufficientFee`). The builder now bids 10,000
@@ -716,7 +716,7 @@ refunded); the classic swaps paid the 100/op base under the same bid.
 
 **Mainnet execution evidence + pool-status awareness + friendly contract errors (Aug 14, Lot
 A5b).** Six successful Pubnet txs, Horizon-verified and XDR-decoded
-(`docs/evidence/t3-d2-mainnet-actions.md`): supplies 5 XLM → Fixed, 5 XLM + 5 USDC → YieldBlox
+(`docs/internal/evidence/t3-d2-mainnet-actions.md`): supplies 5 XLM → Fixed, 5 XLM + 5 USDC → YieldBlox
 (the multi-pool proof), swaps 50 XLM → 7.97 USDC and 10 XLM → 1.38 EURC, and the **withdraw
 closing the supply↔withdraw loop on mainnet** (`537a2303…` — the exact supplied Fixed position
 back, minus the SDK's 1-stroop round-down). Honest counter-example: a supply on the frozen Orbit
@@ -744,7 +744,7 @@ stored) — **the automatic T3-D2 executed-tx KPI ledger, replacing the manual h
 Blend-withdraws are witnessed for the ledger but are never faucet-qualifying. The web widgets
 fire-and-forget the hash after submit (never blocking the action flow). `action_events` gained a
 `metadata jsonb` column populated at build time (historical rows stay NULL — no backfill).
-Evidence: `docs/evidence/lot-r/r1-witness.md`.
+Evidence: `docs/internal/evidence/lot-r/r1-witness.md`.
 
 **Reward faucet (Lot R — R2–R4, 2026-08-17, LIVE on mainnet — a money path).** One-time 5 XLM
 reward per wallet AND per user (ever, DB-enforced, global across networks) after a verified
@@ -755,7 +755,7 @@ isolated in `faucet-payout.service.ts`, which can express exactly ONE tx shape (
 payment, memo `dig-reward`); see `security-invariants.md` §9. Brakes: 40-claim budget, 10/h
 velocity, auto-halt when treasury spendable < reward; drain visibility via the `faucet` block on
 `/v1/ops/metrics`. Deploys dark (`FAUCET_ENABLED` unset). Full loop proven on live testnet (real
-payout `8cb9a86b…`, red tests on-chain — `docs/evidence/lot-r/r4-testnet-e2e.md`). Promo surfaces
+payout `8cb9a86b…`, red tests on-chain — `docs/internal/evidence/lot-r/r4-testnet-e2e.md`). Promo surfaces
 (R3/R3b): campaign card with Swap/Supply CTAs opening the real ActionModal, live `remaining/max`
 progress, server-enforced countdown (`FAUCET_ENDS_AT` → `campaign-ended`). **Campaign live:
 started 2026-08-17 ~16:45 UTC, 48h; 15/40 claims paid (75 XLM) in the first ~12h; 17 witnessed
@@ -764,7 +764,7 @@ accumulated under an incentive campaign — say so in any claim. Post-deploy pro
 (2026-08-17, fixed same day): a missing `action_events.metadata` column (aborted pull) silently
 killed build inserts → witnesses honestly failed `no-matching-build`; and a Vue `v-else` chain
 break (promo note inserted mid-chain) hid the Blend supply form whenever a campaign was live —
-`docs/evidence/lot-r/incident-2026-08-17-prod.md`.
+`docs/internal/evidence/lot-r/incident-2026-08-17-prod.md`.
 
 **Reward campaign 2 (Lot R2, 2026-08-18 — built + testnet-proven, deploy/activation pending).**
 One change vs campaign 1: rewards are **per action family** — first verified swap AND first
@@ -781,7 +781,7 @@ in `GET /v1/faucet/eligibility`; `POST /v1/faucet/claim` takes `family`); promo 
 block is campaign-scoped with an `allTime` sub-block. All Lot R brakes and §9 isolation
 untouched. Full testnet loop proven (per-family double claim on one wallet, same-family
 re-claims refused, campaign-1-wallet both directions, velocity + auto-halt live, fail-closed
-misconfig): `docs/evidence/lot-r2/testnet-e2e.md`.
+misconfig): `docs/internal/evidence/lot-r2/testnet-e2e.md`.
 
 ---
 
@@ -804,7 +804,7 @@ initdb with explicit numbering in dependency order), redis, the containerized AP
 containerized indexer (bootstrap + immediate refresh + 15-min sequential loop replacing
 cron+flock, self-excluding by construction). Proven from a clean clone: 10/10 refresh steps
 green, `/v1/protocols` live mainnet TVL, `down && up` idempotent
-(`docs/evidence/lot-z/z1-compose-fresh-clone.md`; path doc: `docs/reference-deployment.md`).
+(`docs/internal/evidence/lot-z/z1-compose-fresh-clone.md`; path doc: `docs/reference-deployment.md`).
 The default `docker compose up` still runs infra only — the dev workflow is unchanged, and
 the VPS keeps its PM2/cron setup (this lot deploys nothing). `apps/web` stays outside the
 stack (static Vite build on Vercel — a documented choice), and the faucet stays dark (no
@@ -822,7 +822,7 @@ body cap. The API is **pm2-supervised with boot persistence** (`pm2-root` system
 fresh `pm2 save` dump; reboot simulated via `pm2 kill && pm2 resurrect` — API back healthy). The
 beta userId-as-bearer access model is documented honestly in `security-invariants.md` §7 —
 rate-limited, not solved; real auth is post-beta. Config reproducible from `docs/deployment.md`;
-evidence: `docs/evidence/lot-s/`.
+evidence: `docs/internal/evidence/lot-s/`.
 
 Incomplete: deployment is still manual (git pull + build + PM2 restart on the VPS; Vercel
 auto-deploys the front); no CI/CD pipeline on the VPS path — the 2026-08-17 incident (an aborted

@@ -299,7 +299,7 @@ export class StellarService {
     // entity filter, and an active entity with no reserve rows (12 of 44 in
     // prod) then walks the whole index — the same trap the /v1/pools EXISTS
     // rewrite hit. The 90 s list cache absorbs it instead; see
-    // docs/evidence/perf-pools/ for the follow-up options.
+    // docs/internal/evidence/perf-pools/ for the follow-up options.
     const assetRows = (await this.prisma.$queryRawUnsafe(`
       with latest as (
         select rs.entity_id, max(rs.snapshot_at) as snapshot_at

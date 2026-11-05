@@ -238,7 +238,7 @@ implementation — treat it as first-class, not "later."
   scoped price fallback (`xoxno-aggregator`, 24 h max age) covers only structurally unpriced
   markets; XOXNO IS in the network-TVL sum. Static params cached 24 h in the entity metadata.
   Wallet positions (XO-2), actions and alerts are out of scope.
-  `docs/decisions/2026-10-27-xoxno-tvl-and-pricing.md`, `docs/evidence/lot-xo/`.
+  `docs/decisions/2026-10-27-xoxno-tvl-and-pricing.md`, `docs/internal/evidence/lot-xo/`.
 - **Tests / CI** are **largely deferred (likely T3).** The one exception: the T2-D2 alerting evaluator
   has unit specs (`modules/alerts/evaluate.spec.ts`, `alerts.ownership.spec.ts`). Beyond those there
   are no broad suites and no CI pipeline. Do not add a test/CI build-out as a side effect of an

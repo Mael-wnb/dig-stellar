@@ -111,7 +111,7 @@ export interface BlendPoolEntry {
 /**
  * Mainnet Blend pools — the full indexed perimeter (entities where venue=blend,
  * entity_type=lending_pool, is_active). Every id verified 2026-08-14 (evidence:
- * docs/evidence/lot-a5-blend-multipool.md):
+ * docs/internal/evidence/lot-a5-blend-multipool.md):
  *   - Blend's OFFICIAL V2 pool factory (CDSYOAVX…, from docs.blend.capital)
  *     answers is_pool(<id>) = true for all four;
  *   - all four are in the backstop reward zone (Blend-governance recognised);
@@ -334,7 +334,7 @@ export function assertPoolSupportsAsset(
  * array entry here + one MAINNET_SWAP_PAIRS entry in apps/web — the two lists MUST
  * agree (a web pair missing here 400s at build time).
  *
- * Vetting evidence: docs/evidence/pair-vetting-2026-08-01.md (probe stdout + JSON).
+ * Vetting evidence: docs/internal/evidence/pair-vetting-2026-08-01.md (probe stdout + JSON).
  * Issuer verification (bidirectional domain / official docs):
  *   USDC  GA5ZSE… circle.com          — Circle official usdc-contract-addresses doc
  *   EURC  GDHU6W… circle.com          — Circle official eurc-contract-addresses doc

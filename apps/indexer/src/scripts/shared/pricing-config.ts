@@ -66,7 +66,7 @@ export const PRICING_RULES_BY_SYMBOL: Record<string, PricingRule> = {
   USDGLO: { kind: 'oracle', fallbackEnvVar: 'MANUAL_USDGLO_USD', stableQuotePool: 'aquarius-usdglo-usdc-pool' },
   // Lot P (P0b, founder-approved top tier 2026-08-16). Proxy/peg rules carry the
   // same confidence:medium caveat as SolvBTC above — 1:1-redeemable wrappers whose
-  // peg the venue's own price confirmed at vetting time (docs/evidence/lot-p/).
+  // peg the venue's own price confirmed at vetting time (docs/internal/evidence/lot-p/).
   // USDY: single source (aquarius-usdy-usdc cp pool; no feed lists it) → sanity band
   // [1.00, 1.25] + |Δ 24 h| ≤ 2 % (NAV token, 1.1338 on 2026-09-29). Founder asks Reflector to list it.
   USDY: {

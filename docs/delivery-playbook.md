@@ -111,3 +111,19 @@ campaigns. Direct-to-main is over. These rules apply to every lot:
 6. **Deploy-order rule:** when a frontend change depends on an API change, the
    API must be deployed to the VPS BEFORE the frontend merge to `main` — the
    frontend deploy is instant on push; the API deploy is manual.
+
+---
+
+## Evidence, from Lot DOC2 on (2026-11-05)
+
+Evidence exists so that every public claim can be inspected; it is not the place where a lot is
+narrated. From Lot DOC2 on:
+
+- **One file per lot** under `docs/internal/evidence/<lot>/`, at most 80 lines: the commands run
+  and their output, the numbers before and after. No narrative, no recon text, no self-assessment.
+- **At most one capture per lot**, and only when the claim is visual.
+- Recons, reasoning and option tables stay in the session or in the founder's private journal.
+- The public-facing statement of a lot is its row in `docs/status-board.md` and, when it matters
+  to reviewers, a paragraph in `docs/post-grant-summary.md`.
+- `node tools/check-doc-links.mjs` (also a CI step) must report 0 broken links before a docs
+  change is committed.
