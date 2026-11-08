@@ -1,7 +1,7 @@
 # Dig: Stellar DeFi Intelligence & Position Management Layer — Milestones
 
-> SCF Round 45 (integration track) submission. An extension of Dig's existing Stellar work
-> (SCF 43), built in the same monorepo on top of the already-delivered indexing, analytics,
+> SCF #46 (integration track) submission. An extension of Dig's existing Stellar work
+> (SCF #43), built in the same monorepo on top of the already-delivered indexing, analytics,
 > transaction-builder, and multi-wallet infrastructure.
 
 ## Positioning
@@ -14,11 +14,11 @@ and get alerted on Telegram/Discord when a position needs attention.
 
 This builds directly on Dig's existing Stellar indexing and analytics infrastructure: a hybrid
 Horizon + Soroban RPC pipeline that already ingests and normalizes real-time data from
-integrated protocols (Blend, Aquarius, Soroswap, DeFindex, SDEX) into a unified Postgres store,
-served through internal API endpoints, with grouped multi-wallet portfolio tracking, a
-non-custodial transaction builder, and in-app alerting already in place. That infrastructure is
-the foundation this project extends; the work below is the deep protocol execution,
-Etherfuse RWA integration, external notification delivery, CCTP capital import, and
+integrated protocols (Blend, Aquarius, Soroswap, DeFindex, SDEX, XOXNO Lending) into a unified
+Postgres store, served through internal API endpoints, with grouped multi-wallet portfolio
+tracking, a non-custodial transaction builder, and in-app alerting already in place. That
+infrastructure is the foundation this project extends; the work below is the deep protocol
+execution, Etherfuse RWA integration, external notification delivery, CCTP capital import, and
 cross-category intelligence layers built on top of it.
 
 See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the technical architecture and
@@ -58,8 +58,8 @@ BLND emissions from their positions. When a health factor drops below a configur
 the platform surfaces a warning with recommended actions such as adding collateral or making a
 partial repayment, ready to execute. Users can also execute intra-pool rebalances, for example
 withdrawing one collateral and depositing another, using Blend's batched submit with mixed
-Request types. All actions are non-custodial: transactions are built server-side and signed in
-the user's wallet.
+Request types. All actions are non-custodial: transactions are built server-side, validated
+client-side and signed in the user's wallet.
 
 **How to measure completion:**
 

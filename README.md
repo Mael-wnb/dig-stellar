@@ -95,6 +95,9 @@ Reading order: this README, then `docs/post-grant-summary.md` (what shipped afte
 where it is going), then `docs/status-board.md` (one page: tranches, post-grant lots, what is next).
 Full map with source-of-truth ranks: `docs/README.md`.
 
+- `docs/integrationtrack/`: the SCF #46 integration track: architecture of the next layer
+  (`ARCHITECTURE.md`, including the Circle CCTP flow) and the deliverables with their completion
+  criteria (`milestones.md`).
 - `docs/TECHNICAL_ARCHITECTURE.md`: the architecture document, with a design-vs-as-built table
   recording every engineering decision since the June 2026 design.
 - `docs/security-invariants.md`: the security contract for the action path and the money path.

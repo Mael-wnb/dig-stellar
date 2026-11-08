@@ -7,6 +7,14 @@
 > 2026-11-04 (`docs/internal/evidence/lot-doc1/doc1-recon.md` §R2). Sections §6 and §9 also carry
 > short inline as-built notes.
 
+**Next layer (SCF #46 integration track).** The application funds the execution layer on this
+foundation: Circle CCTP native USDC import (burn, attestation, mint), Etherfuse stablebonds,
+Blend backstop and position management, Aquarius / Soroswap / DeFindex actions, Telegram and
+Discord alert delivery, and a cross-category intelligence engine. It is specified in
+`docs/integrationtrack/ARCHITECTURE.md`, with the deliverables and their completion criteria in
+`docs/integrationtrack/milestones.md`, under the same non-custodial invariants
+(`docs/security-invariants.md`).
+
 ## Design vs as-built (2026-11)
 
 | Area | Designed (June 2026) | Built (Nov 2026) | Why / status |

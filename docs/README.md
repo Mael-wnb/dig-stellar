@@ -61,9 +61,10 @@ to fix. Rank 0 is not a document: the code, the SQL files and the production API
 | `grant-roadmap.md` | SCF #43 criteria verbatim + interpretation | closed (grant complete August 2026) | founder | reviewer (grant history) |
 | `final-report.md` | Tranche 4 final report to SDF | historical, not edited | founder | reviewer (grant history) |
 | `TECHNICAL_ARCHITECTURE.md` | June 2026 design document with a design-vs-as-built banner and table | design frozen; table dated 2026-11 | Claude Code (table), founder (design) | reviewer |
+| `integrationtrack/` | SCF #46 integration-track application: scope overview (`README.md`), architecture of the next layer (`ARCHITECTURE.md`, incl. the Circle CCTP flow), deliverables with completion criteria (`milestones.md`) | maintained; dates set with the SCF advisor | founder (content), Claude Code (sync with the as-built system) | reviewer |
 | `delivery-playbook.md` | Standard workflow and branch discipline | maintained | founder | contributor |
 | `ai-guidelines.md` | How AI is used on the project | maintained | founder | contributor |
-| `internal/briefs/`, `internal/alerting/`, `integrationtrack/` | Execution briefs per lot (dated in their first paragraph), T2-D2 recon probes, integration-track application text (headers still say SCF Round 45; the application moved to SCF 46) | historical / founder material | none (briefs, probes), founder (integration track) | contributor, founder |
+| `internal/briefs/`, `internal/alerting/` | Execution briefs per lot (dated in their first paragraph), T2-D2 recon probes | historical | none | contributor |
 
 ## Conventions
 

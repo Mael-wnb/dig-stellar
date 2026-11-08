@@ -1,9 +1,8 @@
 # Dig: Stellar DeFi Intelligence & Position Management Layer
 
-> SCF Round 45 (integration track) submission. An extension of Dig's existing Stellar work
-> (SCF 43), built in the same
-> monorepo on top of the already-delivered indexing, analytics, transaction-builder, and
-> multi-wallet infrastructure.
+> SCF #46 (integration track) submission. An extension of Dig's existing Stellar work
+> (SCF #43), built in the same monorepo on top of the already-delivered indexing, analytics,
+> transaction-builder, and multi-wallet infrastructure.
 
 ## What this is
 
@@ -13,23 +12,26 @@ on each protocol (backstop, LP, reward claims, vault allocation, health-factor);
 click with non-custodial, in-wallet signing; and get alerted on Telegram/Discord when a
 position needs attention.
 
-## Relationship to the existing Stellar work (SCF 43)
+## Relationship to the existing Stellar work (SCF #43)
 
-This scope does not start from scratch. It builds on infrastructure already delivered under
-SCF 43, documented in the repository's main `docs/`:
+This scope does not start from scratch. It builds on infrastructure delivered under SCF #43 and
+extended since, running on Stellar Mainnet and documented in the repository's main `docs/`:
 
-- Hybrid Horizon + Soroban RPC indexing pipeline into a unified Postgres store
-- Protocol read adapters for Blend, Aquarius, Soroswap, DeFindex, SDEX
-- Grouped multi-wallet portfolio tracking
-- A non-custodial transaction builder (multi-op XDR, simulate, in-wallet signing), proven on Testnet
-- In-app alerting (rule evaluation + WebSocket delivery)
+- Hybrid Horizon + Soroban RPC indexing pipeline into a unified Postgres store, refreshed every 15 minutes
+- Protocol read adapters for six protocols: Blend, Aquarius, Soroswap, DeFindex, SDEX, XOXNO Lending
+- Grouped multi-wallet portfolio tracking, with one designated active signer and watch-only addresses that can never sign
+- A non-custodial transaction builder (multi-op XDR, simulate, client-side validation, in-wallet signing), live on Stellar Mainnet for SDEX swaps and Blend supply/withdraw behind launch controls (kill-switch, per-transaction cap, issuer-verified asset whitelist)
+- In-app alerting: rules evaluated on a periodic sweep against the indexed snapshots and delivered in-app; external delivery via Telegram and Discord is deliverable 1.3
+- A public read API with an OpenAPI 3.1 contract served at `/v1/docs`, with the TypeScript SDK `@getdig/stellar-api` and the MCP server `@getdig/stellar-mcp` published on npm
+- A public status page with per-run outcomes, missed cycles and upstream health
+- Earn & Points, live on Mainnet: its public phase opens with the build period, so that each deliverable below is exercised by real users while it is built
 
 The work in this scope is **deep protocol execution, cross-category intelligence, Etherfuse RWA
 integration, CCTP capital import, and external notification delivery** built on that foundation.
 
 ## Documents
 
-- [`ARCHITECTURE.md`](./ARCHITECTURE.md): technical architecture and Stellar integration plan (with a reviewer FAQ)
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md): technical architecture and Stellar integration plan
 - [`milestones.md`](./milestones.md): 8 deliverables across 3 tranches (3 + 3 + 2), Sept 22 → Dec 19, 2026, $75,000 total (T1 $24,200 / T2 $27,900 / T3 $22,900)
 
 ## Core principle
@@ -72,6 +74,7 @@ This scope extends the existing monorepo; it does not introduce a new project.
 | Capital import | `apps/api` + `apps/web` | CCTP burn → attestation → mint orchestration |
 | Notifications | `apps/api` | External delivery via Telegram/Discord bots + rule model |
 | Enriched portfolio | `apps/web` + `apps/api` | Backstop/LP/stablebond position types, cross-protocol summary |
+| Public API, SDK, MCP server | `apps/api` + `packages/sdk` + `packages/mcp` | In place today; the public read API, the SDK and the MCP server (built on the SDK) evolve on Dig's own initiative, outside this application's budget (`docs/post-grant-summary.md` §4) |
 
 ## Out of scope
 
