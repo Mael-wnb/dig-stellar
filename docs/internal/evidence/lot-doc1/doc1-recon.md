@@ -171,7 +171,7 @@ record of a lot; accurate for its date, not maintained.
    update the overview table.
 4. `docs/final-report.md:31` "Redis handles caching": the submitted report is historical; decide
    whether to add a dated footnote or leave it (recommendation: one footnote, no rewrite).
-5. `docs/internal/integrationtrack/*.md`: "SCF Round 45" headers vs the SCF 46 application; founder
+5. `docs/integrationtrack/*.md`: "SCF Round 45" headers vs the SCF 46 application; founder
    decides whether these are rewritten for SCF 46 or archived.
 6. Broken internal references in briefs (`docs/tasks/…` paths that do not exist, e.g. from
    `security-invariants.md:183`); a link check over `docs/` would list them all.

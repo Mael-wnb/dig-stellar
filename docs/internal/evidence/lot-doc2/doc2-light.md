@@ -8,7 +8,7 @@ Branch docs/lot-doc2-light from `main` @ ba6fb5f. Text and file moves only; no c
 | From | To | Files |
 |---|---|---|
 | docs/lot-*.md (20), docs/hotfix-frozen-amm-reserves.md | `docs/internal/briefs/` | 21 |
-| docs/alerting/, docs/integrationtrack/ | `docs/internal/alerting/`, `docs/internal/integrationtrack/` | 6 |
+| docs/alerting/, docs/integrationtrack/ | `docs/internal/alerting/`, `docs/integrationtrack/` | 6 |
 | docs/evidence/ (whole tree) | `docs/internal/evidence/` | 582 |
 | `docs/status-board.md` (511 lines) | `docs/internal/status-board-archive.md` (header line added, paths rewritten) | 1 |
 

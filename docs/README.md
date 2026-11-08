@@ -63,7 +63,7 @@ to fix. Rank 0 is not a document: the code, the SQL files and the production API
 | `TECHNICAL_ARCHITECTURE.md` | June 2026 design document with a design-vs-as-built banner and table | design frozen; table dated 2026-11 | Claude Code (table), founder (design) | reviewer |
 | `delivery-playbook.md` | Standard workflow and branch discipline | maintained | founder | contributor |
 | `ai-guidelines.md` | How AI is used on the project | maintained | founder | contributor |
-| `internal/briefs/`, `internal/alerting/`, `internal/integrationtrack/` | Execution briefs per lot (dated in their first paragraph), T2-D2 recon probes, integration-track application text (headers still say SCF Round 45; the application moved to SCF 46) | historical / founder material | none (briefs, probes), founder (integration track) | contributor, founder |
+| `internal/briefs/`, `internal/alerting/`, `integrationtrack/` | Execution briefs per lot (dated in their first paragraph), T2-D2 recon probes, integration-track application text (headers still say SCF Round 45; the application moved to SCF 46) | historical / founder material | none (briefs, probes), founder (integration track) | contributor, founder |
 
 ## Conventions
 
