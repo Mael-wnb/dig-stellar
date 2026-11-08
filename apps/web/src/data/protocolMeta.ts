@@ -2,6 +2,7 @@ import blendLogo from '@/assets/protocols/blend-logo.svg'
 import aquariusLogo from '@/assets/protocols/aquarius-logo.svg'
 import soroswapLogo from '@/assets/protocols/soroswap-logo.svg'
 import defindexLogo from '@/assets/protocols/defindex-logo.svg'
+import xoxnoLogo from '@/assets/protocols/xoxno-logo.png'
 import type { PoolTokenSummary } from '../types/protocol'
 
 // Per-protocol wording for the "<type>, N pools" subtitles. A protocol whose
@@ -45,14 +46,14 @@ export const PROTOCOL_META: Record<
     iconBg: '#221a10',
     logo: defindexLogo,
   },
-  // Lot XO: no bundled mark (monogram chip) until XOXNO provides an official one.
+  // Lot XO-LOGO: official XOXNO mark bundled like the other four.
   // XOXNO Lending is modelled as one entity per hub (Core, RWA, AMM) whose
   // reserves are the isolated markets, so the UI counts "hubs" and "markets".
   xoxno: {
     icon: '◇',
     iconColor: '#D04E92',
     iconBg: '#33192a',
-    logo: '',
+    logo: xoxnoLogo,
     units: {
       poolNoun: { singular: 'hub', plural: 'hubs' },
       showMarketCount: true,
