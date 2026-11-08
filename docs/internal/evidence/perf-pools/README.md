@@ -68,7 +68,8 @@ entities have no reserve rows and would each walk the whole index.
 
 `prod-index-and-explain.sql` (index build + size + EXPLAIN of the new statement) is run BEFORE
 the api deploy; the code ships only if the plan uses the partial index and runs well under
-100 ms. Paste the output into `explain-after-2026-10-30.md` (pending).
+100 ms. Production measurement, 2026-11-08, API version `f8599d7`: three `GET /v1/pools` from
+the public endpoint (`curl -w %{time_starttransfer}`), TTFB 0.19 s / 0.07 s / 0.16 s.
 
 ## Follow-ups (not in this lot)
 

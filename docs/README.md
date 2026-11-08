@@ -7,8 +7,8 @@ behind it is `docs/internal/evidence/lot-doc1/doc1-recon.md` §R3.
 
 ## Reading order for a reviewer
 
-1. `post-grant-summary.md`: what shipped after the grant closed (2026-08-20 → 2026-11-05), by
-   theme, with the evidence file per item.
+1. `post-grant-summary.md`: what shipped after the grant and where it is going (state at
+   2026-11-08).
 2. `status-board.md`: one page, where every tranche and lot stands, with its "Last updated" line.
 3. `current-state.md`: the detailed as-built reality behind each status line.
 4. `internal/evidence/README.md`: the index of proofs (captures, command outputs, transaction
@@ -46,7 +46,7 @@ to fix. Rank 0 is not a document: the code, the SQL files and the production API
 
 | Document | Purpose | Current? | Update owner | Read by |
 |---|---|---|---|---|
-| `post-grant-summary.md` | Post-grant development summary for reviewers (2026-08-20 → 2026-11-05), evidence-linked | dated snapshot (2026-11-05); refreshed per application window | Claude Code at task completion | reviewer |
+| `post-grant-summary.md` | What shipped after the grant and where it is going, for reviewers | dated snapshot (2026-11-08); refreshed per application window | Claude Code at task completion | reviewer |
 | `status-board.md` | One-page board: grant tranches, post-grant lots, next; the long-form history is `internal/status-board-archive.md` (frozen 2026-11-05) | maintained | Claude Code at task completion, founder on rulings | reviewer, founder |
 | `current-state.md` | Detailed as-built reality, what is partial or fragile | maintained | Claude Code at task completion | reviewer, contributor |
 | `repo-structure.md` | Navigation map of the monorepo | maintained; the alerts, ops, actions, campaign, faucet and auth modules are not mapped yet (DOC2) | Claude Code on structural change | contributor |

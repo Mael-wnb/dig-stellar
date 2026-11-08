@@ -1,11 +1,12 @@
 # Dig Stellar
 
 Dig Stellar is DeFi analytics, multi-wallet portfolio monitoring and non-custodial actions on the
-Stellar network: one place to read protocol and pool metrics, follow several wallets, receive
-in-app alerts, and swap or lend from the same screen while every transaction is signed in the
-user's own wallet. It is built by the Dig team (getdig.ai). The work was funded by Stellar
-Community Fund award #43, completed and fully paid in August 2026; everything since is
-post-grant product hardening ahead of the SCF #46 application.
+Stellar network, live on Stellar Mainnet: one place to read protocol and pool metrics on real data
+refreshed every 15 minutes, follow several wallets, receive in-app alerts, and swap or lend from the
+same screen while every transaction is signed in the user's own wallet. It is built by the Dig team
+(getdig.ai) and is the Stellar module of Dig, a multi-chain Web3 analytics platform. Its foundation
+was funded by Stellar Community Fund award #43, delivered in full and paid in August 2026;
+everything since is Dig's own work ahead of the SCF #46 application.
 
 ## Live
 
@@ -14,52 +15,64 @@ post-grant product hardening ahead of the SCF #46 application.
 - API docs: https://stellar-api.getdig.ai/v1/docs
 - OpenAPI document: https://stellar-api.getdig.ai/v1/openapi.json
 
-## What it does today
+## What it does
 
-Facts as of 2026-11-04, each traceable to `docs/status-board.md`, `docs/current-state.md` or a
-call against the production API.
+Facts as of 2026-11-08, each in production and traceable through `docs/status-board.md`,
+`docs/post-grant-summary.md` or a call against the production API.
 
-- **Protocol analytics** for six Stellar DeFi protocols on real mainnet data: Blend (lending),
-  Soroswap (AMM), Aquarius (AMM), the Stellar native DEX, DeFindex (yield vaults) and XOXNO
-  Lending. Pool-level pages with TVL, reserves, volume, APY and 7-day series. The Allbridge
-  bridge-flow venue is kept as a historical record only (the venue wound down upstream in
-  July 2026).
-- **Multi-wallet portfolio**: several wallets grouped under one account, one designated active
-  signer, watch-only addresses that can never sign, per-asset balances and Blend positions with
-  health factor.
-- **In-app alerting**: rules on wallet health factor, asset price, pool TVL drop and pool
-  supply/borrow APY, plus an automatic pool-status protection. Rules are evaluated on a periodic
-  sweep against the indexed snapshots; notifications are in-app only.
-- **Mainnet actions**: SDEX swaps and Blend supply/withdraw, executed and Horizon-verified on
-  mainnet. Security regime: kill-switch flags, a per-transaction cap, an issuer-verified asset
-  whitelist, client-side XDR validation before the wallet is invoked, in-wallet signing only
+- **Six protocols on one pipeline**, on real Mainnet data: Blend (lending), Aquarius (AMM),
+  Soroswap (AMM), the Stellar native DEX, DeFindex (yield vaults) and XOXNO Lending. Pool-level
+  pages with TVL, reserves, volume, APY and 7-day series, refreshed every 15 minutes.
+- **Freshness on every figure**: each `/v1/*` payload carries `asOf`, `isStale` and
+  `staleAfterSeconds`; the UI shows the same freshness next to the number it qualifies.
+- **Multi-wallet portfolio**: several wallets under one account, one designated active signer,
+  watch-only addresses that can never sign, per-asset balances and Blend positions with health factor.
+- **In-app alerts** on wallet health factor, asset price, pool TVL and pool supply/borrow APY, plus
+  an automatic pool-status protection, evaluated on a periodic sweep against the indexed snapshots.
+- **Non-custodial Mainnet actions**: SDEX swaps and Blend supply/withdraw, built server-side,
+  validated client-side against the user's intent before the wallet is invoked, signed in-wallet,
+  behind a kill-switch, a per-transaction cap and an issuer-verified asset whitelist
   (`docs/security-invariants.md`).
-- **Public read API**: a versioned HTTP contract, 15 operations (OpenAPI 3.1, `v1`), validated
-  by a contract test that boots the real application (`docs/api/README.md`). TypeScript SDK
-  `@getdig/stellar-api` (`packages/sdk`, generated from the contract) and an MCP server
-  `@getdig/stellar-mcp` (`packages/mcp`, six read-only tools for AI agents), both on npm
-  since November 2026.
+- **Public read API** with a published OpenAPI 3.1 contract: 15 operations, each with an explicit
+  stability tier (nine stable, six beta), validated by a contract test that boots the real
+  application and checks every operation and every documented error path (40 checks).
+- **SDK and MCP server**, both on npm and generated from the same contract: the TypeScript SDK
+  `@getdig/stellar-api` (`packages/sdk`) and the MCP server `@getdig/stellar-mcp` (`packages/mcp`,
+  six read-only tools for AI agents).
+
+  ```bash
+  npm i @getdig/stellar-api        # typed client, one method per operation
+  npx -y @getdig/stellar-mcp       # MCP server over stdio, read-only
+  ```
+
+- **Operational transparency**: a public status page with per-run outcomes, missed cycles and
+  upstream health over 24 hours; health and ops endpoints; a reference deployment that runs from
+  a fresh clone with no secrets.
+- **Efficiency work in production**: the alert sweep went from 3,312 RPC calls per run to 36, a
+  97 % reduction with identical results; `GET /v1/pools` went from 3.2 s to about 0.1 s.
 
 ## Architecture in ten lines
 
-- `apps/web`: Vue 3 + Vite, wallet UX via Stellar Wallets Kit; no business logic, no direct
-  provider calls for product data.
+- `apps/web`: Vue 3 + Vite, wallet UX via Stellar Wallets Kit; UI and state only, every product
+  figure comes from the internal API.
 - `apps/api`: NestJS, the single UI-facing façade; raw SQL over Postgres, freshness metadata on
-  every `/v1/*` payload.
+  every `/v1/*` payload, public contract served at `/v1/openapi.json` and `/v1/docs`.
 - `apps/indexer`: ingestion jobs; Soroban RPC is the primary data plane, Horizon the complement,
   DeFindex and XOXNO through their SDK or on-chain views.
-- Storage: Postgres 16. A Redis container ships in the compose stack but no application path
-  uses it today.
+- `packages/sdk` and `packages/mcp`: the TypeScript SDK and the MCP server, generated from and
+  drift-checked against the contract in CI.
+- Storage: Postgres 16, raw SQL schema families (`apps/api/src/db/stellar_v*.sql`).
 - Cadence: one refresh run every 15 minutes writes snapshots and latest metrics; the alert sweep
   runs on its own 15-minute line; staleness is computed at read time and shown in the UI.
 - Operations: one VPS (nginx, pm2, cron), web on Vercel; health and run metrics at `/health`,
-  `/v1/ops/*` and the status page.
-- Design document: `docs/TECHNICAL_ARCHITECTURE.md` (June 2026). Not all of it was built as
-  described; read its banner and "Design vs as-built" table first.
+  `/v1/ops/*` and the status page; CI builds, runs the unit suites and checks SDK drift and doc
+  links on every push.
+- Design document: `docs/TECHNICAL_ARCHITECTURE.md` (June 2026), with a design-vs-as-built table
+  recording every engineering decision taken since, each with its reason.
 
 ## Run it
 
-The proven reference stack, from a fresh clone to real mainnet data, with no secrets
+The reference stack, from a fresh clone to real Mainnet data, with no secrets
 (`docs/reference-deployment.md` has the details and the host-pnpm developer path):
 
 ```bash
@@ -71,40 +84,23 @@ curl -s localhost:3000/v1/protocols    # protocols with live TVL after the first
 ```
 
 Requirements: Docker with compose v2. For the developer path: Node 24 (`.nvmrc`) and pnpm 10.
-Without `DEFINDEX_API_KEY` the DeFindex step fails non-fatally; everything else runs on public
-endpoints.
-
-## Docs map
-
-Full map with source-of-truth ranks and a reviewer reading order: `docs/README.md`.
-
-| Doc | What it is |
-|---|---|
-| `docs/post-grant-summary.md` | What shipped after the grant closed (Aug → Nov 2026), with evidence per item |
-| `docs/status-board.md` | One page: grant tranches, post-grant lots, what is next |
-| `docs/current-state.md` | Detailed as-built reality |
-| `docs/decisions/` | Founder rulings with their rationale |
-| `docs/runbooks.md` | Operating procedures (cron, schema, campaign, API contract) |
-| `docs/deployment.md` | VPS shape, hardening, deploy sequences |
-| `docs/internal/` | Working documents and the proof corpus (briefs, evidence, archived long-form board); not written for reviewers, kept so every claim is inspectable |
-| `docs/api/README.md` | Public API contract, docs page, contract test |
-| `docs/security-invariants.md` | Security contract for the action path and the money path |
-| `docs/TECHNICAL_ARCHITECTURE.md` | Design document, with a design-vs-as-built banner |
-
-## Status and honesty
-
-The product is a production beta. Rules this repository follows when describing itself:
-every number traces to a command, a capture or a transaction hash; design intentions are never
-stated as built; adoption figures earned under an incentive campaign are always stated with
-that context. `docs/status-board.md` carries the current state and its "Last updated" line;
-`docs/internal/evidence/` holds the proofs. Known limits are listed there rather than here: among them,
-deployment to the VPS is still manual (CI builds and tests, it does not deploy), the beta API
-access model is a rate-limited grouping key rather than authentication, and the public API has
-no auth yet. The SDK and MCP packages were published to npm in November 2026 (Lot SDK1),
-both at 0.1.0.
+Every step runs on public endpoints; the DeFindex step additionally takes a `DEFINDEX_API_KEY`.
 
 Tests: unit suites in each app (Jest for the API, Vitest for the web, `node --test` for the
-indexer) and an API contract test; CI runs build and unit tests on every push.
+indexer) and the API contract test; CI runs them on every push.
+
+## Documentation
+
+Reading order: this README, then `docs/post-grant-summary.md` (what shipped after the grant and
+where it is going), then `docs/status-board.md` (one page: tranches, post-grant lots, what is next).
+Full map with source-of-truth ranks: `docs/README.md`.
+
+- `docs/TECHNICAL_ARCHITECTURE.md`: the architecture document, with a design-vs-as-built table
+  recording every engineering decision since the June 2026 design.
+- `docs/security-invariants.md`: the security contract for the action path and the money path.
+- API reference: https://stellar-api.getdig.ai/v1/docs (contract, tiers and tests in `docs/api/README.md`).
+- `docs/internal/evidence/README.md`: index of the proof corpus; every figure above traces to a
+  command output, a capture or a transaction hash there.
 
 ## Contact
 

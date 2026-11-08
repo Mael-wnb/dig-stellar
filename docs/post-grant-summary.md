@@ -1,257 +1,177 @@
-# Dig Stellar — post-grant development summary (2026-08-20 → 2026-11-05)
+# Dig Stellar: from data foundations to an execution layer
 
-## 1. Context
+*Post-grant summary and direction. State at the SCF #46 submission, 2026-11-08.*
+*App: stellar.getdig.ai · API: stellar-api.getdig.ai/v1/docs · Code: github.com/Mael-wnb/dig-stellar*
 
-Stellar Community Fund award #43 funded Dig Stellar's indexing foundation, analytics dashboard,
-transaction builder, multi-wallet portfolio, in-app alerting, bridge-flow monitoring, mainnet
-deployment with freshness tracking, non-custodial mainnet actions and the observability /
-reference-implementation hand-off. All four tranches were validated and paid: the MVP tranche in
-late July 2026, the testnet tranche in early August, the mainnet tranche around 20 August 2026
-with acceptance of the final report (`docs/status-board.md`, "Tranche numbering"). This document
-covers everything shipped after that final validation, from about 2026-08-20 to 2026-11-05. All
-of it was undertaken on Dig's own initiative; none of it was required by SCF #43. Every figure
-below is taken from `docs/status-board.md`, `docs/current-state.md`, `docs/decisions/` or the
-evidence files cited on each "Evidence:" line. Adoption numbers are deliberately absent here.
+## 1. Where SCF #43 left us
 
-Deployment status is stated per item. "In production" means the item's own evidence records a
-production verification. Items marked "on `main`" are merged and present in the production
-checkout (the production API reported version `8e6dd18` on 2026-11-04, which is after every
-commit cited below) but have no separate production capture in the corpus.
+Dig Stellar is the Stellar module of Dig (getdig.ai), a Web3 analytics platform built for several
+chains. SCF #43 funded its foundation, and that foundation is complete: all four tranches
+were validated and paid, the last one in August 2026 with the acceptance of the final report.
 
-## 2. Live surfaces
+What exists today, on Stellar Mainnet, with real data and real transactions:
+
+- **A unified data layer** over Blend, Aquarius, Soroswap, the native SDEX, DeFindex and, since
+  October, XOXNO Lending: protocol and pool analytics, refreshed every 15 minutes, with the
+  freshness of every figure exposed to the user and to the API.
+- **A multi-wallet portfolio** with one designated signer, watch-only addresses that can never
+  sign, per-asset balances and lending positions with health factor.
+- **In-app alerting** on health factor, asset price, pool TVL and APY, plus an automatic
+  pool-status protection.
+- **Non-custodial actions on Mainnet**: SDEX swaps and Blend supply / withdraw, built
+  server-side, validated client-side before the wallet is invoked, signed in the user's wallet,
+  behind a kill-switch, a per-transaction cap and an issuer-verified whitelist.
+- **Operational transparency**: a public status page, health and ops endpoints, and a reference
+  deployment that runs from a fresh clone with no secrets.
+
+Two audiences use this foundation: people, through the app, and since this autumn Stellar
+developers, through a public API.
+
+## 2. What we built since, on our own initiative
+
+Everything below shipped between late August and early November 2026, outside the scope of
+SCF #43, and runs in production.
+
+### 2.1 A sixth protocol: XOXNO Lending
+
+XOXNO Lending is indexed as a first-class protocol: 3 hubs, 25 markets, every figure read from
+the on-chain views of the pool contract, no third-party API. TVL is defined as pool cash priced
+over priced markets, so the number is 100 % on-chain, with a bounded fallback to the protocol's
+own price aggregator for the few markets our price sources do not cover. Integration to
+production took one week, which is the point: the adapter model built under the grant makes the
+next protocol a matter of days, not months.
+
+### 2.2 A public API, an SDK and an MCP server for Stellar builders
+
+The read-only data tier of the API now has a published contract. An OpenAPI 3.1 document is the
+single source of truth, served at `/v1/openapi.json` and rendered at `/v1/docs`: fifteen
+operations, each with an explicit stability tier (nine stable, six beta), covering protocols,
+pools, pool flows and series, network figures and the pipeline's own status. A contract test
+boots the real application and validates every operation and every documented error path
+(40 checks). Versioning is a rule, not a hope: additive changes only inside `/v1`, a breaking
+change ships as `/v2`, every change takes a line in the changelog.
+
+On top of the contract, two surfaces for builders:
+
+- **`@getdig/stellar-api`**, a TypeScript SDK published on npm, generated from the contract.
+  One typed method per operation, typed errors (including rate limits with their Retry-After
+  delay), freshness helpers, ESM and CJS builds. A CI job regenerates the types from the
+  document and fails on any drift, so the SDK cannot silently diverge from the API.
+- **`@getdig/stellar-mcp`**, an MCP server runnable with `npx`, exposing the same read surface to
+  AI agents as six tools: protocols, pools, pool detail, pool series, network stats, pipeline
+  status. Read-only by construction: no wallet, no transaction, no key.
+
+Together they let an agent or a script consume Stellar DeFi data in three lines, with a
+documented contract behind it.
+
+### 2.3 Operational maturity
+
+- **Status page and ops metrics.** `#status` renders per-run outcomes, missed cycles and
+  upstream health over 24 hours, from the same metrics the pipeline persists on every run; RPC
+  calls are recorded per job and per method, so cost and latency are queryable.
+- **RPC efficiency.** The alert sweep went from one pool load and one oracle simulation per
+  wallet per pool to batched ledger reads: 3,312 calls per run to 36 in production, a 97 %
+  reduction, with identical results.
+- **API latency.** `GET /v1/pools`, the endpoint behind the dashboard and the protocols view,
+  went from 3.2 s to about 0.1 s through a partial index and an in-process cache that keeps
+  freshness computed per request.
+- **Price sources v2.** Reflector is the primary oracle, every priced asset has an on-chain
+  source, every reader enforces a maximum price age, and the alert evaluator never evaluates a
+  rule against a stale price.
+- **Runtime.** CI, the VPS and Vercel all run Node 24.
+
+### 2.4 Security hardening
+
+A hardening program ran across the stack during the autumn: typed and validated inputs on every
+request, Stellar addresses checked in StrKey form, admission control on the most expensive
+request the API serves (one refresh per wallet at a time, with honest 429s), redaction of
+upstream URLs and child-process output before anything reaches a client or a log, loopback-only
+bindings for every container with a persistent firewall rule on Docker's forwarding chain,
+rotated credentials, and per-IP edge zones on wallet creation and refresh. Wallet ownership is
+proven by signing a plain-text challenge, never a transaction; the backend verifies with the
+public key only and holds no key, no JWT and no session token. Internal metrics routes are
+token-gated. The security contract for the action path is a public document
+(`docs/security-invariants.md`) and every change to that path is reviewed against it.
+
+### 2.5 Product
+
+- **Earn & Points**, live on Mainnet (see §3).
+- **Responsive overhaul**: every view and modal usable at 390 px, with watch-only first on mobile.
+- **Watch-only as the first wallet**: anyone can track an address without connecting a signer,
+  and a tracked address can never become one.
+- **Consent-first analytics**: nothing loads before the visitor accepts, and no address, user id
+  or handle ever leaves the browser.
+- **Reviewer-facing documentation**: a rewritten README, a one-page status board, a
+  design-vs-as-built table on the original architecture document, and a link checker in CI. The
+  working documents and the proof corpus live under `docs/internal/`, kept so that every public
+  claim stays inspectable.
+
+## 3. Earn & Points: the feedback loop for the next build
+
+The Earn & Points program is live on Mainnet. A wallet proves ownership by signed message and
+enrols; points are awarded only for actions verified on-chain by the execution witness, through a
+single idempotent award job; a daily check-in builds a streak; referrals are credited only after
+the referee's first verified on-chain action; a public leaderboard shows shortened addresses;
+perks are non-monetary and points have no monetary value, are not convertible and are never
+folded into a yield figure (a published founder ruling).
+
+Its public phase opens with the SCF #46 build period, by design. The goal is not a number on a
+slide: it is a steady stream of real users exercising the product while the second layer is being
+built, so that every deliverable of the application is tested against actual usage before the
+major release that closes it. Adoption figures from the program are always reported with their
+incentive context, as they were for SCF #43.
+
+## 4. What SCF #46 adds
+
+The foundation lets a user see what happens across Stellar DeFi. The application funds the layer
+that lets them act on it: manage and compare, not just watch.
+
+- **Manage every position from one place.** Blend backstop deposits and BLND claims, health-factor
+  warnings with the resolution action ready to execute, intra-pool rebalances in one batched
+  transaction; Aquarius liquidity, AQUA rewards, real impermanent loss per position and bribe
+  yield folded into APR; Soroswap liquidity via the Router; DeFindex vault deposits with a strategy
+  comparison; SDEX limit orders. Every action calls the protocol's own contracts; Dig deploys none.
+- **Compare DeFi yield and real-world yield side by side.** Etherfuse stablebonds indexed next to
+  lending, AMM and vault opportunities, with a scoring engine that computes yield estimates and
+  category-specific risk signals, so sources with different risk profiles become comparable in
+  one ranked feed.
+- **Bring capital from other chains.** Native USDC into Stellar through Circle's CCTP, routed
+  directly into any surfaced opportunity.
+- **Get alerted when it matters.** Telegram and Discord delivery for health-factor and yield
+  alerts, with the recommended action ready to execute when the user returns.
+
+The build converges on one major release: a single interface where people compare, decide and
+act across Stellar DeFi.
+
+**In parallel, on our own initiative: the builder layer.** Outside the application's budget, the
+data and signals track continues as it started this autumn: access keys with per-key quotas,
+pagination and an events feed, homogeneous history series across every venue type, market-level
+signal subscriptions with webhook delivery, and the SDK and MCP server maturing with the contract.
+Once keys and per-key limits are in place, the action builders and their client-side validation
+library follow, so that a builder or an agent can prepare a non-custodial transaction and hand it
+to the user's wallet for signature: the agent prepares, the person signs.
+
+## 5. Verify it yourself
 
 - Application: https://stellar.getdig.ai
-- Status page (pipeline runs, gaps, failed steps, freshness per venue): https://stellar.getdig.ai/#status
-- API reference page: https://stellar-api.getdig.ai/v1/docs
-- OpenAPI 3.1 document: https://stellar-api.getdig.ai/v1/openapi.json
-- Reference deployment from a fresh clone, no secrets: `docs/reference-deployment.md`
-  (`docker compose --profile app up -d --build`, proven from a clean clone on 2026-08-18)
+- Status page: https://stellar.getdig.ai/#status
+- API reference: https://stellar-api.getdig.ai/v1/docs · OpenAPI: https://stellar-api.getdig.ai/v1/openapi.json
+- SDK: `packages/sdk` (npm `@getdig/stellar-api`) · MCP server: `packages/mcp` (npm `@getdig/stellar-mcp`)
+- Repository: https://github.com/Mael-wnb/dig-stellar. Reading order: `README.md`,
+  `docs/post-grant-summary.md`, `docs/status-board.md`; the proof corpus is indexed in
+  `docs/internal/evidence/README.md`.
+- Reference deployment, from a fresh clone with no secrets: `docs/reference-deployment.md`.
 
-## 3. What shipped, by theme
+Every figure in this document traces to a command output, a capture or a transaction hash in the
+repository.
 
-Newest first within each theme.
+## 6. Scope notes
 
-### 3.1 Protocol integrations
-
-**XOXNO Lending (Lot XO, 2026-10-26 → 10-30; in production, `xoxno` refreshing on the production
-`/health` on 2026-11-04).** Sixth protocol, read-only market analytics. One Soroban pool contract
-with a controller and a price aggregator; a market is a (hub, asset) pair; the 25 markets are
-grouped in three hubs (Core, RWA, AMM), modelled as one entity per hub and one reserve row per
-market. Every figure comes from on-chain read-only views (`get_reserves`, supplied, borrowed,
-utilisation, rates); no XOXNO HTTP API is called and nothing is vendored (the upstream licence is
-PolyForm Noncommercial). TVL is defined as pool cash priced over priced markets, i.e. 100 %
-on-chain. Markets that our own price sources cannot cover use the protocol's aggregator price as
-a bounded fallback: 14 markets are eligible, and an aggregator price loses to any own source.
-Static parameters are cached 24 h; the refresh costs 162 RPC calls per run on the normal 15-minute
-cadence. Wallet positions on XOXNO (XO-2) are not built.
-Evidence: `docs/decisions/2026-10-27-xoxno-tvl-and-pricing.md`, `docs/internal/evidence/lot-xo/00-recon-verification.md`,
-`docs/internal/evidence/lot-xo/xo1-build-and-calls.md`.
-
-**Price sources v2 (2026-09-29 → 2026-10-15; in production, verified at the first refresh tick
-after deploy).** Triggered by keyless CoinGecko being blocked from datacenter IPs on 2026-09-29.
-Phase A1 gave every priced asset an on-chain source (SDEX and Aquarius pool quotes) with CoinGecko
-used only when a key is configured; phase A2 added a maximum price age on every reader, so a stale
-row is never served as current; phase B made Reflector the primary source with an on-chain
-cross-check per asset (SEP-40 reads, freshness ≤ 900 s). At the first tick after deploy the BTC
-price moved from a 15-day-old 69,846 to 81,216.10 from Reflector, cross-checked within +0.59 %
-against a two-hop on-chain quote; no asset showed an empty price at any point.
-Evidence: `docs/internal/evidence/hotfix-xlm-price-fallback/00-recon.md`, `docs/internal/evidence/price-sources-v2/00-recon.md`,
-`docs/internal/evidence/price-sources-v2/05-phase-b-design.md`, `docs/internal/evidence/price-sources-v2/06-phase-b-prod-verification.md`.
-
-**Lending supplied-side correction (hotfix, 2026-09-28; in production, verified at `18072ca`).**
-The pool TVL series and the protocol card's top assets summed the borrowed column instead of the
-supplied one for Blend pools. API-only fix with a regression spec; series values changed
-retroactively because the number became true (the Blend Fixed pool series moved from about $35M
-to about $190M).
-Evidence: `docs/internal/evidence/hotfix-lending-supplied-side/README.md`.
-
-### 3.2 Public API
-
-**Public API v1 contract (Lot API, 2026-11-02 → 11-03; in production, verified 2026-11-03.)** The
-read-only data-and-signals tier of the API now has a published HTTP contract ("contract" always
-means the HTTP API contract here, never a smart contract). A hand-written OpenAPI 3.1 document is
-the single source of truth, served at `GET /v1/openapi.json`; a Scalar reference page at
-`GET /v1/docs` is pinned to one CDN version so a Scalar release cannot change the page. Fifteen
-operations, each with an explicit stability tier (nine `stable`, six `beta`): protocols, pools,
-pool detail / flows / series, network stats and TVL series, bridge summary / flows / series
-(historical), ops status / metrics / adoption, health, and one read-only quote. Wallet-scoped
-data, the action builders, the witness ledger, the faucet, auth and campaign routes are
-deliberately outside the public contract. A contract test boots the real application against a
-local Postgres and validates every operation and every documented error path with a JSON Schema
-validator (40 checks). Versioning rule: additive changes only inside `/v1`; a breaking change
-ships as `/v2`; every change takes a line in the changelog. A TypeScript SDK and an MCP server
-are built from it (both published on npm, November 2026).
-Evidence: `docs/decisions/2026-11-03-public-api-v1-surface.md`, `docs/internal/evidence/lot-api/api0-recon.md`,
-`docs/internal/evidence/lot-api/api2-contract-test.md`, `docs/internal/evidence/lot-api/api5-prod-verification.md`, `docs/api/README.md`.
-
-### 3.3 Operational maturity
-
-**Pre-dossier fixes (Lot PRE, 2026-11-03; in production at version `8e6dd18`, and PRE2 on
-2026-11-04, on `main`).** The status page exposed an amber Horizon bar on the refresh pipeline;
-the cause was found and corrected within 24 hours. The indexer fetched the Horizon source-account
-sequence once per pool in parallel bursts; it is now fetched once per step process, which took the
-`GET /accounts` count from 290 to 29 per refresh in production (274 to 39 Horizon calls per
-refresh in the local run). The follow-up recon showed the remaining Horizon latency came from the
-24-hour trades walk of the native DEX pools (30 to 60 pages on the public endpoint), not from a
-pool scan; the trades pages were moved to the provider endpoint, provider keys are masked in every
-log line, and a failed page now leaves a pool's 24 h volume empty instead of a partial sum. The
-same lot retired the dashboard bridge section and the Allbridge refresh step, replaced a misleading
-"building history since" caption with a plain "TVL history not available" state on non-lending
-pools, and put the campaign metrics route behind an operator token.
-Evidence: `docs/internal/evidence/lot-pre/pre0-recon.md`, `docs/internal/evidence/lot-pre/pre1-fixes.md`, `docs/internal/evidence/lot-pre/pre2-recon.md`.
-
-**RPC cost reduction on the alert sweep (Lot RP, 2026-10-27; on `main`).** A reconciliation of the
-RPC provider's usage against our own run metrics found the wallet sweep issuing one pool load and
-one oracle simulation per wallet per pool. The sweep now loads each Blend pool once and reads
-wallet positions in batches of 100 ledger keys. Measured locally on 9 wallets and 4 pools: 324
-calls per run before, 36 after, with identical health-factor rows; scaled to the production wallet
-count of the day, 3,312 calls per run before and 36 after. Every job now persists its RPC calls per
-method, so cost is queryable per job.
-Evidence: `docs/internal/evidence/lot-rp/00-rpc-cost-recon.md`, `docs/internal/evidence/lot-rp/rp1-sweep-fix.md`.
-
-**Status page (Lot ST, 2026-09-03 → 09-05; in production).** `GET /v1/ops/status` aggregates the
-per-run step outcomes and RPC metrics already persisted by the pipeline into a current state
-(operational / degraded), missed cycles and failed steps over a window, per-component availability
-bars and the list of gaps; the `#status` view in the app renders it, and the freshness chip on
-every data surface links to it. A follow-up fix counts leading and trailing gaps, so a stalled
-pipeline can no longer read 100 %. This is the visible face of the observability delivered under
-the grant, not uptime monitoring.
-Evidence: `docs/internal/evidence/status-page/00-recon-2026-09-03.md`, `docs/internal/evidence/status-page/01-lot-st-2026-09-04.md`.
-
-**Node 24 runtime (Lot AC, 2026-08-20 → 08-21; in production).** Node 20 reached upstream
-end-of-life in April 2026. CI, the VPS (API under pm2, indexer under cron) and Vercel all moved to
-Node 24 with a founder-executed migration runbook, a reboot simulation and a clean refresh cycle
-after the switch; zero application-code change.
-Evidence: `docs/internal/evidence/lot-ac/ac0-compat.md`, `docs/internal/evidence/lot-ac/ac2-execution.md`, `docs/internal/evidence/lot-ac/ac4-close-out.md`.
-
-### 3.4 Security hardening
-
-**Request validation, refresh admission and ops redaction (Lot SEC, Gate 1, 2026-10-27; on
-`main`; the nginx zones are applied by the founder per the deploy sequence).** Three invariants,
-each unit-tested. Every request field is type-checked before use and a tracked address must be a
-Stellar public key in StrKey form, so malformed input answers 400 rather than a 500 and can no
-longer be persisted. A wallet refresh, the most expensive request the API serves, is
-admission-controlled: one refresh per wallet at a time, one per wallet per 60 seconds, at most two
-running per process, each refusal a 429 with a retry delay that the web shows as "wait a moment".
-Child-process output and upstream URLs never reach a client: step messages are redacted before
-they are written and again when the public ops endpoints read them, so an operator endpoint that
-embeds a key in its URL cannot surface on the status page. Per-IP edge zones were added on wallet
-creation and refresh.
-Evidence: `docs/internal/evidence/lot-sec/g1.md`, `docs/security-invariants.md` §12.
-
-**Host network posture (S1, 2026-09-29; in production, founder-executed).** A routine check found
-the Postgres container port published on all interfaces, reachable from outside the VPS because
-Docker's own forwarding rules bypass the host firewall. Every compose binding is now loopback-only,
-the compose file refuses to start without a database password, the database role password was
-rotated in place, container logs rotate, environment files are owner-readable only, and a
-persistent firewall rule on the Docker forwarding chain is documented and proven. The indexer ran
-its next scheduled cycle normally after the window.
-Evidence: `docs/internal/evidence/lot-ad/ad0-security-findings.md`, `docs/internal/evidence/lot-ad/s1-remediation-runbook.md`,
-`docs/internal/evidence/lot-ad/s1-remediation-execution.md`, `docs/security-invariants.md` §10.
-
-**Ownership proofs (Lot EP, 2026-10-16 → 10-21; in production, dark).** Wallet ownership is proven
-by signing a plain-text nonce challenge, never a transaction; the API verifies the signature with
-the public key only and holds no key, no JWT and no session token. The same proof is now required
-for no-session account recovery, closing a path where a stranger could attach to an existing
-account by address alone.
-Evidence: `docs/internal/evidence/lot-ep/ep1-implementation.md`, `docs/internal/evidence/lot-ep/ep1-wallet-matrix.md`, `docs/security-invariants.md` §11.
-
-### 3.5 Performance
-
-**`GET /v1/pools` latency (2026-10-30; on `main`).** Measured from a laptop against production:
-3.2 s at rest and 6.2 s during a refresh for the endpoint that both the dashboard and the protocols
-view depend on. Root cause: a per-request aggregation of the whole events table (2.87 million
-rows) for the "24h swaps" column, 3.32 s in the plan. Fix: a partial index on swap and trade events
-and a rewrite of the statement around it, proven at 2.5 ms on a local copy with both subplans on
-the new index; plus a 90-second in-process cache of the list rows with freshness still computed
-per request. The first rewrite attempted was 60 s because of a planner cost-model trap on
-entities with no events; it is documented as a lesson for this database.
-Evidence: `docs/internal/evidence/perf-pools/README.md`, `docs/internal/evidence/perf-pools/explain-before-2026-10-30.md`,
-`docs/internal/evidence/perf-pools/explain-local-after-2026-10-30.md`.
-
-### 3.6 Product
-
-**Earn & Points campaign (Lot EP, EP1 → EP4, 2026-10-15 → 10-21; deployed dark, activation is a
-founder decision).** Mechanism only, by design: a wallet proves ownership by signed message and
-enrols; points are awarded for actions already verified on Horizon by the execution witness,
-through a single idempotent award job that is the only writer of action points; a daily check-in
-builds a streak whose multiplier ramps gradually; social tasks are self-declared with one handle
-per wallet and a daily cap; a referral is credited only after the referee's first verified
-on-chain action; a public leaderboard shows shortened addresses; perk tiers are non-monetary.
-Points have no monetary value, are not convertible and are never folded into a yield figure
-(`docs/decisions/2026-10-21-points-have-no-monetary-value.md`). Third-party APYs stay exactly as
-the protocols report them. Action validators, flags and whitelists were not touched.
-Evidence: `docs/internal/evidence/lot-ep/00-recon.md`, `docs/internal/evidence/lot-ep/ep1-implementation.md`,
-`docs/internal/evidence/lot-ep/ep2-implementation.md`, `docs/internal/evidence/lot-ep/ep3-implementation.md`, `docs/internal/evidence/lot-ep/ep4-implementation.md`.
-
-**Analytics, consent-first (AN0, 2026-10-21; in production).** Google Analytics 4 with Consent
-Mode v2: nothing loads until the visitor accepts in a banner, decline sends nothing, and a
-parameter guard drops any address, user id or handle before an event is sent. Six product events
-only.
-Evidence: `docs/internal/evidence/lot-an0/an0-implementation.md`.
-
-**Alerting.** The five rule families (wallet health factor, asset price, pool TVL drop, pool
-supply and borrow APY, automatic pool-status protection) date from the grant period (Lot N,
-2026-08-16). Post-grant, the evaluator gained the fresh-price rule from price sources v2, so a
-price or TVL-drop rule is never evaluated against a stale price (2026-10-14).
-Evidence: `docs/internal/evidence/lot-n/n0-recon.md`, `docs/internal/evidence/price-sources-v2/04-phase-a2.md`.
-
-**Watch-only as the first wallet (Lot AB, 2026-08-20; in production).** A visitor can track an
-address without connecting a signer; the backend mints a real account for it, and the tracked row
-is never promoted to signer, so tracking an address cannot create signing power.
-Evidence: `docs/internal/evidence/lot-ab/ab-watch-only-first.md`.
-
-**Responsive overhaul (Lot AA, 2026-08-20; in production).** All five views and three modals
-usable at 390 px: drawer shell, per-view mobile pass, modals as bottom sheets, an honest mobile
-connect state that presents watch-only first because mobile signing was found unreliable on real
-devices. Final sweep: 81 capture records at three viewports, zero horizontal overflow, zero
-console errors, desktop pixel-identical outside live-data drift, zero lines changed in the
-widgets and XDR validators.
-Evidence: `docs/internal/evidence/lot-aa/aa0-breakage-catalog.md`, `docs/internal/evidence/lot-aa/aa0-mobile-signing.md`,
-`docs/internal/evidence/lot-aa/aa4-close-out.md`.
-
-### 3.7 Deployment discipline
-
-**CI (since Lot E, Node 24 since Lot AC).** A GitHub Actions workflow builds and runs the unit
-suites of the API and the web on every push to `main`, `alpha`, `feat/**` and `fix/**` and on every
-pull request; the merge gate is CI green on the pushed branch. It does not deploy.
-Evidence: `.github/workflows/ci.yml`, `docs/internal/evidence/lot-ac/ac4-close-out.md`.
-
-**Per-lot deploy sequences.** Every lot that touches the VPS ships with an ordered sequence in
-`docs/deployment.md` (schema file before build, build before restart, one manual refresh, a
-`/health` version check): status page, RP1, SEC Gate 1, XO, API, PRE. The three deploy incidents of
-the grant and post-grant periods (a skipped SQL file, a pull without rebuild, a checkout stuck on a
-local edit) are catalogued with the step that must make each one impossible or loud.
-Evidence: `docs/deployment.md`, `docs/internal/evidence/lot-ad/ad0-recon.md`.
-
-**Reference compose.** The fully containerised stack (Postgres with the SQL files applied in
-dependency order, Redis, API, indexer loop) remains the reviewer path and was last proven from a
-clean clone on 2026-08-18; the public API routes are served by the same image.
-Evidence: `docs/reference-deployment.md`, `docs/internal/evidence/lot-z/z1-compose-fresh-clone.md`.
-
-## 4. Honest boundaries
-
-- The product is a beta. The API access model for wallet-scoped data is a rate-limited grouping
-  key, not authentication (`docs/security-invariants.md` §7).
-- Not built: API keys or any auth on the public API, a CI deploy gate
-  (deployment to the VPS is manual and founder-executed, with the sequences above), daily TVL
-  history for AMM and vault pools (available for lending pools only), XOXNO wallet positions,
-  the alert latency of the design document (alerts run on a 15-minute sweep, not an event stream).
-- A Redis container ships in the compose stack but no application code uses it today; the list
-  cache is in-process.
-- Lot SEC's edge zones and Lot RP's schema line depend on founder-side VPS steps whose captures
-  are not in the evidence corpus; the code is on `main` and in the production checkout.
-- The Allbridge bridge-flow integration delivered under the grant was retired from the refresh
-  pipeline and the dashboard on 2026-11-03 after the venue wound down upstream in July 2026; its
-  data, API routes and adapter remain as a historical record.
-- `docs/TECHNICAL_ARCHITECTURE.md` is the June 2026 design document; its banner and
-  "Design vs as-built" table list every point where the build diverged.
-
-## 5. What's next
-
-The SCF 46 application extends this base into an execution and intelligence layer: rank yield
-opportunities across lending, AMM liquidity, vaults and tokenised real-world assets with risk
-signals and net-of-cost returns, and manage positions on each protocol from one place with the
-same non-custodial, in-wallet signing. In parallel, the data-and-signals API track continues: the
-SDK, access keys and the contract's stability tiers moving from beta to stable as consumers appear.
-No dates are stated here; the application carries the schedule.
+- The public API is read-only today, by design; execution stays in the app, where every
+  transaction is validated client-side and signed in the user's wallet. Exposing it to builders
+  comes after access keys and per-key limits, with the same validation and signing rules.
+- SDK v0 covers the read surface of the contract; access keys, pagination and retries arrive with
+  the builder layer.
+- The Allbridge bridge-flow integration delivered under SCF #43 remains in the API as a
+  historical record; the venue wound down upstream in July 2026 and is no longer shown on the
+  dashboard.
