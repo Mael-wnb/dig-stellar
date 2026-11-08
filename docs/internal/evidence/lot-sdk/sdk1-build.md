@@ -1,24 +1,30 @@
 # Lot SDK1 — SDK publish readiness + MCP server (build evidence)
 
 Date: 2026-11-05. Branch `feat/lot-sdk1` off `main` (`8f6e2b4`). Two commits planned: (1) SDK
-publish readiness, (2) MCP package + CI + docs. **Nothing published**: the founder publishes
-(npm org `getdig`, 2FA). Node 24.22, pnpm 10.32.1 (corepack).
+publish readiness, (2) MCP package + CI + docs. Node 24.22, pnpm 10.32.1 (corepack).
+
+**Publish record** (founder, npm org `getdig`, 2FA): `@getdig/stellar-api` 0.1.0 published
+2026-11-05 15:40 UTC with `npm publish --access public` from `packages/sdk`; `@getdig/stellar-mcp`
+0.1.0 published 2026-11-07 18:48 UTC with `pnpm pack` then `npm publish <tgz>` (`pnpm publish`
+failed on auth; the pnpm-built tarball carries the rewritten range, verified before publishing).
+`npm view` afterwards: `@getdig/stellar-api version` → `0.1.0`; `@getdig/stellar-mcp version` →
+`0.1.0`; `@getdig/stellar-mcp dependencies` → `{ zod: '^4.6.7', '@getdig/stellar-api': '^0.1.0',
+'@modelcontextprotocol/sdk': '^1.32.2' }`. npx proof: `npx -y @getdig/stellar-mcp` from an empty
+`/tmp` dir (2026-11-07 18:53 UTC) starts the server, which waits on stdin with no error.
 
 ## Part 1 — `packages/sdk` (`@getdig/stellar-api` 0.1.0)
 
-`package.json`: `repository` → `git+https://github.com/Mael-wnb/dig-stellar.git` (public
-remote, directory `packages/sdk`), `bugs`, keywords `stellar defi soroban api sdk openapi blend`,
-`files` = `dist README.md LICENSE` (`src` dropped), `engines.node >=18` (was `>=20`; the client
-needs only global `fetch`), `sideEffects: false`, `exports` unchanged (ESM/CJS/types verified
-by the smoke below). README: real install line, "Versioning" line, "not published" lines gone.
+`package.json`: `repository` → `git+https://github.com/Mael-wnb/dig-stellar.git` (directory
+`packages/sdk`), `bugs`, keywords `stellar defi soroban api sdk openapi blend`, `files` = `dist
+README.md LICENSE` (`src` dropped), `engines.node >=18` (was `>=20`), `sideEffects: false`,
+`exports` unchanged (verified by the smoke below). README: install line, "Versioning" line.
 
 | Command | Result |
 |---|---|
 | `pnpm -C packages/sdk build` / `typecheck` / `test` | ESM 6.91 KB, CJS 7.12 KB, DTS 56 KB / clean / **20 tests, 5 suites, 0 failed** (unchanged) |
 | `npm pack --dry-run` | 9 files, 31.4 kB packed / 179.0 kB unpacked: `LICENSE`, `README.md`, `dist/index.cjs`, `dist/index.cjs.map`, `dist/index.d.cts`, `dist/index.d.ts`, `dist/index.js`, `dist/index.js.map`, `package.json` (no src, no tests) |
 
-**Tarball smoke** (`npm pack` → throwaway project outside the repo, `npm i <tgz>`, 3-line
-example against production, 2026-11-05 15:06 UTC):
+**Tarball smoke** (`npm pack` → throwaway project outside the repo, 3-line example, production, 2026-11-05 15:06 UTC):
 
 ```
 ESM 44 pools; top: blend-fixed-pool 156538821 isStale=false asOf=2026-11-05T15:00:40.330Z
@@ -44,11 +50,9 @@ transaction, no key, no write". Build: tsup ESM only, `dist/index.js` + `dist/cl
 | `pnpm -C packages/mcp build` | `index.js` 98 B, `cli.js` 345 B (shebang kept, mode 755), chunk 11.1 KB, `index.d.ts` 1 KB |
 | `npm pack --dry-run` | 7 files, 7.5 kB packed / 19.5 kB unpacked: `LICENSE`, `README.md`, `dist/chunk-2Z6ZPPCE.js`, `dist/cli.js`, `dist/index.d.ts`, `dist/index.js`, `package.json` |
 
-**Finding — `workspace:^` rewrite.** `npm pack` (and therefore `npm publish`) leaves
-`"@getdig/stellar-api": "workspace:^"` in the tarball's `package.json` (checked by extracting
-it). `pnpm pack` rewrites it to `"^0.1.0"` (checked the same way). **The MCP package must be
-published with `pnpm publish`**, not `npm publish`; the SDK has no workspace dependency and
-can go either way.
+**Finding — `workspace:^` rewrite.** `npm pack` leaves `"workspace:^"` in the tarball's
+`package.json`; `pnpm pack` rewrites it to `"^0.1.0"` (both checked by extracting the tarball).
+Hence the pnpm-built tarball in the publish record; the SDK has no workspace dependency.
 
 **Local proof** (`pnpm -C packages/mcp example`: real MCP client spawning `dist/cli.js` over
 stdio, production API, 2026-11-05 15:12 UTC, payload lines trimmed):
@@ -68,12 +72,9 @@ server tools (6): list_protocols, list_pools, get_pool, get_pool_series, get_net
 ## Part 3 — CI, docs
 
 `ci.yml` job `sdk` gains `pnpm -C packages/mcp typecheck / test / build` after the SDK build (the
-server imports the built SDK). `docs/api/README.md` SDK section rewritten (install line, pnpm
-publish note) + new "MCP server" section; root `README.md` (API bullet, "publication pending"
-in Status and honesty); `docs/post-grant-summary.md` two lines; `docs/status-board.md` SDK1 row
-`in_progress` + Next table. `node tools/check-doc-links.mjs`: 162 files, 703 targets, 0 broken.
-`pnpm -C apps/api test`: 402 passed, 43 skipped (unchanged). `pnpm-lock.yaml`:
-+131 lines (MCP SDK and its deps, zod 4).
+server imports the built SDK). Docs: `docs/api/README.md` (SDK section, new "MCP server"
+section), root `README.md`, `docs/post-grant-summary.md`, `docs/status-board.md` (SDK1 row `done`
+2026-11-07). Link check: 163 files, 706 targets, 0 broken. `pnpm -C apps/api test`: 402 passed,
+43 skipped (unchanged). `pnpm-lock.yaml`: +131 lines (MCP SDK and its deps, zod 4).
 
-**Not in this lot:** the publish itself (founder), wallet/portfolio/action tools, HTTP transport,
-tools for bridge, flows, TVL series and ops metrics (the SDK covers them), retries, API keys.
+**Not in this lot:** wallet/action tools, HTTP transport, bridge/flows/TVL-series/ops-metrics tools, retries, API keys.

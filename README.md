@@ -38,7 +38,7 @@ call against the production API.
   by a contract test that boots the real application (`docs/api/README.md`). TypeScript SDK
   `@getdig/stellar-api` (`packages/sdk`, generated from the contract) and an MCP server
   `@getdig/stellar-mcp` (`packages/mcp`, six read-only tools for AI agents), both on npm
-  (publication pending, see below).
+  since November 2026.
 
 ## Architecture in ten lines
 
@@ -100,8 +100,8 @@ that context. `docs/status-board.md` carries the current state and its "Last upd
 `docs/internal/evidence/` holds the proofs. Known limits are listed there rather than here: among them,
 deployment to the VPS is still manual (CI builds and tests, it does not deploy), the beta API
 access model is a rate-limited grouping key rather than authentication, and the public API has
-no auth yet; the SDK and MCP packages are built and release-ready but their npm publication
-is pending (Lot SDK1).
+no auth yet. The SDK and MCP packages were published to npm in November 2026 (Lot SDK1),
+both at 0.1.0.
 
 Tests: unit suites in each app (Jest for the API, Vitest for the web, `node --test` for the
 indexer) and an API contract test; CI runs build and unit tests on every push.

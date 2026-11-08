@@ -9,7 +9,7 @@ Status vocabulary: `done` · `in_progress` · `planned` · `blocked` · `dropped
 one; "on main" means merged into `main` and present in the production checkout without a
 separate production capture.
 
-Last updated: 2026-11-05 (Lot SDK1).
+Last updated: 2026-11-07 (Lot SDK1 published).
 
 ## 1. Grant SCF #43 (4 disbursements, all received)
 
@@ -48,14 +48,13 @@ None of this was required by SCF #43. Public-facing statements per item: `post-g
 | PRE | Pre-dossier fixes: bridge retired, TVL caption, Horizon calls, campaign metrics gated, native step exit code | done (closed 2026-11-05) | `14c8bb8` | `internal/evidence/lot-pre/pre3-recon.md` |
 | DOC1 | Reviewer-facing docs: README, design-vs-as-built table, docs map, post-grant summary | done (2026-11-04) | on main (`438971f`) | `internal/evidence/lot-doc1/doc1-recon.md` |
 | SDK0 | Vercel-preview CORS matcher + TypeScript SDK v0 (`@getdig/stellar-api`, not published) | done (2026-11-04) | `b34f07d` | `internal/evidence/lot-sdk/sdk0-build.md` |
-| DOC2 | Internal material out of the reviewer path, one-page board, doc link check in CI | in_progress | not merged | `internal/evidence/lot-doc2/` |
-| SDK1 | SDK publish readiness (`@getdig/stellar-api` 0.1.0) + MCP server `@getdig/stellar-mcp` 0.1.0 (six read-only tools) | in_progress (built 2026-11-05; npm publication pending, founder flips to done) | not merged | `internal/evidence/lot-sdk/sdk1-build.md` |
+| DOC2 | Internal material out of the reviewer path, one-page board, doc link check in CI | done (2026-11-05) | on main (`8f6e2b4`) | `internal/evidence/lot-doc2/` |
+| SDK1 | SDK publish readiness (`@getdig/stellar-api` 0.1.0) + MCP server `@getdig/stellar-mcp` 0.1.0 (six read-only tools) | done (2026-11-07; both published on npm at 0.1.0) | on main | `internal/evidence/lot-sdk/sdk1-build.md` |
 
 ## 3. Next
 
 | Item | What | Status |
 |---|---|---|
-| SDK1 publish | `npm publish` of `@getdig/stellar-api`, then `pnpm publish` of `@getdig/stellar-mcp` (founder, 2FA); then flip the SDK1 row and the README "publication pending" lines | planned |
 | SEC Gate 2 | Second security gate (scope: founder brief) | planned |
 | KEY | Access keys on the public API (not built today, `post-grant-summary.md` §4) | planned |
 | DATA | Scope to be stated in the lot brief | planned |

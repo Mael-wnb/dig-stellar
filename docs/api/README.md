@@ -46,8 +46,8 @@ consumers need no build step), and `DigStellarClient` exposes one typed method p
 `sdk` regenerates the file and fails on any drift from the yaml, so a contract change lands
 with its types in the same commit and takes an SDK version bump (additive API change → SDK
 minor; `0.x` follows contract `1.0.0`). Usage, errors, the freshness helper and what v0 does
-not do (retries, keys, pagination): `packages/sdk/README.md`. Publishing is a founder action
-(`npm publish` from `packages/sdk`, 2FA); Lot SDK1 evidence:
+not do (retries, keys, pagination): `packages/sdk/README.md`. Published to npm on 2026-11-05
+(`npm publish` from `packages/sdk`, founder, 2FA); Lot SDK1 evidence:
 `../internal/evidence/lot-sdk/sdk1-build.md`.
 
 ## MCP server
@@ -61,9 +61,10 @@ payload as JSON; `get_pipeline_status` condenses the 150 KB `/v1/ops/status` pay
 arrays replaced by counts). No wallet, no transaction, no key, no write. Env:
 `DIG_API_BASE_URL`, `DIG_USER_AGENT`. Tests cover registration, every handler on a mocked API
 and the 404 path; CI builds and tests it in the `sdk` job after the SDK build. Depends on
-`@getdig/stellar-api` with the `workspace:^` protocol, which `pnpm publish` rewrites to the
-published range (`npm publish` does not: publish this package with pnpm). Client config and
-example questions: `packages/mcp/README.md`.
+`@getdig/stellar-api` with the `workspace:^` protocol, so it is published with `pnpm pack` (which
+rewrites the range to `^0.1.0`, verified in the tarball) followed by `npm publish <tgz>`; a plain
+`npm publish` would ship `workspace:^`. Published 2026-11-07. Client config and example
+questions: `packages/mcp/README.md`.
 
 ## Validating the contract
 

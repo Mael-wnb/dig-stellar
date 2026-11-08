@@ -80,7 +80,7 @@ deliberately outside the public contract. A contract test boots the real applica
 local Postgres and validates every operation and every documented error path with a JSON Schema
 validator (40 checks). Versioning rule: additive changes only inside `/v1`; a breaking change
 ships as `/v2`; every change takes a line in the changelog. A TypeScript SDK and an MCP server
-are built from it (npm publication pending).
+are built from it (both published on npm, November 2026).
 Evidence: `docs/decisions/2026-11-03-public-api-v1-surface.md`, `docs/internal/evidence/lot-api/api0-recon.md`,
 `docs/internal/evidence/lot-api/api2-contract-test.md`, `docs/internal/evidence/lot-api/api5-prod-verification.md`, `docs/api/README.md`.
 
