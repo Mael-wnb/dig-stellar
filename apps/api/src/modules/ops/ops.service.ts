@@ -14,6 +14,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../db/prisma.service';
 import { FaucetService } from '../faucet/faucet.service';
+import { RewardsService } from '../rewards/rewards.service';
 import { freshPriceSql, staleAfterSeconds } from '../../common/freshness';
 // Lot SEC (G1): step messages are redacted at read time too (URLs → host only,
 // key-like tokens → [redacted]) so rows persisted before the indexer-side
@@ -88,6 +89,7 @@ export class OpsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly faucetService: FaucetService,
+    private readonly rewardsService: RewardsService,
   ) {}
 
   async getMetrics() {
@@ -183,6 +185,10 @@ export class OpsService {
       // R2 (Lot R): faucet drain visibility — enabled flag, claim counts,
       // treasury SPENDABLE balance (no address, no key state beyond balance).
       faucet: await this.faucetService.getOpsSnapshot(),
+      // EP5 (Lot EP): rewards treasury drain visibility — enabled flag, pool /
+      // cap, allocation + claim counts, outstanding claimable XLM, treasury
+      // NATIVE balance (no address, no key state beyond balance).
+      rewards: await this.rewardsService.getOpsSnapshot(),
     };
   }
 

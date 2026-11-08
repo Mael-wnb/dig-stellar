@@ -50,7 +50,7 @@ post-grant hardening, as the status board does.
 | `lot-c/` | T3-D3 final UI polish: design-handoff port (shell, views, modals) | `lot-c/README.md` | grant |
 | `lot-doc1/` | Reviewer-facing docs before SCF 46: README rewrite, architecture design-vs-as-built table, docs map, drift fixes | `lot-doc1/doc1-recon.md` | post-grant |
 | `lot-e/` | T3-D3 observability: `/health`, RPC metrics, adoption counters, reference quickstart; frozen-AMM-reserves hotfix | `lot-e/README.md` | grant |
-| `lot-ep/` | Earn & Points campaign (EP0 recon, EP1–EP4 implementation, deploy notes, wallet matrix) | `lot-ep/00-recon.md` | post-grant |
+| `lot-ep/` | Earn & Points campaign (EP0 recon, EP1–EP4 implementation, deploy notes, wallet matrix, EP5 in progress) | `lot-ep/00-recon.md` | post-grant |
 | `lot-f/` | T3-D3 advisor-feedback polish (F1–F5): empty states, pair logos, underfunded-swap copy | `lot-f/advisor-feedback-2026-08-10.md` | grant |
 | `lot-g/` | T3-D3 founder review 1 (G0–G4): network-TVL persistence + chart, quick wins, dashboard cleanup, adaptive pools table | `lot-g/G0-network-tvl-persistence.md` | grant |
 | `lot-h/` | T3-D3 founder review 2 (H0–H7): flows coverage, position breakdown, chips + HF gauge | `lot-h/h0-flows-recon.md` | grant |

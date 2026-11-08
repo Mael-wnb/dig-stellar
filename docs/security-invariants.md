@@ -427,7 +427,9 @@ Review check (any change under `modules/campaign/` or `apps/web/src/components/e
 the diff for `handle_normalized` in log statements and in payload types/returns (it may appear
 only in SQL and in the in-transaction decision inputs); grep for `update points_ledger` /
 `delete from points_ledger` outside specs and cleanup helpers; grep for `Keypair` outside the
-two allowed files; grep the web copy for "reward", "airdrop", "token" and "earn XLM".
+three allowed files (since EP5: the faucet payout, the verify-only proof check and the rewards
+payout); grep the web copy for "airdrop", "token" and "earn XLM" ("reward" is legitimate since EP5
+on the XLM surface only: `rules.rewards`, the Earn hero block and the bonus line).
 
 ## 12. Request validation, refresh admission, ops redaction (Lot SEC, Gate 1, 2026-10-27)
 
@@ -470,3 +472,56 @@ Review check (any change under `modules/wallets/`, `modules/alerts/`, `modules/a
 `common/request-validation.ts` helper (grep the diff for `.trim()` on a raw request value);
 a new child-process or upstream error path must not return `error.message` to the client; a
 new free-text column read by `/v1/ops/*` must pass `redactSecrets`.
+
+## 13. Rewards treasury (Lot EP5, 2026-10-21): the SECOND server-side key
+
+EP5 pays real XLM to enrolled wallets from a DIG-owned rewards treasury: every closed UTC day a
+pool (`REWARDS_DAILY_POOL_XLM`, 100) is shared by that day's points, capped per wallet
+(`REWARDS_DAILY_CAP_XLM`, 5), and the wallet claims the total when it wants
+(`POST /v1/campaign/rewards/claim`). This is the second time a funded secret lives server-side; the
+§1 boundary for anything a USER owns is untouched, and the §9 faucet is untouched too (the two
+money paths share no code: `modules/rewards/` is a copy of the faucet pattern, never an import).
+Decision: `docs/decisions/2026-10-21-points-have-no-monetary-value.md` (EP5 update). Schema:
+`stellar_v9_rewards.sql`. Evidence: `docs/internal/evidence/lot-ep/ep5.md`.
+
+- **INV-13.1** A SECOND payout key, `REWARDS_SECRET_KEY`, read by exactly ONE file:
+  `modules/rewards/rewards-payout.service.ts` (lazily per call, never cached, never logged, never
+  in an error, payload or chat). The keypair is generated OFFLINE by the founder; the treasury is
+  funded with **a few days of pool and no more** (3 × pool at activation, refills manual and
+  deliberate): the hard exposure cap. Kill-switch `REWARDS_ENABLED` defaults **off**: while dark
+  nothing is allocated, nothing is claimable, the treasury is never queried and no key state is
+  observable. The paying network is `REWARDS_NETWORK` (default testnet, `mainnet` set at
+  activation — never an accidental mainnet).
+- **INV-13.2** Claims are USER-initiated and pay ONE native payment per claim (memo
+  `dig-points`), never a batch send and never a job-driven send: the award job only ALLOCATES
+  (writes `reward_allocations`), the payment happens on the user's claim, serialized in-process,
+  and the payout service cannot express any other transaction shape (`rewards-payout.spec.ts`
+  pins it) and refuses a `pay()` without a claim id. A failed payout is NEVER auto-retried (an
+  ambiguous submit may still have paid): the claim and its allocations stay `failed` until the
+  founder resolves them by hand (`docs/runbooks.md` "Rewards treasury"). Treasury guard: a claim is
+  refused when the native balance is below total + 2 XLM, and rate-limited to one per wallet per
+  hour.
+- **INV-13.3** `reward_allocations` and `reward_claims` are append-only in meaning: statuses move
+  forward only (`claimable → paying → paid | failed`; `paying → paid | failed`), no code path
+  deletes a row or moves a status back, the DB CHECKs enforce the consistency of each state
+  (`share_xlm > 0 and <= cap_xlm`, `(status = 'claimable') = (claim_id is null)`, a paid claim
+  carries `tx_hash` + `paid_at`), the pool and cap used are stored on every row, and amounts are
+  `numeric(12,7)` handled as integer stroops (BigInt) in code — never a float.
+- **INV-13.4** Excluded addresses (`REWARDS_EXCLUDED_ADDRESSES`, team wallets) are never
+  allocated and never counted in a day's Σ (so they dilute nobody), and are refused at claim time
+  (`excluded-address`). A day is allocated once and never re-opened (primary key
+  `(campaign, day, address)`; a day with any row is skipped), after a 30-minute post-midnight
+  grace so late awards for the closing day are included.
+- **INV-13.5** The campaign module never imports from `modules/rewards/` (the four public values
+  of `GET /v1/campaign` `rules.rewards` are read in `campaign-config.ts`; the rewards module
+  imports them, not the reverse). Nothing in `apps/web` computes an XLM amount: every figure is
+  rendered as served, and the whole XLM surface hides unless `rules.rewards.enabled` is true.
+  Logs carry claim ids, counts and amounts only — no address, no hash, nothing about the key.
+
+Review check (every change under `modules/rewards/`, `campaign-config.ts`, `84-campaign-award.ts`
+or the Earn web components): grep for `REWARDS_SECRET_KEY` outside `rewards-payout.service.ts`
+(expected: `.env.example` and docs only); grep for `Keypair` outside the three allowed files;
+grep for `.pay(` and confirm every call carries a claim id; grep `modules/campaign/` for
+`modules/rewards`; confirm the red tests still pass (disabled, below-minimum, rate-limited,
+treasury-insufficient / unavailable, concurrent claim, failed payout never retried, excluded
+address never allocated, idempotent allocation).

@@ -81,9 +81,19 @@ describe('EarnMoreCard', () => {
     expect(fallback).toMatch(/<button[^>]*data-pool-slug=""[^>]*>\s*Open deposit/)
   })
 
-  it('states the minimum-amount rule once, and never a token / airdrop / reward word', async () => {
-    const html = await render({ me: meFixture(), rules: rulesFixture() })
-    expect(html.match(/Very small amounts below the minimum are not counted/g)).toHaveLength(1)
-    expect(html).not.toMatch(/token|airdrop|reward|earn XLM/i)
+  it('EP5 item 10: each row states the campaign minimum from rules.actions[kind].minNotionalXlm (verbatim), the vague sentence is gone', async () => {
+    const rules = rulesFixture()
+    rules.actions['sdex-swap'].minNotionalXlm = 2.5
+    rules.actions['blend-deposit'].minNotionalXlm = 1
+    const html = await render({ me: meFixture(), rules })
+    const lines = [...html.matchAll(/data-testid="earn-more-line"[^>]*>\s*([^<]+?)\s*</g)].map((m) => m[1])
+    expect(lines).toEqual(['+50 pts per verified swap · 2/5 today · min 2.5 XLM', '+100 pts per verified deposit · 0/3 today · min 1 XLM'])
+    expect(html).not.toContain('Very small amounts below the minimum')
+    expect(html).not.toMatch(/token|airdrop|earn XLM/i)
+    // older API without minNotionalXlm → no "min" fragment, no error
+    const older = rulesFixture()
+    delete older.actions['sdex-swap'].minNotionalXlm
+    delete older.actions['blend-deposit'].minNotionalXlm
+    expect(await render({ me: meFixture(), rules: older })).not.toContain('min ')
   })
 })

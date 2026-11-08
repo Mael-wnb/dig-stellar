@@ -95,7 +95,7 @@ describe('LEDGER_REASON_RE (same regex as points_ledger_reason_check)', () => {
     const window = { startsAtMs: START, endsAtMs: null };
     const produced: string[] = [];
     for (const kind of ['sdex-swap', 'blend-deposit'] as const) {
-      const r = actionAward({ kind, meetsMinNotional: true, closedAtMs: NOW, countedSameDayBefore: 0, streakDaysBeforeDay: 0, window });
+      const r = actionAward({ kind, notionalXlm: 10, minNotionalXlm: 1, closedAtMs: NOW, countedSameDayBefore: 0, streakDaysBeforeDay: 0, window });
       if (r.award) produced.push(r.reason);
     }
     for (const task of Object.keys(SOCIAL_TASKS)) {
@@ -212,7 +212,8 @@ describe('campaignStatus / withinWindow', () => {
 describe('actionAward', () => {
   const base = () => ({
     kind: 'sdex-swap' as const,
-    meetsMinNotional: true,
+    notionalXlm: 10,
+    minNotionalXlm: 1,
     closedAtMs: NOW - DAY,
     countedSameDayBefore: 0,
     streakDaysBeforeDay: 0,
@@ -293,11 +294,14 @@ describe('actionAward', () => {
     });
   });
 
-  it('refuses a witness below the min notional', () => {
-    expect(actionAward({ ...base(), meetsMinNotional: false })).toEqual({
-      award: false,
-      reason: 'below-min-notional',
-    });
+  it('refuses a witness below the CAMPAIGN minimum (EP5 item 10): notional < min, null notional; equal passes; the min is a fact', () => {
+    expect(actionAward({ ...base(), notionalXlm: 0.9999 })).toEqual({ award: false, reason: 'below-min-notional' });
+    expect(actionAward({ ...base(), notionalXlm: null })).toEqual({ award: false, reason: 'below-min-notional' });
+    expect(actionAward({ ...base(), notionalXlm: 1 }).award).toBe(true);
+    // the faucet's flag is not consulted: a 10 XLM swap under a 20 XLM campaign minimum is below
+    expect(actionAward({ ...base(), notionalXlm: 10, minNotionalXlm: 20 })).toEqual({ award: false, reason: 'below-min-notional' });
+    // a kind that does not require the minimum ignores it (but withdraws are not awarded anyway)
+    expect(actionAward({ ...base(), kind: 'blend-withdraw', notionalXlm: null }).reason).toBe('kind-not-awarded');
   });
 
   it('refuses a witness outside the campaign window (before start, at/after end)', () => {
@@ -317,7 +321,7 @@ describe('actionAward', () => {
 
   it('window check comes before every other reason', () => {
     expect(
-      actionAward({ ...base(), closedAtMs: START - 1, meetsMinNotional: false, countedSameDayBefore: 9 }).reason,
+      actionAward({ ...base(), closedAtMs: START - 1, notionalXlm: null, countedSameDayBefore: 9 }).reason,
     ).toBe('outside-window');
   });
 });

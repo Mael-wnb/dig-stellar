@@ -101,7 +101,8 @@ export interface ActionCandidateRow {
   address: string;
   user_id: string;
   kind: ActionKind;
-  meets_min_notional: boolean;
+  /** XLM-equivalent at verification time; null = unpriced (below any minimum). */
+  notional_xlm: number | null;
   ledger_closed_at: Date;
 }
 
@@ -565,8 +566,9 @@ export class CampaignRepository {
     campaign: number,
     address: string,
     window: { startsAtMs: number | null; endsAtMs: number | null },
+    minNotionalXlm: number,
   ): Promise<number> {
-    const byKind = await this.pendingVerificationByKind(campaign, address, window);
+    const byKind = await this.pendingVerificationByKind(campaign, address, window, minNotionalXlm);
     return Object.values(byKind).reduce((sum, n) => sum + n, 0);
   }
 
@@ -578,6 +580,8 @@ export class CampaignRepository {
     campaign: number,
     address: string,
     window: { startsAtMs: number | null; endsAtMs: number | null },
+    /** EP5 item 10: the campaign's own minimum, judged on notional_xlm (null = below). */
+    minNotionalXlm: number,
   ): Promise<PendingByKind> {
     const out: PendingByKind = { 'sdex-swap': 0, 'blend-deposit': 0 };
     if (window.startsAtMs == null) return out;
@@ -586,7 +590,7 @@ export class CampaignRepository {
          from action_witnesses w
         where lower(w.wallet_address) = lower($1)
           and w.kind = any($2::text[])
-          and w.meets_min_notional = true
+          and w.notional_xlm is not null and w.notional_xlm >= $6::numeric
           and w.ledger_closed_at >= $3::timestamptz
           and ($4::timestamptz is null or w.ledger_closed_at < $4::timestamptz)
           and not exists (
@@ -599,6 +603,7 @@ export class CampaignRepository {
       new Date(window.startsAtMs).toISOString(),
       window.endsAtMs != null ? new Date(window.endsAtMs).toISOString() : null,
       campaign,
+      minNotionalXlm,
     )) as Array<{ kind: AwardableKind; n: number }>;
     for (const r of rows) if (r.kind in out) out[r.kind] = r.n;
     return out;
@@ -673,17 +678,21 @@ export class CampaignRepository {
    * Awardable witnesses of ENROLLED wallets inside the campaign window that
    * have no action ledger row yet, oldest first. Rows below the min notional
    * are included so the job can count the skip; withdraws never are.
+   * EP5 (item 8): `address` narrows the scan to ONE wallet for the immediate
+   * sync; absent, the job's full scan.
    */
   async findActionCandidates(
     campaign: number,
     window: { startsAtMs: number; endsAtMs: number | null },
+    address: string | null = null,
   ): Promise<ActionCandidateRow[]> {
     return (await this.db.$queryRawUnsafe(
-      `select w.tx_hash, e.address, e.user_id, w.kind, w.meets_min_notional, w.ledger_closed_at
+      `select w.tx_hash, e.address, e.user_id, w.kind, w.notional_xlm::float as notional_xlm, w.ledger_closed_at
          from action_witnesses w
          join campaign_enrollments e
            on e.campaign = $1 and lower(e.address) = lower(w.wallet_address)
         where w.kind = any($2::text[])
+          and ($5::text is null or lower(e.address) = lower($5))
           and w.ledger_closed_at >= $3::timestamptz
           and ($4::timestamptz is null or w.ledger_closed_at < $4::timestamptz)
           and not exists (
@@ -695,26 +704,49 @@ export class CampaignRepository {
       [...AWARDABLE_KINDS],
       new Date(window.startsAtMs).toISOString(),
       window.endsAtMs != null ? new Date(window.endsAtMs).toISOString() : null,
+      address,
     )) as ActionCandidateRow[];
   }
 
-  /** Existing action awards per (wallet, reason, UTC day): the daily-cap baseline. */
-  async countedActionsByDay(campaign: number): Promise<Array<{ address: string; reason: string; day: string; n: number }>> {
+  /** Existing action awards per (wallet, reason, UTC day): the daily-cap baseline. `address` narrows to one wallet (sync). */
+  async countedActionsByDay(campaign: number, address: string | null = null): Promise<Array<{ address: string; reason: string; day: string; n: number }>> {
     return (await this.db.$queryRawUnsafe(
       `select address, reason, counted_day::text as day, count(*)::int as n
          from points_ledger
         where campaign = $1 and reason like 'action:%' and counted_day is not null
+          and ($2::text is null or lower(address) = lower($2))
         group by address, reason, counted_day`,
       campaign,
+      address,
     )) as Array<{ address: string; reason: string; day: string; n: number }>;
   }
 
-  /** Every check-in day of every wallet in the campaign (streak inputs). */
-  async checkinDaysByWallet(campaign: number): Promise<Array<{ address: string; day: string }>> {
+  /** Every check-in day of every wallet in the campaign (streak inputs). `address` narrows to one wallet (sync). */
+  async checkinDaysByWallet(campaign: number, address: string | null = null): Promise<Array<{ address: string; day: string }>> {
     return (await this.db.$queryRawUnsafe(
-      `select address, day::text as day from wallet_daily_checkins where campaign = $1`,
+      `select address, day::text as day from wallet_daily_checkins
+        where campaign = $1 and ($2::text is null or lower(address) = lower($2))`,
       campaign,
+      address,
     )) as Array<{ address: string; day: string }>;
+  }
+
+  /**
+   * EP5 (item 8): lock the wallet's enrollment row for the duration of the
+   * enclosing transaction (SELECT … FOR UPDATE) — the immediate sync writes
+   * action awards outside the cron flock, so it serializes per wallet here.
+   * Returns the row or null when the wallet is not enrolled.
+   */
+  async lockEnrollment(campaign: number, address: string): Promise<EnrollmentRow | null> {
+    const rows = (await this.db.$queryRawUnsafe(
+      `select id, campaign, address, user_id, referral_code, referred_by_code, enrolled_at
+         from campaign_enrollments
+        where campaign = $1 and lower(address) = lower($2)
+        for update`,
+      campaign,
+      address,
+    )) as EnrollmentRow[];
+    return rows[0] ?? null;
   }
 
   /** Idempotent: the witness unique index makes a repeat a no-op (returns 0). */
@@ -756,23 +788,25 @@ export class CampaignRepository {
     )) as ReferralRow[];
   }
 
-  /** The referee's earliest awardable, min-notional witness at or after the link. */
+  /** The referee's earliest awardable witness at or above the CAMPAIGN minimum notional, at or after the link. */
   async findRefereeFirstQualifyingWitness(
     refereeAddress: string,
     linkedAt: Date,
+    minNotionalXlm: number,
   ): Promise<{ tx_hash: string; ledger_closed_at: Date } | null> {
     const rows = (await this.db.$queryRawUnsafe(
       `select tx_hash, ledger_closed_at
          from action_witnesses
         where lower(wallet_address) = lower($1)
           and kind = any($2::text[])
-          and meets_min_notional = true
+          and notional_xlm is not null and notional_xlm >= $4::numeric
           and ledger_closed_at >= $3::timestamptz
         order by ledger_closed_at asc, tx_hash asc
         limit 1`,
       refereeAddress,
       [...AWARDABLE_KINDS],
       linkedAt.toISOString(),
+      minNotionalXlm,
     )) as Array<{ tx_hash: string; ledger_closed_at: Date }>;
     return rows[0] ?? null;
   }

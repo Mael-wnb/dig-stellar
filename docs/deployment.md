@@ -40,6 +40,7 @@ psql "$DATABASE_URL" -f apps/api/src/db/stellar_v5_faucet_campaign2.sql   # Lot 
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v6_campaign.sql   # Lot EP (EP1): Earn & Points — proofs, enrollments, points_ledger, check-ins, referrals (points only, no key; depends on v2 + action_witnesses); deploys dark (CAMPAIGN_ENABLED unset)
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v7_social_claim_delete.sql   # Lot EP (EP2): soft delete of social task claims (deleted_at + partial unique indexes); depends on v6, apply after it
 psql "$DATABASE_URL" -f apps/api/src/db/stellar_v8_campaign_perks.sql   # Lot EP (EP3): wallet_perks, non-monetary perks granted by the award job (depends on v6; apply BEFORE the EP3 api build)
+psql "$DATABASE_URL" -f apps/api/src/db/stellar_v9_rewards.sql   # Lot EP (EP5): reward_claims + reward_allocations — daily XLM rewards, MONEY PATH (second payout key, invariants §13); depends on v6; apply BEFORE the EP5 api build; deploys dark (REWARDS_ENABLED unset)
 # Allbridge needs its venue + USDC asset seeded once before the first refresh:
 pnpm -C apps/indexer tsx src/scripts/bootstrap/allbridge-upsert-core.ts
 ```
@@ -558,6 +559,15 @@ activation; activation itself is an env change (`CAMPAIGN_STARTS_AT`, `CAMPAIGN_
 `CAMPAIGN_X_REPOST_URL` in `apps/api/.env`) + `pm2 restart --update-env`, no build, no web
 redeploy. Deploy checklist for the EP3 code itself: `docs/internal/evidence/lot-ep/ep3-deploy.md`
 (`stellar_v8_campaign_perks.sql` BEFORE the API build).
+
+EP5 (daily XLM rewards): the SAME cron line now also runs the allocation step (step 5 of the award
+job, dark while `REWARDS_ENABLED` is unset) — no new cron entry. Deploy checklist and the
+activation section (treasury keypair generated OFFLINE, funded with 3 days of pool,
+`REWARDS_SECRET_KEY` + `REWARDS_NETWORK=mainnet` + `REWARDS_ENABLED=true` in `apps/api/.env`,
+`pm2 restart --update-env`): `docs/internal/evidence/lot-ep/ep5.md`; founder procedure:
+`docs/runbooks.md` "Rewards treasury". `stellar_v9_rewards.sql` BEFORE the API build.
+nginx: put `POST /v1/campaign/rewards/claim` in the strict zone like the faucet claim;
+`GET /v1/campaign/rewards/me` and `POST /v1/campaign/sync` stay in the general zone (polled).
 
 ## Package changes on the VPS (S1 lesson, 2026-09-29)
 

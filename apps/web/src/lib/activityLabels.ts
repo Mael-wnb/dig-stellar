@@ -24,3 +24,8 @@ export function signedPoints(points: number): string {
   if (points < 0) return `−${Math.abs(points).toLocaleString('en-US')}`
   return '0'
 }
+
+/** EP5: an API-served XLM amount rendered as-is (up to 7 decimals, no rounding beyond what the API sent). */
+export function xlmLabel(xlm: number): string {
+  return `${xlm.toLocaleString('en-US', { maximumFractionDigits: 7 })} XLM`
+}

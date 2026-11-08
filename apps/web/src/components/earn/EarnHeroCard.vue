@@ -10,15 +10,54 @@
 // D-1), say "×cap from tomorrow" rather than let the bar and the figure disagree.
 // Deploy order (SHOW 2): without rules.streak or streak.daysToCap (older API)
 // the card renders without the streak line and the bar, never throws.
+//
+// EP5: the XLM block — "Daily pool · N XLM shared by points" from rules.rewards,
+// "Claimable: X XLM" from GET /campaign/rewards/me and a Claim button the view
+// wires to POST /campaign/rewards/claim. The button is disabled below the API's
+// minimum and then reads "X / 1 XLM minimum". Hidden entirely unless
+// rules.rewards.enabled. No amount is computed here: the only logic is the
+// comparison claimable < minimum, both figures the API's. Item 9: while the
+// outbox is re-reporting hashes the hero says "Verifying N recent actions…".
 import { computed } from 'vue'
-import type { CampaignMe, CampaignRules } from '../../api/campaign'
+import type { CampaignMe, CampaignRules, RewardsMe } from '../../api/campaign'
+import { xlmLabel } from '../../lib/activityLabels'
 
 const props = defineProps<{
   me: CampaignMe
   rules: CampaignRules
   /** The caller's leaderboard rank, when the leaderboard payload has it. */
   rank?: number | null
+  /** EP5: GET /campaign/rewards/me; null while loading / disabled. */
+  rewards?: RewardsMe | null
+  /** EP5: a claim is in flight (button disabled). */
+  claiming?: boolean
+  /** EP5: the last claim's outcome line, written by the view from the API's answer. */
+  claimMessage?: string | null
+  /** EP5 item 9: hashes being re-reported right now. */
+  verifying?: number
 }>()
+
+const emit = defineEmits<{ (e: 'claim'): void }>()
+
+/** EP5: the rewards block renders only on this one API boolean. */
+const rewardsRules = computed(() => (props.rules.rewards?.enabled ? props.rules.rewards : null))
+const claimable = computed(() => (rewardsRules.value && props.rewards ? props.rewards.claimableXlm : null))
+const belowMinimum = computed(() => {
+  if (!rewardsRules.value || claimable.value == null) return true
+  return claimable.value < (props.rewards?.minClaimXlm ?? rewardsRules.value.minClaimXlm)
+})
+const claimLabel = computed(() => {
+  if (!rewardsRules.value) return ''
+  if (props.claiming) return 'Claiming…'
+  if (claimable.value == null) return 'Claim'
+  if (belowMinimum.value) return `${claimable.value.toLocaleString('en-US', { maximumFractionDigits: 7 })} / ${props.rewards?.minClaimXlm ?? rewardsRules.value.minClaimXlm} XLM minimum`
+  return 'Claim'
+})
+const verifyingLabel = computed(() => {
+  const n = props.verifying ?? 0
+  if (n <= 0) return null
+  return `Verifying ${n} recent ${n === 1 ? 'action' : 'actions'}…`
+})
 
 /** Both halves the streak line and the bar need; null while an older API answers. */
 const ramp = computed(() => {
@@ -89,6 +128,43 @@ const pendingLabel = computed(() => {
       >
         {{ pendingLabel }}
       </span>
+      <span
+        v-if="verifyingLabel"
+        class="inline-flex items-center min-h-[26px] px-[10px] py-[3px] rounded-[13px] text-[11.5px] font-semibold leading-[1.3]"
+        :class="pendingLabel ? '' : 'ml-auto max-md:ml-0'"
+        style="background: var(--dig-surface-2); border: 1px solid var(--dig-line-soft); color: var(--dig-text-2)"
+        data-testid="hero-verifying"
+      >
+        {{ verifyingLabel }}
+      </span>
+    </div>
+
+    <div
+      v-if="rewardsRules"
+      class="mt-[16px] rounded-[12px] px-[14px] py-[12px] flex items-center gap-[12px] flex-wrap"
+      style="background: var(--dig-surface-2); border: 1px solid var(--dig-line-soft)"
+      data-testid="hero-rewards"
+    >
+      <div class="flex flex-col flex-1 min-w-[200px]">
+        <span class="text-[12px] font-medium" style="color: var(--dig-text-2)" data-testid="hero-pool">
+          Daily pool · {{ rewardsRules.dailyPoolXlm.toLocaleString('en-US', { maximumFractionDigits: 7 }) }} XLM shared by points
+        </span>
+        <span class="text-[14px] font-bold tabular-nums mt-[2px]" data-testid="hero-claimable">
+          Claimable: {{ claimable == null ? '…' : xlmLabel(claimable) }}
+        </span>
+        <span v-if="props.claimMessage" class="text-[11.5px] mt-[4px]" style="color: var(--dig-text-2)" data-testid="hero-claim-message">{{ props.claimMessage }}</span>
+      </div>
+      <button
+        type="button"
+        class="dig-btn h-[32px] px-[14px] rounded-[10px] text-[12px] font-semibold tabular-nums"
+        :class="belowMinimum || props.claiming ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'"
+        style="background: var(--dig-accent); color: #141414; border: none"
+        :disabled="belowMinimum || props.claiming"
+        data-testid="hero-claim"
+        @click="emit('claim')"
+      >
+        {{ claimLabel }}
+      </button>
     </div>
 
     <div v-if="ramp && streakLine" class="mt-[16px]">

@@ -57,6 +57,17 @@ on action points, cap ×1.35 at 7 days, still fixed on D-1), Earn v1.1 cards (he
 "Earn more", activity feed), neutral user-facing copy ("Points unlock perks on Dig as the campaign
 grows.", rendered once), perks recorded by the backend but not surfaced in the UI
 (`docs/internal/evidence/lot-ep/ep4-implementation.md`).
+EP5 (2026-10-21, `feat/lot-ep5`, WIP commit rebased on main 2026-11-08, not merged, not deployed, **money path**): daily XLM rewards on
+top of points — a SECOND server-side payout key in `modules/rewards/` (copied from the faucet
+pattern, never imported; `docs/security-invariants.md` §13), schema `stellar_v9_rewards.sql`
+(`reward_allocations`, `reward_claims`), the award job allocates every closed UTC day's pool
+(100 XLM, cap 5 / wallet, floor to the stroop, remainder stays in treasury, excluded team wallets),
+users claim from the Earn hero (min 1 XLM, one payment per claim, memo `dig-points`, never
+auto-retried), `/v1/ops/metrics` carries the treasury block. Same lot: `POST /v1/campaign/sync`
+(immediate per-wallet award under the enrollment lock, 10 s rate limit), a localStorage witness
+outbox that re-reports lost tx hashes (2026-10-21 incident: two mainnet swaps without a witness
+row), and `CAMPAIGN_MIN_NOTIONAL_XLM` replacing the faucet flag in the points rule
+(`docs/internal/evidence/lot-ep/ep5.md`).
 
 **Lot AN0 — Google Analytics 4 (2026-10-21, `apps/web` only, uncommitted):** GA4 with Consent Mode
 v2 (all signals default `denied`; gtag.js is only injected after an explicit "Accept analytics" in a

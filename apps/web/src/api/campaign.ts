@@ -6,7 +6,10 @@
 // multipliers (recon §6). Every type below mirrors
 // apps/api/src/modules/campaign/*.service.ts payloads 1:1; the EP1 routes are a
 // frozen contract. EP4 adds the daily-ramp rules block, today's figures on /me
-// and GET /campaign/me/activity.
+// and GET /campaign/me/activity. EP5 adds rules.rewards (the XLM daily pool),
+// rules.actions[kind].minNotionalXlm, POST /campaign/sync (immediate award) and
+// the /campaign/rewards/* routes (claimable XLM, claim). The web never computes
+// an XLM amount: every figure below is rendered as served.
 import { apiFetch } from "./client";
 
 // --- Ownership proof (EP1) --------------------------------------------------
@@ -96,8 +99,17 @@ export interface SocialTaskEntry {
   available: boolean;
 }
 
+/** EP5: the public XLM-rewards rules. OPTIONAL on the web side (older API) and the whole surface hides unless `enabled`. */
+export interface RewardsRules {
+  enabled: boolean;
+  dailyPoolXlm: number;
+  dailyCapXlm: number;
+  minClaimXlm: number;
+}
+
 export interface CampaignRules {
-  actions: Record<ActionKind, { basePoints: number; dailyCap: number; requiresMinNotional: boolean }>;
+  /** EP5 item 10: `minNotionalXlm` = the campaign's own minimum the action must reach (null when not required; absent on an older API). */
+  actions: Record<ActionKind, { basePoints: number; dailyCap: number; requiresMinNotional: boolean; minNotionalXlm?: number | null }>;
   streakDailyPoints: number;
   /**
    * EP4: the daily ramp — multiplier = min(1 + stepPerDay × streak days, cap),
@@ -118,6 +130,8 @@ export interface CampaignRules {
   referral: { referrer: number; referee: number };
   /** EP3: the tiers, ascending by threshold; the copy for each key lives in PerksBlock. */
   perks: Array<{ key: PerkKey; threshold: number }>;
+  /** EP5: absent on an older API → treated as disabled (nothing rendered). */
+  rewards?: RewardsRules;
 }
 
 export interface CampaignState {
@@ -206,6 +220,50 @@ export interface CampaignLeaderboard {
   disclaimer: string;
 }
 
+/** EP5 item 8: POST /campaign/sync — the immediate per-wallet award. */
+export interface CampaignSyncResult {
+  campaign: number;
+  active: boolean;
+  reason?: CampaignInactiveReason;
+  address: string;
+  enrolled: boolean;
+  /** Action ledger rows written by this call. */
+  awarded: number;
+  /** Verified actions still without a points row (same figure as /me pendingVerification). */
+  pending: number;
+  rateLimited?: true;
+  disclaimer: string;
+}
+
+/** EP5: GET /campaign/rewards/me — every XLM figure is the API's, rendered as-is. */
+export interface RewardsMe {
+  campaign: number;
+  enabled: boolean;
+  address: string;
+  claimableXlm: number;
+  pendingDays: Array<{ day: string; xlm: number; pointsDay: number; poolXlm: number }>;
+  paid: Array<{ claimId: string; xlm: number; txHash: string; paidAt: string }>;
+  nextCloseAt: string;
+  minClaimXlm: number;
+}
+
+export type RewardsClaimReason =
+  | "rewards-disabled"
+  | "ownership-proof-required"
+  | "not-enrolled"
+  | "excluded-address"
+  | "claim-in-progress"
+  | "claim-rate-limited"
+  | "nothing-claimable"
+  | "below-minimum"
+  | "treasury-unavailable"
+  | "treasury-insufficient";
+
+export type RewardsClaimResult =
+  | { claimed: true; status: "paid"; claimId: string; xlm: number; txHash: string; days: string[] }
+  | { claimed: false; status: "failed"; reason: "payout-failed"; claimId: string }
+  | { claimed: false; reason: RewardsClaimReason };
+
 export type EnrollResult =
   | { enrolled: true; address: string; referralCode: string; referredBy: string | null; disclaimer: string }
   | { enrolled: false; reason: CampaignWriteReason; disclaimer: string };
@@ -235,6 +293,26 @@ export function fetchCampaignMe(address: string, userId: string): Promise<Campai
 export function fetchCampaignActivity(address: string, userId: string): Promise<CampaignActivity> {
   const qs = `?address=${encodeURIComponent(address)}&userId=${encodeURIComponent(userId)}`;
   return apiFetch<CampaignActivity>(`/campaign/me/activity${qs}`, { cache: "no-store" });
+}
+
+/** EP5 item 8: same access rule as /me (no proof). Never cached. */
+export function syncCampaign(payload: { address: string; userId: string }): Promise<CampaignSyncResult> {
+  return apiFetch<CampaignSyncResult>("/campaign/sync", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchRewardsMe(address: string, userId: string): Promise<RewardsMe> {
+  const qs = `?address=${encodeURIComponent(address)}&userId=${encodeURIComponent(userId)}`;
+  return apiFetch<RewardsMe>(`/campaign/rewards/me${qs}`, { cache: "no-store" });
+}
+
+export function claimRewards(payload: { address: string; userId: string }): Promise<RewardsClaimResult> {
+  return apiFetch<RewardsClaimResult>("/campaign/rewards/claim", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function fetchCampaignLeaderboard(address?: string | null): Promise<CampaignLeaderboard> {

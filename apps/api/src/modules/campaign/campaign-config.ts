@@ -66,6 +66,19 @@ export function campaignEndsAt(): Date | null {
 }
 
 /**
+ * EP5 (item 10): the CAMPAIGN'S OWN minimum notional in XLM
+ * (CAMPAIGN_MIN_NOTIONAL_XLM, default 1). An action earns points only when the
+ * witness row's notional_xlm (XLM-equivalent at verification time) is >= this
+ * value; a NULL notional (could not be priced honestly) is below the minimum.
+ * Decoupled from the faucet's stored meets_min_notional flag: the faucet keeps
+ * its own threshold, modules/actions is untouched.
+ */
+export function campaignMinNotionalXlm(): number {
+  const parsed = parseFloat(process.env.CAMPAIGN_MIN_NOTIONAL_XLM ?? '');
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+/**
  * EP2: the campaign post to repost (CAMPAIGN_X_REPOST_URL, https URL), served
  * in GET /v1/campaign rules.socialTasks['x-repost'].url. When unset the task is
  * listed as not yet available and cannot be claimed. Lazy like every flag.
@@ -79,4 +92,54 @@ export function xRepostUrl(): string | null {
   } catch {
     return null;
   }
+}
+
+// --- Lot EP (EP5): the PUBLIC rewards rules, served in GET /v1/campaign -------
+//
+// The campaign module must never import anything from modules/rewards (the
+// money path, docs/security-invariants.md §13), so the four public values the
+// rules payload carries are read HERE and modules/rewards imports them from
+// this file (rewards → campaign is the allowed direction). Nothing below is a
+// key, a network or a treasury: those readers live in rewards-config.ts.
+
+/** REWARDS_ENABLED kill-switch. Default OFF — the payout path deploys dark. */
+export function isRewardsEnabled(): boolean {
+  return process.env.REWARDS_ENABLED === 'true';
+}
+
+function positiveNumberEnv(name: string, fallback: number): number {
+  const parsed = parseFloat(process.env[name] ?? '');
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/** Daily pool in XLM shared by points (REWARDS_DAILY_POOL_XLM, default 100). */
+export function rewardsDailyPoolXlm(): number {
+  return positiveNumberEnv('REWARDS_DAILY_POOL_XLM', 100);
+}
+
+/** Per-wallet daily cap in XLM (REWARDS_DAILY_CAP_XLM, default 5). */
+export function rewardsDailyCapXlm(): number {
+  return positiveNumberEnv('REWARDS_DAILY_CAP_XLM', 5);
+}
+
+/** Minimum claim in XLM (REWARDS_MIN_CLAIM_XLM, default 1). */
+export function rewardsMinClaimXlm(): number {
+  return positiveNumberEnv('REWARDS_MIN_CLAIM_XLM', 1);
+}
+
+export interface RewardsPublicRules {
+  enabled: boolean;
+  dailyPoolXlm: number;
+  dailyCapXlm: number;
+  minClaimXlm: number;
+}
+
+/** The rewards block of GET /v1/campaign rules — public values only. */
+export function rewardsPublicRules(): RewardsPublicRules {
+  return {
+    enabled: isRewardsEnabled(),
+    dailyPoolXlm: rewardsDailyPoolXlm(),
+    dailyCapXlm: rewardsDailyCapXlm(),
+    minClaimXlm: rewardsMinClaimXlm(),
+  };
 }

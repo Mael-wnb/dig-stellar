@@ -4,15 +4,14 @@ import {
   buildBlendDeposit,
   buildBlendWithdraw,
   fetchBlendPosition,
-  reportActionWitness,
   type BlendPositionResponse,
 } from "../api/actions";
 import { useWalletSession } from "../composables/useWalletSession";
 import { useActiveSigner } from "../composables/useActiveSigner";
-import { useAppUser } from "../composables/useAppUser";
 import { useFaucet } from "../composables/useFaucet";
 import FaucetClaimPanel from "./FaucetClaimPanel.vue";
 import PointsChip from "./earn/PointsChip.vue";
+import RewardsBonusLine from "./earn/RewardsBonusLine.vue";
 import { useCampaign } from "../composables/useCampaign";
 import { useNetwork, toWalletNetwork } from "../composables/useNetwork";
 import { blendPoolFor } from "../config/blendPools";
@@ -44,14 +43,15 @@ const props = defineProps<{ poolSlug?: string }>();
 const { connectedAddress, signTransaction } = useWalletSession();
 const { activeSignerAddress } = useActiveSigner();
 const { network } = useNetwork();
-const { userId } = useAppUser();
 
 // R3 (Lot R): upfront reward note (supply side only — withdraws never earn)
 // + the post-deposit claim panel. Live-campaign-gated: never a stale promise.
 const { campaign: faucetCampaign, campaignLiveFor, refreshCampaign } = useFaucet();
 // Lot EP (EP2): "+N pts" in the success block (deposits only), from the API
 // rules block only; renders nothing while the campaign is inactive/unknown.
-const { pointsForAction, disclaimer: pointsDisclaimer, refreshCampaign: refreshPointsCampaign } = useCampaign();
+// EP5: `rules` gates the "Dig bonus" line; `witnessAndSync` replaces the bare
+// fire-and-forget witness report (outbox + immediate /sync, items 8 + 9).
+const { pointsForAction, disclaimer: pointsDisclaimer, refreshCampaign: refreshPointsCampaign, rules: campaignRules, witnessAndSync } = useCampaign();
 const faucetPromo = computed(() =>
   campaignLiveFor(network.value) ? faucetCampaign.value : null,
 );
@@ -564,7 +564,7 @@ async function onDeposit() {
     track("deposit_success", { pool: requirePool().slug });
     // R1 (Lot R): report the executed deposit for server-side verification.
     // Fire-and-forget — never blocks or fails the deposit flow.
-    reportTxWitness(hash);
+    reportTxWitness(hash, "blend-deposit");
     loadBalances(); // reflect the new balances
     if (position.value) loadPosition(); // and the new supplied position
   } catch (err: unknown) {
@@ -574,7 +574,7 @@ async function onDeposit() {
       // so it simply lands once (if) the tx settles within the retry window.
       txHash.value = err.hash;
       status.value = "pending";
-      reportTxWitness(err.hash);
+      reportTxWitness(err.hash, "blend-deposit");
       return;
     }
     errorMessage.value = readApiError(err, "Deposit failed.");
@@ -588,12 +588,10 @@ async function onDeposit() {
  * 2026-08-17) as KPI-ledger evidence only — the server decides the kind and
  * the faucet never qualifies a withdraw.
  */
-function reportTxWitness(hash: string): void {
-  reportActionWitness({
-    txHash: hash,
-    network: network.value,
-    userId: userId.value ?? undefined,
-  });
+function reportTxWitness(hash: string, kind: "blend-deposit" | "blend-withdraw"): void {
+  // EP5: the hash lands in the witness outbox first, then the report + /sync run.
+  // Never awaited — the action flow does not depend on it.
+  void witnessAndSync({ txHash: hash, network: network.value, kind });
 }
 
 /**
@@ -633,14 +631,14 @@ async function onWithdraw() {
     status.value = "success";
     // Founder amendment 2026-08-17: witness withdraws too (KPI ledger only —
     // never faucet-qualifying, the server enforces that by kind).
-    reportTxWitness(hash);
+    reportTxWitness(hash, "blend-withdraw");
     loadBalances(); // the withdrawn funds are back in the wallet
     loadPosition(); // and the supplied position has shrunk
   } catch (err: unknown) {
     if (err instanceof TxPendingTimeout) {
       txHash.value = err.hash;
       status.value = "pending";
-      reportTxWitness(err.hash);
+      reportTxWitness(err.hash, "blend-withdraw");
       return;
     }
     errorMessage.value = readApiError(err, "Withdraw failed.");
@@ -1052,6 +1050,8 @@ function showSimulationError(rawError: string | undefined, fallback: string) {
           :disclaimer="pointsDisclaimer"
           caption="Dig points once this deposit is verified on-chain (enrolled wallets)"
         />
+        <!-- EP5: one separate line, hidden unless rules.rewards.enabled; never a %, never in the APY. -->
+        <RewardsBonusLine v-if="!isWithdraw" :rules="campaignRules" />
       </div>
 
       <!-- STILL PENDING — confirmation polling timed out. Not a failure: the tx was

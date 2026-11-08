@@ -40,6 +40,7 @@ None of this was required by SCF #43. Public-facing statements per item: `post-g
 | S1 | Host network posture: loopback-only compose bindings, Docker firewall rule, rotated DB password | done (2026-09-29) | on main | `internal/evidence/lot-ad/s1-remediation-execution.md` |
 | SEC G1 | Request validation, wallet-refresh admission, ops redaction, nginx wallet zones | done (2026-10-27) | on main | `internal/evidence/lot-sec/g1.md` |
 | EP1–4 | Earn & Points: signed ownership proofs, award job, streaks, referrals, leaderboard, Earn v1.1 | done; deployed dark, activation is a founder decision | on main | `internal/evidence/lot-ep/00-recon.md` |
+| EP5 | Daily XLM rewards on points: second payout key (`modules/rewards/`), schema v9 allocations + claims, user-initiated claims, immediate sync award, witness outbox, campaign min notional | in_progress (built 2026-10-21, rebased 2026-11-08; money path, dark by default) | not merged | `internal/evidence/lot-ep/ep5.md` |
 | AN0 | Google Analytics 4, consent-first, six product events | done (2026-10-21) | on main | `internal/evidence/lot-an0/an0-implementation.md` |
 | XO | XOXNO Lending as sixth protocol: 3 hubs, 25 markets, read-only | done (2026-10-30; `xoxno` fresh on prod `/health` 2026-11-04) | on main | `internal/evidence/lot-xo/00-recon-verification.md` |
 | RP1 | Alert-sweep RPC calls 3,312 → 36 per run; per-method cost rows | done (2026-10-27) | on main | `internal/evidence/lot-rp/rp1-sweep-fix.md` |

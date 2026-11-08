@@ -12,6 +12,8 @@
 // (OPS_METRICS_TOKEN bearer, 404 otherwise), no-store.
 // EP4: GET /me/activity — the wallet's last ledger rows, same access rule as
 // /me (address + userId, no proof for reads), no-store.
+// EP5 (item 8): POST /sync — the immediate per-wallet award (same access rule
+// as /me, no proof), rate-limited in the service.
 
 import { Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { OpsTokenGuard } from '../../common/ops-token.guard';
@@ -92,6 +94,15 @@ export class CampaignController {
       address: requireAddress(body?.address),
       userId: requireUserId(body?.userId),
       id: requireClaimId(id),
+    });
+  }
+
+  @Post('sync')
+  @HttpCode(HttpStatus.OK)
+  sync(@Body() body?: CheckinBody) {
+    return this.campaign.sync({
+      address: requireAddress(body?.address),
+      userId: requireUserId(body?.userId),
     });
   }
 

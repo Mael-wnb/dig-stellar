@@ -94,6 +94,7 @@ services:
       - ./apps/api/src/db/stellar_v6_campaign.sql:/docker-entrypoint-initdb.d/50-stellar_v6_campaign.sql:ro
       - ./apps/api/src/db/stellar_v7_social_claim_delete.sql:/docker-entrypoint-initdb.d/51-stellar_v7_social_claim_delete.sql:ro
       - ./apps/api/src/db/stellar_v8_campaign_perks.sql:/docker-entrypoint-initdb.d/52-stellar_v8_campaign_perks.sql:ro
+      - ./apps/api/src/db/stellar_v9_rewards.sql:/docker-entrypoint-initdb.d/53-stellar_v9_rewards.sql:ro
 
   redis:
     image: redis:7

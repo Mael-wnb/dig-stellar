@@ -42,6 +42,35 @@ view; it makes no promise and no denial, and the "Are points worth anything?" FA
 The **internal position is unchanged**: points are non-monetary, nothing pays, no token, no
 airdrop; the grep rule on the copy (no "reward", "airdrop", "token", "earn XLM") still applies.
 
+## Update 2026-10-21 (EP5, decided with Paul): daily XLM rewards on top of points
+
+**Decided:** a daily XLM pool is shared by points. Every closed UTC day, `REWARDS_DAILY_POOL_XLM`
+(100 XLM) is split among the enrolled, non-excluded wallets with points that day,
+`share = pool × points(wallet) / Σ points`, capped at `REWARDS_DAILY_CAP_XLM` (5 XLM) per wallet;
+the uncapped remainder stays in the treasury. Wallets claim their total when they want (minimum
+`REWARDS_MIN_CLAIM_XLM` = 1 XLM, one claim per hour), one native payment per claim, memo
+`dig-points`. This is a SECOND server-side payout key with its own module (`modules/rewards/`,
+copied from the faucet pattern, never imported), its own treasury funded with a few days of pool,
+and a kill-switch defaulting off (`docs/security-invariants.md` §13).
+
+**What this changes in the ruling above:** points now have a *derived* value — a claim on a share
+of the daily pool — but they remain non-transferable, non-convertible by the user, not a token and
+not an airdrop: the pool is DIG's own money, capped per day and per wallet, paid only while
+`REWARDS_ENABLED` is on, and the campaign copy still makes no promise of value (neutral disclaimer
+unchanged). The derived value is the pool's, not the point's: it moves with the day's total points
+and with the founder's env.
+
+**What stays non-promised:** any future pool size, cap or duration (the env can change or stop at
+any time; a stopped reward is not a broken promise), any payout for days the rewards were dark,
+any token or airdrop, any conversion rate. User-facing copy says "Daily pool · 100 XLM shared by
+points" and "Dig bonus: XLM paid daily from the points pool" — never an APY, never a percentage,
+never a projected amount.
+
+**Also decided the same day (production observations):** immediate award on demand
+(`POST /v1/campaign/sync`, the cron job stays the safety net), a client-side witness outbox so a
+lost fire-and-forget report heals at the next visit, and a campaign-specific minimum notional
+(`CAMPAIGN_MIN_NOTIONAL_XLM`) decoupled from the faucet's stored flag.
+
 ## Why
 
 - **Legal and reputational surface.** A points programme that could be read as a token

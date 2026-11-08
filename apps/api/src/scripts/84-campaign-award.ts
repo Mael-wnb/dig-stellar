@@ -27,8 +27,18 @@
 //                 (wallet_perks' primary key). Insert-only: a later negative
 //                 adjust never removes a perk. This script is the ONLY writer
 //                 of wallet_perks.
-//   5. summary  — awarded_actions, skipped_by_reason, referrals_credited,
-//                 perks_granted, duration_ms. Exit 0; any thrown error → exit 1.
+//   5. rewards  — (EP5, MONEY PATH ALLOCATION ONLY — no payout, no key here)
+//                 RewardsRepository.allocateClosedDays: for every CLOSED UTC day
+//                 (< today, past the post-midnight grace) with positive points
+//                 and no allocation row yet, share the XLM pool by points
+//                 (pure allocateDay), insert on conflict do nothing (PK). Dark
+//                 while REWARDS_ENABLED is unset: one line, nothing written.
+//                 The payment itself only ever happens on a user's claim
+//                 (modules/rewards/rewards.service.ts), never in this job.
+//   6. summary  — awarded_actions, skipped_by_reason, referrals_credited,
+//                 perks_granted, rewards_days / rewards_allocations /
+//                 rewards_distributed_xlm, duration_ms. Exit 0; any thrown
+//                 error → exit 1.
 
 import 'dotenv/config';
 import { PrismaService } from '../db/prisma.service';
@@ -36,10 +46,12 @@ import { CampaignRepository } from '../modules/campaign/campaign.repository';
 import {
   CAMPAIGN_ID,
   campaignEndsAt,
+  campaignMinNotionalXlm,
   campaignStartsAt,
   isCampaignEnabled,
 } from '../modules/campaign/campaign-config';
 import { perksFor, referralCredit, utcDay } from '../modules/campaign/campaign-rules';
+import { RewardsRepository } from '../modules/rewards/rewards.repository';
 import {
   checkinSetsFromRows,
   countsFromRows,
@@ -57,11 +69,17 @@ export interface AwardSummary {
   referralsPending: number;
   /** EP3: wallet_perks rows inserted this run (every tier reached, all wallets). */
   perksGranted: number;
+  /** EP5: reward_allocations — dark (REWARDS_ENABLED off), closed days allocated, rows inserted, Σ XLM allocated this run. */
+  rewardsDark: boolean;
+  rewardsDaysAllocated: number;
+  rewardsAllocations: number;
+  rewardsDistributedXlm: string;
   durationMs: number;
 }
 
 export async function runCampaignAward(
   repo: CampaignRepository,
+  rewards: RewardsRepository,
   opts: { log?: (line: string) => void } = {},
 ): Promise<AwardSummary> {
   const log = opts.log ?? ((line: string) => console.log(line));
@@ -74,6 +92,10 @@ export async function runCampaignAward(
     referralsCredited: 0,
     referralsPending: 0,
     perksGranted: 0,
+    rewardsDark: true,
+    rewardsDaysAllocated: 0,
+    rewardsAllocations: 0,
+    rewardsDistributedXlm: '0.0000000',
     durationMs: 0,
   };
 
@@ -87,8 +109,9 @@ export async function runCampaignAward(
     return summary;
   }
   const window = { startsAtMs: startsAt.getTime(), endsAtMs: endsAt?.getTime() ?? null };
+  const minNotionalXlm = campaignMinNotionalXlm(); // EP5 item 10: the campaign's own minimum
   log(
-    `[campaign-award] window campaign=${CAMPAIGN_ID} starts=${startsAt.toISOString()} ends=${endsAt?.toISOString() ?? 'none'}`,
+    `[campaign-award] window campaign=${CAMPAIGN_ID} starts=${startsAt.toISOString()} ends=${endsAt?.toISOString() ?? 'none'} min_notional_xlm=${minNotionalXlm}`,
   );
 
   // 2. actions
@@ -103,12 +126,13 @@ export async function runCampaignAward(
       address: c.address,
       userId: c.user_id,
       kind: c.kind,
-      meetsMinNotional: c.meets_min_notional,
+      notionalXlm: c.notional_xlm,
       closedAtMs: new Date(c.ledger_closed_at).getTime(),
     })),
     countsFromRows(countedRows),
     checkinSetsFromRows(checkinRows),
     window,
+    minNotionalXlm,
   );
   for (const award of plan.awards) {
     summary.awardedActions += await repo.insertActionAward({
@@ -132,7 +156,7 @@ export async function runCampaignAward(
   // 3. referrals
   const uncredited = await repo.findUncreditedReferrals(CAMPAIGN_ID);
   for (const link of uncredited) {
-    const witness = await repo.findRefereeFirstQualifyingWitness(link.referee_address, new Date(link.linked_at));
+    const witness = await repo.findRefereeFirstQualifyingWitness(link.referee_address, new Date(link.linked_at), minNotionalXlm);
     const decision = referralCredit({
       linkedAtMs: new Date(link.linked_at).getTime(),
       witnessClosedAtMs: witness ? new Date(witness.ledger_closed_at).getTime() : null,
@@ -167,12 +191,32 @@ export async function runCampaignAward(
   }
   log(`[campaign-award] perks wallets=${balances.length} granted=${summary.perksGranted}`);
 
-  // 5. summary
+  // 5. rewards (EP5): allocation of closed days ONLY — the payout happens on
+  // the user's claim, never here. Dark while REWARDS_ENABLED is unset.
+  const allocation = await rewards.allocateClosedDays(CAMPAIGN_ID, { log });
+  summary.rewardsDark = allocation.dark;
+  summary.rewardsDaysAllocated = allocation.daysAllocated;
+  summary.rewardsAllocations = allocation.allocations;
+  summary.rewardsDistributedXlm = allocation.distributedXlm;
+  if (allocation.dark) {
+    log(`[campaign-award] rewards dark (REWARDS_ENABLED unset), no allocation`);
+  } else {
+    log(
+      `[campaign-award] rewards days_pending=${allocation.daysPending} waiting_grace=${allocation.daysWaitingGrace} ` +
+        `days_allocated=${allocation.daysAllocated} allocations=${allocation.allocations} ` +
+        `excluded_wallets=${allocation.excludedWallets} distributed_xlm=${allocation.distributedXlm} ` +
+        `remainder_xlm=${allocation.remainderXlm} pool_xlm=${allocation.poolXlm} cap_xlm=${allocation.capXlm}`,
+    );
+  }
+
+  // 6. summary
   summary.durationMs = Date.now() - startedAt;
   log(
     `[campaign-award] summary awarded_actions=${summary.awardedActions} ` +
       `skipped_by_reason=${JSON.stringify(summary.skippedByReason)} ` +
       `referrals_credited=${summary.referralsCredited} perks_granted=${summary.perksGranted} ` +
+      `rewards_days=${summary.rewardsDaysAllocated} rewards_allocations=${summary.rewardsAllocations} ` +
+      `rewards_distributed_xlm=${summary.rewardsDistributedXlm} ` +
       `duration_ms=${summary.durationMs}`,
   );
   return summary;
@@ -182,7 +226,7 @@ async function main() {
   const prisma = new PrismaService();
   await prisma.$connect();
   try {
-    await runCampaignAward(new CampaignRepository(prisma));
+    await runCampaignAward(new CampaignRepository(prisma), new RewardsRepository(prisma));
   } finally {
     await prisma.$disconnect();
   }

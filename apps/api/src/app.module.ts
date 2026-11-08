@@ -13,9 +13,10 @@ import { OpsModule } from './modules/ops/ops.module';
 import { FaucetModule } from './modules/faucet/faucet.module';
 import { CampaignModule } from './modules/campaign/campaign.module';
 import { OpenApiModule } from './modules/openapi/openapi.module';
+import { RewardsModule } from './modules/rewards/rewards.module';
 
 @Module({
-  imports: [DbModule, StellarModule, WalletsModule, NetworkModule, ActionsModule, BridgeModule, AlertsModule, OpsModule, FaucetModule, CampaignModule, OpenApiModule],
+  imports: [DbModule, StellarModule, WalletsModule, NetworkModule, ActionsModule, BridgeModule, AlertsModule, OpsModule, FaucetModule, CampaignModule, RewardsModule, OpenApiModule],
   controllers: [AppController],
   providers: [AppService],
 })

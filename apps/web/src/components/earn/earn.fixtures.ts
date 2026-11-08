@@ -1,13 +1,13 @@
 // Lot EP (EP4): shared test fixtures for the Earn components — the API payload
 // shapes with deliberately odd numbers, so a spec can prove a figure came from
 // the payload and not from a constant in the component.
-import type { CampaignMe, CampaignRules } from '../../api/campaign'
+import type { CampaignMe, CampaignRules, RewardsMe } from '../../api/campaign'
 
 export const rulesFixture = (overrides: Partial<CampaignRules> = {}): CampaignRules => ({
   actions: {
-    'sdex-swap': { basePoints: 50, dailyCap: 5, requiresMinNotional: true },
-    'blend-deposit': { basePoints: 100, dailyCap: 3, requiresMinNotional: true },
-    'blend-withdraw': { basePoints: 0, dailyCap: 0, requiresMinNotional: false },
+    'sdex-swap': { basePoints: 50, dailyCap: 5, requiresMinNotional: true, minNotionalXlm: 1 },
+    'blend-deposit': { basePoints: 100, dailyCap: 3, requiresMinNotional: true, minNotionalXlm: 1 },
+    'blend-withdraw': { basePoints: 0, dailyCap: 0, requiresMinNotional: false, minNotionalXlm: null },
   },
   streakDailyPoints: 5,
   streak: {
@@ -37,6 +37,24 @@ export const rulesFixture = (overrides: Partial<CampaignRules> = {}): CampaignRu
     { key: 'beta-features', threshold: 500 },
     { key: 'priority-rwa', threshold: 1500 },
   ],
+  // EP5: dark by default — the rewards specs enable it explicitly.
+  rewards: { enabled: false, dailyPoolXlm: 100, dailyCapXlm: 5, minClaimXlm: 1 },
+  ...overrides,
+})
+
+/** EP5: GET /campaign/rewards/me as served; odd figures so a spec can prove nothing is computed. */
+export const rewardsMeFixture = (overrides: Partial<RewardsMe> = {}): RewardsMe => ({
+  campaign: 1,
+  enabled: true,
+  address: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWXYZ',
+  claimableXlm: 2.4234567,
+  pendingDays: [
+    { day: '2026-10-19', xlm: 2.1234567, pointsDay: 300, poolXlm: 100 },
+    { day: '2026-10-20', xlm: 0.3, pointsDay: 55, poolXlm: 100 },
+  ],
+  paid: [{ claimId: '11111111-1111-4111-8111-111111111111', xlm: 7, txHash: 'abcdef0123456789'.repeat(4), paidAt: '2026-10-18T08:00:00.000Z' }],
+  nextCloseAt: '2026-10-22T00:00:00.000Z',
+  minClaimXlm: 1,
   ...overrides,
 })
 

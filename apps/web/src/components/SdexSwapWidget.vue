@@ -3,12 +3,10 @@ import { computed, onMounted, ref, watch } from "vue";
 import {
   buildSdexSwap,
   quoteSdexSwap,
-  reportActionWitness,
   type SdexAssetRef,
 } from "../api/actions";
 import { useWalletSession } from "../composables/useWalletSession";
 import { useActiveSigner } from "../composables/useActiveSigner";
-import { useAppUser } from "../composables/useAppUser";
 import { useFaucet } from "../composables/useFaucet";
 import FaucetClaimPanel from "./FaucetClaimPanel.vue";
 import PointsChip from "./earn/PointsChip.vue";
@@ -46,14 +44,15 @@ const XLM_RESERVE = 1;
 const { connectedAddress, signTransaction } = useWalletSession();
 const { activeSignerAddress } = useActiveSigner();
 const { network } = useNetwork();
-const { userId } = useAppUser();
 
 // R3 (Lot R): upfront reward note — rendered ONLY while the campaign is live
 // on THIS network (never a stale promise), plus the post-swap claim panel.
 const { campaign: faucetCampaign, campaignLiveFor, refreshCampaign } = useFaucet();
 // Lot EP (EP2): "+N pts" in the success block, from the API rules block only;
 // renders nothing while the campaign is inactive/unknown.
-const { pointsForAction, disclaimer: pointsDisclaimer, refreshCampaign: refreshPointsCampaign } = useCampaign();
+// EP5: `witnessAndSync` replaces the bare fire-and-forget witness report
+// (outbox + immediate /sync, items 8 + 9).
+const { pointsForAction, disclaimer: pointsDisclaimer, refreshCampaign: refreshPointsCampaign, witnessAndSync } = useCampaign();
 const faucetPromo = computed(() =>
   campaignLiveFor(network.value) ? faucetCampaign.value : null,
 );
@@ -408,13 +407,10 @@ async function onSwap() {
       // Lot AN0: asset codes only — no hash, amount, address or user id.
       track("swap_success", { pair: `${fromCode.value}/${toCode.value}` });
       // R1 (Lot R): report the executed swap for server-side verification.
-      // Fire-and-forget — never blocks or fails the swap flow.
+      // Fire-and-forget — never blocks or fails the swap flow. EP5: through the
+      // witness outbox, then the immediate /campaign/sync.
       if (txHash.value) {
-        reportActionWitness({
-          txHash: txHash.value,
-          network: network.value,
-          userId: userId.value ?? undefined,
-        });
+        void witnessAndSync({ txHash: txHash.value, network: network.value, kind: "sdex-swap" });
       }
       loadBalances(); // reflect the new balances
     } else {

@@ -33,7 +33,7 @@ defineProps<{ rules: CampaignRules | null }>()
         <dt class="font-semibold" style="color: var(--dig-text)">My action does not show up.</dt>
         <dd class="m-0" style="color: var(--dig-text-2)">
           Points are credited by a periodic verification run, not instantly. A swap signed more than
-          an hour after it was built is not counted. Very small amounts below the minimum are not counted either.
+          an hour after it was built is not counted. Amounts below the campaign minimum shown on each Earn-more row are not counted either.
         </dd>
       </div>
       <div>

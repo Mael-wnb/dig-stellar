@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { createSSRApp } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import EarnHeroCard from './EarnHeroCard.vue'
-import { meFixture, rulesFixture } from './earn.fixtures'
+import { meFixture, rewardsMeFixture, rulesFixture } from './earn.fixtures'
 
 const render = (props: Record<string, unknown>) => renderToString(createSSRApp(EarnHeroCard, props))
 
@@ -78,5 +78,67 @@ describe('EarnHeroCard', () => {
     expect(html).not.toContain('role="progressbar"')
     expect(html).not.toContain('Streak day')
     expect(html).not.toContain('today')
+  })
+
+  describe('EP5: XLM rewards block', () => {
+    const live = () => rulesFixture({ rewards: { enabled: true, dailyPoolXlm: 137, dailyCapXlm: 5, minClaimXlm: 1 } })
+    /** The rendered Claim button tag (SSR puts `disabled` before data-testid). */
+    const claimButton = (html: string) => html.match(/<button[^>]*data-testid="hero-claim"[^>]*>[^<]*<\/button>/)?.[0] ?? ''
+    const isDisabled = (html: string) => /\sdisabled(\s|>)/.test(claimButton(html))
+    /** The rewards block only (the streak bar below it legitimately carries a % width). */
+    const rewardsBlock = (html: string) => {
+      const start = html.indexOf('data-testid="hero-rewards"')
+      return start < 0 ? '' : html.slice(start, html.indexOf('data-testid="hero-streak-line"', start))
+    }
+
+    it('hidden entirely when rules.rewards.enabled is false or absent (older API), even with a rewards payload', async () => {
+      const off = await render({ me: meFixture(), rules: rulesFixture(), rewards: rewardsMeFixture() })
+      expect(off).not.toContain('Daily pool')
+      expect(off).not.toContain('Claimable')
+      expect(off).not.toContain('data-testid="hero-claim"')
+      const older = rulesFixture()
+      delete (older as { rewards?: unknown }).rewards
+      const olderHtml = await render({ me: meFixture(), rules: older, rewards: rewardsMeFixture() })
+      expect(olderHtml).not.toContain('XLM')
+      expect(olderHtml).not.toContain('data-testid="hero-rewards"')
+    })
+
+    it('pool line from rules.rewards.dailyPoolXlm, claimable from /rewards/me — verbatim, nothing computed', async () => {
+      const html = await render({ me: meFixture(), rules: live(), rewards: rewardsMeFixture({ claimableXlm: 2.4234567 }) })
+      expect(html).toContain('Daily pool · 137 XLM shared by points')
+      expect(html).toContain('Claimable: 2.4234567 XLM')
+      expect(claimButton(html)).toMatch(/>Claim</)
+      expect(isDisabled(html)).toBe(false)
+      expect(rewardsBlock(html)).not.toContain('%')
+      expect(rewardsBlock(html)).not.toContain('5 XLM') // the per-wallet cap is not shown here
+    })
+
+    it('below the minimum: the button is disabled and reads "X / 1 XLM minimum" (minimum from the payload)', async () => {
+      const html = await render({ me: meFixture(), rules: live(), rewards: rewardsMeFixture({ claimableXlm: 0.3, minClaimXlm: 1 }) })
+      expect(html).toContain('Claimable: 0.3 XLM')
+      expect(isDisabled(html)).toBe(true)
+      expect(claimButton(html)).toContain('0.3 / 1 XLM minimum')
+      // exactly the minimum is claimable
+      const atMin = await render({ me: meFixture(), rules: live(), rewards: rewardsMeFixture({ claimableXlm: 1, minClaimXlm: 1 }) })
+      expect(isDisabled(atMin)).toBe(false)
+      // an odd minimum from the API is what is shown
+      const odd = await render({ me: meFixture(), rules: live(), rewards: rewardsMeFixture({ claimableXlm: 1.5, minClaimXlm: 2.5 }) })
+      expect(odd).toContain('1.5 / 2.5 XLM minimum')
+    })
+
+    it('while /rewards/me has not answered: "Claimable: …" and a disabled Claim; the claim message and the claiming state render', async () => {
+      const loading = await render({ me: meFixture(), rules: live(), rewards: null })
+      expect(loading).toContain('Claimable: …')
+      expect(isDisabled(loading)).toBe(true)
+      const busy = await render({ me: meFixture(), rules: live(), rewards: rewardsMeFixture(), claiming: true, claimMessage: 'Paid 2.4234567 XLM · tx abcdef01' })
+      expect(busy).toContain('Claiming…')
+      expect(busy).toContain('Paid 2.4234567 XLM · tx abcdef01')
+    })
+
+    it('item 9: "Verifying N recent actions…" while the outbox re-reports; singular at 1; absent at 0', async () => {
+      expect(await render({ me: meFixture(), rules: rulesFixture(), verifying: 2 })).toContain('Verifying 2 recent actions…')
+      expect(await render({ me: meFixture(), rules: rulesFixture(), verifying: 1 })).toContain('Verifying 1 recent action…')
+      expect(await render({ me: meFixture(), rules: rulesFixture(), verifying: 0 })).not.toContain('Verifying')
+    })
   })
 })

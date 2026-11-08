@@ -7,6 +7,9 @@
 // action modal (useModals.openAction) with the SAME contexts as the Get-started
 // card (lib/advertisedBlendPool): the deposit acts on the advertised Blend pool
 // picked by the shared useAdvertisedBlendPool (network default when unknown).
+// EP5 (item 10): each row states the campaign minimum from
+// rules.actions[kind].minNotionalXlm ("min 1 XLM") — the API's figure, not a
+// constant here; absent on an older API, the row simply omits it.
 import { computed, onMounted } from 'vue'
 import type { AwardableActionKind, CampaignMe, CampaignRules } from '../../api/campaign'
 import { useAdvertisedBlendPool } from '../../composables/useAdvertisedBlendPool'
@@ -35,9 +38,11 @@ const rows = computed(() =>
     ...ROW_META[kind],
     points: props.rules.actions[kind].basePoints,
     // Older API (deploy order): no today counts → the row shows the points only.
-    line: props.me.actionsToday?.[kind]
-      ? `+${props.rules.actions[kind].basePoints} pts ${ROW_META[kind].unit} · ${props.me.actionsToday[kind].counted}/${props.me.actionsToday[kind].cap} today`
-      : `+${props.rules.actions[kind].basePoints} pts ${ROW_META[kind].unit}`,
+    line: [
+      `+${props.rules.actions[kind].basePoints} pts ${ROW_META[kind].unit}`,
+      ...(props.me.actionsToday?.[kind] ? [`${props.me.actionsToday[kind].counted}/${props.me.actionsToday[kind].cap} today`] : []),
+      ...(props.rules.actions[kind].minNotionalXlm != null ? [`min ${props.rules.actions[kind].minNotionalXlm} XLM`] : []),
+    ].join(' · '),
     pending: props.me.pendingByKind?.[kind] ?? 0,
   })),
 )
@@ -95,8 +100,7 @@ function open(kind: AwardableActionKind) {
     </ul>
 
     <p class="mt-[10px] mb-0 text-[11px] leading-[1.5]" style="color: var(--dig-faint)">
-      Points are credited by a periodic verification run, within about 15 minutes.
-      Very small amounts below the minimum are not counted.
+      Points are credited as soon as the action is verified on-chain; a periodic run catches up within about 15 minutes.
     </p>
   </section>
 </template>

@@ -386,9 +386,9 @@ d('CampaignRepository (integration, local Postgres)', () => {
         userId,
       );
       const window = { startsAtMs: Date.UTC(2026, 9, 1), endsAtMs: null };
-      expect(await repo.pendingVerificationCount(CAMPAIGN_ID, wallet, window)).toBe(1);
-      expect(await repo.pendingVerificationCount(CAMPAIGN_ID, wallet, { startsAtMs: Date.UTC(2026, 9, 11), endsAtMs: null })).toBe(0);
-      expect(await repo.pendingVerificationCount(CAMPAIGN_ID, wallet, { startsAtMs: null, endsAtMs: null })).toBe(0);
+      expect(await repo.pendingVerificationCount(CAMPAIGN_ID, wallet, window, 1)).toBe(1);
+      expect(await repo.pendingVerificationCount(CAMPAIGN_ID, wallet, { startsAtMs: Date.UTC(2026, 9, 11), endsAtMs: null }, 1)).toBe(0);
+      expect(await repo.pendingVerificationCount(CAMPAIGN_ID, wallet, { startsAtMs: null, endsAtMs: null }, 1)).toBe(0);
 
       await prisma.$executeRawUnsafe(
         `insert into points_ledger (campaign, address, user_id, reason, base_points, multiplier, points, witness_tx_hash, counted_day)
@@ -398,7 +398,7 @@ d('CampaignRepository (integration, local Postgres)', () => {
         userId,
         witnessHash,
       );
-      expect(await repo.pendingVerificationCount(CAMPAIGN_ID, wallet, window)).toBe(0);
+      expect(await repo.pendingVerificationCount(CAMPAIGN_ID, wallet, window, 1)).toBe(0);
       // A. the witness idempotency index refuses a second award for the same tx
       await expect(
         prisma.$executeRawUnsafe(
@@ -583,12 +583,13 @@ d('CampaignRepository (integration, local Postgres)', () => {
     const witness = (txHash: string, kind: string, meetsMin: boolean) =>
       prisma.$executeRawUnsafe(
         `insert into action_witnesses (tx_hash, network, wallet_address, user_id, kind, op_summary, notional_xlm, min_notional_xlm, meets_min_notional, ledger_closed_at)
-         values ($1, 'testnet', $2, $3::uuid, $4, '{}'::jsonb, 10, 1, $5, now())`,
+         values ($1, 'testnet', $2, $3::uuid, $4, '{}'::jsonb, $6, 1, $5, now())`,
         txHash,
         ep4Wallet,
         ep4User,
         kind,
         meetsMin,
+        meetsMin ? 10 : 0.5, // EP5 item 10: the campaign judges notional_xlm against its own minimum
       );
     const adjust = (points: number, countedDay: string | null) =>
       prisma.$executeRawUnsafe(
@@ -661,9 +662,9 @@ d('CampaignRepository (integration, local Postgres)', () => {
 
     it('pendingVerificationByKind: the awarded swap is not pending, the deposit is, the below-min swap never; the sum is pendingVerificationCount', async () => {
       const window = { startsAtMs: Date.UTC(2026, 9, 1), endsAtMs: null };
-      expect(await repo.pendingVerificationByKind(CAMPAIGN_ID, ep4Wallet, window)).toEqual({ 'sdex-swap': 0, 'blend-deposit': 1 });
-      expect(await repo.pendingVerificationCount(CAMPAIGN_ID, ep4Wallet, window)).toBe(1);
-      expect(await repo.pendingVerificationByKind(CAMPAIGN_ID, ep4Wallet, { startsAtMs: null, endsAtMs: null })).toEqual({ 'sdex-swap': 0, 'blend-deposit': 0 });
+      expect(await repo.pendingVerificationByKind(CAMPAIGN_ID, ep4Wallet, window, 1)).toEqual({ 'sdex-swap': 0, 'blend-deposit': 1 });
+      expect(await repo.pendingVerificationCount(CAMPAIGN_ID, ep4Wallet, window, 1)).toBe(1);
+      expect(await repo.pendingVerificationByKind(CAMPAIGN_ID, ep4Wallet, { startsAtMs: null, endsAtMs: null }, 1)).toEqual({ 'sdex-swap': 0, 'blend-deposit': 0 });
     });
 
     it('recentLedger: newest first, limit honoured, tx hash truncated to 8 chars on action rows only', async () => {

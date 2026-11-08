@@ -5,7 +5,7 @@
 // check-in), and the reads (me streak maths, leaderboard shortening + cache).
 
 import { Keypair } from '@stellar/stellar-sdk';
-import { CampaignService, METRICS_BOUNDARY } from './campaign.service';
+import { CampaignService, METRICS_BOUNDARY, SYNC_RATE_LIMIT_MS } from './campaign.service';
 import { CampaignRepository, type EnrollmentRow, type MetricsFacts, type ProofRow } from './campaign.repository';
 import { CHALLENGE_TTL_SECONDS, CAMPAIGN_ID, LEADERBOARD_CACHE_MS, METRICS_CACHE_MS } from './campaign-config';
 import { DISCLAIMER, PERK_TIERS, REFERRAL_CODE_RE } from './campaign-rules';
@@ -46,6 +46,7 @@ type Fake = jest.Mocked<Pick<
   | 'referredByCode' | 'checkinToday' | 'checkinDays' | 'todayUtc' | 'balance' | 'leaderboard' | 'rankOf'
   | 'pendingVerificationCount' | 'pendingVerificationByKind' | 'pointsOn' | 'actionsCountedOn' | 'recentLedger'
   | 'listSocialClaims' | 'listPerks' | 'metricsFacts' | 'transaction'
+  | 'lockEnrollment' | 'findActionCandidates' | 'countedActionsByDay' | 'checkinDaysByWallet' | 'insertActionAward'
 >>;
 
 const facts = (overrides: Partial<MetricsFacts> = {}): MetricsFacts => ({
@@ -91,6 +92,12 @@ function fakeRepo(): Fake {
     listPerks: jest.fn().mockResolvedValue([]),
     metricsFacts: jest.fn().mockResolvedValue(facts()),
     transaction: jest.fn(),
+    // EP5 item 8 (sync)
+    lockEnrollment: jest.fn().mockResolvedValue(null),
+    findActionCandidates: jest.fn().mockResolvedValue([]),
+    countedActionsByDay: jest.fn().mockResolvedValue([]),
+    checkinDaysByWallet: jest.fn().mockResolvedValue([]),
+    insertActionAward: jest.fn().mockResolvedValue(1),
   } as unknown as Fake;
   // transaction(fn) hands the same fake back, so writes are observable.
   repo.transaction.mockImplementation(async (fn: (r: CampaignRepository) => Promise<unknown>) =>
@@ -227,7 +234,10 @@ describe('GET /v1/campaign payload', () => {
       ],
     });
     expect(out.rules).not.toHaveProperty('streakMultipliers');
-    expect(JSON.stringify(out).toLowerCase()).not.toMatch(/airdrop|reward|token/);
+    // EP5: `rules.rewards` is the one legitimate "reward" key (the XLM pool); the copy and every other key stay clean.
+    const { rewards: _rewards, ...rulesWithoutRewards } = out.rules;
+    expect(JSON.stringify({ ...out, rules: rulesWithoutRewards }).toLowerCase()).not.toMatch(/airdrop|reward|token/);
+    expect(JSON.stringify(out).toLowerCase()).not.toMatch(/airdrop|token/);
   });
 
   it('reports active with ISO window when enabled and started', () => {
@@ -641,5 +651,118 @@ describe('EP3: perks on /me and the public metrics', () => {
     expect(METRICS_BOUNDARY).toMatch(/self-declared/);
     expect(METRICS_BOUNDARY).toMatch(/CAMPAIGN_STARTS_AT/);
     expect(METRICS_BOUNDARY).toMatch(/no page views/);
+  });
+});
+
+describe('EP5 item 10: rules.actions carry the campaign minimum notional; rules.rewards are the public values', () => {
+  afterEach(() => {
+    delete process.env.CAMPAIGN_MIN_NOTIONAL_XLM;
+    delete process.env.REWARDS_ENABLED;
+    delete process.env.REWARDS_DAILY_POOL_XLM;
+  });
+
+  it('defaults: min 1 XLM on the two awardable kinds, null on withdraw; rewards dark with the default pool / cap / min', () => {
+    const out = service(fakeRepo()).getCampaign();
+    expect(out.rules.actions['sdex-swap']).toEqual({ basePoints: 50, dailyCap: 5, requiresMinNotional: true, minNotionalXlm: 1 });
+    expect(out.rules.actions['blend-deposit'].minNotionalXlm).toBe(1);
+    expect(out.rules.actions['blend-withdraw'].minNotionalXlm).toBeNull();
+    expect(out.rules.rewards).toEqual({ enabled: false, dailyPoolXlm: 100, dailyCapXlm: 5, minClaimXlm: 1 });
+  });
+
+  it('reads the env lazily: CAMPAIGN_MIN_NOTIONAL_XLM and REWARDS_* flow into the payload', () => {
+    process.env.CAMPAIGN_MIN_NOTIONAL_XLM = '2.5';
+    process.env.REWARDS_ENABLED = 'true';
+    process.env.REWARDS_DAILY_POOL_XLM = '250';
+    const out = service(fakeRepo()).getCampaign();
+    expect(out.rules.actions['sdex-swap'].minNotionalXlm).toBe(2.5);
+    expect(out.rules.rewards).toEqual({ enabled: true, dailyPoolXlm: 250, dailyCapXlm: 5, minClaimXlm: 1 });
+  });
+
+  it('/me passes the campaign minimum to the pending count (never the faucet flag)', async () => {
+    liveEnv();
+    process.env.CAMPAIGN_MIN_NOTIONAL_XLM = '3';
+    const repo = fakeRepo();
+    await service(repo).me({ address: ADDRESS, userId: USER });
+    expect(repo.pendingVerificationByKind).toHaveBeenCalledWith(CAMPAIGN_ID, ADDRESS, expect.anything(), 3);
+  });
+});
+
+describe('EP5 item 8: sync (immediate per-wallet award)', () => {
+  const NOW = Date.parse('2026-10-10T12:00:00Z');
+  const candidate = (txHash: string, notionalXlm: number | null, closedAt = '2026-10-10T09:00:00Z') => ({
+    tx_hash: txHash,
+    address: ADDRESS,
+    user_id: USER,
+    kind: 'sdex-swap' as const,
+    notional_xlm: notionalXlm,
+    ledger_closed_at: new Date(closedAt),
+  });
+
+  it('dark campaign: nothing locked, nothing written, zeros with the reason', async () => {
+    const repo = fakeRepo();
+    const out = await service(repo).sync({ address: ADDRESS, userId: USER }, NOW);
+    expect(out).toMatchObject({ active: false, reason: 'campaign-disabled', enrolled: false, awarded: 0, pending: 0, disclaimer: DISCLAIMER });
+    expect(repo.transaction).not.toHaveBeenCalled();
+  });
+
+  it('not enrolled: the lock finds no row → enrolled false, nothing planned', async () => {
+    liveEnv();
+    const repo = fakeRepo();
+    const out = await service(repo).sync({ address: ADDRESS, userId: USER }, NOW);
+    expect(out).toMatchObject({ active: true, enrolled: false, awarded: 0, pending: 0 });
+    expect(repo.lockEnrollment).toHaveBeenCalledWith(CAMPAIGN_ID, ADDRESS);
+    expect(repo.findActionCandidates).not.toHaveBeenCalled();
+  });
+
+  it('enrolled: plans the wallet\'s candidates under the lock with the campaign minimum, inserts idempotently, reports awarded + pending', async () => {
+    liveEnv();
+    process.env.CAMPAIGN_MIN_NOTIONAL_XLM = '2';
+    const repo = fakeRepo();
+    repo.lockEnrollment.mockResolvedValue(enrollmentRow());
+    repo.findActionCandidates.mockResolvedValue([
+      candidate('a'.repeat(64), 10), // awarded
+      candidate('b'.repeat(64), 1.5), // below the CAMPAIGN minimum (2), not the faucet's 1
+      candidate('c'.repeat(64), null), // unpriced → below
+    ]);
+    repo.insertActionAward.mockResolvedValueOnce(1);
+    repo.pendingVerificationByKind.mockResolvedValue({ 'sdex-swap': 1, 'blend-deposit': 0 });
+    const out = await service(repo).sync({ address: ADDRESS, userId: USER }, NOW);
+    expect(out).toMatchObject({ active: true, enrolled: true, awarded: 1, pending: 1 });
+    expect(out.rateLimited).toBeUndefined();
+    expect(repo.findActionCandidates).toHaveBeenCalledWith(CAMPAIGN_ID, { startsAtMs: Date.parse('2026-10-01T00:00:00Z'), endsAtMs: null }, ADDRESS);
+    expect(repo.countedActionsByDay).toHaveBeenCalledWith(CAMPAIGN_ID, ADDRESS);
+    expect(repo.checkinDaysByWallet).toHaveBeenCalledWith(CAMPAIGN_ID, ADDRESS);
+    expect(repo.insertActionAward).toHaveBeenCalledTimes(1);
+    expect(repo.insertActionAward).toHaveBeenCalledWith(
+      expect.objectContaining({ campaign: CAMPAIGN_ID, address: ADDRESS, reason: 'action:sdex-swap', basePoints: 50, multiplier: 1, points: 50, witnessTxHash: 'a'.repeat(64), countedDay: '2026-10-10' }),
+    );
+    expect(repo.pendingVerificationByKind).toHaveBeenCalledWith(CAMPAIGN_ID, ADDRESS, expect.anything(), 2);
+  });
+
+  it('an insert that hits the unique index (the job won the race) counts 0, never a second row', async () => {
+    liveEnv();
+    const repo = fakeRepo();
+    repo.lockEnrollment.mockResolvedValue(enrollmentRow());
+    repo.findActionCandidates.mockResolvedValue([candidate('a'.repeat(64), 10)]);
+    repo.insertActionAward.mockResolvedValue(0);
+    const out = await service(repo).sync({ address: ADDRESS, userId: USER }, NOW);
+    expect(out.awarded).toBe(0);
+  });
+
+  it('rate limit: a second sync for the same wallet within 10 s plans nothing and says so; another wallet is not affected; 10 s later it runs again', async () => {
+    liveEnv();
+    const repo = fakeRepo();
+    repo.lockEnrollment.mockResolvedValue(enrollmentRow());
+    repo.findEnrollment.mockResolvedValue(enrollmentRow());
+    const svc = service(repo);
+    await svc.sync({ address: ADDRESS, userId: USER }, NOW);
+    const again = await svc.sync({ address: ADDRESS.toLowerCase() as string, userId: USER }, NOW + SYNC_RATE_LIMIT_MS - 1);
+    expect(again).toMatchObject({ enrolled: true, awarded: 0, rateLimited: true });
+    expect(repo.transaction).toHaveBeenCalledTimes(1);
+    await svc.sync({ address: OTHER, userId: USER }, NOW + 1);
+    expect(repo.transaction).toHaveBeenCalledTimes(2);
+    const later = await svc.sync({ address: ADDRESS, userId: USER }, NOW + SYNC_RATE_LIMIT_MS);
+    expect(later.rateLimited).toBeUndefined();
+    expect(repo.transaction).toHaveBeenCalledTimes(3);
   });
 });

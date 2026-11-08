@@ -20,6 +20,7 @@ function stub() {
     checkin: jest.fn().mockResolvedValue('checkin'),
     me: jest.fn().mockResolvedValue('me'),
     activity: jest.fn().mockResolvedValue('activity'),
+    sync: jest.fn().mockResolvedValue('sync'),
     leaderboard: jest.fn().mockResolvedValue('leaderboard'),
     metrics: jest.fn().mockResolvedValue('metrics'),
   };
@@ -166,5 +167,18 @@ describe('CampaignController (EP4)', () => {
     expect(() => c.activity(ADDRESS, undefined)).toThrow(BadRequestException);
     expect(() => c.activity('not-an-address', USER)).toThrow(BadRequestException);
     expect(() => c.activity(ADDRESS, 'not-a-uuid')).toThrow(BadRequestException);
+  });
+});
+
+describe('CampaignController — EP5 item 8: POST /sync', () => {
+  it('validates address + userId like /me (no proof), passes them through trimmed', async () => {
+    const s = stub();
+    const c = campaignController(s);
+    expect(await c.sync({ address: ` ${ADDRESS} `, userId: USER })).toBe('sync');
+    expect(s.sync).toHaveBeenCalledWith({ address: ADDRESS, userId: USER });
+    expect(() => c.sync({ address: ADDRESS })).toThrow(BadRequestException);
+    expect(() => c.sync({ address: 'nope', userId: USER })).toThrow(BadRequestException);
+    expect(() => c.sync({ address: ADDRESS, userId: 'not-a-uuid' })).toThrow(BadRequestException);
+    expect(() => c.sync(undefined)).toThrow(BadRequestException);
   });
 });

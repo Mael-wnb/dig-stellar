@@ -15,6 +15,7 @@ import { Keypair } from '@stellar/stellar-sdk';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../db/prisma.service';
 import { CampaignRepository } from '../modules/campaign/campaign.repository';
+import { RewardsRepository } from '../modules/rewards/rewards.repository';
 import { CAMPAIGN_ID } from '../modules/campaign/campaign-config';
 import { previousUtcDay } from '../modules/campaign/campaign-rules';
 import { runCampaignAward } from './84-campaign-award';
@@ -25,6 +26,9 @@ const d = RUN ? describe : describe.skip;
 d('84-campaign-award (integration, local Postgres)', () => {
   const prisma = new PrismaService();
   const repo = new CampaignRepository(prisma);
+  // EP5: the rewards step runs dark here (REWARDS_ENABLED unset below) — the
+  // allocation itself is covered by rewards.repository.integration.spec.ts.
+  const rewardsRepo = new RewardsRepository(prisma);
   const referee = Keypair.random().publicKey(); // wallet A: acts
   const referrer = Keypair.random().publicKey(); // wallet B: referred A
   const refereeUser = randomUUID();
@@ -42,17 +46,21 @@ d('84-campaign-award (integration, local Postgres)', () => {
   const witness = (txHash: string, kind: string, closedAt: string, meetsMin = true) =>
     prisma.$executeRawUnsafe(
       `insert into action_witnesses (tx_hash, network, wallet_address, user_id, kind, op_summary, notional_xlm, min_notional_xlm, meets_min_notional, ledger_closed_at)
-       values ($1, 'testnet', $2, $3::uuid, $4, '{}'::jsonb, 10, 1, $5, $6::timestamptz)`,
+       values ($1, 'testnet', $2, $3::uuid, $4, '{}'::jsonb, $7, 1, $5, $6::timestamptz)`,
       txHash,
       referee,
       refereeUser,
       kind,
       meetsMin,
       closedAt,
+      meetsMin ? 10 : 0.5, // EP5 item 10: the campaign judges notional_xlm, not the faucet flag
     );
 
   const cleanup = async () => {
     for (const a of [referee, referrer]) {
+      // EP5 (defensive: the rewards step is dark in this suite, so these are always empty)
+      await prisma.$executeRawUnsafe(`delete from reward_allocations where lower(address) = lower($1)`, a);
+      await prisma.$executeRawUnsafe(`delete from reward_claims where lower(address) = lower($1)`, a);
       await prisma.$executeRawUnsafe(`delete from wallet_perks where lower(address) = lower($1)`, a);
       await prisma.$executeRawUnsafe(`delete from points_ledger where lower(address) = lower($1)`, a);
       await prisma.$executeRawUnsafe(`delete from referrals where referee_address = $1 or referrer_address = $1`, a);
@@ -82,6 +90,7 @@ d('84-campaign-award (integration, local Postgres)', () => {
     process.env.CAMPAIGN_ENABLED = 'true';
     process.env.CAMPAIGN_STARTS_AT = '2026-10-01T00:00:00Z';
     delete process.env.CAMPAIGN_ENDS_AT;
+    delete process.env.REWARDS_ENABLED; // EP5: never allocate the seeded 2026-10-10 rows here
 
     // enrolments + the referral link (B referred A, linked 2026-10-09)
     await repo.insertEnrollment({ campaign: CAMPAIGN_ID, address: referrer, userId: referrerUser, referralCode: 'AWARDIT1', referredByCode: null });
@@ -116,7 +125,7 @@ d('84-campaign-award (integration, local Postgres)', () => {
   });
 
   it('run 1 writes exactly the expected ledger and credits the referral once', async () => {
-    const summary = await runCampaignAward(repo, { log: (l) => logs.push(l) });
+    const summary = await runCampaignAward(repo, rewardsRepo, { log: (l) => logs.push(l) });
 
     expect(summary).toMatchObject({
       dark: false,
@@ -125,8 +134,12 @@ d('84-campaign-award (integration, local Postgres)', () => {
       referralsCredited: 1,
       referralsPending: 0,
       perksGranted: 2, // early-access for A (470) and for B (100): the referral credit counted first
+      rewardsDark: true, // EP5: REWARDS_ENABLED unset → step 5 writes nothing
+      rewardsAllocations: 0,
     });
     expect(summary.durationMs).toBeGreaterThanOrEqual(0);
+    expect(logs.some((l) => l.includes('rewards dark (REWARDS_ENABLED unset), no allocation'))).toBe(true);
+    expect(logs.at(-1)).toContain('rewards_allocations=0');
 
     const a = await ledger(referee);
     const actions = a.filter((r) => String(r.reason).startsWith('action:'));
@@ -176,7 +189,7 @@ d('84-campaign-award (integration, local Postgres)', () => {
 
   it('run 2 is a no-op: zero new rows, nothing re-credited', async () => {
     const before = (await ledger(referee)).length + (await ledger(referrer)).length;
-    const summary = await runCampaignAward(repo, { log: () => undefined });
+    const summary = await runCampaignAward(repo, rewardsRepo, { log: () => undefined });
     expect(summary).toMatchObject({ awardedActions: 0, referralsCredited: 0, referralsPending: 0, perksGranted: 0 });
     // the below-min and the capped sixth swap are still candidates (no ledger row) and are skipped again each run
     expect(summary.skippedByReason).toEqual({ 'outside-window': 0, 'kind-not-awarded': 0, 'below-min-notional': 1, 'daily-cap-reached': 1 });
@@ -186,7 +199,7 @@ d('84-campaign-award (integration, local Postgres)', () => {
 
   it('a partial earlier run converges: ledger rows present but link unmarked → marked, no duplicate rows', async () => {
     await prisma.$executeRawUnsafe(`update referrals set credited_at = null, credited_tx_hash = null where campaign = $1 and referee_address = $2`, CAMPAIGN_ID, referee);
-    const summary = await runCampaignAward(repo, { log: () => undefined });
+    const summary = await runCampaignAward(repo, rewardsRepo, { log: () => undefined });
     expect(summary.referralsCredited).toBe(1);
     expect(summary.perksGranted).toBe(0);
     expect((await ledger(referrer)).length).toBe(1);
@@ -203,7 +216,7 @@ d('84-campaign-award (integration, local Postgres)', () => {
       referrer,
     );
     expect(await repo.balance(CAMPAIGN_ID, referrer)).toBe(40);
-    const summary = await runCampaignAward(repo, { log: () => undefined });
+    const summary = await runCampaignAward(repo, rewardsRepo, { log: () => undefined });
     expect(summary.perksGranted).toBe(0);
     expect(await perks(referrer)).toEqual([{ perk_key: 'early-access', points_at_grant: 100 }]);
   });
@@ -217,19 +230,19 @@ d('84-campaign-award (integration, local Postgres)', () => {
       referee,
       refereeUser,
     );
-    const summary = await runCampaignAward(repo, { log: () => undefined });
+    const summary = await runCampaignAward(repo, rewardsRepo, { log: () => undefined });
     expect(summary.perksGranted).toBe(1);
     expect(await perks(referee)).toEqual([
       { perk_key: 'beta-features', points_at_grant: 570 },
       { perk_key: 'early-access', points_at_grant: 470 },
     ]);
-    const again = await runCampaignAward(repo, { log: () => undefined });
+    const again = await runCampaignAward(repo, rewardsRepo, { log: () => undefined });
     expect(again.perksGranted).toBe(0);
   });
 
   it('dark campaign: exits without touching the DB', async () => {
     delete process.env.CAMPAIGN_ENABLED;
-    const summary = await runCampaignAward(repo, { log: (l) => logs.push(l) });
+    const summary = await runCampaignAward(repo, rewardsRepo, { log: (l) => logs.push(l) });
     expect(summary).toMatchObject({ dark: true, awardedActions: 0, referralsCredited: 0, perksGranted: 0 });
     expect(logs.at(-1)).toContain('campaign dark, nothing to award');
     process.env.CAMPAIGN_ENABLED = 'true';

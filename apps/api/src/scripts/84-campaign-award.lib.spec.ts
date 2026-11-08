@@ -13,20 +13,21 @@ const B = 'GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
 const START = Date.UTC(2026, 9, 1);
 const D = Date.UTC(2026, 9, 10, 9, 0); // 2026-10-10 09:00Z
 const window = { startsAtMs: START, endsAtMs: null };
+const MIN = 1; // the campaign minimum notional (EP5 item 10)
 
 const swap = (n: number, overrides: Partial<AwardCandidate> = {}): AwardCandidate => ({
   txHash: `${n}`.padStart(64, '0'),
   address: A,
   userId: '00000000-0000-4000-8000-0000000000aa',
   kind: 'sdex-swap',
-  meetsMinNotional: true,
+  notionalXlm: 10,
   closedAtMs: D + n * 60_000,
   ...overrides,
 });
 
 describe('planActionAwards', () => {
   it('awards in order and carries the daily cap inside one run: 6 same-day swaps → 5 awarded, 1 skipped', () => {
-    const plan = planActionAwards([1, 2, 3, 4, 5, 6].map((n) => swap(n)), new Map(), new Map(), window);
+    const plan = planActionAwards([1, 2, 3, 4, 5, 6].map((n) => swap(n)), new Map(), new Map(), window, MIN);
     expect(plan.awards).toHaveLength(5);
     expect(plan.awards.map((a) => a.txHash)).toEqual([1, 2, 3, 4, 5].map((n) => `${n}`.padStart(64, '0')));
     expect(plan.skipped).toEqual({ 'outside-window': 0, 'kind-not-awarded': 0, 'below-min-notional': 0, 'daily-cap-reached': 1 });
@@ -35,7 +36,7 @@ describe('planActionAwards', () => {
 
   it('starts the daily count from the existing ledger rows (countedBefore)', () => {
     const before = countsFromRows([{ address: A.toLowerCase(), reason: 'action:sdex-swap', day: '2026-10-10', n: 4 }]);
-    const plan = planActionAwards([swap(1), swap(2)], before, new Map(), window);
+    const plan = planActionAwards([swap(1), swap(2)], before, new Map(), window, MIN);
     expect(plan.awards).toHaveLength(1);
     expect(plan.skipped['daily-cap-reached']).toBe(1);
     expect(countKey(A, 'action:sdex-swap', '2026-10-10')).toBe(`${A.toLowerCase()}|action:sdex-swap|2026-10-10`);
@@ -53,6 +54,7 @@ describe('planActionAwards', () => {
       new Map(),
       new Map(),
       window,
+      MIN,
     );
     expect(plan.awards).toHaveLength(8); // 5 A swaps + B swap + A deposit + A swap next day
     expect(plan.awards.find((a) => a.txHash === swap(8).txHash)).toMatchObject({ reason: 'action:blend-deposit', points: 100 });
@@ -69,24 +71,25 @@ describe('planActionAwards', () => {
       cursor = previousUtcDay(cursor);
     }
     const checkins = checkinSetsFromRows(sevenBefore);
-    expect(planActionAwards([swap(1)], new Map(), checkins, window).awards[0]).toMatchObject({ multiplier: 1.35, points: 68 }); // round(67.5)
+    expect(planActionAwards([swap(1)], new Map(), checkins, window, MIN).awards[0]).toMatchObject({ multiplier: 1.35, points: 68 }); // round(67.5)
 
     const withToday = checkinSetsFromRows([...sevenBefore, { address: A, day }]);
-    expect(planActionAwards([swap(1)], new Map(), withToday, window).awards[0]).toMatchObject({ multiplier: 1.35, points: 68 });
+    expect(planActionAwards([swap(1)], new Map(), withToday, window, MIN).awards[0]).toMatchObject({ multiplier: 1.35, points: 68 });
 
     const fourOnly = checkinSetsFromRows(sevenBefore.slice(0, 4));
-    expect(planActionAwards([swap(1)], new Map(), fourOnly, window).awards[0]).toMatchObject({ multiplier: 1.2, points: 60 });
+    expect(planActionAwards([swap(1)], new Map(), fourOnly, window, MIN).awards[0]).toMatchObject({ multiplier: 1.2, points: 60 });
 
     const oneOnly = checkinSetsFromRows(sevenBefore.slice(0, 1));
-    expect(planActionAwards([swap(1)], new Map(), oneOnly, window).awards[0]).toMatchObject({ multiplier: 1.05, points: 53 }); // round(52.5)
+    expect(planActionAwards([swap(1)], new Map(), oneOnly, window, MIN).awards[0]).toMatchObject({ multiplier: 1.05, points: 53 }); // round(52.5)
 
-    expect(planActionAwards([swap(1)], new Map(), new Map(), window).awards[0]).toMatchObject({ multiplier: 1, points: 50 });
+    expect(planActionAwards([swap(1)], new Map(), new Map(), window, MIN).awards[0]).toMatchObject({ multiplier: 1, points: 50 });
   });
 
   it('counts skips without planning them: below min notional, withdraw, outside window', () => {
     const plan = planActionAwards(
       [
-        swap(1, { meetsMinNotional: false }),
+        swap(1, { notionalXlm: 0.5 }),
+        swap(10, { notionalXlm: null }),
         swap(2, { kind: 'blend-withdraw' }),
         swap(3, { closedAtMs: START - 1 }),
         swap(4),
@@ -94,14 +97,15 @@ describe('planActionAwards', () => {
       new Map(),
       new Map(),
       window,
+      MIN,
     );
     expect(plan.awards.map((a) => a.txHash)).toEqual([swap(4).txHash]);
-    expect(plan.skipped).toEqual({ 'outside-window': 1, 'kind-not-awarded': 1, 'below-min-notional': 1, 'daily-cap-reached': 0 });
+    expect(plan.skipped).toEqual({ 'outside-window': 1, 'kind-not-awarded': 1, 'below-min-notional': 2, 'daily-cap-reached': 0 });
   });
 
   it('never mutates the caller\'s count map', () => {
     const before = new Map<string, number>();
-    planActionAwards([swap(1)], before, new Map(), window);
+    planActionAwards([swap(1)], before, new Map(), window, MIN);
     expect(before.size).toBe(0);
   });
 });

@@ -28,12 +28,16 @@ import {
   LEADERBOARD_LIMIT,
   METRICS_CACHE_MS,
   campaignEndsAt,
+  campaignMinNotionalXlm,
   campaignStartsAt,
   isCampaignEnabled,
+  rewardsPublicRules,
+  type RewardsPublicRules,
   xRepostUrl,
 } from './campaign-config';
 import {
   ACTION_RULES,
+  type ActionRule,
   DISCLAIMER,
   PERK_TIERS,
   REFERRAL_POINTS,
@@ -71,6 +75,7 @@ import {
   type MetricsFacts,
   type PendingByKind,
 } from './campaign.repository';
+import { checkinSetsFromRows, countsFromRows, planActionAwards } from './award-planner';
 import { buildChallengeMessage } from './challenge-message';
 import { verifyWalletSignature, type SignatureVariant } from './verify-wallet-signature';
 
@@ -109,7 +114,8 @@ export interface CampaignPayload {
   startsAt: string | null;
   endsAt: string | null;
   rules: {
-    actions: typeof ACTION_RULES;
+    /** EP5 item 10: each kind carries the campaign minimum notional it is judged against (null when not required). */
+    actions: Record<ActionKind, ActionRule & { minNotionalXlm: number | null }>;
     streakDailyPoints: number;
     /**
      * EP4: the daily ramp (multiplier = min(1 + stepPerDay × days, cap)) plus
@@ -128,6 +134,8 @@ export interface CampaignPayload {
     referral: typeof REFERRAL_POINTS;
     /** EP3: the non-monetary tiers (key + points threshold), ascending. */
     perks: typeof PERK_TIERS;
+    /** EP5: the public XLM-rewards rules (enabled, daily pool, per-wallet cap, min claim); read from campaign-config, never from modules/rewards. */
+    rewards: RewardsPublicRules;
   };
   disclaimer: string;
 }
@@ -223,6 +231,28 @@ export interface ActivityPayload {
 /** EP4: rows served by /me/activity. */
 export const ACTIVITY_LIMIT = 20;
 
+/** EP5 (item 8): one immediate sync per wallet per this many ms, in-process. */
+export const SYNC_RATE_LIMIT_MS = 10_000;
+
+/**
+ * EP5 (item 8): POST /v1/campaign/sync — the immediate per-wallet award.
+ * `awarded` = action ledger rows written by THIS call; `pending` = in-window
+ * witnesses at or above the campaign minimum still without a ledger row
+ * (the same figure /me serves). `rateLimited` = nothing was planned, the
+ * previous sync for this wallet was less than SYNC_RATE_LIMIT_MS ago.
+ */
+export interface SyncPayload {
+  campaign: number;
+  active: boolean;
+  reason?: CampaignInactiveReason;
+  address: string;
+  enrolled: boolean;
+  awarded: number;
+  pending: number;
+  rateLimited?: true;
+  disclaimer: string;
+}
+
 export const METRICS_BOUNDARY =
   'Counts of wallets, not people: a person may hold several wallets. ' +
   'Registered = first registration of a wallet (user_wallets.created_at; re-connects are invisible). ' +
@@ -256,6 +286,8 @@ export interface LeaderboardPayload {
 export class CampaignService {
   private leaderboardCache: { at: number; rows: LeaderboardRow[] } | null = null;
   private metricsCache: { at: number; facts: MetricsFacts } | null = null;
+  /** EP5 (item 8): last sync instant per lower-cased address (in-process rate limit). */
+  private syncLastAt = new Map<string, number>();
 
   constructor(private readonly repo: CampaignRepository) {}
 
@@ -342,7 +374,7 @@ export class CampaignService {
       startsAt: w.startsAtMs != null ? new Date(w.startsAtMs).toISOString() : null,
       endsAt: w.endsAtMs != null ? new Date(w.endsAtMs).toISOString() : null,
       rules: {
-        actions: ACTION_RULES,
+        actions: this.actionRules(),
         streakDailyPoints: STREAK_DAILY_POINTS,
         streak: {
           stepPerDay: STREAK_RAMP.stepPerDay,
@@ -355,9 +387,21 @@ export class CampaignService {
         socialDailyCap: SOCIAL_DAILY_CAP,
         referral: REFERRAL_POINTS,
         perks: PERK_TIERS,
+        rewards: rewardsPublicRules(),
       },
       disclaimer: DISCLAIMER,
     };
+  }
+
+  /** EP5 item 10: ACTION_RULES plus the campaign minimum notional (env, lazily) on the kinds that require it. */
+  actionRules(): Record<ActionKind, ActionRule & { minNotionalXlm: number | null }> {
+    const min = campaignMinNotionalXlm();
+    const out = {} as Record<ActionKind, ActionRule & { minNotionalXlm: number | null }>;
+    for (const kind of Object.keys(ACTION_RULES) as ActionKind[]) {
+      const rule = ACTION_RULES[kind];
+      out[kind] = { ...rule, minNotionalXlm: rule.requiresMinNotional ? min : null };
+    }
+    return out;
   }
 
   // --- Writes (campaign must be active; proof required) ---------------------
@@ -449,7 +493,7 @@ export class CampaignService {
         this.repo.balance(CAMPAIGN_ID, params.address),
         this.repo.checkinDays(CAMPAIGN_ID, params.address),
         this.repo.referredByCode(CAMPAIGN_ID, params.address),
-        this.repo.pendingVerificationByKind(CAMPAIGN_ID, params.address, w),
+        this.repo.pendingVerificationByKind(CAMPAIGN_ID, params.address, w, campaignMinNotionalXlm()),
         this.repo.listSocialClaims(CAMPAIGN_ID, params.address),
         this.repo.listPerks(CAMPAIGN_ID, params.address),
         this.repo.pointsOn(CAMPAIGN_ID, params.address, today),
@@ -514,6 +558,85 @@ export class CampaignService {
       flags: { beta: grantedKeys.includes('beta-features') },
       disclaimer: DISCLAIMER,
     };
+  }
+
+  /**
+   * EP5 (item 8): the immediate award for ONE wallet. Same access rule as /me
+   * (address + userId, no proof: it writes nothing a wallet could not already
+   * earn from the job, and the witness itself was Horizon-verified). Runs the
+   * SAME planner as the job (award-planner.ts) inside ONE transaction that
+   * first locks the wallet's campaign_enrollments row (SELECT … FOR UPDATE):
+   * the job holds the cron flock, not this row, so the lock serializes two
+   * concurrent syncs for one wallet, and the ledger's partial unique index
+   * (on conflict do nothing) is the backstop against a job run in between.
+   * The job stays the safety net for everything this call misses.
+   */
+  async sync(params: { address: string; userId: string }, now: number = Date.now()): Promise<SyncPayload> {
+    const w = this.window(now);
+    const status = campaignStatus(w);
+    const base = {
+      campaign: CAMPAIGN_ID,
+      active: status.active,
+      ...(status.active ? {} : { reason: status.reason }),
+      address: params.address,
+      disclaimer: DISCLAIMER,
+    };
+    if (!status.active || w.startsAtMs == null) return { ...base, enrolled: false, awarded: 0, pending: 0 };
+
+    const minNotionalXlm = campaignMinNotionalXlm();
+    const window = { startsAtMs: w.startsAtMs, endsAtMs: w.endsAtMs };
+    const key = params.address.toLowerCase();
+    const last = this.syncLastAt.get(key);
+    if (last != null && now - last < SYNC_RATE_LIMIT_MS) {
+      const pendingByKind = await this.repo.pendingVerificationByKind(CAMPAIGN_ID, params.address, w, minNotionalXlm);
+      const enrolled = (await this.repo.findEnrollment(CAMPAIGN_ID, params.address)) != null;
+      return { ...base, enrolled, awarded: 0, pending: pendingByKind['sdex-swap'] + pendingByKind['blend-deposit'], rateLimited: true };
+    }
+    this.syncLastAt.set(key, now);
+    if (this.syncLastAt.size > 5000) {
+      for (const [k, at] of this.syncLastAt) if (now - at >= SYNC_RATE_LIMIT_MS) this.syncLastAt.delete(k);
+    }
+
+    const result = await this.repo.transaction(async (r) => {
+      const enrollment = await r.lockEnrollment(CAMPAIGN_ID, params.address);
+      if (!enrollment) return { enrolled: false, awarded: 0 };
+      const [candidates, countedRows, checkinRows] = await Promise.all([
+        r.findActionCandidates(CAMPAIGN_ID, window, enrollment.address),
+        r.countedActionsByDay(CAMPAIGN_ID, enrollment.address),
+        r.checkinDaysByWallet(CAMPAIGN_ID, enrollment.address),
+      ]);
+      const plan = planActionAwards(
+        candidates.map((c) => ({
+          txHash: c.tx_hash,
+          address: c.address,
+          userId: c.user_id,
+          kind: c.kind,
+          notionalXlm: c.notional_xlm,
+          closedAtMs: new Date(c.ledger_closed_at).getTime(),
+        })),
+        countsFromRows(countedRows),
+        checkinSetsFromRows(checkinRows),
+        window,
+        minNotionalXlm,
+      );
+      let awarded = 0;
+      for (const award of plan.awards) {
+        awarded += await r.insertActionAward({
+          campaign: CAMPAIGN_ID,
+          address: award.address,
+          userId: award.userId,
+          reason: award.reason,
+          basePoints: award.basePoints,
+          multiplier: award.multiplier,
+          points: award.points,
+          witnessTxHash: award.txHash,
+          countedDay: award.countedDay,
+        });
+      }
+      return { enrolled: true, awarded };
+    });
+    const pendingByKind = await this.repo.pendingVerificationByKind(CAMPAIGN_ID, params.address, w, minNotionalXlm);
+    return { ...base, ...result, pending: pendingByKind['sdex-swap'] + pendingByKind['blend-deposit'] };
   }
 
   /**

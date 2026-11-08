@@ -236,8 +236,21 @@ pnpm -C apps/api job:campaign-award        # the award script itself (ts-node), 
 ```
 Env (apps/api/.env, names only): `CAMPAIGN_ENABLED` (default off → "campaign dark, nothing to
 award", exit 0), `CAMPAIGN_STARTS_AT` (REQUIRED, fail-closed when unset; only witnesses that
-closed at or after it earn points), `CAMPAIGN_ENDS_AT` (optional). Prereq: `stellar_v6_campaign.sql`, `stellar_v7_social_claim_delete.sql`
-and `stellar_v8_campaign_perks.sql` applied, in that order.
+closed at or after it earn points), `CAMPAIGN_ENDS_AT` (optional), `CAMPAIGN_MIN_NOTIONAL_XLM`
+(EP5 item 10, default 1: the campaign's OWN minimum, judged on the witness `notional_xlm`; a null
+notional is below it; independent of the faucet flag). Prereq: `stellar_v6_campaign.sql`,
+`stellar_v7_social_claim_delete.sql`, `stellar_v8_campaign_perks.sql` and `stellar_v9_rewards.sql`
+applied, in that order.
+
+**Immediate award (EP5 item 8):** `POST /v1/campaign/sync {address, userId}` runs the SAME
+planner for ONE wallet under its enrollment row lock (same idempotent inserts, one call per wallet
+per 10 s in-process) and answers `{awarded, pending}`; the web calls it after each action and on
+Earn view load. The cron job stays the safety net. **Witness outbox (EP5 item 9):** the web keeps
+every submitted tx hash (hash, network, kind, time — no address) in localStorage and re-POSTs
+`/v1/actions/witness` for unacknowledged hashes younger than 24 h before each sync, so a lost
+fire-and-forget report (2026-10-21 incident: two mainnet swaps without a witness row) heals itself
+at the next visit. **Rewards step (EP5):** step 5 of the same job allocates the XLM pool of every
+closed UTC day (see "Rewards treasury" below); dark while `REWARDS_ENABLED` is unset.
 
 **Retroactive awards:** witnesses that closed at or after `CAMPAIGN_STARTS_AT` earn points once
 the wallet enrols, even if the enrolment comes later — the job selects by window and enrolment at
@@ -331,6 +344,8 @@ Pre-activation checklist — every box BEFORE the flag flip:
 - [ ] Paul's X post is published and its URL is at hand for `CAMPAIGN_X_REPOST_URL` (https);
       without it the repost task shows "coming soon" on day one.
 - [ ] `stellar_v8_campaign_perks.sql` applied (`\d wallet_perks` lists the table).
+- [ ] `stellar_v9_rewards.sql` applied (`\d reward_allocations` lists the table) — the rewards
+      themselves stay dark until the "Rewards treasury" procedure below.
 - [ ] The cron line is installed (above) and ONE manual run shows the dark path end to end:
       ```bash
       cd /root/dig-stellar && pnpm --dir apps/indexer job:campaign
@@ -458,6 +473,7 @@ psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stella
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v6_campaign.sql   # Lot EP (EP1): Earn & Points — proofs, enrollments, points_ledger, check-ins, referrals (points only, no key; depends on v2 + action_witnesses); deploys dark (CAMPAIGN_ENABLED unset)
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v7_social_claim_delete.sql   # Lot EP (EP2): soft delete of social task claims (deleted_at + partial unique indexes); depends on v6, apply after it
 psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v8_campaign_perks.sql   # Lot EP (EP3): wallet_perks, non-monetary perks granted by the award job (depends on v6; apply BEFORE the EP3 api build)
+psql "postgresql://dig:dig@localhost:5432/dig_stellar" -f apps/api/src/db/stellar_v9_rewards.sql   # Lot EP (EP5): reward_claims + reward_allocations, daily XLM rewards (MONEY PATH, invariants §13; depends on v6; apply BEFORE the EP5 api build; dark until REWARDS_ENABLED)
 ```
 Manually-applied schemas (local AND VPS): `stellar_v1.sql`, `stellar_v1_metrics.sql`,
 `stellar_v1_bridge.sql` (Allbridge bridge flows, T2-D3), `stellar_v2_multiwallet.sql`,
@@ -472,6 +488,8 @@ fire-and-forget adoption inserts start failing silently),
 `stellar_v7_social_claim_delete.sql` (Lot EP EP2: soft delete of social task claims, after v6),
 `stellar_v8_campaign_perks.sql` (Lot EP EP3: `wallet_perks`, non-monetary perks, after v6),
 `stellar_v1_perf_indexes.sql` (perf/pools-latency: partial swap-event index; **concurrently, outside a transaction**, see below).
+`stellar_v9_rewards.sql` (Lot EP EP5: `reward_claims` + `reward_allocations`, daily XLM rewards,
+money path, after v6).
 Note: when a new table **or column** is added to one of these files (e.g. `network_stats_latest`
 in `stellar_v1_metrics.sql`, `bridge_flows` in `stellar_v1_bridge.sql`, or the T2-D1
 `is_active_signer` column + `user_wallets_one_signer_per_user` index, or the T2-D1 Gap B
@@ -1182,3 +1200,85 @@ earn 5 XLM (max 2 claims per wallet), budget 60 claims. Evidence:
   blindly: that is the double-pay path.
 - **Row stuck in `pending` > 5 min**: the post-payout UPDATE failed; same explorer-verify
   procedure as `failed`, then resolve the row manually.
+
+## Rewards treasury (Lot EP5, daily XLM rewards)
+
+EP5 pays real XLM from a SECOND DIG-owned hot wallet: every closed UTC day the award job shares
+`REWARDS_DAILY_POOL_XLM` (100) among the enrolled, non-excluded wallets by their points of that
+day, capped at `REWARDS_DAILY_CAP_XLM` (5) each (`reward_allocations`); a wallet claims its total
+from the Earn hero (`POST /v1/campaign/rewards/claim`, min `REWARDS_MIN_CLAIM_XLM` = 1, one claim
+per hour) and ONE native payment with memo `dig-points` is sent (`reward_claims`). Security model:
+`docs/security-invariants.md` §13. Everything defaults DARK (`REWARDS_ENABLED` unset): nothing is
+allocated, nothing claimable, the treasury never queried.
+
+### Setup (founder, one-time)
+
+1. Generate the keypair **OFFLINE** with the SDK on a machine without the repo's `.env` open, never
+   in chat, never committed:
+   `node -e "const {Keypair}=require('@stellar/stellar-sdk');const k=Keypair.random();console.log(k.publicKey());console.log(k.secret())"`
+   Keep the secret in the password manager; only the PUBLIC key is ever typed anywhere else.
+2. Fund the public address with **3 days of pool** (3 × `REWARDS_DAILY_POOL_XLM` = 300 XLM at the
+   default) plus the 2 XLM reserve: that is the exposure cap. Never fund further ahead; refills
+   are manual (step "Refill" below).
+3. VPS env (`apps/api/.env`, names only here): `REWARDS_SECRET_KEY=<secret>`,
+   `REWARDS_NETWORK=mainnet`, optional `REWARDS_DAILY_POOL_XLM` / `REWARDS_DAILY_CAP_XLM` /
+   `REWARDS_MIN_CLAIM_XLM`, and `REWARDS_EXCLUDED_ADDRESSES=<team wallets, comma-separated>`
+   (they are never allocated and never dilute the others). Leave `REWARDS_ENABLED` unset until
+   the flip.
+4. Apply `stellar_v9_rewards.sql` (see "Apply raw SQL schemas") BEFORE deploying the EP5 api.
+5. nginx: `POST /v1/campaign/rewards/claim` goes in the strict zone like `/v1/faucet/claim`;
+   `GET /v1/campaign/rewards/me` and `POST /v1/campaign/sync` stay in the general zone (polled).
+
+### Activate (the flip)
+
+1. Baseline: `curl -s https://stellar-api.getdig.ai/v1/campaign | jq .rules.rewards` →
+   `enabled: false`; `curl -s …/v1/ops/metrics | jq .rewards` → `treasuryBalanceXlm: null`.
+2. `REWARDS_ENABLED=true` in `apps/api/.env`, then `pm2 restart dig-stellar-api --update-env &&
+   pm2 save`. No web redeploy: the web polls `GET /v1/campaign` (60 s) and the hero block, the
+   bonus lines and the paid rows appear on their own.
+3. Verify: `jq .rules.rewards` → `enabled: true`; `jq .rewards` on `/v1/ops/metrics` →
+   `treasuryBalanceXlm` = the funded balance (never the address). The first allocation happens at
+   the first award-job tick after 00:30Z of the next day (`[campaign-award] rewards day=… allocated=N
+   distributed_xlm=…` in `/var/log/dig-stellar-campaign.log`).
+
+### Daily check (founder, every morning)
+
+```bash
+curl -s https://stellar-api.getdig.ai/v1/ops/metrics | jq '.rewards | {enabled, treasuryBalanceXlm, claimableXlm, paidXlm, allocations, claims, lastAllocatedDay}'
+# or, on the VPS:
+docker exec -i dig_stellar_postgres psql -U dig -d dig_stellar -c "select status, count(*), sum(share_xlm) from reward_allocations group by status" -c "select status, count(*), sum(total_xlm) from reward_claims group by status"
+```
+Rules of thumb: `treasuryBalanceXlm` must stay above `claimableXlm` + one day of pool + 2 XLM;
+`claims.failed` must be 0 (otherwise "Failed claim" below); `lastAllocatedDay` must be yesterday
+after 00:30Z (otherwise read the campaign log: the job may be dark or the day may have had no
+points).
+
+### Refill
+
+Send XLM from treasury to the rewards public address with a normal payment, at most 3 days of pool
+ahead. Nothing to restart: the balance is read live (30 s cache).
+
+### Failed claim (status `failed`)
+
+The payout errored; `failure_reason` says whether it MAY have paid (`submit-ambiguous`) or
+definitely did not (`horizon-rejected: …`, `treasury-account-unavailable`). Verify the treasury's
+outgoing payments on stellar.expert (memo `dig-points`, amount = `total_xlm`). Then, by hand:
+```sql
+-- it DID pay: record it (forward-only: failed → paid)
+update reward_claims set status = 'paid', tx_hash = '<hash>', paid_at = now() where id = '<claim id>' and status = 'failed';
+update reward_allocations set status = 'paid' where claim_id = '<claim id>' and status = 'failed';
+-- it did NOT pay: give the allocations back to the wallet (the ONLY manual backwards move, founder-only)
+update reward_allocations set status = 'claimable', claim_id = null where claim_id = '<claim id>' and status = 'failed';
+```
+NEVER resubmit blindly: that is the double-pay path. A claim stuck in `paying` for more than
+5 minutes means the post-payout UPDATE failed: same explorer-verify procedure.
+
+### Pause / stop
+
+`REWARDS_ENABLED=false` + `pm2 restart --update-env`: the allocation step stops, claims are
+refused with `rewards-disabled`, already-claimable allocations stay recorded and become claimable
+again on resume. Known limit: closed days that pass during a pause stay *pending* (positive points,
+no rows) and ARE allocated at the first enabled run after resume, with the pool and cap configured
+then — there is no "skip these days" switch, so decide before re-enabling whether the paused days
+should pay (if not, keep the rewards paused). Draining the wallet back to treasury: pause first,
+then a normal payment from the hot wallet.

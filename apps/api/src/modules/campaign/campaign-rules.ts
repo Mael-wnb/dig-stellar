@@ -54,7 +54,7 @@ export interface ActionRule {
   basePoints: number;
   /** Max awards counted per wallet per UTC day (0 = never awarded). */
   dailyCap: number;
-  /** The witness row's meets_min_notional must be true. */
+  /** The witness notional (XLM-equivalent) must reach the campaign minimum (CAMPAIGN_MIN_NOTIONAL_XLM). */
   requiresMinNotional: boolean;
 }
 
@@ -210,7 +210,10 @@ export function withinWindow(w: Pick<CampaignWindow, 'startsAtMs' | 'endsAtMs'>,
 
 export interface ActionAwardFacts {
   kind: ActionKind;
-  meetsMinNotional: boolean;
+  /** action_witnesses.notional_xlm (XLM-equivalent at verification time); null = could not be priced = below the minimum. */
+  notionalXlm: number | null;
+  /** The campaign's own minimum (campaignMinNotionalXlm()), NOT the faucet's stored flag (EP5, item 10). */
+  minNotionalXlm: number;
   /** action_witnesses.ledger_closed_at */
   closedAtMs: number;
   /** Awards of the same kind already counted for this wallet on the same UTC day. */
@@ -245,7 +248,7 @@ export function actionAward(f: ActionAwardFacts): ActionAward {
   const rule = ACTION_RULES[f.kind];
   if (!withinWindow(f.window, f.closedAtMs)) return { award: false, reason: 'outside-window' };
   if (rule.basePoints <= 0 || rule.dailyCap <= 0) return { award: false, reason: 'kind-not-awarded' };
-  if (rule.requiresMinNotional && !f.meetsMinNotional) {
+  if (rule.requiresMinNotional && (f.notionalXlm == null || !(f.notionalXlm >= f.minNotionalXlm))) {
     return { award: false, reason: 'below-min-notional' };
   }
   if (f.countedSameDayBefore >= rule.dailyCap) return { award: false, reason: 'daily-cap-reached' };

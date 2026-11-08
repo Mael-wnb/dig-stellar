@@ -10,7 +10,10 @@
 // EP4: PerksBlock is NOT rendered any more (founder decision 2026-10-21: perks
 // are recorded by the backend and served on /me, but not surfaced in the UI
 // yet). The component and its spec are kept for when they are.
-import { computed, onMounted, onUnmounted, watch } from 'vue'
+// EP5: on load the view flushes the witness outbox and runs the immediate
+// /sync (items 8 + 9); the hero's Claim button calls POST /campaign/rewards/claim
+// and the API's answer is rendered as one honest line.
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useCampaign } from '../../composables/useCampaign'
 import EnrollCard from '../earn/EnrollCard.vue'
 import EarnHeroCard from '../earn/EarnHeroCard.vue'
@@ -21,7 +24,7 @@ import ReferralCard from '../earn/ReferralCard.vue'
 import ActivityFeed from '../earn/ActivityFeed.vue'
 import LeaderboardTable from '../earn/LeaderboardTable.vue'
 import EarnFaq from '../earn/EarnFaq.vue'
-import type { CampaignTask, SocialTaskKey } from '../../api/campaign'
+import type { CampaignTask, RewardsClaimResult, SocialTaskKey } from '../../api/campaign'
 
 const {
   campaign,
@@ -32,17 +35,59 @@ const {
   meLoading,
   leaderboard,
   activity,
+  rewards,
+  verifying,
   identity,
   refreshCampaign,
   refreshMe,
   refreshLeaderboard,
+  flushOutboxAndSync,
+  claimRewards,
 } = useCampaign()
+
+// EP5: the claim outcome, rendered in the hero from the API's answer only.
+const claiming = ref(false)
+const claimMessage = ref<string | null>(null)
+
+const CLAIM_REASON_COPY: Record<string, string> = {
+  'rewards-disabled': 'XLM rewards are paused right now.',
+  'ownership-proof-required': 'Prove wallet ownership first (join the campaign).',
+  'not-enrolled': 'Join the campaign first.',
+  'excluded-address': 'This wallet is not eligible for XLM rewards.',
+  'claim-in-progress': 'A claim is already being paid. Check back in a minute.',
+  'claim-rate-limited': 'One claim per hour. Try again later.',
+  'nothing-claimable': 'Nothing to claim yet. Closed days are shared after midnight UTC.',
+  'below-minimum': 'Below the minimum claim. Keep earning.',
+  'treasury-unavailable': 'The rewards treasury is unreachable right now. Nothing was sent; try again later.',
+  'treasury-insufficient': 'The rewards treasury is being refilled. Nothing was sent; try again later.',
+}
+
+function describeClaim(res: RewardsClaimResult): string {
+  if (res.claimed) return `Paid ${res.xlm.toLocaleString('en-US', { maximumFractionDigits: 7 })} XLM · tx ${res.txHash.slice(0, 8)}`
+  if ('status' in res && res.status === 'failed') {
+    return 'The payment could not be sent. It is recorded for review; nothing to redo on your side.'
+  }
+  return CLAIM_REASON_COPY[res.reason] ?? `Claim refused (${res.reason}).`
+}
+
+async function onClaim() {
+  if (claiming.value) return
+  claiming.value = true
+  claimMessage.value = null
+  try {
+    claimMessage.value = describeClaim(await claimRewards())
+  } catch {
+    claimMessage.value = 'The claim could not be submitted. Please try again.'
+  } finally {
+    claiming.value = false
+  }
+}
 
 const POLL_MS = 60_000
 let timer: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
-  void refreshCampaign(true)
+  void refreshCampaign(true).then(() => flushOutboxAndSync()) // EP5: re-report lost witnesses, then /sync + /me
   void refreshMe()
   void refreshLeaderboard()
   timer = setInterval(() => {
@@ -124,7 +169,17 @@ const catalogueTasks = computed<CampaignTask[]>(() => {
 
     <template v-else>
       <!-- Hero (enrolled) or enrol -->
-      <EarnHeroCard v-if="enrolled && me && rules" :me="me" :rules="rules" :rank="leaderboard?.me?.rank ?? null" />
+      <EarnHeroCard
+        v-if="enrolled && me && rules"
+        :me="me"
+        :rules="rules"
+        :rank="leaderboard?.me?.rank ?? null"
+        :rewards="rewards"
+        :claiming="claiming"
+        :claim-message="claimMessage"
+        :verifying="verifying"
+        @claim="onClaim"
+      />
 
       <EnrollCard v-else-if="!meLoading || !identity" />
 
@@ -132,7 +187,7 @@ const catalogueTasks = computed<CampaignTask[]>(() => {
         <StreakStrip :me="me" :rules="rules" />
         <EarnMoreCard :me="me" :rules="rules" />
         <TasksList :tasks="me.tasks" enrolled />
-        <ActivityFeed :activity="activity" />
+        <ActivityFeed :activity="activity" :paid="rewards?.paid ?? null" />
         <ReferralCard v-if="me.referralCode" :code="me.referralCode" :rules="rules" />
       </div>
       <div v-else-if="rules" class="mt-[14px]">

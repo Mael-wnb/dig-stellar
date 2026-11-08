@@ -21,6 +21,7 @@ import { useModals } from '../../composables/useModals'
 import { useNetwork } from '../../composables/useNetwork'
 import FreshnessChip from '../FreshnessChip.vue'
 import PointsChip from '../earn/PointsChip.vue'
+import RewardsBonusLine from '../earn/RewardsBonusLine.vue'
 import { useCampaign } from '../../composables/useCampaign'
 
 const props = withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
@@ -31,7 +32,10 @@ const { network } = useNetwork()
 // Lot EP (EP2): "+N pts" next to the APY — a SIBLING node fed only by the API
 // rules block; null (campaign inactive/unknown) renders nothing. The APY node
 // and its helper above are untouched; points are never folded into the rate.
-const { pointsForAction, disclaimer: campaignDisclaimer, refreshCampaign } = useCampaign()
+// EP5: `rules` feeds the ONE separate "Dig bonus" line under the Blend tile
+// (RewardsBonusLine) — static copy gated by rules.rewards.enabled, never a
+// percentage, never merged with the APY node above it.
+const { pointsForAction, disclaimer: campaignDisclaimer, refreshCampaign, rules: campaignRules } = useCampaign()
 
 const isMainnet = computed(() => network.value === 'mainnet')
 
@@ -131,6 +135,8 @@ function depositBlend() {
         <div class="mt-[6px]">
           <PointsChip :points="pointsForAction('blend-deposit')" :disclaimer="campaignDisclaimer" caption="Dig points per verified deposit" />
         </div>
+        <!-- Lot EP (EP5): one separate line, hidden unless rules.rewards.enabled; never a %, never in the APY. -->
+        <RewardsBonusLine :rules="campaignRules" />
         <div class="text-[12px] mt-[6px] flex-1" style="color: var(--dig-faint)">
           Supply an asset as collateral and earn the pool's variable rate. Not a
           promised or projected return.

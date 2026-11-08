@@ -100,30 +100,41 @@ export async function submitActionWitness(
 }
 
 /**
- * Fire-and-forget witness reporting after a successful swap / Blend deposit
- * submit. NEVER blocks or fails the action flow (Lot R rule). Retries a few
- * times because the widgets report the hash as soon as the network ACCEPTS the
- * tx (PENDING) — Horizon may not see it as successful for a few ledgers.
- * Re-witnessing is idempotent server-side, so retrying is always safe.
+ * Witness reporting after a successful swap / Blend deposit submit. NEVER
+ * throws and never blocks the action flow (Lot R rule): the widgets call it
+ * without awaiting. Retries a few times because the widgets report the hash as
+ * soon as the network ACCEPTS the tx (PENDING) — Horizon may not see it as
+ * successful for a few ledgers. Re-witnessing is idempotent server-side, so
+ * retrying is always safe.
+ *
+ * EP5 (item 9): resolves with the API's DEFINITIVE answer (witnessed, or a
+ * non-retryable refusal) or null when it gave up / the network failed, so the
+ * caller (useCampaign.witnessAndSync) can acknowledge the hash in the witness
+ * outbox and run the immediate /campaign/sync. Lost reports are the outbox's job.
  */
-export function reportActionWitness(payload: WitnessRequest): void {
-  const RETRYABLE = new Set(["tx-not-found", "tx-not-successful"]);
+export const WITNESS_RETRYABLE_REASONS: ReadonlySet<string> = new Set(["tx-not-found", "tx-not-successful"]);
+
+/** True when the API's answer settles the hash (nothing more to report). */
+export function isWitnessSettled(res: WitnessResponse | null | undefined): boolean {
+  return !!res && (res.witnessed || !WITNESS_RETRYABLE_REASONS.has(res.reason ?? ""));
+}
+
+export async function reportActionWitness(payload: WitnessRequest): Promise<WitnessResponse | null> {
   const DELAYS_MS = [4000, 6000, 6000, 6000];
-  void (async () => {
-    for (const delayMs of DELAYS_MS) {
-      await new Promise((r) => setTimeout(r, delayMs));
-      try {
-        const res = await submitActionWitness(payload);
-        if (res.witnessed || !RETRYABLE.has(res.reason ?? "")) {
-          console.log("[witness]", payload.txHash, res);
-          return;
-        }
-      } catch {
-        // transient (network / 503) — retry on the next delay
+  for (const delayMs of DELAYS_MS) {
+    await new Promise((r) => setTimeout(r, delayMs));
+    try {
+      const res = await submitActionWitness(payload);
+      if (isWitnessSettled(res)) {
+        console.log("[witness]", payload.txHash, res);
+        return res;
       }
+    } catch {
+      // transient (network / 503) — retry on the next delay
     }
-    console.warn("[witness] gave up after retries", payload.txHash);
-  })();
+  }
+  console.warn("[witness] gave up after retries", payload.txHash);
+  return null;
 }
 
 // --- Blend deposit (Testnet) ----------------------------------------------
