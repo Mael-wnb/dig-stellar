@@ -8,3 +8,4 @@ the repo so that every public claim stays inspectable.
 - `evidence/` — the proof corpus: captures, command outputs, transaction hashes, incident notes (`evidence/README.md` indexes it).
 - `status-board-archive.md` — the long-form status board as it stood on 2026-11-05, frozen; the live board is `docs/status-board.md`.
 - `alerting/` — the T2-D2 read-only recon probes. The SCF #46 integration-track application is reviewer-facing and lives at `docs/integrationtrack/`.
+- `history/` — historical delivery documents (`grant-roadmap.md`, `final-report.md`), closed and not edited.

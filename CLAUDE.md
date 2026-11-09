@@ -249,7 +249,7 @@ implementation — treat it as first-class, not "later."
 ## Keep docs in sync
 
 When a structural change lands, update the relevant doc(s) in the same change:
-`docs/grant-roadmap.md`, `docs/current-state.md`, `docs/status-board.md`,
+`docs/internal/history/grant-roadmap.md`, `docs/current-state.md`, `docs/status-board.md`,
 `docs/TECHNICAL_ARCHITECTURE.md`, `docs/runbooks.md`, `docs/deployment.md`, or a note in
 `docs/decisions/`. When updating status, prefer brutal clarity over optimism.
 
@@ -257,7 +257,7 @@ When a structural change lands, update the relevant doc(s) in the same change:
 
 ## Source of truth
 
-`docs/TECHNICAL_ARCHITECTURE.md` (architecture), `docs/grant-roadmap.md` (deliverables),
+`docs/TECHNICAL_ARCHITECTURE.md` (architecture), `docs/internal/history/grant-roadmap.md` (deliverables),
 `docs/current-state.md` + `docs/status-board.md` (where things actually stand),
 schema: the **raw SQL v1/v2** files and the "Data architecture (as-built)" section above are
 authoritative; `docs/data-model.md` + `packages/db/prisma/schema.prisma` describe the legacy path,

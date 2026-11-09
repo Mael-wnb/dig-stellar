@@ -4,9 +4,8 @@ Dig Stellar is DeFi analytics, multi-wallet portfolio monitoring and non-custodi
 Stellar network, live on Stellar Mainnet: one place to read protocol and pool metrics on real data
 refreshed every 15 minutes, follow several wallets, receive in-app alerts, and swap or lend from the
 same screen while every transaction is signed in the user's own wallet. It is built by the Dig team
-(getdig.ai) and is the Stellar module of Dig, a multi-chain Web3 analytics platform. Its foundation
-was funded by Stellar Community Fund award #43, delivered in full and paid in August 2026;
-everything since is Dig's own work ahead of the SCF #46 application.
+(getdig.ai), is the Stellar module of Dig, a multi-chain Web3 analytics platform, and has been in
+production on Stellar Mainnet since August 2026.
 
 ## Live
 
@@ -91,11 +90,12 @@ indexer) and the API contract test; CI runs them on every push.
 
 ## Documentation
 
-Reading order: this README, then `docs/post-grant-summary.md` (what shipped after the grant and
-where it is going), then `docs/status-board.md` (one page: tranches, post-grant lots, what is next).
+Reading order: this README, then `docs/post-grant-summary.md` (where the foundation stands and
+where it is going), then `docs/status-board.md` (one page: the foundation, the lots shipped since,
+what is next).
 Full map with source-of-truth ranks: `docs/README.md`.
 
-- `docs/integrationtrack/`: the SCF #46 integration track: architecture of the next layer
+- `docs/integrationtrack/`: the integration track: architecture of the next layer
   (`ARCHITECTURE.md`, including the Circle CCTP flow) and the deliverables with their completion
   criteria (`milestones.md`).
 - `docs/TECHNICAL_ARCHITECTURE.md`: the architecture document, with a design-vs-as-built table

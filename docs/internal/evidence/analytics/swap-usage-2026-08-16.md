@@ -93,7 +93,7 @@ make this report's section 3 answerable next run.
 
 ## 4. KPI cross-reference — T3-D2 targets
 
-Targets (`docs/grant-roadmap.md`): **50+ unique mainnet wallets, 200+ mainnet transactions.**
+Targets (`docs/internal/history/grant-roadmap.md`): **50+ unique mainnet wallets, 200+ mainnet transactions.**
 
 | Metric | Target | Build-side (this run) | Progress |
 |---|---|---|---|

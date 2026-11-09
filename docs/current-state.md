@@ -6,7 +6,7 @@ This document captures the real, current state of Dig Stellar. It is an internal
 not a pitch. It answers: what works, what is partial, what is fragile, what is still placeholder, and
 what blocks tranche-aligned progress.
 
-Keep it honest and aligned with `docs/grant-roadmap.md` and `docs/status-board.md`. Prefer brutal
+Keep it honest and aligned with `docs/internal/history/grant-roadmap.md` and `docs/status-board.md`. Prefer brutal
 clarity over optimism — this file improves decision quality, not morale.
 
 ---

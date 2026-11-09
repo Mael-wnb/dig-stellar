@@ -1,16 +1,15 @@
 # Dig Stellar: Technical Architecture (Revised)
 
-> **Design document from the SCF #43 application (June 2026).** The grant's four tranches were
-> delivered and validated against the system as built; where the build departed from this design,
-> the table below records the decision and its reason, and `docs/repo-structure.md` /
-> `docs/current-state.md` describe the as-built system. Verified against code and production on
-> 2026-11-04 (`docs/internal/evidence/lot-doc1/doc1-recon.md` §R2). Sections §6 and §9 also carry
-> short inline as-built notes.
+> **Design document (June 2026).** The system was built and validated against this design; where
+> the build departed from it, the table below records the decision and its reason, and
+> `docs/repo-structure.md` / `docs/current-state.md` describe the as-built system. Verified against
+> code and production on 2026-11-04 (`docs/internal/evidence/lot-doc1/doc1-recon.md` §R2).
+> Sections §6 and §9 also carry short inline as-built notes.
 
-**Next layer (SCF #46 integration track).** The application funds the execution layer on this
-foundation: Circle CCTP native USDC import (burn, attestation, mint), Etherfuse stablebonds,
-Blend backstop and position management, Aquarius / Soroswap / DeFindex actions, Telegram and
-Discord alert delivery, and a cross-category intelligence engine. It is specified in
+**Next layer (integration track).** The next layer is the execution layer on this foundation:
+Circle CCTP native USDC import (burn, attestation, mint), Etherfuse stablebonds, lending position
+management on Blend and XOXNO Lending, Aquarius / Soroswap / DeFindex actions, SDEX limit orders,
+Telegram and Discord alert delivery, and a cross-category intelligence engine. It is specified in
 `docs/integrationtrack/ARCHITECTURE.md`, with the deliverables and their completion criteria in
 `docs/integrationtrack/milestones.md`, under the same non-custodial invariants
 (`docs/security-invariants.md`).
@@ -28,12 +27,12 @@ Discord alert delivery, and a cross-category intelligence engine. It is specifie
 | Rule catalogue | Health factor and netflow < 30 s, APY shift, utilization, staleness, email/webhook notifier (§9) | Five families on the sweep: wallet health factor, asset price, pool TVL drop, pool supply/borrow APY, automatic pool-status protection; in-app only (`docs/internal/evidence/lot-n/`, `docs/current-state.md` Lot N) | Built the rules with demand; netflow and utilization deferred, staleness surfaced by `#status` rather than a rule. |
 | History | 30-day backfill from Data Lake / Hubble (§4, §5.3) | Own snapshot tables since 2026-08-12 (network TVL series); event reads within RPC retention (~7 days) | One data lineage over mixed sources; history grows daily; backfill remains possible later (`docs/decisions/2026-08-17-network-tvl-definition.md`). |
 | Storage | Prisma models, monthly partitions, TimescaleDB (§1, §5.2, §6) | Raw SQL families `stellar_v1…v8` on plain Postgres 16, one partial index for `/v1/pools`; Prisma client used as a raw-SQL connection, Prisma models only for legacy routes (`docs/data-model.md`, `docs/repo-structure.md`) | Explicit SQL over ORM surprises; current volume needs no partitioning (`docs/internal/evidence/perf-pools/`). |
-| Access and ownership | SEP-10 web auth, session tokens (§3, §11.1) | Beta reads: rate-limited `userId` grouping key; campaign writes: SEP-53 signed message verified with the public key only (`docs/security-invariants.md` §7, §11) | A non-custodial read product needs no session; SEP-53 covers the one write that needs proof. API keys = Lot KEY (`docs/status-board.md` §3). |
+| Access and ownership | SEP-10 web auth, session tokens (§3, §11.1) | Beta reads: rate-limited `userId` grouping key; ownership-bound writes: SEP-53 signed message verified with the public key only (`docs/security-invariants.md` §7, §11) | A non-custodial read product needs no session; SEP-53 covers the one write that needs proof. API keys = Lot KEY (`docs/status-board.md` §3). |
 | Infrastructure | Fly.io/Railway/Cloud Run, managed Postgres with replicas, managed Redis, leader election (§1, §10.1) | One DigitalOcean VPS: nginx rate-limit zones → API under pm2, indexer from crontab with `flock`; Postgres 16 and Redis 7 in Docker on the host; web on Vercel; Redis provisioned, unused (`docs/internal/evidence/lot-s/`) | Cost and simplicity at beta scale; everything is documented for a later move (`docs/deployment.md`). |
 | CI/CD | lint → typecheck → unit → Testnet → preview → staging → promote (§10.5) | GitHub Actions (`.github/workflows/ci.yml`): build + unit tests + SDK-contract drift and doc-link checks on every push; VPS deploy manual with a checklist (pull, build, pm2 restart, SQL by hand, `docs/deployment.md`); Vercel builds the web | Deploy discipline is on the board as Lot AD (fail-closed deploy script, `docs/internal/evidence/lot-ad/ad0-recon.md`); no staging environment. |
 | Actions | SEP-7 URI/QR, SEP-11 txrep, multisig detection, fee-bump, `restore_footprint` (§3, §8) | Two families on mainnet: SDEX swap and Blend supply/withdraw (`simulateTransaction` preflight); XDR built server-side, decoded and validated client-side before signing, signed in-wallet (Stellar Wallets Kit) (`docs/security-invariants.md` §2–§4, `docs/internal/evidence/t3-d2-mainnet-actions.md`) | The invariants that matter (non-custodial, validate before sign) kept in full; convenience features (SEP-7, txrep, multisig detection, fee bump, restore footprint) deferred. |
 | Allbridge | Active bridge-flow adapter (§1, §5, §7.7, §14) | Built and live for T2-D3; the venue wound down upstream after 2026-07-20; step retired and dashboard section removed 2026-11-03; `bridge_flows` and `/v1/bridge/*` keep the historical record (`docs/status-board.md` T2-D3, `docs/api/CHANGELOG.md`) | External event; the data model stays ready for other rails. |
-| Adapters | Per-adapter 5/15-min cadence (§1, §5.2, §7) | Six live protocols on one 15-min run: Blend, Soroswap, Aquarius, Stellar native DEX, DeFindex, XOXNO Lending (added post-grant); Allbridge retired, see above (`docs/status-board.md`, `docs/current-state.md`) | One cadence, one pipeline, one status page. |
+| Adapters | Per-adapter 5/15-min cadence (§1, §5.2, §7) | Six live protocols on one 15-min run: Blend, Soroswap, Aquarius, Stellar native DEX, DeFindex, XOXNO Lending (added October 2026); Allbridge retired, see above (`docs/status-board.md`, `docs/current-state.md`) | One cadence, one pipeline, one status page. |
 
 Unchanged from the design: Stellar RPC primary with Horizon as complement (§2, §4), the
 non-custodial invariants (§11.2), client-side XDR validation before signing (§8.1). Open items
@@ -193,7 +192,7 @@ This section exists so a reviewer can see at a glance which Stellar and Soroban 
 
 | SEP | Purpose | Our usage |
 |---|---|---|
-| SEP-53 (signed messages) | Wallet signs a plain-text message, never a transaction | As built (Lot EP): the API issues a nonce challenge, the wallet signs the SEP-53 bytes (raw utf8 / sha256 variants also accepted), and the API verifies with the PUBLIC key only (`Keypair.fromPublicKey(...).verify`) — no server key, no JWT, no session token. The proof gates campaign writes and no-session account recovery. SEP-10 is NOT used. |
+| SEP-53 (signed messages) | Wallet signs a plain-text message, never a transaction | As built (Lot EP): the API issues a nonce challenge, the wallet signs the SEP-53 bytes (raw utf8 / sha256 variants also accepted), and the API verifies with the PUBLIC key only (`Keypair.fromPublicKey(...).verify`) — no server key, no JWT, no session token. The proof gates ownership-bound writes and no-session account recovery. SEP-10 is NOT used. |
 | SEP-7 | Transaction URIs (`web+stellar:tx?xdr=…`) | Used for cross-wallet handoff; users can route a generated proposal to any SEP-7-compatible wallet. Replaces the need for a custom "switch signer" flow. |
 | SEP-11 (txrep) | Human-readable transaction envelopes | Used in the proposal UI to show a plain-English summary of the XDR the user is about to sign. |
 
@@ -474,9 +473,9 @@ Reflector is consumed by Blend and (optionally) by our own USD conversions. We r
 
 ### 7.7 Bridge Flows: Allbridge (T2 scope)
 
-Bridge inflow/outflow to Stellar is tracked via Allbridge's attribution data. Axelar and Near Intents remain out of scope for the grant period; we will reassess once Allbridge integration proves the dashboard pattern.
+Bridge inflow/outflow to Stellar is tracked via Allbridge's attribution data. Axelar and Near Intents remain out of scope for this phase; we will reassess once Allbridge integration proves the dashboard pattern.
 
-### 7.8 XOXNO Lending (post-grant, Lot XO — read-only analytics)
+### 7.8 XOXNO Lending (added October 2026, Lot XO — read-only analytics)
 
 - **Contracts**: one pool (custody + per-market accounting), a controller (accounts / risk / price views), a Position NFT (one NFT = one account) and a price aggregator. A market is `HubAssetKey { hub_id, asset }`; three hubs (Core, RWA, AMM), 25 markets. Modelled as one entity per hub, one reserve row per market.
 - **State reads** (read-only simulations, 4 req/s): per market the accrued views `get_reserves` (cash, the TVL leg), `get_supplied_amount`, `get_borrowed_amount`, `get_utilisation`, `get_deposit_rate`, `get_borrow_rate`; `get_sync_data` (static params) cached 24 h in the entity metadata; `controller.get_app_version` smoke check per hub; `controller.get_market_indexes_detailed` (3 keys per call) only for markets our own pricing cannot cover. No XOXNO HTTP API, no event ingestion, no vendored code (PolyForm Noncommercial upstream).
@@ -600,7 +599,7 @@ Alerting architecture aligns with the tiered pipeline: real-time rules run again
 
 ### 9.2 Delivery
 
-Alerts are delivered in-app via WebSocket push to connected sessions. Missed alerts (user offline) are queued in the `Alert` table and delivered on next session open. Email / webhook / Slack delivery is out of scope for the grant period but the delivery layer is abstracted behind a `Notifier` interface for future extension.
+Alerts are delivered in-app via WebSocket push to connected sessions. Missed alerts (user offline) are queued in the `Alert` table and delivered on next session open. Email / webhook / Slack delivery is out of scope for this phase but the delivery layer is abstracted behind a `Notifier` interface for future extension.
 
 ### 9.3 Noise Reduction
 
@@ -655,7 +654,7 @@ The non-custodial model protects against direct key theft, but it does not prote
 | Compromised backend crafts malicious XDR | User signs transaction that drains funds | Client-side XDR decoding and operation-by-operation display; SEP-11 txrep shown to user; user-configurable spend limits enforced client-side. |
 | Compromised frontend (XSS) | Attacker injects malicious proposal | Strict CSP, Trusted Types, no third-party scripts in signing flows, subresource integrity on all loaded assets. |
 | Indexer data poisoning | Wrong alerts, wrong analytics | Ingest from multiple sources where possible (Stellar RPC + Horizon + Hubble backfill); anomaly detection on metric jumps; staleness surfaced in UI. |
-| Stolen session token | Attacker reads user data / triggers notifications | No session token exists: the beta uses the `userId` grouping key (rate-limited, `docs/security-invariants.md` §7) and, for campaign writes and account recovery, a fresh signed-message ownership proof (single-use nonce, 300 s TTL, SEP-53 bytes verified with the public key, no server key). SEP-10 is not used. |
+| Stolen session token | Attacker reads user data / triggers notifications | No session token exists: the beta uses the `userId` grouping key (rate-limited, `docs/security-invariants.md` §7) and, for ownership-bound writes and account recovery, a fresh signed-message ownership proof (single-use nonce, 300 s TTL, SEP-53 bytes verified with the public key, no server key). SEP-10 is not used. |
 | Phishing SEP-7 URIs | User scans a malicious URI | SEP-7 URIs generated by Dig are signed; the receiving wallet is instructed to verify origin. User education in-app. |
 | RPC provider compromise | Stale or false state reads | Cross-check critical reads against a secondary provider for high-value actions. |
 

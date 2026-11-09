@@ -272,7 +272,7 @@ An honest statement of what protects the user-scoped API during the beta:
   ABSENT userId falls back to the shared demo account by design. Invalid userIds are
   always 400; the fallback applies only when the parameter is missing entirely.
 - **Ops endpoints are deliberately public** (founder decision, S0 2026-08-17):
-  `/v1/ops/metrics` and `/v1/ops/adoption` stay unauthenticated for grant
+  `/v1/ops/metrics` and `/v1/ops/adoption` stay unauthenticated for public
   transparency; adoption counters are citable KPI evidence. Their payloads are
   verified to contain no secrets, env values or internal URLs; they do reveal
   aggregate usage levels, which is accepted.
@@ -304,7 +304,7 @@ For every action-path PR:
    one over-cap request rejected by the API.
 3. Before each ungating step (swap, then deposit): run the full checklist top to bottom and record
    the result (date, commit SHA, checker) in the PR or runbook; this record is part of the T3-D2
-   security-validation evidence for the SCF claim.
+   security-validation evidence for the Mainnet-actions claim.
 
 Doc updates: mirror the flag + caps regime into `runbooks.md` and `deployment.md` once implemented.
 
@@ -353,7 +353,7 @@ tests (double claim, disabled flag, below-notional, exhausted, velocity, drained
 
 ## 10. Host network posture (S1, 2026-09-29): Docker bypasses ufw; no CI credential on the VPS
 
-Found during the Lot AD audit: the Postgres container's published port (`5432:5432` in
+Found during the Lot AD internal security review: the Postgres container's published port (`5432:5432` in
 `docker-compose.yml`) was reachable from outside despite ufw default-deny. Docker programs
 its own iptables chains (`DOCKER`, `DOCKER-USER` in FORWARD), which ufw's INPUT rules never
 see. Evidence: `docs/internal/evidence/lot-ad/ad0-security-findings.md`.

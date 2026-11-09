@@ -103,7 +103,7 @@ Smaller corrections: CETES −5.0 % (hard-coded 0.069 → 0.0656), EURC −2.8 %
 
 **Published TVL figures that may depend on the old prices** (listed, nothing modified tonight):
 `docs/status-board.md` (network-TVL lines around 279–280, 348, 363: $230.06M / $186.49M net,
-$249M, $190M, $192M / $166M / $22.7M), `docs/final-report.md`, `docs/grant-roadmap.md`,
+$249M, $190M, $192M / $166M / $22.7M), `docs/internal/history/final-report.md`, `docs/internal/history/grant-roadmap.md`,
 `docs/current-state.md`, `docs/TECHNICAL_ARCHITECTURE.md` (TVL mentions), the hotfix note
 `hotfix-xlm-price-fallback/02-prod-verification.md` (262.10 M vs 260.66 M). The SCF 43 grant is
 closed; these are historical statements dated at their capture and stay as they are. The SCF 46

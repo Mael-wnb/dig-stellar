@@ -97,7 +97,7 @@ When asked to review code, AI should explicitly assess:
 ## Documentation rules
 AI should help keep docs lightweight but useful.
 When a structural change happens, AI should suggest whether one of these needs updating:
-- `grant-roadmap.md`
+- `internal/history/grant-roadmap.md`
 - `current-state.md`
 - `runbooks.md`
 - `deployment.md`

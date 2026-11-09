@@ -361,7 +361,7 @@ Method: a file is "unreferenced" when its **basename** appears in no `docs/**/*.
 
 Of the 92 Markdown files, **26 are not linked from any other doc** (lot-n ×5, lot-g ×6, price-sources-v2 ×3, lot-ep ×3, lot-w ×2, lot-r ×2, lot-q ×3, lot-f ×2, lot-aa ×2, lot-ab, lot-xo, status-page, lot-p — see list above).
 
-**Broken links: 0.** Every Markdown link into `docs/internal/evidence` from `docs/status-board.md`, `docs/grant-roadmap.md`, `docs/current-state.md` (and, second pass, from every `docs/**/*.md` outside `evidence/`) resolves. The only non-resolving textual hit is `docs/internal/evidence/lot-{c,f,g,h}/` in status-board.md line 408, a brace expansion in prose, not a link.
+**Broken links: 0.** Every Markdown link into `docs/internal/evidence` from `docs/status-board.md`, `docs/internal/history/grant-roadmap.md`, `docs/current-state.md` (and, second pass, from every `docs/**/*.md` outside `evidence/`) resolves. The only non-resolving textual hit is `docs/internal/evidence/lot-{c,f,g,h}/` in status-board.md line 408, a brace expansion in prose, not a link.
 
 ### B.11 Exact duplicates (md5)
 

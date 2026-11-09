@@ -10,7 +10,7 @@ This file is the operational progress board for Dig Stellar. It answers, quickly
 - what is still partial or fragile
 - what the next execution step should be
 
-Keep it short, practical, and frequently updated. Keep it aligned with `docs/grant-roadmap.md`
+Keep it short, practical, and frequently updated. Keep it aligned with `docs/internal/history/grant-roadmap.md`
 (the contract + interpretation) and `docs/current-state.md` (the detailed reality).
 
 ---
@@ -510,5 +510,5 @@ T1-D3 criteria.
 
 Update when: a deliverable moves in maturity, a blocker is removed, a gap becomes clearer, the next
 tranche-critical target changes, or a partial area becomes substantially done. When in doubt, prefer
-realism over optimism. Mirror any status change into `docs/grant-roadmap.md` (interpretation layer)
+realism over optimism. Mirror any status change into `docs/internal/history/grant-roadmap.md` (interpretation layer)
 and `docs/current-state.md`.

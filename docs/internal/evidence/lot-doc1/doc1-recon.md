@@ -169,7 +169,7 @@ record of a lot; accurate for its date, not maintained.
    the T1 surface plus `openapi`.
 3. `docs/data-model.md`: title/overview says three families; confirm v4–v8 are described and
    update the overview table.
-4. `docs/final-report.md:31` "Redis handles caching": the submitted report is historical; decide
+4. `docs/internal/history/final-report.md:31` "Redis handles caching": the submitted report is historical; decide
    whether to add a dated footnote or leave it (recommendation: one footnote, no rewrite).
 5. `docs/integrationtrack/*.md`: "SCF Round 45" headers vs the SCF 46 application; founder
    decides whether these are rewritten for SCF 46 or archived.
