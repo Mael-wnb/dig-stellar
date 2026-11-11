@@ -13,7 +13,7 @@ Enumerate the real public surface and its current protections:
   in front of it. Classify: open reads / state-mutating (POST actions builds,
   wallets connect + PATCH, alert rules CRUD, tx submits) / ops.
 - **`/v1/ops/metrics` and `/v1/ops/adoption`**: currently public? They leak
-  usage/adoption data to anyone. Recommend: keep public (grant transparency)
+  usage/adoption data to anyone. Recommend: keep public (adoption transparency)
   or gate behind a static token — report, founder decides.
 - Current state of: CORS (locked to the app origin or `*`?), body-size limits,
   validation coverage (which endpoints accept unvalidated params), error

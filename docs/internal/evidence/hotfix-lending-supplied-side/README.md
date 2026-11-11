@@ -2,7 +2,7 @@
 
 **Branch:** `hotfix/lending-supplied-side` (from `main` @ `322517d`). **Scope:** `apps/api` only —
 two SQL expressions + one comment in `apps/api/src/modules/stellar/stellar.service.ts`, one new
-spec. No schema file, no indexer change, no web change. Post-grant hardening; surfaced by the Lot LM
+spec. No schema file, no indexer change, no web change. Production hardening; surfaced by the Lot LM
 L0 recon (`l0-recon.md`, section E, on the unmerged `lot-lm` branch) and fixed first, on its own, because it
 would propagate to any second lending venue.
 

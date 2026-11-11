@@ -4,9 +4,9 @@
 
 This document captures the real, current state of Dig Stellar. It is an internal execution document,
 not a pitch. It answers: what works, what is partial, what is fragile, what is still placeholder, and
-what blocks tranche-aligned progress.
+what blocks phase-aligned progress.
 
-Keep it honest and aligned with `docs/internal/history/grant-roadmap.md` and `docs/status-board.md`. Prefer brutal
+Keep it honest and aligned with `docs/status-board.md`. Prefer brutal
 clarity over optimism — this file improves decision quality, not morale.
 
 ---
@@ -14,7 +14,7 @@ clarity over optimism — this file improves decision quality, not morale.
 ## Overall project state
 
 **Lot PRE — pre-dossier fixes (2026-11-03, built on `feat/lot-pre`, not deployed).** Four visible
-defects fixed before the SCF 46 window: (A) the dashboard bridge section and the `allbridge`
+defects fixed before the application window: (A) the dashboard bridge section and the `allbridge`
 refresh step are retired — Allbridge Core wound down upstream; `bridge_flows`, `/v1/bridge/*` and
 the adapter stay as a historical record (last flow 2026-07-19); (B) the pool-detail TVL panel shows
 a plain "TVL history not available" state on non-lending pools and cites a "since" date only from
@@ -30,14 +30,11 @@ DeFindex API on a 15-minute cron (XOXNO Lending live in prod since Lot XO, `/hea
 in-app alerting, a bridge-flow API kept as a historical record (Lot PRE), and a non-custodial transaction builder with swaps and
 Blend supply/withdraw executed and Horizon-verified on Mainnet.
 
-**SCF #43 is COMPLETE — all four tranches validated and paid.** Tranche 2 (20%, MVP): late July
-2026 · Tranche 3 (30%): early August 2026 · Tranche 4 (40%): around 20 August 2026, including
-acceptance of the final SDF report. The team rushed to finish before 15 August to apply to
-SCF 45; SCF 45 reviewers redirected the application to SCF 46 (8 November 2026) because SCF 43's
-final validation had not landed at their review time. Everything since — Lots AA/AB (responsive
-shell + watch-only-first), AC (Node 24), AD (CI/CD, in progress), ST (status page), EP (Earn &
-Points campaign, Oct 2026) — is **post-grant product hardening** while preparing the SCF 46
-application.
+**The foundation is COMPLETE — all three phases closed.** Phase 1 (MVP): late July 2026 ·
+Phase 2: early August 2026 · Phase 3: around 20 August 2026, with the final delivery report
+accepted. Everything since — Lots AA/AB (responsive shell + watch-only-first), AC (Node 24),
+AD (CI/CD, in progress), ST (status page), EP (Earn & Points campaign, Oct 2026) — is **product
+hardening** while preparing the integration-track application (8 November 2026).
 
 **Lot EP — Earn & Points campaign (EP1 + EP2 + EP3, 2026-10-15 → 2026-10-21): delivered, deployed
 DARK, activation pending.** Points only: no payout, no token, no new server-side key. Wallet
@@ -489,7 +486,7 @@ to prod** (VPS bootstrap + full `job:refresh` clean on Aug 4, ~3 min end-to-end;
 serves 5 protocols with `isStale=false`; Vercel front live). DeFindex user positions stay out of
 scope (portfolio is Blend-only by design).
 
-**XOXNO Lending (post-grant Lot XO, XO-1 — built 2026-10-26→30, deployed: `xoxno` refreshing in
+**XOXNO Lending (Lot XO, XO-1 — built 2026-10-26→30, deployed: `xoxno` refreshing in
 prod on 2026-11-04, `/health` fresh + `/v1/protocols` ≈ $146.8k, Lot DOC1 recon).** Sixth
 protocol, read-only: venue `xoxno`, one entity per hub (Core / RWA / AMM), one reserve row per
 market (25), refreshed as step 6c of `job:refresh` through `run-xoxno-hub-refresh.ts` (adapter
@@ -534,7 +531,7 @@ Exists: refresh jobs on a 15-min cron; persisted timestamps across snapshots/met
 **Landed (T3-D3 Lot E, Aug 13):** enriched `/health` (per-venue freshness + GIT_SHA),
 `GET /v1/ops/metrics` (per-run RPC latency p50/p95/p99 + error rates), `GET /v1/ops/adoption`.
 
-**Landed (post-grant Lot ST, Sept 2026):** a public **status page** at `#status` — the visible
+**Landed (Lot ST, Sept 2026):** a public **status page** at `#status` — the visible
 face of the Lot E observability. `GET /v1/ops/status?window=24h` aggregates
 `refresh_step_runs` + `rpc_metrics_runs` server-side into a Statuspage-style payload (one row
 per pipeline step and per RPC target, one tile per 15-min run, gap/availability math incl.
@@ -624,7 +621,7 @@ deep XLM/USDC pool) via a swap-only asset constant (Blend's USDC untouched), and
 from a live quote with slippage instead of a manual guess.
 
 Architectural fact (important): Stellar Protocol 20 forbids mixing `InvokeHostFunction` (Soroban) with
-classic operations in one envelope. So the grant's literal `ChangeTrust + Deposit` single-XDR is only
+classic operations in one envelope. So the literal `ChangeTrust + Deposit` single-XDR is only
 achievable via classic SDEX, not Blend. Hence the SDEX swap is the primary single-XDR demonstration of
 the criterion; the Blend deposit is a secondary Soroban pattern (two sequential txs).
 
@@ -867,28 +864,28 @@ T3-D3 ops item.
    counts automatically and the incentive campaign drives real executions, but post-campaign
    organic adoption is unproven (the action stack itself is deployed and evidenced end-to-end)
 
-## 12. Closest post-grant wins
+## 12. Closest wins after the foundation
 1. Lot AD — CI/CD deploy pipeline (in progress): removes the manual-VPS-deploy failure mode
 2. Lot ST — status page deploy (API → verify → Vercel, `docs/deployment.md` "Lot ST deploy sequence")
-3. SCF 46 application prep (deadline 8 November 2026)
+3. Integration-track application prep (deadline 8 November 2026)
 
 ---
 
-## 13. Current execution priorities (updated 2026-09-05 — post-grant)
+## 13. Current execution priorities (updated 2026-09-05)
 1. **Lot AD — CI/CD deploy pipeline** (in progress): automated VPS deploy replacing the manual
    sequence (the 2026-08-17 aborted-pull incident class is the failure mode it removes)
 2. **Lot ST — status page deploy**: founder runs the ordered sequence in `docs/deployment.md`
    (API build + pm2 restart → three curl verifications → Vercel push → `#status` + 390px check)
-3. **SCF 46 application prep** (deadline 8 November 2026)
+3. **Integration-track application prep** (deadline 8 November 2026)
 4. **Lot EP activation** (after the EP3 dark deploy): founder sets the three env names, installs
    the campaign cron line, runs the job by hand once (`docs/runbooks.md` "Activate the campaign")
 
 What should not dominate now: over-engineering auth/session, premature abstraction layers, broad
-refactors not tied to a product need, or polishing low-value UI ahead of the SCF 46 application.
+refactors not tied to a product need, or polishing low-value UI ahead of the integration-track application.
 
 ---
 
 ## 14. How to update this file
 Update when a feature moves from partial to stable, a placeholder becomes real, a new backend/indexer
 capability becomes operational, deployment reality changes, a fragile area becomes dependable, or a
-grant deliverable meaningfully advances. Prefer brutal clarity over optimism.
+foundation deliverable or lot meaningfully advances. Prefer brutal clarity over optimism.

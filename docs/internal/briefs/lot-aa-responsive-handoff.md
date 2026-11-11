@@ -9,7 +9,7 @@ are **not overridable**. Flag conflicts instead of silently deviating.
 
 ## 0. Context
 
-- Tranche 4 is submitted (form + video + final report). SCF reviewers may open
+- Phase 3 is submitted (form + video + final report). Reviewers may open
   stellar.getdig.ai at any time during review, including from phones. The app is
   currently hard to use on mobile (fixed sidebar, no mobile shell).
 - Faucet campaign 2 is LIVE (60-claim budget, per-family anti-sybil rule). Campaign
@@ -23,7 +23,7 @@ are **not overridable**. Flag conflicts instead of silently deviating.
 
 ## 1. Workflow Rules — NEW STANDING DISCIPLINE (applies to this lot and all future lots)
 
-The app is released, in SCF review, and running a live incentive campaign.
+The app is released, under external review, and running a live incentive campaign.
 Direct-to-main is over.
 
 1. **Never commit or push to `main` directly.** All work happens on `feat/responsive`

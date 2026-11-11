@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-18 · **Branch:** `feat/t3-reference-compose` (final: `4804e9f`) ·
 **Criterion (T3-D3, verbatim):** "The application is packaged as a Reference Implementation
-for the SDF (functional Docker compose) with internal documentation."
+(functional Docker compose) with internal documentation."
 
 Proof machine: macOS (Darwin 25.6.0), Docker 27.3.1, compose v2. The clone ran **side-by-side
 with the live dev stack**, so the documented second-stack overrides were used (distinct

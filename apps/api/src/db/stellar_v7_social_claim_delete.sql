@@ -1,6 +1,6 @@
 -- apps/api/src/db/stellar_v7_social_claim_delete.sql
 --
--- Lot EP (post-grant, EP2): SOFT delete for self-declared social task claims
+-- Lot EP (EP2): SOFT delete for self-declared social task claims
 -- (recon §9.4 — a person must be able to remove their X handle, user-supplied
 -- PII, before launch). POINTS ONLY, no key, no payout.
 --

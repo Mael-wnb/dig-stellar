@@ -1,7 +1,7 @@
 # Advisor feedback — 2026-08-10 (paraphrase)
 
 Source: front-advisor review of the mainnet beta, received 2026-08-10. Maël holds the
-original message; the points below are a paraphrase, dated for the tranche record. This
+original message; the points below are a paraphrase, dated for the phase record. This
 feedback is the origin of **Lot F (T3-D3 — "Final UI polish based on Mainnet feedback")**;
 each point traces to a Lot F step.
 
@@ -32,5 +32,5 @@ each point traces to a Lot F step.
 ## Trace
 
 F1 → points 1 & 2 · F2 → point 5 · F3 → point 3 · F4 → points 4 & 5.
-This is the feedback→fix loop the tranche reviewer asked to see; before/after captures for
+This is the feedback→fix loop the phase reviewer asked to see; before/after captures for
 each step land in this folder as the step ships.

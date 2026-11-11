@@ -1,6 +1,6 @@
 // apps/web/src/composables/useAlerts.ts
 //
-// View-model adapter for the Alerts feature (SCF T2-D2). Presents the shape Paul's
+// View-model adapter for the Alerts feature (T2-D2). Presents the shape Paul's
 // design consumes (AlertsView.vue + AlertRuleModal.vue) on top of the REAL, frozen
 // backend contract.
 //

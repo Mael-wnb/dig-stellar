@@ -84,7 +84,7 @@ Searched on 2026-10-15 (`grep` over `docs/**/*.md`): the field names `stableMcap
 `stable_mcap`, any nine-digit figure starting with 9, and "stablecoin(s)" next to an M / B
 amount. **No committed document quotes the inflated figure** (the only nine-digit hit is an
 unrelated balance in `docs/internal/evidence/lot-h/h6-position-breakdown-2026-08-13.md:70`). The
-figure was only ever served live, never written into a grant document or an evidence file.
+figure was only ever served live, never written into a delivery document or an evidence file.
 
 The one user-facing surface is the dashboard tile:
 - `apps/web/src/components/views/DashboardView.vue:96` — `{ label: 'Stablecoin MCap', value:

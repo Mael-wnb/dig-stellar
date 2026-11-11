@@ -5,8 +5,8 @@
 Scope: establish, from the code at `6ee8721` (main), what exists today for wallet identity,
 action recording, the faucet's anti-abuse logic, the DB, the web shell, the jobs and the
 analytics, and derive the smallest credible plan for an in-app points campaign ("Earn"
-page + leaderboard). Post-grant product work: it serves product growth and SCF 46 material,
-not an SCF 43 criterion.
+page + leaderboard). Product work: it serves product growth and the integration-track material,
+not a foundation criterion.
 
 Nothing was modified, run on the VPS, committed or pushed. Only this file was created.
 Every claim below carries a `path:line` reference verified with `grep -n` / `sed -n`.
@@ -665,7 +665,7 @@ which is out of EP scope.
    label later, top-N only, cached, in the general nginx zone. Founder call at the EP2 gate.
 6. **Points next to yields.** Keep points in a separate API field and a separate DOM node; copy
    must never say "APY + points" or compute a combined rate. The disclaimer string travels in
-   every payload. This also keeps the "no token/airdrop" line auditable by grep.
+   every payload. This also keeps the "no token/airdrop" line checkable by grep.
 7. **Self-declared social tasks are gameable** by construction. Handle uniqueness and the daily
    cap bound the damage; multipliers from social tasks should be small and capped so on-chain
    verified actions dominate the leaderboard. State "self-declared" in the metrics boundary.

@@ -1,6 +1,6 @@
 -- apps/api/src/db/stellar_v8_campaign_perks.sql
 --
--- Lot EP (post-grant, EP3): NON-MONETARY perks unlocked by points balance.
+-- Lot EP (EP3): NON-MONETARY perks unlocked by points balance.
 -- POINTS ONLY, no key, no payout, no token: a perk is a badge, an early-access
 -- or a beta flag the web reads from GET /v1/campaign/me. Nothing here moves
 -- funds or signs anything.
@@ -23,7 +23,7 @@
 -- "Revoke a perk"); no code path updates or deletes a row of this table.
 --
 -- points_at_grant records the balance the job saw when it granted the tier
--- (audit only; the balance itself is always sum(points), never stored).
+-- (for the record only; the balance itself is always sum(points), never stored).
 
 create table if not exists wallet_perks (
   campaign int not null,

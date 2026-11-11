@@ -49,7 +49,7 @@ payout. On-chain artifacts are permanent testnet evidence.
 - Reminder for go-live (runbook): testnet `faucet_claims` rows on the VPS DB
   must be cleared before the mainnet flip (global uniqueness).
 
-## KPI integrity note (grant narrative)
+## KPI integrity note (adoption narrative)
 
 Witnessed actions gathered while the faucet campaign runs are real on-chain
 executions by real wallets (the eligibility REQUIRES a settled qualifying tx),

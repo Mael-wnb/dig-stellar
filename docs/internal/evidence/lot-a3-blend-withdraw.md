@@ -2,7 +2,7 @@
 
 Date: 2026-08-13 · Brief: `docs/internal/briefs/lot-a3-blend-withdraw.md` · Contract: `docs/security-invariants.md`
 
-Completes the supply↔withdraw loop in the action modal. Not required by any SCF criterion
+Completes the supply↔withdraw loop in the action modal. Not required by any foundation criterion
 (T3-D2's "vault/lending interactions" is satisfied by the deposit) — product completeness
 before the advisor re-review, plus a bonus mainnet evidence pair once reviewed.
 

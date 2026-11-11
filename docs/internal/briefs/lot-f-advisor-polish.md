@@ -16,7 +16,7 @@ Create `docs/internal/evidence/lot-f/` and save:
   failed atomically, only the 100-stroop fee charged. Motivates F2.
 - Before/after screenshots for each step as it lands.
 
-This feedback→fix loop is exactly what the tranche reviewer needs to see. Keep the trace.
+This feedback→fix loop is exactly what the phase reviewer needs to see. Keep the trace.
 
 ## Non-negotiables (unchanged from Lots A/C)
 

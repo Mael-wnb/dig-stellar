@@ -9,7 +9,7 @@
 #        web     -> pnpm -C apps/web dev              (Vite, :5173)
 #        indexer -> one-shot cron-style commands (pnpm -C apps/indexer job:refresh)
 #
-#   2. Reference deployment (SDF reviewers): the `app` profile adds the
+#   2. Reference deployment (external reviewers): the `app` profile adds the
 #      containerized api + indexer on top:
 #        docker compose --profile app up -d --build
 #      Full path (fresh clone -> mainnet data): docs/reference-deployment.md.

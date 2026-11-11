@@ -12,13 +12,13 @@ below are not overridable. Flag conflicts instead of silently deviating.
 - Status-board weakest area #2: "CI/CD: VPS deploy is still manual — the 2026-08-17
   incident (aborted pull skipping a SQL file) is exactly the failure mode this
   invites."
-- SCF 45 feedback: the SCF 46 resubmission (Nov 8) requires full Tranche 4
-  validation first. This quiet window is for hardening within SCF 43 scope —
+- Reviewer feedback: the integration-track application (Nov 8) requires the Phase 3
+  validation first. This quiet window is for hardening within the foundation scope —
   operational maturity is a first-class T3-D3 theme, and this lot is its most
   legible piece for a reviewer.
-- Update 2026-09-05: the "requires full Tranche 4 validation first" condition above is
-  **satisfied** — SCF 43 is complete (all four tranches validated and paid; see
-  `docs/status-board.md` Global status).
+- Update 2026-09-05: the "requires the Phase 3 validation first" condition above is
+  **satisfied** — the foundation is complete (all three phases closed; see
+  `docs/status-board.md`).
 - Observed during the Lot ST prod deploy (2026-09-05): the VPS had drifted to `3618c03`
   (Lot AB) for ~3 weeks, and a locally modified root `package.json` (a `packageManager`
   field written by pnpm/corepack) blocked `git pull`. Two requirements for this lot: the
@@ -82,7 +82,7 @@ below are not overridable. Flag conflicts instead of silently deviating.
   (type-level only), deal with third-party `.d.ts` debt explicitly (e.g.
   `skipLibCheck` with a comment naming why, or targeted excludes) — the gate must be
   green and meaningful, not silenced wholesale without a note.
-- Add a dependency-audit step (`pnpm audit --prod` or equivalent): **non-blocking
+- Add a dependency-check step (`pnpm audit --prod` or equivalent): **non-blocking
   report** by default (surfaces in the CI log/summary), so it informs without
   freezing the pipeline on upstream noise. Flag if you think blocking-on-critical
   is warranted.
@@ -117,7 +117,7 @@ frontend changes.
 - One real production deploy executed end-to-end via `scripts/deploy-api.sh` with
   the health assert passing (evidence captured), plus dry-run + failure-path
   captures.
-- CI green with indexer typecheck active and the audit step reporting.
+- CI green with indexer typecheck active and the `pnpm audit` step reporting.
 - Force-push/deletion protection active on `main` on both remotes.
 - Docs updated (script is the canonical procedure); evidence folder complete; §1
   respected throughout (branch → CI → founder go → FF → both remotes).

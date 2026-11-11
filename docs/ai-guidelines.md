@@ -65,7 +65,7 @@ AI should place in the indexer:
 ## What AI should do before writing code on non-trivial tasks
 Before implementing a significant feature or refactor, AI should first help answer:
 - what is the actual goal?
-- which tranche/deliverable does it serve?
+- which phase/deliverable or lot does it serve?
 - which app should own this logic?
 - what files are likely involved?
 - what is the most pragmatic execution order?
@@ -90,14 +90,14 @@ When asked to review code, AI should explicitly assess:
 - hidden coupling
 - needless complexity
 - impact on beta delivery speed
-- whether the change is enough for the current tranche or still incomplete
+- whether the change is enough for the current phase or still incomplete
 
 ---
 
 ## Documentation rules
 AI should help keep docs lightweight but useful.
 When a structural change happens, AI should suggest whether one of these needs updating:
-- `internal/history/grant-roadmap.md`
+- `status-board.md`
 - `current-state.md`
 - `runbooks.md`
 - `deployment.md`

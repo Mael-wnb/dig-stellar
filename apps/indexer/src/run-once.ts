@@ -18,7 +18,7 @@ async function main() {
       type: 'market',
       label: 'Demo Market',
       protocolId: protocol.id,
-      meta: { note: 'seeded for grant demo' },
+      meta: { note: 'seeded for demo' },
     },
   });
 

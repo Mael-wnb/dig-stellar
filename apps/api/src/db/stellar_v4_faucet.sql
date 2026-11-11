@@ -31,7 +31,7 @@ create table if not exists faucet_claims (
   witness_tx_hash text not null references action_witnesses(tx_hash),
   network text not null,                     -- 'testnet' | 'mainnet' (the paying network)
   status text not null default 'pending',    -- 'pending' | 'paid' | 'failed'
-  reward_xlm numeric not null,               -- amount in force when the claim was made (auditable)
+  reward_xlm numeric not null,               -- amount in force when the claim was made (traceable)
   payout_tx_hash text,                       -- set on paid
   failure_reason text,                       -- set on failed; never contains key material
   created_at timestamptz not null default now(),

@@ -9,15 +9,15 @@ Status vocabulary: `done` · `in_progress` · `planned` · `blocked` · `dropped
 one; "on main" means merged into `main` and present in the production checkout without a
 separate production capture.
 
-Last updated: 2026-11-09 (Lot DOC6, reviewer-path wording).
+Last updated: 2026-11-11 (Lot DOC7, documentation layout).
 
 ## 1. Foundation (August 2026)
 
 | Phase | Deliverables | Status | Completed | Detail |
 |---|---|---|---|---|
-| MVP | T1-D1 data indexing (Horizon + Soroban), T1-D2 analytics dashboard, T1-D3 transaction builder (testnet) | done | late July 2026 | [archive, "MVP"](internal/status-board-archive.md#tranche-1--mvp-reviewed-for-the-scf-20-disbursement) |
-| Testnet | T2-D1 multi-wallet portfolio and active signer, T2-D2 in-app alerting, T2-D3 bridge-flow monitoring | done | early August 2026 | [archive, "Expansion"](internal/status-board-archive.md#tranche-2--expansion-internal-reviewed-later-for-the-30-disbursement) |
-| Mainnet | T3-D1 mainnet deployment and freshness, T3-D2 non-custodial mainnet actions, T3-D3 observability, polish, reference hand-off | done | around 20 August 2026 | [archive, "Mainnet"](internal/status-board-archive.md#tranche-3--mainnet--operational-maturity-internal-reviewed-for-the-40-disbursement) |
+| Phase 1 — MVP | T1-D1 data indexing (Horizon + Soroban), T1-D2 analytics dashboard, T1-D3 transaction builder (testnet) | done | late July 2026 | [archive, "Phase 1 — MVP"](internal/status-board-archive.md#phase-1--mvp) |
+| Phase 2 — Expansion | T2-D1 multi-wallet portfolio and active signer, T2-D2 in-app alerting, T2-D3 bridge-flow monitoring | done | early August 2026 | [archive, "Phase 2 — Expansion"](internal/status-board-archive.md#phase-2--expansion) |
+| Phase 3 — Mainnet | T3-D1 mainnet deployment and freshness, T3-D2 non-custodial mainnet actions, T3-D3 observability, polish, reference hand-off | done | around 20 August 2026 | [archive, "Phase 3 — Mainnet"](internal/status-board-archive.md#phase-3--mainnet--operational-maturity) |
 
 Post-delivery note: the T2-D3 Allbridge integration was retired from the refresh pipeline and the
 dashboard on 2026-11-03 (Lot PRE) after the venue wound down upstream in July 2026; its data,
@@ -45,10 +45,11 @@ Public-facing statements per item: `post-grant-summary.md`.
 | perf-pools | `GET /v1/pools` latency: partial swap index, statement rewrite, 90 s list cache | done (2026-10-30) | on main | `internal/evidence/perf-pools/README.md` |
 | API | Public API v1 contract: OpenAPI 3.1, Scalar page, contract test (40 checks) | done (2026-11-03) | `de1b8bb` | `internal/evidence/lot-api/api5-prod-verification.md` |
 | PRE | Pre-dossier fixes: bridge retired, TVL caption, Horizon calls, internal metrics route gated, native step exit code | done (closed 2026-11-05) | `14c8bb8` | `internal/evidence/lot-pre/pre3-recon.md` |
-| DOC1 | Reviewer-facing docs: README, design-vs-as-built table, docs map, post-grant summary | done (2026-11-04) | on main (`438971f`) | `internal/evidence/lot-doc1/doc1-recon.md` |
+| DOC1 | Reviewer-facing docs: README, design-vs-as-built table, docs map, summary document (`post-grant-summary.md`) | done (2026-11-04) | on main (`438971f`) | `internal/evidence/lot-doc1/doc1-recon.md` |
 | SDK0 | Vercel-preview CORS matcher + TypeScript SDK v0 (`@getdig/stellar-api`, not published) | done (2026-11-04) | `b34f07d` | `internal/evidence/lot-sdk/sdk0-build.md` |
 | DOC2 | Internal material out of the reviewer path, one-page board, doc link check in CI | done (2026-11-05) | on main (`8f6e2b4`) | `internal/evidence/lot-doc2/` |
 | SDK1 | SDK publish readiness (`@getdig/stellar-api` 0.1.0) + MCP server `@getdig/stellar-mcp` 0.1.0 (six read-only tools) | done (2026-11-07; both published on npm at 0.1.0) | on main | `internal/evidence/lot-sdk/sdk1-build.md` |
+| DOC7 | Documentation layout consolidated | done | on main | |
 
 ## 3. Next
 
@@ -58,7 +59,7 @@ Public-facing statements per item: `post-grant-summary.md`.
 | KEY | Access keys on the public API (not built today, `post-grant-summary.md` §3) | planned |
 | DATA | Scope to be stated in the lot brief | planned |
 | REC | Scope to be stated in the lot brief | planned |
-| DOC2 follow-ups | `CLAUDE.md` test/CI and network-stats lines, `repo-structure.md` module map, `data-model.md` overview, `internal/history/final-report.md` Redis footnote, integration-track headers (`internal/evidence/lot-doc1/doc1-recon.md` §6) | planned |
+| DOC2 follow-ups | `CLAUDE.md` test/CI and network-stats lines, `repo-structure.md` module map, `data-model.md` overview, integration-track headers (`internal/evidence/lot-doc1/doc1-recon.md` §6) | planned |
 
 ## Update rule
 

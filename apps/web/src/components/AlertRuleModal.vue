@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // apps/web/src/components/AlertRuleModal.vue
-// SCF T2-D2 — "New alert rule" modal. Reconstructed 1:1 from Paul's Claude Design mock.
+// T2-D2 — "New alert rule" modal. Reconstructed 1:1 from Paul's Claude Design mock.
 // Steps: 1) What to watch  2) Which target  3) Condition  4) Severity.
 //
 // Scope discipline: the full builder is shown (Paul's vision), but only rule families the

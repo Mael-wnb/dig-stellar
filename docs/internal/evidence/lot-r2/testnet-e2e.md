@@ -76,7 +76,7 @@ decremented by the payouts.
   before the mainnet flip — uniqueness is per (wallet, family, campaign), not
   per network, unchanged from campaign 1.
 
-## KPI integrity note (grant narrative)
+## KPI integrity note (adoption narrative)
 
 Same framing as Lot R: witnessed actions gathered during campaign 2 are real
 on-chain executions, but the adoption figures must state the incentive

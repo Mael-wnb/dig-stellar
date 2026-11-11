@@ -1,7 +1,7 @@
 # CLAUDE.md — Dig Stellar
 
 Operating instructions for Claude Code in this repository.
-This file is the working contract for code tasks. For grant/architecture detail, defer to
+This file is the working contract for code tasks. For product/architecture detail, defer to
 `docs/` (see "Source of truth" below) rather than guessing — do not duplicate that content here.
 
 ---
@@ -9,8 +9,9 @@ This file is the working contract for code tasks. For grant/architecture detail,
 ## What this project is
 
 Stellar-native DeFi analytics + multi-wallet portfolio monitoring + optional non-custodial
-action proposals. Funded by SCF 43 ($75k, 3 tranches). Stage: **functional beta with real
-foundations**, transitioning toward operational, tranche-claimable maturity.
+action proposals. The foundation (three phases, nine deliverables) has been in production since
+August 2026; work since then is product hardening and the integration track. Stage: **functional
+beta with real foundations**, transitioning toward operational maturity.
 
 Mindset: **beta-first, execution-first, clarity-first.** Ship a credible beta, not a perfect
 architecture. Prefer robust pragmatism over theoretical elegance. Short-term debt is acceptable
@@ -167,14 +168,14 @@ entry points are the per-protocol `run-*-refresh.ts` called by `71-refresh-all-m
 ## Before any non-trivial task
 
 Answer briefly, then proceed:
-1. Which tranche / deliverable does this serve? (see `docs/status-board.md`)
+1. Which phase / deliverable or lot does this serve? (see `docs/status-board.md`)
 2. Which app owns the logic — `web`, `api`, or `indexer`?
 3. What is the beta-first version, and what is explicitly out of scope?
 4. Files likely involved + most pragmatic execution order?
 5. What can be postponed?
 
 Then: implement → review (fragility, hidden coupling, needless complexity, is it *enough* for the
-current tranche) → validate with real commands/endpoints/UI → flag which doc needs updating.
+current phase) → validate with real commands/endpoints/UI → flag which doc needs updating.
 
 Prefer the smallest coherent change that moves the product forward. Commit in small, understandable
 increments.
@@ -209,14 +210,13 @@ increments.
 `docs/status-board.md` is the live source of truth for status — do not hard-code percentages here
 (they re-stale). Read the board.
 
-- **T1 (MVP) — submitted & awaiting SCF validation.** No further T1 build work is pending review.
-- **Active work is the T2 group:**
-  1. **T2-D1 — Multi-Wallet Portfolio & "Active Signer"** — substantially done (final HF cross-check
-     vs blend.capital remaining).
-  2. **T2-D2 — In-App Alerting Engine** — built (backend + frontend), awaiting internal validation /
-     demo + VPS deploy. As-built: periodic OS-cron sweep (`job:wallet-alert`) → in-app notifications;
-     see the v3 alerting family above and `docs/runbooks.md`.
-  3. **T2-D3 — Bridge Flow Monitoring** — delivered and paid; Allbridge Core wound down upstream,
+- **The foundation (Phases 1–3, T1-D1 … T3-D3) is complete and in production** since August 2026;
+  the per-deliverable record is `docs/internal/status-board-archive.md`.
+- **Work since then is the lot list in `docs/status-board.md` §2–3** (hardening, public API, SDK,
+  engagement module, XOXNO, documentation). Notes on two foundation deliverables still worth knowing:
+  1. **T2-D2 — In-App Alerting Engine** — as-built: periodic OS-cron sweep (`job:wallet-alert`) →
+     in-app notifications; see the v3 alerting family above and `docs/runbooks.md`.
+  2. **T2-D3 — Bridge Flow Monitoring** — delivered; Allbridge Core wound down upstream,
      so the dashboard bridge section and the `allbridge` refresh step were retired (Lot PRE,
      2026-11-03). `/v1/bridge/*`, `bridge_flows` and the adapter stay as a historical record.
 
@@ -231,7 +231,7 @@ implementation — treat it as first-class, not "later."
   DEX) and is **excluded from the canonical network-TVL sum** (`network_tvl_snapshots`) — its vault
   funds sit inside Blend pools, so counting both would double-count (founder ruling 2026-08-17,
   `docs/decisions/2026-08-17-network-tvl-definition.md`).
-- **XOXNO Lending** (post-grant Lot XO, XO-1, 2026-10-30) is on the `job:refresh` path (step 6c,
+- **XOXNO Lending** (Lot XO, XO-1, 2026-10-30) is on the `job:refresh` path (step 6c,
   `run-xoxno-hub-refresh.ts`, adapter `lib/protocols/xoxno/`): venue `xoxno`, one entity per hub
   (3), one reserve row per market (25), read-only, on-chain views only (no XOXNO HTTP API; the
   protocol's repository is PolyForm Noncommercial — never vendor its code). TVL = pool cash; a
@@ -249,7 +249,7 @@ implementation — treat it as first-class, not "later."
 ## Keep docs in sync
 
 When a structural change lands, update the relevant doc(s) in the same change:
-`docs/internal/history/grant-roadmap.md`, `docs/current-state.md`, `docs/status-board.md`,
+`docs/current-state.md`, `docs/status-board.md`,
 `docs/TECHNICAL_ARCHITECTURE.md`, `docs/runbooks.md`, `docs/deployment.md`, or a note in
 `docs/decisions/`. When updating status, prefer brutal clarity over optimism.
 
@@ -257,8 +257,8 @@ When a structural change lands, update the relevant doc(s) in the same change:
 
 ## Source of truth
 
-`docs/TECHNICAL_ARCHITECTURE.md` (architecture), `docs/internal/history/grant-roadmap.md` (deliverables),
-`docs/current-state.md` + `docs/status-board.md` (where things actually stand),
+`docs/TECHNICAL_ARCHITECTURE.md` (architecture), `docs/internal/status-board-archive.md` (the
+foundation deliverables, per phase), `docs/current-state.md` + `docs/status-board.md` (where things actually stand),
 schema: the **raw SQL v1/v2** files and the "Data architecture (as-built)" section above are
 authoritative; `docs/data-model.md` + `packages/db/prisma/schema.prisma` describe the legacy path,
 `docs/runbooks.md` + `docs/deployment.md` (operations), `docs/ai-guidelines.md` (how AI works here).

@@ -18,7 +18,7 @@
 -- (tx successful on Horizon, source is a known wallet, a qualifying op with a
 -- matching source exists, and a matching Dig build event was recorded within
 -- the linking window). The min-notional rule is stored PER ROW (threshold +
--- outcome) so faucet eligibility stays auditable even if the env threshold
+-- outcome) so faucet eligibility stays traceable even if the env threshold
 -- changes later.
 create table if not exists action_witnesses (
   tx_hash text primary key,                  -- lowercase hex, 64 chars
@@ -26,7 +26,7 @@ create table if not exists action_witnesses (
   wallet_address text not null,              -- tx source; public on-chain data (same rationale as action_events)
   user_id uuid not null,                     -- owning user_wallets.user_id at verification time
   kind text not null,                        -- 'sdex-swap' | 'blend-deposit' | 'blend-withdraw' (withdraws: KPI ledger only, NEVER faucet-qualifying)
-  op_summary jsonb not null,                 -- audit trail: qualifying op, legs, prices used
+  op_summary jsonb not null,                 -- record: qualifying op, legs, prices used
   notional_xlm numeric,                      -- XLM-equivalent at verification-time prices; NULL = could not price honestly
   min_notional_xlm numeric not null,         -- the threshold in force when verified
   meets_min_notional boolean not null,       -- notional_xlm is not null AND >= min_notional_xlm

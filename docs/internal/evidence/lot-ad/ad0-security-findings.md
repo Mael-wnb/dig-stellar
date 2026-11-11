@@ -1,6 +1,6 @@
-# S1 — Postgres port reachable from outside through Docker (found during the Lot AD audit)
+# S1 — Postgres port reachable from outside through Docker (found during the Lot AD review)
 
-Date: 2026-09-28/29. Found while auditing the deploy surface for Lot AD (CI/CD & deploy
+Date: 2026-09-28/29. Found while reviewing the deploy surface for Lot AD (CI/CD & deploy
 discipline). Remediation: `s1-remediation-runbook.md` (founder executes; outcomes in
 `s1-remediation-execution.md`).
 

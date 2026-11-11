@@ -1,6 +1,6 @@
 -- apps/api/src/db/stellar_v6_campaign.sql
 --
--- Lot EP (post-grant, EP1): Earn & Points campaign tables. POINTS ONLY — points
+-- Lot EP (EP1): Earn & Points campaign tables. POINTS ONLY — points
 -- have no monetary value, are not convertible to money or tokens, and unlock
 -- non-monetary perks. Nothing in this file (or in modules/campaign/) moves
 -- funds or signs anything; the faucet treasury (security-invariants §9) stays
@@ -103,7 +103,7 @@ create table if not exists campaign_enrollments (
     constraint campaign_enrollments_address_check check (address ~ '^G[A-Z2-7]{55}$'),
   user_id uuid not null,
   referral_code text not null,               -- this wallet's own shareable code
-  referred_by_code text,                     -- the code used at enrolment, if any (audit; referrals holds the link)
+  referred_by_code text,                     -- the code used at enrolment, if any (for the record; referrals holds the link)
   enrolled_at timestamptz not null default now()
 );
 

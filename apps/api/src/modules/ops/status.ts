@@ -1,6 +1,6 @@
 // apps/api/src/modules/ops/status.ts
 //
-// Lot ST — post-grant upgrade (Sept 2026), builds on Lot E: pure aggregation
+// Lot ST — upgrade (Sept 2026), builds on Lot E: pure aggregation
 // for GET /v1/ops/status.
 // Turns raw `refresh_step_runs` + `rpc_metrics_runs` rows (24h window) into the
 // Statuspage-style payload the web renders dumbly. No I/O here — the service

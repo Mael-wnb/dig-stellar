@@ -417,7 +417,7 @@ psql "$DATABASE_URL" -c "select reason, points, counted_day from points_ledger w
 
 **Revoke points** (founder review): the ledger is append-only — never `update` or `delete` a
 row. Insert a negative `adjust:<note>` row pointing at the row being corrected; the balance is
-always `sum(points)`, so the correction is visible and auditable:
+always `sum(points)`, so the correction is visible and traceable:
 ```sql
 insert into points_ledger (campaign, address, user_id, reason, base_points, multiplier, points, adjusts_id)
 select campaign, address, user_id, 'adjust:founder-review-2026-11-05', 0, 1, -points, id
@@ -652,7 +652,7 @@ reaffirmed in Lot PRE — `docs/security-invariants.md` §7).
   Honest boundary (stated in the payload): counts server-side BUILDS; on-chain submission is
   client-side (non-custodial), so executed-tx evidence stays the manual hash list. No backfill:
   counters start at deploy.
-- `GET /v1/ops/status?window=24h` (Lot ST, post-grant Sept 2026 — feeds the `#status` page):
+- `GET /v1/ops/status?window=24h` (Lot ST, Sept 2026 — feeds the `#status` page):
   the Statuspage-style aggregation of the same two tables. Public read-only, `Cache-Control:
   no-store`, only `window=24h` accepted (anything else → 400 listing supported values).
   Rules — all in ONE exported object, `OPS_STATUS_RULES` in `apps/api/src/modules/ops/status.ts`:

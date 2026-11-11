@@ -1,6 +1,6 @@
 -- apps/api/src/db/stellar_v9_rewards.sql
 --
--- Lot EP (post-grant, EP5): daily XLM rewards on top of points. THIS IS A MONEY
+-- Lot EP (EP5): daily XLM rewards on top of points. THIS IS A MONEY
 -- PATH: a second server-side payout key (the rewards treasury secret env, read by
 -- exactly one file, modules/rewards/rewards-payout.service.ts) pays real XLM from a
 -- DIG-owned treasury to enrolled wallets. Security model:

@@ -108,7 +108,7 @@ Pre-condition for S1 to be meaningful: **close direct :3000** (see §2).
 
 ## 5. Decisions for the founder
 
-1. **`/v1/ops/metrics` + `/v1/ops/adoption`** — stay public (grant transparency;
+1. **`/v1/ops/metrics` + `/v1/ops/adoption`** — stay public (adoption transparency;
    payloads verified to carry no secrets/URLs) **or** static-token gate. Recon
    verdict: content is safe to keep public; it does reveal usage levels.
 2. **Port 3000 closure** — recommend both: bind `127.0.0.1` in `main.ts` **and**

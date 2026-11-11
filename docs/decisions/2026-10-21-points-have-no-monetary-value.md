@@ -4,7 +4,7 @@
 
 ## Ruling
 
-The Earn & Points campaign (Lot EP, post-grant) issues **points only**:
+The Earn & Points campaign (Lot EP) issues **points only**:
 
 1. **No payout, no token, no promise of either.** Points are not convertible to money or
    tokens, carry no price and are never folded into an APY. The disclaimer string
@@ -74,14 +74,14 @@ lost fire-and-forget report heals at the next visit, and a campaign-specific min
 ## Why
 
 - **Legal and reputational surface.** A points programme that could be read as a token
-  pre-sale, an airdrop promise or a yield would put a post-grant beta under rules it is not
-  built for and would contradict the SCF 43 "no financial advice" posture. Saying "no value"
+  pre-sale, an airdrop promise or a yield would put the beta under rules it is not
+  built for and would contradict the product's "no financial advice" posture. Saying "no value"
   everywhere, in code and copy, removes the ambiguity.
 - **Security.** The faucet (Lot R) already proved that a money path needs a key, a treasury,
   an abuse gate and an incident runbook. A second money path doubles that surface for a
   campaign whose goal is visibility, not distribution. Points cost nothing to issue, so the
   anti-abuse requirement drops to "honest counts".
-- **Honesty of the KPI narrative.** The SCF 46 application will cite adoption; an incentive
+- **Honesty of the KPI narrative.** The integration-track application will cite adoption; an incentive
   that is explicitly non-monetary keeps the distinction between "did something on-chain" and
   "was paid to" visible in the metrics themselves.
 

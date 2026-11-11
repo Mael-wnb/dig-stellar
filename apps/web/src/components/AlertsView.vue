@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // apps/web/src/components/AlertsView.vue
-// SCF T2-D2 — Alerts screen. Reconstructed 1:1 from Paul's Claude Design mock.
+// T2-D2 — Alerts screen. Reconstructed 1:1 from Paul's Claude Design mock.
 // Two-column layout: Activity feed (left) + Your alert rules (right).
 // Topbar copy for the shell: "Alerts / Catch every move before it moves the market".
 

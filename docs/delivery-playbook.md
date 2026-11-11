@@ -11,7 +11,7 @@ This document defines the default way to execute a Dig Stellar task from idea to
 Clarify:
 - what are we trying to achieve?
 - why now?
-- which tranche/deliverable does it support?
+- which phase/deliverable or lot does it support?
 - what is the beta-first version?
 - what is explicitly out of scope?
 
@@ -37,7 +37,7 @@ Check:
 - correctness
 - simplicity
 - alignment with project architecture
-- sufficiency for the current beta/tranche stage
+- sufficiency for the current beta/phase stage
 
 ### Step 6 — Validate
 Use real commands, endpoints, and manual UI checks.
@@ -83,7 +83,7 @@ Done when:
 
 ## Branch & release discipline (STANDING — since Lot AA, 2026-08-20)
 
-The app is released, has been in SCF review, and periodically runs live incentive
+The app is released, in production since August 2026, and periodically runs live incentive
 campaigns. Direct-to-main is over. These rules apply to every lot:
 
 1. **Never commit or push to `main` directly.** All work happens on a `feat/*`

@@ -235,7 +235,7 @@ the real price (instead of the −14 % stale BTC today, or the A2-alone removal)
 rows never show as `—`: the first refresh after the deploy writes `reflector_*` rows for BTC,
 xSolvBTC and USDGLO in the same run that A2's rule starts ignoring the old ones.
 
-## 8. Founder arbitrations (2026-10-14) and tranche 1 — modules + read-only comparison
+## 8. Founder arbitrations (2026-10-14) and batch 1 — modules + read-only comparison
 
 Arbitrations: BTC primary = Reflector CEX, second source = BTC/ETH cp pool via Reflector ETH
 if its ETH side ≥ 50 000 USD, clpool slot0 = control only; the Blend pool oracles are checked
@@ -268,12 +268,12 @@ Two facts decide the design:
   stays single-source** (Blend values it at 1 by assumption, so do we — parity holds), and
   **USDY is not held by any Blend pool**, so the Blend oracle does not cover it either.
 
-USDY stays single-source (the aquarius-usdy-usdc cp pool): tranche 2 applies a sanity band
+USDY stays single-source (the aquarius-usdy-usdc cp pool): batch 2 applies a sanity band
 **[1.00, 1.25]** (NAV token, 1.1338 on 2026-09-29) and a bounded daily move (|Δ 24 h| ≤ 2 %,
 checked against our own previous row), and the `#status` "single-source assets" counter
 lists it with oUSD. The founder will ask Reflector to list USDY.
 
-### 8.2 Tranche 1 — what was built (uncommitted, tests green)
+### 8.2 Batch 1 — what was built (uncommitted, tests green)
 
 | File | Role |
 |---|---|
@@ -319,9 +319,9 @@ Run: **74 simulations, 0 retries, 0 failures, 10 s** end to end. Step 1 in prod 
 fewer (token orders and fees cached, Blend oracle reads limited to the parity controls):
 ≈ 50 sequential simulations ≈ 7 s per 15-min run, sequential with 120 ms spacing.
 
-## 9. Tranche 2 — the lightweight production rule (2026-10-14, code + tests, uncommitted)
+## 9. Batch 2 — the lightweight production rule (2026-10-14, code + tests, uncommitted)
 
-Founder decision after tranche 1: the simplest robust fix, not a machine. Production (step 1):
+Founder decision after batch 1: the simplest robust fix, not a machine. Production (step 1):
 
 1. **Reflector primary** for every asset it lists — CEX feed for XLM / BTC / ETH / EURC
    (USDC read as sanity only), Stellar DEX feed for AQUA, USDGLO, CETES, USTRY, TESOURO,
@@ -415,7 +415,7 @@ Rebase first (two web-only commits on `origin/main`, no overlap):
 ```bash
 git fetch origin
 git rebase origin/main
-git log --oneline origin/main..HEAD        # A2 (3) + A2-bis (3) + B tranche 1 (5) + B tranche 2 (4) commits
+git log --oneline origin/main..HEAD        # A2 (3) + A2-bis (3) + B batch 1 (5) + B batch 2 (4) commits
 git diff --stat origin/main..HEAD | tail -1
 # then push (branch + PR, or fast-forward main) — the deploy block expects origin/main to carry it
 ```

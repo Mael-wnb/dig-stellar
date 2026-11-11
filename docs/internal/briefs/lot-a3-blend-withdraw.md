@@ -2,7 +2,7 @@
 
 Execution brief for Claude Code. The deliberate fast-follow deferred by Lot A2: in-app
 **withdraw of supplied Blend collateral**, completing the supply↔withdraw loop in the
-action modal. Not required by any SCF criterion (T3-D2's "vault/lending interactions" is
+action modal. Not required by any foundation criterion (T3-D2's "vault/lending interactions" is
 satisfied by the deposit) — this is product completeness before the advisor re-review,
 and it produces a bonus mainnet evidence pair (supply tx + withdraw tx). Written
 2026-08-13. Pattern: `docs/internal/briefs/lot-a2-blend-mainnet.md`; contract:

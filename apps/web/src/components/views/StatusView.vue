@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// StatusView — Lot ST, post-grant upgrade (Sept 2026): the visible face of the Lot E
+// StatusView — Lot ST, upgrade (Sept 2026): the visible face of the Lot E
 // observability. One row per pipeline step and per RPC target, one tile per
 // 15-min refresh run over 24h. ALL states/percentages come from
 // GET /v1/ops/status — this view renders, it never re-derives a rule.

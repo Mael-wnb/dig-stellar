@@ -23,7 +23,7 @@ faucet, no claims, no keys, nothing money-touching).
      verification-time prices (≤ 24h-fresh `asset_prices`; native legs price
      directly, others cross through USD; unpriceable → `NULL`, honestly failing
      the rule). Threshold `FAUCET_MIN_NOTIONAL_XLM` (default 1), **stored on the
-     row** with the outcome so the rule stays auditable.
+     row** with the outcome so the rule stays traceable.
 - **`action_witnesses`** (`stellar_v1_action_witness.sql`): tx_hash PK →
   re-witnessing is a no-op; failed verifications are never stored. Row carries
   wallet, user_id, kind, op_summary (op + legs + prices used), notional,

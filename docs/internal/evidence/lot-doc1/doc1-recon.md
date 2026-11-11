@@ -1,4 +1,4 @@
-# Lot DOC1 — recon (reviewer-facing docs before the SCF 46 window)
+# Lot DOC1 — recon (reviewer-facing docs before the application window)
 
 Read-only recon, 2026-11-04, on `main` at `98e0267` (branch docs/lot-doc1). Every claim
 below traces to a grep over the code, a file line, or a `curl` against the production API on
@@ -27,20 +27,20 @@ refreshing in prod, so **Lot XO is deployed**. Both were still marked "VPS deplo
 
 ## R1 — Root `README.md` today
 
-206 lines, grant-era (written around the T1/T2 MVP, mid-2026). What is stale:
+206 lines, foundation-era (written around the T1/T2 MVP, mid-2026). What is stale:
 
 | README says | Reality | Where proven |
 |---|---|---|
 | "the foundation for future alerts and non-custodial action flows"; "advanced alerting workflows … direct in-app execution of non-custodial actions … not fully in scope yet" | Both shipped: 5 alert families on a 15-min sweep (T2-D2 + Lot N); mainnet SDEX swaps and Blend supply/withdraw executed and Horizon-verified | `docs/status-board.md` T2-D2 / T3-D2 rows, `docs/internal/evidence/t3-d2-mainnet-actions.md` |
 | Integrated protocols: Blend, Aquarius, Soroswap (3) | 6 live: Blend, Soroswap, Aquarius, Stellar native DEX, DeFindex, XOXNO Lending (+ dormant Allbridge venue row) | `curl /v1/protocols` above; `apps/indexer/src/scripts/ingest/71-refresh-all-metrics.ts:291-415` |
-| No mention of SCF #43 completion, post-grant phase, status page, API docs, OpenAPI | SCF #43 complete (all four tranches paid, Aug 2026); `#status`, `/v1/docs`, `/v1/openapi.json` live | `docs/status-board.md` "Tranche numbering"; `docs/decisions/2026-11-03-public-api-v1-surface.md` |
+| No mention of the foundation's completion, the production phase, status page, API docs, OpenAPI | Foundation complete (all three phases closed, Aug 2026); `#status`, `/v1/docs`, `/v1/openapi.json` live | `docs/internal/status-board-archive.md` "Phase numbering"; `docs/decisions/2026-11-03-public-api-v1-surface.md` |
 | "fully production-grade ownership verification / signed wallet auth" out of scope | Beta session model unchanged (userId key, §7) but a signed-message ownership proof exists for campaign writes (§11) | `docs/security-invariants.md` §7, §11 |
 | No run instructions at all; "packages/db: Prisma schema and database-related package remnants" | Proven quickstart exists (`docker compose --profile app up`) | `docs/reference-deployment.md` |
 | Repository structure lists only `docs/TECHNICAL_ARCHITECTURE.md` | 30+ docs, decisions, evidence corpus | `find docs -name '*.md'` |
 | Data-model section names `wallet_protocol_positions` as "future foundation" | Written since T2-D1; per-asset legs served since Lot H6 | `docs/status-board.md` T2-D1 row |
 | No contact links, no license mention | `LICENSE` (MIT) exists; footer links in the app: `https://x.com/Dig_Agentic`, `https://discord.gg/sDpqGfmDgF` | `apps/web/src` grep |
 
-The README is two tranches behind and gives a reviewer no reading order.
+The README is two phases behind and gives a reviewer no reading order.
 
 ---
 
@@ -88,14 +88,12 @@ record of a lot; accurate for its date, not maintained.
 
 | Path | Purpose | Current? | Audience |
 |---|---|---|---|
-| `TECHNICAL_ARCHITECTURE.md` | June 2026 design document (SCF #43 application) | **Stale as a system description** (R2); carries two as-built notes (§6, §9) and gets the DOC1 banner + table | reviewer (with banner), historical |
+| `TECHNICAL_ARCHITECTURE.md` | June 2026 design document (the foundation's application text) | **Stale as a system description** (R2); carries two as-built notes (§6, §9) and gets the DOC1 banner + table | reviewer (with banner), historical |
 | `ai-guidelines.md` | How AI is used on the project | yes (process doc) | contributor |
 | `current-state.md` | Detailed as-built reality, lot by lot (881 lines) | yes, maintained; two one-line drifts fixed in D4 (five→six protocols; XO deploy) | reviewer, contributor |
 | `data-model.md` | Raw SQL schema families as built (v1/v2/v3 + later) | mostly yes; title says "three families", the schema has eight numbered files (v4–v8 covered in later sections of the doc). `CLAUDE.md` still describes this doc as legacy Prisma; it is the raw-SQL as-built doc (DOC2) | contributor |
 | `delivery-playbook.md` | Standard task workflow + branch discipline (§1) | yes | contributor |
 | `deployment.md` | VPS shape, nginx hardening, SQL apply order, per-lot deploy sequences | yes, maintained | operator |
-| `final-report.md` | Tranche 4 final report to SDF (August 2026) | historical, do not edit. Line 31 says "Redis handles caching" — not true in code (R2 row 8) — DOC2 note only | historical |
-| `grant-roadmap.md` | SCF #43 criteria verbatim + interpretation | yes for its purpose (contract is closed); `protocolCount = 4/5` lines are dated statements inside tranche narratives, left as-is | reviewer (grant history) |
 | `hotfix-frozen-amm-reserves.md`, `lot-a1-…`, `lot-a1b-…`, `lot-a2-…`, `lot-a3-…`, `lot-a5-…`, `lot-aa-…`, `lot-ac-…`, `lot-ad-…`, `lot-b-…`, `lot-c-…`, `lot-e-…`, `lot-f-…`, `lot-g-…`, `lot-h-…`, `lot-n-…`, `lot-p-…`, `lot-q-…`, `lot-r-…`, `lot-s-…`, `lot-w-…` (21 files) | Execution briefs per lot | historical (each dated in its first paragraph); some referenced a former docs/tasks folder that no longer exists (e.g. `security-invariants.md:183`; corrected in Lot DOC2) | contributor, historical |
 | `reference-deployment.md` | Proven quickstart (compose path + host-pnpm path) | yes; one count drift fixed in D4 (`5 protocols` comment) | reviewer, operator |
 | `repo-structure.md` | As-built navigation map of the monorepo | partly stale: still lists Step 8 Allbridge as live (fixed in D4); documents `stellar`, `wallets`, `network`, `openapi` modules but **not** `alerts`, `ops`, `actions`, `bridge`, `campaign`, `faucet`, `auth` — DOC2 | contributor |
@@ -116,7 +114,7 @@ record of a lot; accurate for its date, not maintained.
 | `decisions/2026-11-03-public-api-v1-surface.md` | Public API surface ruling | yes | reviewer |
 | `evidence/README.md` | Index of the evidence corpus (lot → entry doc → era) | yes (2026-11-03); no `lot-doc1` row yet (added in this lot) | reviewer |
 | `evidence/**` (36 folders/files, ~559 files) | Per-lot proofs: captures, command outputs, incident notes | per lot | reviewer |
-| `integrationtrack/{README,ARCHITECTURE,milestones}.md` | SCF Round **45** integration-track application text | headers still say "SCF Round 45"; the application moved to SCF 46 (`current-state.md:36`) — founder material, DOC2 | founder |
+| `integrationtrack/{README,ARCHITECTURE,milestones}.md` | integration-track application text (earlier round) | headers still named the earlier round; the application moved to the next one (`current-state.md:36`) — founder material, DOC2 | founder |
 
 ### Contradictions between docs (facts)
 
@@ -126,12 +124,12 @@ record of a lot; accurate for its date, not maintained.
 | Lot XO deploy state | `status-board.md:54-55`, `current-state.md:481` "VPS deploy pending" | prod `/health` 2026-11-04: `xoxno` fresh; `/v1/protocols` XOXNO ≈ $146.8k | one-line drift → **fixed (D4/D5)** |
 | Lot PRE deploy state | `status-board.md:401` "Lot PRE + PRE2 built, not deployed" | prod `/health` version `8e6dd18` (Lot PRE docs commit, after the PRE code commits); PRE2 `98e0267` not deployed | one-line drift → **fixed (D5)** |
 | Allbridge refresh step | `repo-structure.md:190-195, 221` "Step 8 run-allbridge-bridge-refresh.ts" live | `71-refresh-all-metrics.ts:407` step retired (Lot PRE, 2026-11-03); `status-board.md` T2-D3 | one-line drift → **fixed (D4)** |
-| Redis role | `final-report.md:31` "Redis handles caching"; `TECHNICAL_ARCHITECTURE.md` "Redis Cache – hot data + rate limits" | no Redis client in any app (R2 row 8); rate limits in nginx | final report is a submitted historical document: **not edited**, DOC2 note; architecture doc covered by the D2 table |
+| Redis role | `TECHNICAL_ARCHITECTURE.md` "Redis Cache – hot data + rate limits" | no Redis client in any app (R2 row 8); rate limits in nginx | architecture doc covered by the D2 table |
 | "Single source of truth" | `TECHNICAL_ARCHITECTURE.md:3` claims it for architecture | `CLAUDE.md` + `repo-structure.md` header + `status-board.md` are the as-built truth | resolved by the D2 banner and `docs/README.md` rank table |
 | Test coverage statement | `CLAUDE.md:112,114` "No tests yet" for indexer and web; "Tests / CI largely deferred" | indexer 11 `*.test.ts` (node:test), web 12 `*.spec.ts` (Vitest), api 38 `*.spec.ts` + contract test; CI build+test | `CLAUDE.md` is the Claude Code working contract, out of DOC1's file list → DOC2 |
 | `GET /v1/network/stats` source | `CLAUDE.md` "hits external APIs live (CoinGecko, DefiLlama, stellar.expert, Horizon) with no DB persistence" | `apps/api/src/modules/network/network.service.ts:84-100` reads `network_stats_latest` (DB-backed since step 73) | DOC2 (`CLAUDE.md`) |
-| Public repository URL | `final-report.md:86` `github.com/Mael-wnb/dig-stellar` (×4 across docs) | `git remote`: `origin` = `Digbot-ai/dig-stellar`, `public-origin` = `Mael-wnb/dig-stellar` (the VPS and Vercel pull from `public-origin`, `deployment.md:179`) | consistent: the public repo is `Mael-wnb/dig-stellar`; the single `Digbot-ai` URL in docs is the private origin. No change; README links to neither (the reader is already in the repo) |
-| SCF round of the integration-track docs | `integrationtrack/*.md` "SCF Round 45" | `current-state.md:36`, `status-board.md:45`: application redirected to SCF 46 (8 Nov 2026) | founder application text → DOC2 (not a DOC1 edit) |
+| Public repository URL | `github.com/Mael-wnb/dig-stellar` (×4 across docs) | `git remote`: `origin` = `Digbot-ai/dig-stellar`, `public-origin` = `Mael-wnb/dig-stellar` (the VPS and Vercel pull from `public-origin`, `deployment.md:179`) | consistent: the public repo is `Mael-wnb/dig-stellar`; the single `Digbot-ai` URL in docs is the private origin. No change; README links to neither (the reader is already in the repo) |
+| Round named in the integration-track docs | `integrationtrack/*.md` headers (earlier round) | `current-state.md:36`, `status-board.md:45`: application redirected to the next round (8 Nov 2026) | founder application text → DOC2 (not a DOC1 edit) |
 
 ---
 
@@ -156,7 +154,7 @@ record of a lot; accurate for its date, not maintained.
 | `docs/reference-deployment.md` | 66 | comment "5 protocols" → "6 live protocols (+ the dormant allbridge row)" with the 2026-08-13 proof context kept |
 | `docs/runbooks.md` | 99 | "`protocolCount = 5`" → "live count, 6 since Lot XO" |
 | `docs/repo-structure.md` | 190-195, 221 | Step 8 Allbridge marked retired (Lot PRE, 2026-11-03), adapter kept as record |
-| `docs/internal/evidence/README.md` | table | one `lot-doc1/` row (post-grant) |
+| `docs/internal/evidence/README.md` | table | one `lot-doc1/` row (production era) |
 
 ## 6. DOC2 follow-up (bigger than a one-line fix; not done here)
 
@@ -169,10 +167,8 @@ record of a lot; accurate for its date, not maintained.
    the T1 surface plus `openapi`.
 3. `docs/data-model.md`: title/overview says three families; confirm v4–v8 are described and
    update the overview table.
-4. `docs/internal/history/final-report.md:31` "Redis handles caching": the submitted report is historical; decide
-   whether to add a dated footnote or leave it (recommendation: one footnote, no rewrite).
-5. `docs/integrationtrack/*.md`: "SCF Round 45" headers vs the SCF 46 application; founder
-   decides whether these are rewritten for SCF 46 or archived.
+4. `docs/integrationtrack/*.md`: earlier-round headers vs the current application; founder
+   decides whether these are rewritten for the current round or archived.
 6. Broken internal references in briefs (`docs/tasks/…` paths that do not exist, e.g. from
    `security-invariants.md:183`); a link check over `docs/` would list them all.
 7. `docs/TECHNICAL_ARCHITECTURE.md` beyond the banner: §13 quickstart and §10 could be
@@ -181,7 +177,7 @@ record of a lot; accurate for its date, not maintained.
    the container from the compose stack and the architecture summary; the README now states the
    honest situation.
 
-## 7. D6 — post-grant summary and the PDF
+## 7. D6 — the summary document (`post-grant-summary.md`) and the PDF
 
 `docs/post-grant-summary.md` (256 lines) was built only from `status-board.md`, `current-state.md`,
 `decisions/`, `evidence/README.md` and the evidence files it cites per item; no adoption numbers.
@@ -194,7 +190,7 @@ PDF: **not produced** (no markdown-to-PDF tool on the recon machine). Export cha
 is installed (`brew install pandoc`):
 
 ```bash
-pandoc docs/post-grant-summary.md -f gfm -s --metadata title="Dig Stellar — post-grant summary" \
+pandoc docs/post-grant-summary.md -f gfm -s --metadata title="Dig Stellar — summary" \
   -o /tmp/post-grant-summary.html
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --disable-gpu \
   --print-to-pdf=docs/post-grant-summary.pdf --no-pdf-header-footer /tmp/post-grant-summary.html

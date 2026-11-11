@@ -1,5 +1,5 @@
 // apps/web/src/api/ops.ts
-// Lot ST — post-grant upgrade (Sept 2026), builds on Lot E: the status page's
+// Lot ST — upgrade (Sept 2026), builds on Lot E: the status page's
 // ONLY data source. Mirrors the
 // GET /v1/ops/status contract — the server computes everything (states,
 // availability, gaps); the web renders dumbly and never re-derives a rule.

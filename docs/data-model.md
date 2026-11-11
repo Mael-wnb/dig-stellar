@@ -299,7 +299,7 @@ References v1 `venues` and `assets`.
 ### `bridge_flows`
 
 One row per Allbridge Core bridge event on Stellar. Tracks **inflows** (other chain → Stellar,
-the SCF claim) and **outflows** (Stellar → other chain, bonus) with per-counterparty-chain
+the primary metric) and **outflows** (Stellar → other chain, bonus) with per-counterparty-chain
 attribution. Mono-token today (USDC, the only token Allbridge Core bridges on Stellar). Flows are
 aggregated **on read** (no pre-computed `*_metrics_latest` table); volume is low.
 

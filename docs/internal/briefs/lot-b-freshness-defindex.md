@@ -1,7 +1,7 @@
 # Lot B — Freshness System + DeFindex (T3-D1) — Implementation Brief
 
 Execution brief for Claude Code. Serves **T3-D1 — Mainnet Deployment & Freshness Tracking**
-(SCF date **Aug 10** — the earliest contract date of the T3 group). Verbatim criteria:
+(target date **Aug 10** — the earliest date of the T3 group). Verbatim criteria:
 
 > - Production deployment with real Mainnet data for Blend V2, SDEX, Soroswap, Aquarius, and
 >   **DeFindex**.
@@ -113,4 +113,4 @@ and **retries live in the indexer orchestrator** (one mechanism, all steps).
 Sub-minute freshness/event streams · RPC latency percentile metrics + error-rate endpoints
 (T3-D3) · alerting on staleness (T2-D2 engine exists; wiring a stale-source alert family is
 post-beta) · DeFindex user positions (portfolio is Blend-only by design) · any deposit/withdraw
-actions on DeFindex (out of the grant's action scope).
+actions on DeFindex (out of the foundation's action scope).

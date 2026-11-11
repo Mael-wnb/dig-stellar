@@ -48,7 +48,7 @@ export interface QualifyingOp {
    * the notional (a swap's source leg first, dest leg as fallback).
    */
   legs: WitnessLeg[];
-  /** Audit payload persisted as action_witnesses.op_summary. */
+  /** Record payload persisted as action_witnesses.op_summary. */
   summary: Record<string, unknown>;
 }
 
@@ -87,7 +87,7 @@ function assetFrom(
   return { native: false, code, issuer };
 }
 
-/** Compact 'CODE:ISSUER' / 'XLM' form for audit summaries. */
+/** Compact 'CODE:ISSUER' / 'XLM' form for op summaries. */
 export function assetLabel(a: WitnessAsset): string {
   return a.native ? 'XLM' : `${a.code ?? '?'}:${a.issuer ?? '?'}`;
 }
@@ -228,7 +228,7 @@ export function contractIdFor(a: WitnessAsset, networkPassphrase: string): strin
 export interface NotionalResult {
   /** XLM-equivalent of the first priceable leg; null = could not price honestly. */
   notionalXlm: number | null;
-  /** Audit detail merged into op_summary. */
+  /** Detail merged into op_summary. */
   pricing: Record<string, unknown>;
 }
 

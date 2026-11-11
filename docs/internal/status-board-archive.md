@@ -6,12 +6,12 @@
 
 This file is the operational progress board for Dig Stellar. It answers, quickly and honestly:
 - where the project stands right now
-- which grant deliverables are closest to completion
+- which foundation deliverables are closest to completion
 - what is still partial or fragile
 - what the next execution step should be
 
-Keep it short, practical, and frequently updated. Keep it aligned with `docs/internal/history/grant-roadmap.md`
-(the contract + interpretation) and `docs/current-state.md` (the detailed reality).
+Keep it short, practical, and frequently updated. Keep it aligned with `docs/current-state.md`
+(the detailed reality).
 
 ---
 
@@ -22,31 +22,27 @@ Keep it short, practical, and frequently updated. Keep it aligned with `docs/int
 
 ---
 
-## Tranche numbering (SCF #43 — 4 disbursements)
+## Phase numbering
 
-SCF #43 paid in four tranches: 10% / 20% / 30% / 40%. **All four are received.**
-- **Tranche 1 (10%)** — upfront, received on approval. No deliverables to prove.
-- **Tranche 2 (20%)** — MVP group ("T1": D1 indexing, D2 dashboard, D3 builder) —
-  **validated and paid late July 2026**.
-- **Tranche 3 (30%)** — testnet review (internal "T2" work) — **validated and paid early
-  August 2026**.
-- **Tranche 4 (40%)** — mainnet launch (internal "T3" work) — **validated and paid around
-  20 August 2026, including acceptance of the final SDF report**.
+The foundation closed in three phases, each a group of three deliverables:
+- **Phase 1 — MVP** ("T1": D1 indexing, D2 dashboard, D3 builder) — **closed late July 2026**.
+- **Phase 2 — Expansion** (testnet, "T2") — **closed early August 2026**.
+- **Phase 3 — Mainnet** ("T3") — **closed around 20 August 2026, with the final delivery
+  report accepted**.
 
-The internal "T1/T2/T3" labels below are the *deliverable groups* the project was approved
-with; the tables and notes below are kept as the historical record of how each closed.
+The "T1/T2/T3" labels and the `Tn-Dm` deliverable codes used below and across the evidence
+files refer to these phases (phase number, deliverable number); the tables and notes below are
+kept as the historical record of how each closed.
 
 ---
 
 ## Global status
 
-- Current phase: **post-grant. SCF #43 is COMPLETE — all four tranches validated and paid**
-  (Tranche 2, 20%, MVP: late July 2026 · Tranche 3, 30%: early August 2026 · Tranche 4, 40%:
-  around 20 August 2026, including acceptance of the final SDF report). Everything since is
-  post-grant product hardening/upgrades (Lots AA, AB, AC, AD in progress, ST) while preparing
-  the **SCF 46 application (8 November 2026)** — SCF 45 reviewers redirected the application
-  to SCF 46 because SCF 43's final validation had not landed at their review time.
-- **Post-grant Lot EP — Earn & Points campaign: DELIVERED (EP1/EP2/EP3), deployed DARK, activation
+- Current phase: **the foundation is COMPLETE — all three phases closed** (Phase 1, MVP: late
+  July 2026 · Phase 2: early August 2026 · Phase 3: around 20 August 2026, with the final
+  delivery report accepted). Everything since is product hardening/upgrades (Lots AA, AB, AC,
+  AD in progress, ST) while preparing the **integration-track application (8 November 2026)**.
+- **Lot EP — Earn & Points campaign: DELIVERED (EP1/EP2/EP3), deployed DARK, activation
   pending (2026-10-21).** Points only, no payout, no token, no new key; signed-message ownership
   proofs, award job on Horizon-verified executions, streaks, self-declared social tasks, referrals,
   leaderboard, non-monetary perk tiers (`wallet_perks`), `GET /v1/campaign/metrics` with a boundary
@@ -77,7 +73,7 @@ with; the tables and notes below are kept as the historical record of how each c
   feed (≈½ market price; predated Lot P) — ruled + fixed same day (manual rule $0.069, vetted vs
   pool-implied + Aqua oracle, confidence: low; robust Aquarius-derived fix on the fast-follow
   list). Evidence: `docs/internal/evidence/lot-p/`.
-- Closest tranche-critical targets: T3-D2 KPIs (adoption — the 5 XLM witness-gated reward
+- Closest phase-critical targets: T3-D2 KPIs (adoption — the 5 XLM witness-gated reward
   campaign is LIVE since Aug 17 and `action_witnesses` counts executions automatically; the
   execution evidence itself is complete), T3-D3 (**Lot C design-handoff port DONE** —
   shell + 5 views + modals on real data, `/v1/pools/:slug/flows` + `/series` added; observability
@@ -88,7 +84,7 @@ with; the tables and notes below are kept as the historical record of how each c
 - Lot A3 note (2026-08-13): **in-app Blend WITHDRAW is built and testnet-proven E2E** — the
   supply↔withdraw loop is now complete in the action modal (supply tx `b199a1d7…` + withdraw tx
   `322d760e…`, both confirmed on-chain; `docs/internal/evidence/lot-a3-blend-withdraw.md`). Not required by
-  any SCF criterion (T3-D2's "vault/lending interactions" is satisfied by the deposit) — product
+  any foundation criterion (T3-D2's "vault/lending interactions" is satisfied by the deposit) — product
   completeness before the advisor re-review. It rides the SAME kill-switch as the deposit (no new
   flag), so it is testnet-only until `ACTIONS_MAINNET_BLEND_ENABLED` is set. **The awaited mainnet
   supply+withdraw pair EXECUTED 2026-08-14** (supply `38390736…` 15:29 + withdraw `537a2303…` 16:07,
@@ -138,7 +134,7 @@ with; the tables and notes below are kept as the historical record of how each c
   **E1** enriched `GET /health`: `status` ok|degraded, `version` (GIT_SHA env, runbook updated),
   db latency, per-venue freshness (shared 45-min rule), `lastRefreshAt`; always HTTP 200 with a
   readable status (503 only if DB unreachable); degraded state proven by aging a row. **E2** RPC
-  latency percentiles + error rates (the verbatim grant criterion): capture at the two real choke
+  latency percentiles + error rates (the verbatim foundation criterion): capture at the two real choke
   points (global `fetch` + the shared axios copy used by stellar-sdk/blend-sdk/defindex-sdk),
   per-run per-target rows in `rpc_metrics_runs` + queryable step outcomes in `refresh_step_runs`
   (new `stellar_v1_ops_metrics.sql`, applied local; **apply on VPS at deploy**), served by
@@ -320,7 +316,7 @@ with; the tables and notes below are kept as the historical record of how each c
   swap-builds + 108 quotes) — builds ≠ executions. The 50-wallet KPI is arguably met on tracked
   wallets (65) but only 16 wallets have a witnessed execution. **Context stated explicitly:
   these numbers accumulated during the 5 XLM incentive campaign** (one claim per wallet/user,
-  1 XLM min notional, 40-claim budget, 10/h velocity cap) — the grant narrative must say so
+  1 XLM min notional, 40-claim budget, 10/h velocity cap) — the adoption narrative must say so
   (see the KPI-integrity note in `docs/internal/evidence/lot-r/r4-testnet-e2e.md`).
 - T3-D2 note (2026-08-18, Lot R2): **reward campaign 2 built + testnet-proven — per-FAMILY
   first-action rewards.** One change vs campaign 1: first verified swap AND first verified Blend
@@ -339,7 +335,7 @@ with; the tables and notes below are kept as the historical record of how each c
   error) removed from step 73. api 125/125 tests, web build green. Evidence:
   `docs/internal/evidence/lot-r2/testnet-e2e.md`. **VPS deploy + activation founder-side (v5 SQL before
   restart; set FAUCET_MAX_CLAIMS=60 + FAUCET_STARTS_AT + FAUCET_ENDS_AT at go-live).**
-- T3-D3 note (2026-08-18, Lot Z): **SDF Reference Implementation packaging DONE — the
+- T3-D3 note (2026-08-18, Lot Z): **Reference Implementation packaging DONE — the
   "functional Docker compose" criterion is met and proven from a clean clone.**
   `docker compose --profile app up -d --build` now runs the full stack: postgres (the ten
   `stellar_v*.sql` files auto-applied via numbered init mounts in dependency order — the
@@ -352,16 +348,16 @@ with; the tables and notes below are kept as the historical record of how each c
   `/health` version = GIT_SHA, `/v1/protocols` live TVL, `down && up` idempotent; one
   deviation found and fixed (root-owned `apps/indexer/tmp` broke non-root writes).
   Evidence: `docs/internal/evidence/lot-z/z1-compose-fresh-clone.md`. Zero product-logic changes.
-  **Remaining T3-D3: the final SDF report (+ demo)** — observability (Lot E) and packaging
+  **Remaining T3-D3: the final delivery report (+ demo)** — observability (Lot E) and packaging
   (Lot Z) are both done.
-- Post-grant note (2026-09-05, Lot ST): **status page live at `#status`** — the visible face
+- Post-foundation note (2026-09-05, Lot ST): **status page live at `#status`** — the visible face
   of the Lot E observability: `GET /v1/ops/status?window=24h` (public, no-store; gap +
   availability math incl. trailing/leading gaps; `overall.state` = current state) + the
   StatusView/StatusBar web view, FreshnessChip click-through, sidebar link. Steps-query 24h
   fix on `/v1/ops/metrics`; ops module's first tests (api suite 129 → 147). VPS + Vercel
   push founder-side (`docs/deployment.md` "Lot ST deploy sequence"). Evidence:
-  `docs/internal/evidence/status-page/`. No SCF criterion involved.
-- Post-grant note (2026-09-28, hotfix): **lending "supplied" side read from the wrong column** —
+  `docs/internal/evidence/status-page/`. No foundation criterion involved.
+- Post-foundation note (2026-09-28, hotfix): **lending "supplied" side read from the wrong column** —
   the pool TVL series (`/v1/pools/:slug/series`) and the Protocols-card top assets
   (`/v1/protocols`) summed `d_supply_scaled` (borrowed) instead of `b_supply_scaled` (supplied)
   for Blend, since Lot C / Lot Q. API-only fix on `hotfix/lending-supplied-side` + regression spec
@@ -370,9 +366,9 @@ with; the tables and notes below are kept as the historical record of how each c
   2026-09-28 (`18072ca`):** series last point = pool supplied to the cent on all 4 Blend pools;
   Blend top assets native / USDC / EURC; Aquarius/Soroswap unchanged. First deploy attempt
   served old code (pulled, not rebuilt — caught by the `/health` version check; Lot AD input).
-  Evidence: `docs/internal/evidence/hotfix-lending-supplied-side/`. No SCF criterion involved. Surfaced
+  Evidence: `docs/internal/evidence/hotfix-lending-supplied-side/`. No foundation criterion involved. Surfaced
   by the Lot LM L0 recon.
-- Post-grant note (2026-11-03, Lot API): **public API contract live in prod (deployed
+- Post-foundation note (2026-11-03, Lot API): **public API contract live in prod (deployed
   2026-11-03, `de1b8bb`).** The read-only data-and-signals tier of `apps/api` now has a published HTTP
   contract: a hand-written OpenAPI 3.1 document (`apps/api/openapi/openapi.v1.yaml`, 15
   operations — 9 `stable`, 6 `beta`) served at `GET /v1/openapi.json`, a Scalar reference
@@ -385,10 +381,10 @@ with; the tables and notes below are kept as the historical record of how each c
   Decision: `docs/decisions/2026-11-03-public-api-v1-surface.md`; evidence
   `docs/internal/evidence/lot-api/` (prod verification: `api5-prod-verification.md` — version 1.0.0,
   15 paths, `/v1/docs` text/html, `/health` version `de1b8bb`). Web: an "API docs" sidebar
-  link to `/v1/docs` on `feat/lot-api-web` (Vercel preview pending). No SCF criterion involved.
+  link to `/v1/docs` on `feat/lot-api-web` (Vercel preview pending). No foundation criterion involved.
 - **Lot PRE — pre-dossier fixes (2026-11-03): closed 2026-11-05 (C, C2, C3 in prod, `14c8bb8`)**
   (`docs/deployment.md` "Lot PRE deploy sequence", evidence `docs/internal/evidence/lot-pre/`). Four
-  founder-observed defects before the SCF 46 window: (A) bridge section retired from the dashboard
+  founder-observed defects before the application window: (A) bridge section retired from the dashboard
   and the Allbridge step from `job:refresh` — Allbridge Core wound down upstream; data, API and
   adapter kept as a historical record; (B) pool-detail TVL panel no longer shows "Building history
   since <refresh tick>" — plain "TVL history not available" on non-lending pools, "since" only
@@ -414,8 +410,8 @@ with; the tables and notes below are kept as the historical record of how each c
   17-row "Design vs as-built (2026-11)" table (no other change), new `docs/README.md` (reading
   order, source-of-truth rank, update owners), one-line count/deploy drifts fixed in place;
   D6 `docs/post-grant-summary.md` (what shipped 2026-08-20 → 11-05, by theme, evidence per item,
-  no adoption numbers) for the grant advisor review of 2026-11-05 and the SCF 46 reviewers.
-  Recon + DOC2 follow-ups: `docs/internal/evidence/lot-doc1/doc1-recon.md`. No SCF criterion involved.
+  no adoption numbers) for the advisor review of 2026-11-05 and the application reviewers.
+  Recon + DOC2 follow-ups: `docs/internal/evidence/lot-doc1/doc1-recon.md`. No foundation criterion involved.
 - **Lot SDK0 — Vercel-preview CORS + TypeScript SDK v0 (2026-11-04): BUILT on `feat/lot-sdk0`,
   merged and deployed (`b34f07d`).** (1) The API accepts Vercel preview origins of the web project by
   pattern (`apps/api/src/cors-origin.ts`, 9 unit tests; `docs/deployment.md` "CORS: allowed
@@ -424,46 +420,46 @@ with; the tables and notes below are kept as the historical record of how each c
   types generated from `openapi.v1.yaml` and committed, `DigStellarClient` with one typed method
   per operationId (15), `DigApiError` / `DigTimeoutError`, freshness helpers, ESM + CJS build,
   20 unit tests + a type-level test, one production example; CI job `sdk` fails on drift between
-  the yaml and the committed types. Evidence: `docs/internal/evidence/lot-sdk/sdk0-build.md`. No SCF
+  the yaml and the committed types. Evidence: `docs/internal/evidence/lot-sdk/sdk0-build.md`. No foundation
   criterion involved.
 - Last updated: 2026-11-05 (Lot PRE closed — C, C2, C3 in prod, `14c8bb8`; Lot SDK0 merged and
   deployed, `b34f07d`; Lot DOC1 merged to `main`, `438971f`)
 
 ---
 
-# Tranche 1 — MVP (reviewed for the SCF 20% disbursement)
+# Phase 1 — MVP
 
 | Deliverable | Status | Completion | Confidence | Current evidence | Remaining (post-claim / out of contract) | Next action |
 |---|---|---:|---|---|---|---|
 | D1 — Data Indexing Foundation (Horizon & Soroban) | Done | 100% | High | Hybrid Horizon+Soroban ingestion live into one Postgres DB; canonical `job:refresh` pipeline (72→71→steps) writing raw SQL v1; **prod (Jun 18–19)**: 4 protocols aggregated — Blend 3 pools (≈$192M) *(YieldBlox added Jun 26 → 4 active Blend pools ≈$166M; Forex excluded — frozen oracle)*, Aquarius 4 (≈$22.7M), stellar-native 9 (≈$6.2M), Soroswap 1 active (≈$130k); synchronous `as_of` across protocols within one refresh cycle, observed advancing over consecutive cycles; cron every 15 min on the VPS (within the 5–15 min criterion); served via `/v1/*` | Freshness exposure in the API and retry/backoff standardization (belongs to T3-D1); DeFindex (T3) | Capture evidence in the demo video (live `/v1/protocols`, `/v1/pools`) |
 | D2 — Analytics Dashboard MVP | Done | 100% | High | Public beta live at `stellar.getdig.ai` (Vercel); protocol/pool views show TVL/volume/APY from indexed data; Stellar Wallets Kit integrated; runs on real Mainnet data (over-delivery vs the "Testnet data" wording); **`GET /v1/network/stats` DB-backed** (`network_stats_latest` via indexer step `73`); `protocolCount` now dynamic = 4; "native" rendered as "XLM"; Blend panel trimmed to real metrics | ~~Responsive pass~~ (done 2026-08-20, Lot AA) + stale/loading/error consistency (polish, not a criterion); two network-stats fields (`activeWallets`, `dexVolume24hUsd`) null from a stale stellar.expert endpoint (pre-existing, minor) | Show the live dashboard in the demo video |
-| D3 — Smart Transaction Builder (Testnet) | Done | 100% | High | **Fully successful SDEX swap on Testnet from the UI (Jun 19)**: `POST /v1/actions/sdex/swap` builds a multi-op XDR (`ChangeTrust` + `PathPaymentStrictSend`) on the native SDEX, signed in-wallet via Freighter/Wallets Kit, executed on-chain — tx `fb10c5b8d86b87bc3408bf0d4e9698f93370a3e788244008ef31f6200a12b8b2`, **Successful** (10 XLM → 5.91 USDC, min-receive respected). Live quote endpoint (`/v1/actions/sdex/quote`, Horizon strict-send) drives auto-slippage so swaps fill reliably. Backend never touches keys. All three SCF criteria met. | Blend deposit (Soroban, sequential — beyond the single-XDR criterion; relates to T3-D2) now exercised from the UI and **proven on testnet** (deposit tx `a842f370…`); minor `getAssetBalance` re-bundles `ChangeTrust` when trustline exists | Capture the live swap in the demo video |
+| D3 — Smart Transaction Builder (Testnet) | Done | 100% | High | **Fully successful SDEX swap on Testnet from the UI (Jun 19)**: `POST /v1/actions/sdex/swap` builds a multi-op XDR (`ChangeTrust` + `PathPaymentStrictSend`) on the native SDEX, signed in-wallet via Freighter/Wallets Kit, executed on-chain — tx `fb10c5b8d86b87bc3408bf0d4e9698f93370a3e788244008ef31f6200a12b8b2`, **Successful** (10 XLM → 5.91 USDC, min-receive respected). Live quote endpoint (`/v1/actions/sdex/quote`, Horizon strict-send) drives auto-slippage so swaps fill reliably. Backend never touches keys. All three criteria met. | Blend deposit (Soroban, sequential — beyond the single-XDR criterion; relates to T3-D2) now exercised from the UI and **proven on testnet** (deposit tx `a842f370…`); minor `getAssetBalance` re-bundles `ChangeTrust` when trustline exists | Capture the live swap in the demo video |
 
 **Note on the single-XDR criterion.** Stellar Protocol 20 forbids mixing `InvokeHostFunction`
-(Soroban) with classic operations in one envelope, so the grant's literal `ChangeTrust + Deposit`
+(Soroban) with classic operations in one envelope, so the literal `ChangeTrust + Deposit`
 single-XDR is demonstrated via the **classic SDEX path** (`ChangeTrust` + `PathPaymentStrictSend`).
 The Blend deposit is a secondary Soroban pattern (two sequential txs) and is not required by the
 T1-D3 criteria.
 
 ---
 
-# Tranche 2 — Expansion (internal; reviewed later for the 30% disbursement)
+# Phase 2 — Expansion
 
 | Deliverable | Status | Completion | Confidence | Current evidence | Main remaining gap | Next action |
 |---|---|---:|---|---|---|---|
 | D1 — Multi-Wallet Portfolio & "Active Signer" Model | Done | 100% | High | **Gap A done (criteria 1 + 3):** active-signer vs watch-only formalized — `user_wallets.is_active_signer` (DB-enforced singleton), `PATCH /v1/wallets/:id/signer`, Kit-connect auto-promotes, watch-only add-path, UI badges + signing guardrail. **Gap B done (criterion 2 — full stack):** Part 1 resolver (`lib/protocols/blend/{fetch-user-positions,resolve-user-health}` + `81-…`) writes per-asset supply/borrow → `wallet_protocol_positions` + per-pool `health_factor` → `wallet_pool_health` (SDK `PositionsEstimate`, NULL = no debt), non-fatal in `refreshWallet`. Part 2 surfaces it: `GET /v1/wallets/:id/positions` + a `defi` block on `/overview` (Σ supplied/borrowed/net + per-(wallet,pool) health, riskiest first, **latest-snapshot filter** so closed positions don't linger), plus the UI portfolio slice (consolidated "DeFi positions (Blend)" header + per-wallet supplied/borrowed/HF with colour states). Validated on mainnet (borrower HF 1.11/1.32 = collateral/debt; phantom-snapshot + empty cases confirmed; `apps/web build` green). Plus prior: grouped multi-wallet, per-wallet balances, raw SQL v2. **Jun 26:** YieldBlox indexed as a 4th active Blend pool, closing the position-coverage gap — the resolver is entity-driven, so positions resolve across all active pools (test wallets re-resolved clean: `GAZXV3PH…` shows both legs — fixed-pool supply ≈$50.9k / borrow EURC ≈$28.9k, HF ≈1.33 + yieldblox supply native ≈$26.8k / borrow USDC ≈$15.0k, HF ≈1.27). **Jul 22:** the final visual HF cross-check vs the mainnet.blend.capital UI on `GAZXV3PH…` was performed and **matched**. **Aug 14 (Lot W — UX debt repair, not a criterion change):** connect-signer now attaches to the session account instead of forking a user (session `userId` on `/connect`, signer-preferring deterministic recovery when no session); labels settable at connect + `PATCH /v1/wallets/:id` rename + short-address fallback; portfolio Assets card (honest USD, per-wallet detail); pool-detail per-wallet position breakdown. Evidence `docs/internal/evidence/lot-w/`. | — | Complete — all three criteria met; HF now feeds D2's live alerting. Non-Blend LP positions (Soroswap/Aquarius) and cryptographic proof-of-ownership are post-beta / out of contract. |
-| D2 — In-App Alerting Engine | Done — live in prod | 100% | High | **Both SCF criteria met and verified end-to-end live in prod on the VPS.** Rule storage + periodic evaluation over the snapshot DB + in-app notifications: as-built is a periodic **OS-cron sweep** (scripts `82`→`81`→`83`, `job:wallet-alert`) — no broker, no in-process scheduler — writing a `notifications` row on each fire/resolve edge; tables `alert_rules` / `alert_rule_state` / `notifications` (`stellar_v3_alerting.sql`, depends on v1 entities + v2 `user_wallets`); endpoints `GET/POST /v1/alert-rules` + `GET /v1/notifications`; web notification **bell** + full **Alerts page** (`AlertsView` + 4-step `AlertRuleModal`) + compact dashboard **`WalletAlertsPanel`** — all on the shared `useAlerts` state (HTTP polling), creation gated to wallet·health-factor; first rule family = health-factor risk (consumes T2-D1's `wallet_pool_health`). **Live in prod:** `stellar_v3_alerting.sql` applied on the VPS and the `job:wallet-alert` cron scheduled (82→81→83 sweep); contract validated against the live API; create round-trip confirmed; and the fire path is proven by **real `alert_fired` notifications in the prod DB** from the evaluator on live Blend HF (YieldBlox 1.274<1.5, Fixed 1.353<1.85). Matches the verbatim criterion (rules evaluated against the snapshot DB → in-app notifications). | — | Complete — live in prod, captured in the ~5-min submission demo video. Optional polish: derive notification severity from `payload` rather than `kind`. |
-| D3 — Bridge Flow Monitoring | Done — live in prod | 100% | High | **Both SCF criteria met and live in prod on the VPS.** (1) Allbridge Core adapter live (`apps/indexer/.../allbridge/`): inflow + outflow events via Soroban `getEvents`, per-source-chain attribution (inflow via `receive_tokens` arg parse), `bridge_flows` table + `amount_usd`, wired non-fatal into `job:refresh`, idempotent on rescan; verified against mainnet (inflow BAS, outflows SOL/POL/CEL/BAS). (2) API `GET /v1/bridge/summary` (24h/7d/30d window — inflow/outflow by source chain + net) + `GET /v1/bridge/flows` (recent feed) via `apps/api/src/modules/bridge/`, on-read aggregation (no metrics table). (3) Dashboard bridge section: one full-width Paul-DA card (`components/bridge/` — `BridgeSection` + `BridgeChart` + `BridgeRoutesTable` + `BridgeFlowsFeed`) fed by the extended `useBridge`: stat strip + inflow/outflow-and-cumulative-net chart (`24h/7d/30d`, default 7d) + tabs (per-chain **Routes** table with click-to-scope + sortable columns, **Recent flows** feed `chain → Stellar`). All on real `/v1/bridge/*` data — chart uses the gap-filled `/bridge/series` for unscoped 7d/30d and client-buckets `/bridge/flows` for 24h/chain-scoped; stat strip authoritative from `/bridge/summary`; real chains only (BAS/SOL/POL/CEL/…), no mock figures. Wired into the dashboard (`DashboardView.vue`, retired in Lot PRE). **Deployed:** `stellar_v1_bridge.sql` applied on the VPS and the `allbridge-upsert-core.ts` bootstrap run, so prod `bridge_flows` is populated and the live section renders real flows. | Venue wound down upstream: Allbridge Core stopped operating in its current form after 2026-07-20 (last recorded flow 2026-07-19). **Lot PRE (2026-11-03):** the dashboard bridge section is retired and the `allbridge` step left `job:refresh`; `/health` keeps listing the venue with `asOf: null`; `bridge_flows`, `/v1/bridge/*` and the adapter stay as a historical record. Reintegration = a new Allbridge Next adapter, only if it has Stellar contracts emitting events (`docs/runbooks.md`). | Complete — live in prod, captured in the ~5-min submission demo video. Honest constraint kept in UI copy: Soroban `getEvents` retains ~7 days → rolling recent-flows view, not deep history. |
+| D2 — In-App Alerting Engine | Done — live in prod | 100% | High | **Both criteria met and verified end-to-end live in prod on the VPS.** Rule storage + periodic evaluation over the snapshot DB + in-app notifications: as-built is a periodic **OS-cron sweep** (scripts `82`→`81`→`83`, `job:wallet-alert`) — no broker, no in-process scheduler — writing a `notifications` row on each fire/resolve edge; tables `alert_rules` / `alert_rule_state` / `notifications` (`stellar_v3_alerting.sql`, depends on v1 entities + v2 `user_wallets`); endpoints `GET/POST /v1/alert-rules` + `GET /v1/notifications`; web notification **bell** + full **Alerts page** (`AlertsView` + 4-step `AlertRuleModal`) + compact dashboard **`WalletAlertsPanel`** — all on the shared `useAlerts` state (HTTP polling), creation gated to wallet·health-factor; first rule family = health-factor risk (consumes T2-D1's `wallet_pool_health`). **Live in prod:** `stellar_v3_alerting.sql` applied on the VPS and the `job:wallet-alert` cron scheduled (82→81→83 sweep); contract validated against the live API; create round-trip confirmed; and the fire path is proven by **real `alert_fired` notifications in the prod DB** from the evaluator on live Blend HF (YieldBlox 1.274<1.5, Fixed 1.353<1.85). Matches the verbatim criterion (rules evaluated against the snapshot DB → in-app notifications). | — | Complete — live in prod, captured in the ~5-min submission demo video. Optional polish: derive notification severity from `payload` rather than `kind`. |
+| D3 — Bridge Flow Monitoring | Done — live in prod | 100% | High | **Both criteria met and live in prod on the VPS.** (1) Allbridge Core adapter live (`apps/indexer/.../allbridge/`): inflow + outflow events via Soroban `getEvents`, per-source-chain attribution (inflow via `receive_tokens` arg parse), `bridge_flows` table + `amount_usd`, wired non-fatal into `job:refresh`, idempotent on rescan; verified against mainnet (inflow BAS, outflows SOL/POL/CEL/BAS). (2) API `GET /v1/bridge/summary` (24h/7d/30d window — inflow/outflow by source chain + net) + `GET /v1/bridge/flows` (recent feed) via `apps/api/src/modules/bridge/`, on-read aggregation (no metrics table). (3) Dashboard bridge section: one full-width Paul-DA card (`components/bridge/` — `BridgeSection` + `BridgeChart` + `BridgeRoutesTable` + `BridgeFlowsFeed`) fed by the extended `useBridge`: stat strip + inflow/outflow-and-cumulative-net chart (`24h/7d/30d`, default 7d) + tabs (per-chain **Routes** table with click-to-scope + sortable columns, **Recent flows** feed `chain → Stellar`). All on real `/v1/bridge/*` data — chart uses the gap-filled `/bridge/series` for unscoped 7d/30d and client-buckets `/bridge/flows` for 24h/chain-scoped; stat strip authoritative from `/bridge/summary`; real chains only (BAS/SOL/POL/CEL/…), no mock figures. Wired into the dashboard (`DashboardView.vue`, retired in Lot PRE). **Deployed:** `stellar_v1_bridge.sql` applied on the VPS and the `allbridge-upsert-core.ts` bootstrap run, so prod `bridge_flows` is populated and the live section renders real flows. | Venue wound down upstream: Allbridge Core stopped operating in its current form after 2026-07-20 (last recorded flow 2026-07-19). **Lot PRE (2026-11-03):** the dashboard bridge section is retired and the `allbridge` step left `job:refresh`; `/health` keeps listing the venue with `asOf: null`; `bridge_flows`, `/v1/bridge/*` and the adapter stay as a historical record. Reintegration = a new Allbridge Next adapter, only if it has Stellar contracts emitting events (`docs/runbooks.md`). | Complete — live in prod, captured in the ~5-min submission demo video. Honest constraint kept in UI copy: Soroban `getEvents` retains ~7 days → rolling recent-flows view, not deep history. |
 
 ---
 
-# Tranche 3 — Mainnet / Operational maturity (internal; reviewed for the 40% disbursement)
+# Phase 3 — Mainnet / Operational maturity
 
 | Deliverable | Status | Completion | Confidence | Current evidence | Main remaining gap | Next action |
 |---|---|---:|---|---|---|---|
-| D1 — Mainnet Deployment & Freshness Tracking | Done | 100% | High | **Both criteria met, deployed to prod Aug 4 (Lot B).** (1) All 5 named protocols live on real Mainnet data — **DeFindex integrated into the v1 pipeline** (venue + 3 vaults enumerated from `GET /vault/discover`: Meru ≈$18.1M, Beans USDC ≈$507k, Beans EURC ≈$200k; ≈$18.8M aggregate, avg APY ≈7.1%; `protocolCount = 5`; yield-vault detail variant in the UI). (2) Freshness first-class: `isStale` + `staleAfterSeconds` on every `/v1/*` payload (read-time, threshold 45 min = 3× cron), FreshnessChip + stale badges in the UI, standardized exponential-backoff retries on every refresh step. Evidence in `docs/internal/evidence/lot-b/`. Full prod `job:refresh` clean in ~3 min | — (validated by SCF) | — |
-| D2 — Non-Custodial Mainnet Actions | Done | 100% | High | **Both action families executed and Horizon-verified on Pubnet.** Swaps LIVE from the dashboard (ungated Aug 2; both directions incl. `eeeae199…`; Aug 14: 50 XLM→7.97 USDC + 10 XLM→1.38 EURC). **Blend lending: multi-pool supplies (5 XLM→Fixed, 5 XLM + 5 USDC→YieldBlox) AND the withdraw closing the supply↔withdraw loop (`537a2303…`, the exact supplied position back)** — six txs, all XDR-decoded, congestion-fee bid confirmed against reality (10,000-stroop inclusion bid, ~46–59% of ceiling charged). Honest refusal path proven: frozen Orbit supply dies at SIMULATION (#1206, nothing signed). Security regime verified in prod: kill-switch (403 default), 100 XLM cap, issuer-verified 5-pair whitelist, client-side pre-sign XDR validation (fail closed), in-wallet signing only. Evidence: `docs/internal/evidence/t3-d2-mainnet-actions.md` + `mainnet-ungating-2026-08-02.md` + `pair-vetting-2026-08-01.md` + `lot-a5-blend-multipool.md`. **Since Aug 17 (Lot R): the full action stack is deployed to prod, `action_witnesses` is the automatic executed-tx KPI ledger, and the 5 XLM reward campaign is live** (48h, ends Aug 19 16:45 UTC) | — (validated by SCF — the deliverable was accepted with the incentive-campaign context disclosed alongside the KPI adoption evidence; the numbers are not restated here as "met") | — |
-| D3 — Observability, UI/UX Polish & Reference Handoff | Done | 100% | High | **UI/UX-polish component substantially landed** across Lots C/F/G/H (design-handoff port → shell + 5 views + modals; advisor-feedback F1–F5; founder-review G0–G4: TVL history + chain logos + clickable tx hashes + adaptive pools table + hero dedupe/compact actions + network-TVL hero chart; founder-review-2 H0–H4: modal teleport fix, dashboard "Your positions" panel, Uniswap-standard swap reskin, measurable flows coverage + Aquarius/Soroswap liquidity-amount extraction — **H deploy pending**) — all green (web build + 49 tests + api build), captures in `docs/internal/evidence/lot-{c,f,g,h}/`. Plus `docker-compose.yml` local-dev stack, `/health` liveness, modular architecture, grown docs corpus | — (validated by SCF) | — |
+| D1 — Mainnet Deployment & Freshness Tracking | Done | 100% | High | **Both criteria met, deployed to prod Aug 4 (Lot B).** (1) All 5 named protocols live on real Mainnet data — **DeFindex integrated into the v1 pipeline** (venue + 3 vaults enumerated from `GET /vault/discover`: Meru ≈$18.1M, Beans USDC ≈$507k, Beans EURC ≈$200k; ≈$18.8M aggregate, avg APY ≈7.1%; `protocolCount = 5`; yield-vault detail variant in the UI). (2) Freshness first-class: `isStale` + `staleAfterSeconds` on every `/v1/*` payload (read-time, threshold 45 min = 3× cron), FreshnessChip + stale badges in the UI, standardized exponential-backoff retries on every refresh step. Evidence in `docs/internal/evidence/lot-b/`. Full prod `job:refresh` clean in ~3 min | — (validated at the phase review) | — |
+| D2 — Non-Custodial Mainnet Actions | Done | 100% | High | **Both action families executed and Horizon-verified on Pubnet.** Swaps LIVE from the dashboard (ungated Aug 2; both directions incl. `eeeae199…`; Aug 14: 50 XLM→7.97 USDC + 10 XLM→1.38 EURC). **Blend lending: multi-pool supplies (5 XLM→Fixed, 5 XLM + 5 USDC→YieldBlox) AND the withdraw closing the supply↔withdraw loop (`537a2303…`, the exact supplied position back)** — six txs, all XDR-decoded, congestion-fee bid confirmed against reality (10,000-stroop inclusion bid, ~46–59% of ceiling charged). Honest refusal path proven: frozen Orbit supply dies at SIMULATION (#1206, nothing signed). Security regime verified in prod: kill-switch (403 default), 100 XLM cap, issuer-verified 5-pair whitelist, client-side pre-sign XDR validation (fail closed), in-wallet signing only. Evidence: `docs/internal/evidence/t3-d2-mainnet-actions.md` + `mainnet-ungating-2026-08-02.md` + `pair-vetting-2026-08-01.md` + `lot-a5-blend-multipool.md`. **Since Aug 17 (Lot R): the full action stack is deployed to prod, `action_witnesses` is the automatic executed-tx KPI ledger, and the 5 XLM reward campaign is live** (48h, ends Aug 19 16:45 UTC) | — (validated at the phase review — the deliverable was accepted with the incentive-campaign context disclosed alongside the KPI adoption evidence; the numbers are not restated here as "met") | — |
+| D3 — Observability, UI/UX Polish & Reference Handoff | Done | 100% | High | **UI/UX-polish component substantially landed** across Lots C/F/G/H (design-handoff port → shell + 5 views + modals; advisor-feedback F1–F5; founder-review G0–G4: TVL history + chain logos + clickable tx hashes + adaptive pools table + hero dedupe/compact actions + network-TVL hero chart; founder-review-2 H0–H4: modal teleport fix, dashboard "Your positions" panel, Uniswap-standard swap reskin, measurable flows coverage + Aquarius/Soroswap liquidity-amount extraction — **H deploy pending**) — all green (web build + 49 tests + api build), captures in `docs/internal/evidence/lot-{c,f,g,h}/`. Plus `docker-compose.yml` local-dev stack, `/health` liveness, modular architecture, grown docs corpus | — (validated at the phase review) | — |
 
 ---
 
@@ -489,19 +485,19 @@ T1-D3 criteria.
    entry via Lot AB. Final sweep: 81 capture records at 390/768/1024, zero horizontal
    overflow, zero console errors — `docs/internal/evidence/lot-aa/`.)
 
-## Best near-term wins (post-grant)
+## Best near-term wins (after the foundation)
 1. **Lot AD — CI/CD deploy pipeline** (in progress): removes the manual-VPS-deploy failure
    mode (the 2026-08-17 aborted-pull incident class)
 2. **Lot ST — status page deploy**: API → verify → Vercel per the Lot ST sequence in
    `docs/deployment.md` (built, staged, tests 147 green)
-3. **SCF 46 application prep** (deadline 8 November 2026)
+3. **Integration-track application prep** (deadline 8 November 2026)
 4. **Lot EP activation**: EP3 dark deploy (v8 before build), cron line installed, then the
-   founder's activation sequence — the campaign is the adoption lever for the SCF 46 narrative
+   founder's activation sequence — the campaign is the adoption lever for the application narrative
 5. **Lot RP — RPC cost** (RP1 built 2026-10-27, deploy pending): wallet sweep 3,312 → 36 RPC
    calls per run at 92 wallets; per-job/per-method cost rows in `rpc_metrics_runs`. RP2 = shared
    RPC client + free-provider pool (`docs/internal/evidence/lot-rp/`)
 6. **Lot XO deploy — XOXNO Lending** (built 2026-10-30): seed + API build + one refresh on the
-   VPS, then the web (`docs/deployment.md` "Lot XO deploy"); the sixth protocol for the SCF 46
+   VPS, then the web (`docs/deployment.md` "Lot XO deploy"); the sixth protocol for the application
    narrative
 
 ---
@@ -509,6 +505,5 @@ T1-D3 criteria.
 ## Update rule
 
 Update when: a deliverable moves in maturity, a blocker is removed, a gap becomes clearer, the next
-tranche-critical target changes, or a partial area becomes substantially done. When in doubt, prefer
-realism over optimism. Mirror any status change into `docs/internal/history/grant-roadmap.md` (interpretation layer)
-and `docs/current-state.md`.
+phase-critical target changes, or a partial area becomes substantially done. When in doubt, prefer
+realism over optimism. Mirror any status change into `docs/current-state.md`.

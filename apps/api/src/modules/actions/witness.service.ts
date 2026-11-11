@@ -40,7 +40,7 @@ const PRICE_MAX_AGE = '24 hours';
 /**
  * Min XLM-equivalent notional for faucet eligibility (raises farming cost).
  * Env-overridable (FAUCET_MIN_NOTIONAL_XLM, default 1); the threshold in force
- * is stored ON the witness row so the rule stays auditable if it changes.
+ * is stored ON the witness row so the rule stays traceable if it changes.
  */
 export function faucetMinNotionalXlm(): number {
   const raw = process.env.FAUCET_MIN_NOTIONAL_XLM;

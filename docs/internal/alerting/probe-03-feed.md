@@ -185,5 +185,5 @@ sweep-driven engine (probe-02). Deliver via HTTP:
   background poller in the app — keep it small and single-purpose.
 - **End-to-end latency** = evaluator sweep interval (≈5–15 min, probe-02) **+** client poll
   interval (≈30–60 s). Adequate for liquidation/health-factor warnings; no real-time push needed.
-- Defer SSE/WebSocket to a later tranche *only if* a product need for instant push emerges; do not
+- Defer SSE/WebSocket to a later phase *only if* a product need for instant push emerges; do not
   pre-build it.

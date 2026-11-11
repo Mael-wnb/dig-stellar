@@ -119,4 +119,4 @@ asset SAC, inflated fee, wrong trustline issuer.
 
 Withdraw / borrow / repay UI (fast-follow — the blend.capital escape hatch is documented in the
 UI copy) · other Blend pools (orbit/etherfuse/yieldblox — one registry line each later) · EURC
-deposits · DeFindex vault deposits (not in the grant's action scope) · fee sponsorship.
+deposits · DeFindex vault deposits (not in the foundation's action scope) · fee sponsorship.

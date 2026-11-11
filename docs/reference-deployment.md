@@ -1,6 +1,6 @@
 # Dig Stellar Reference Deployment (Quickstart)
 
-E4 (Lot E, T3-D3): the SDF reference-implementation quickstart. From a fresh clone to a
+E4 (Lot E, T3-D3): the reference-implementation quickstart. From a fresh clone to a
 rendering dashboard backed by real mainnet data, with **no secrets required** (one optional
 key noted below). Proven end-to-end from a fresh clone on 2026-08-13; deviations found
 during that proof are folded in; the proof notes live in `docs/internal/evidence/lot-e/`.
@@ -9,7 +9,7 @@ Two supported paths, same repo, same compose file:
 
 - **Docker compose path (Lot Z, the packaged Reference Implementation):** postgres,
   redis, the API and the indexer all run as containers, one command from a fresh clone.
-  This is the path for an SDF reviewer. See the next section.
+  This is the path for an external reviewer. See the next section.
 - **Host-pnpm path (dev workflow):** `docker compose up -d` runs only the infrastructure
   (Postgres 16 + Redis 7); the applications run as documented pnpm services on the host.
   Unchanged; starts at "1. Clone + install".

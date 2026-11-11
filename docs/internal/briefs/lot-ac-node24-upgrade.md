@@ -16,7 +16,7 @@ Invariants below are not overridable. Flag conflicts instead of silently deviati
   so the Vercel side is build-tooling only.
 - Target: Node 24 (active LTS, maintained to April 2028). Node 22 would only buy one
   extra year over 20.
-- No faucet campaign is live. SCF review is ongoing — prod stability matters; the
+- No faucet campaign is live. The foundation is under external review — prod stability matters; the
   order below is deliberate: prove compatibility locally and in CI before touching
   the VPS, and do Vercel last (lowest risk).
 

@@ -190,7 +190,7 @@ function patchGlobalFetch(): void {
     try {
       const res = await originalFetch(input as RequestInfo, init);
       // Non-2xx counts as an error: fetchJson treats it as a failure (only 429
-      // is retried) and the grant criterion is error RATE, not exception rate.
+      // is retried) and the foundation criterion is error RATE, not exception rate.
       recordOpsSample({ target, ok: res.ok, durationMs: Date.now() - start, method });
       return res;
     } catch (err) {

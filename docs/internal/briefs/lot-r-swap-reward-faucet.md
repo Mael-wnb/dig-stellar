@@ -41,7 +41,7 @@ Dig (builds alone prove nothing — `action_events` is build-side).
   op summary, ledger close time, verified_at).
 - Min notional for faucet eligibility: the swapped/deposited amount ≥ **1 XLM
   equivalent** at verification-time prices (raises farming cost; stored on the
-  witness row so the rule is auditable).
+  witness row so the rule stays traceable).
 - **Also in R1 (closes the analytics gap found 2026-08-17):** add a
   `metadata jsonb` to `action_events`, populated at build time — asset pair /
   asset, amounts, venue/pool slug, network. Additive migration; historical
@@ -108,7 +108,7 @@ reward nobody knows about incentivizes nothing.
   as the go-live proof. Red tests: double claim (both unique keys), unwitnessed
   wallet, below-notional swap, disabled flag, drained balance, velocity brake.
 
-## KPI integrity note (for the grant narrative)
+## KPI integrity note (for the adoption narrative)
 
 Faucet-driven wallets ARE real users (they must execute a real mainnet swap
 first — that's the eligibility), but say so explicitly in the KPI evidence:

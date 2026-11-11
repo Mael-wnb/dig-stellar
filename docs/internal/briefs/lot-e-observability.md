@@ -3,7 +3,7 @@
 Execution brief for Claude Code. Serves the two REMAINING build criteria of **T3-D3**
 (the UI/UX-polish component landed via Lots C/F/G/H): **observability** — health,
 RPC latency percentiles and error rates — and the **packaged reference implementation**.
-Plus the adoption counters the final tranche report needs. This is the last build brick
+Plus the adoption counters the final delivery report needs. This is the last build brick
 of T3; everything after it is evidence assembly. Written 2026-08-13 against current
 `main`; re-verify file states before editing. Evidence: `docs/internal/evidence/lot-e/`.
 
@@ -43,7 +43,7 @@ Replace the bare liveness with the real picture (one DB round-trip, cheap):
 - `GIT_SHA` comes from an env var set at deploy time; add the export line to the VPS
   deploy procedure in `docs/runbooks.md` (`GIT_SHA=$(git rev-parse --short HEAD)`).
 
-## E2 — RPC latency percentiles + error rates (the verbatim grant criterion)
+## E2 — RPC latency percentiles + error rates (the verbatim foundation criterion)
 
 **Capture (apps/indexer).** All external calls flow through a small set of choke
 points (the Soroban RPC helpers, the Horizon fetches, the DeFindex/price HTTP calls
@@ -105,7 +105,7 @@ boundary in the evidence, don't build API-side capture in this lot.
 - Backfill impossible (no historical log) — counters start at deploy, like G0. One
   more reason this lot ships now.
 
-## E4 — Reference packaging (SDF reference-implementation criterion)
+## E4 — Reference packaging (reference-implementation criterion)
 
 - Make `docker-compose.yml` a complete reference stack: postgres + redis (existing)
   **+ api + web** services (Dockerfiles or documented `pnpm` dev-mode services —

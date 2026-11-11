@@ -1,6 +1,6 @@
 # Lot A1 — Mainnet SDEX Swap Enablement (T3-D2) — Implementation Brief
 
-Execution brief for Claude Code. Serves **T3-D2 — Non-Custodial Mainnet Actions** (SCF criteria:
+Execution brief for Claude Code. Serves **T3-D2 — Non-Custodial Mainnet Actions** (foundation criteria:
 mainnet swaps from the dashboard, strict non-custodial security, clean execution feedback; KPIs
 50+ wallets / 200+ txs). Companion contract: `docs/security-invariants.md` (section 4 = this lot).
 Written 2026-08-01 against the current `main`; re-verify file states before editing.

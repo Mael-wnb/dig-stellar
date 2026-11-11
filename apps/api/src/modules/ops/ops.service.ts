@@ -192,7 +192,7 @@ export class OpsService {
     };
   }
 
-  // Lot ST — post-grant upgrade (Sept 2026), builds on Lot E:
+  // Lot ST — upgrade (Sept 2026), builds on Lot E:
   // GET /v1/ops/status — the status-page payload.
   // All logic lives in the pure computeOpsStatus() (see status.ts, incl. the
   // thresholds object and the honest boundary); this method only fetches the
@@ -332,7 +332,7 @@ export class OpsService {
     }
   }
 
-  // E3: adoption counters for the final tranche report / T3-D2 KPIs.
+  // E3: adoption counters for the final delivery report / T3-D2 KPIs.
   async getAdoption() {
     const walletRows = (await this.prisma.$queryRawUnsafe(`
       select
